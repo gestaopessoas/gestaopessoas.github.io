@@ -1,0 +1,214 @@
+/* MP - Memorando de Pessoal - Estilos */
+
+.mp-wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.mp-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.btn-secondary:hover {
+  background: var(--color-bg);
+}
+
+/* Document */
+.mp-document {
+  background: #fff;
+  color: #111;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 2.5rem;
+  font-family: 'Arial', sans-serif;
+  font-size: 0.875rem;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+
+/* Header */
+.mp-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  border-bottom: 3px solid #F5AE38;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+.mp-logo { height: 52px; object-fit: contain; }
+.mp-title-area { flex: 1; text-align: center; }
+.mp-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #111;
+  margin: 0;
+}
+.mp-subtitle { font-size: 0.8rem; color: #555; margin: 0.2rem 0 0; }
+.mp-meta { display: flex; flex-direction: column; gap: 0.4rem; min-width: 160px; }
+.mp-meta-field { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
+.mp-meta-field span { white-space: nowrap; font-weight: 600; }
+.mp-meta-input {
+  border: none;
+  border-bottom: 1px solid #888;
+  background: transparent;
+  font-size: 0.8rem;
+  padding: 0.1rem 0.3rem;
+  width: 100%;
+  outline: none;
+  color: #111;
+}
+
+/* Section */
+.mp-section {
+  margin-bottom: 1.25rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 1rem;
+}
+.mp-section-row {
+  margin-bottom: 1rem;
+  padding: 0.5rem 0;
+}
+.mp-section-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.4rem;
+}
+
+/* Rows and fields */
+.mp-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.mp-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 100px;
+}
+.mp-label {
+  font-size: 0.7rem;
+  color: #666;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.mp-input {
+  border: none;
+  border-bottom: 1px solid #bbb;
+  background: transparent;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.3rem;
+  color: #111;
+  width: 100%;
+  outline: none;
+  font-family: 'Arial', sans-serif;
+  box-sizing: border-box;
+}
+.mp-input:focus { border-bottom-color: #F5AE38; }
+
+/* Dual column for alteracao */
+.mp-dual-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+}
+.mp-dual-header h3 {
+  background: #F5AE38;
+  color: #fff;
+  margin: 0;
+  padding: 0.4rem 0.75rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+.mp-dual-header h3.alt {
+  background: #727376;
+}
+.mp-dual-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.mp-dual-col {
+  border: 1px solid #eee;
+  padding: 0.75rem;
+  border-radius: 4px;
+}
+
+/* Signatures */
+.mp-signatures {
+  display: flex;
+  gap: 2rem;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+.mp-sig-box {
+  flex: 1;
+  text-align: center;
+}
+.mp-sig-line {
+  border-top: 1px solid #333;
+  margin-bottom: 0.4rem;
+  margin-top: 2.5rem;
+}
+.mp-sig-box p {
+  font-size: 0.75rem;
+  color: #555;
+  margin: 0;
+}
+
+/* Footer */
+.mp-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #888;
+  border-top: 1px solid #eee;
+  padding-top: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* PRINT STYLES */
+@media print {
+  .no-print { display: none !important; }
+  .mp-wrapper { padding: 0; max-width: 100%; }
+  .mp-document {
+    border: none;
+    box-shadow: none;
+    padding: 1.5cm;
+  }
+  .mp-input, .mp-meta-input {
+    border-bottom: 1px solid #bbb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body { background: #fff !important; }
+}

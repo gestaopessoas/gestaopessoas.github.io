@@ -10,15 +10,14 @@ import Armarios from './pages/Armarios';
 import Uniformes from './pages/Uniformes';
 import Ilhas from './pages/Ilhas';
 import Aniversarios from './pages/Aniversarios';
+import MPContratacao from './pages/mp/MPContratacao';
+import MPAlteracao from './pages/mp/MPAlteracao';
 
 function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* Rota pública */}
         <Route path="/login" element={<Login />} />
-
-        {/* Rotas protegidas - exige login */}
         <Route
           path="/"
           element={
@@ -33,6 +32,8 @@ function App() {
           <Route path="uniformes" element={<Uniformes />} />
           <Route path="ilhas" element={<Ilhas />} />
           <Route path="aniversarios" element={<Aniversarios />} />
+          <Route path="mp/contratacao" element={<MPContratacao />} />
+          <Route path="mp/alteracao" element={<MPAlteracao />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
