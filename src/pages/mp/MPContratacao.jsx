@@ -24,7 +24,7 @@ const MPContratacao = () => {
     current_location: '',
     current_sector: '',
     current_cost_center: '',
-    current_role: '',
+    from_role: '',
     current_level: '',
     current_profile_code: '',
     current_modality: 'CLT',
@@ -178,7 +178,7 @@ const MPContratacao = () => {
           <div className="mp-row">
             <div className="mp-field-group" style={{flex:3}}>
               <label className="mp-label">Cargo</label>
-              <select value={form.current_role} onChange={e => set('current_role', e.target.value)} className="mp-input">
+              <select value={form.from_role} onChange={e => set('from_role', e.target.value)} className="mp-input">
                 <option value="">Selecione...</option>
                 {cargos.map(c => <option key={c} value={c}>{c}</option>)}
               </select>

@@ -39,7 +39,7 @@ const MPAlteracao = () => {
     current_location: '',
     current_sector: '',
     current_cost_center: '',
-    current_role: '',
+    from_role: '',
     current_level: '',
     current_profile_code: '',
     current_modality: 'CLT',
@@ -49,7 +49,7 @@ const MPAlteracao = () => {
     new_location: '',
     new_sector: '',
     new_cost_center: '',
-    new_role: '',
+    to_role: '',
     new_level: '',
     new_profile_code: '',
     new_modality: 'CLT',
@@ -82,7 +82,7 @@ const MPAlteracao = () => {
         employee_name: emp.name,
         phone: emp.phone || '',
         email: emp.email_corporate || '',
-        current_role: emp.role || '',
+        from_role: emp.role || '',
         current_modality: emp.contract_type || 'CLT',
       }));
     }
@@ -179,7 +179,7 @@ const MPAlteracao = () => {
               ))}
               <div className="mp-field-group" style={{ marginBottom: '0.75rem' }}>
                 <label className="mp-label">Cargo</label>
-                <select value={form.current_role} onChange={e => set('current_role', e.target.value)} className="mp-input">
+                <select value={form.from_role} onChange={e => set('from_role', e.target.value)} className="mp-input">
                   <option value="">Selecione...</option>
                   {cargos.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
@@ -221,7 +221,7 @@ const MPAlteracao = () => {
               ))}
               <div className="mp-field-group" style={{ marginBottom: '0.75rem' }}>
                 <label className="mp-label">Cargo</label>
-                <select value={form.new_role} onChange={e => set('new_role', e.target.value)} className="mp-input">
+                <select value={form.to_role} onChange={e => set('to_role', e.target.value)} className="mp-input">
                   <option value="">Selecione...</option>
                   {cargos.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
