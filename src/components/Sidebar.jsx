@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Lock, Shirt, Map, Gift } from 'lucide-react';
+import { LayoutDashboard, Lock, Shirt, Map, Gift, Users } from 'lucide-react';
 
 const Sidebar = () => {
   return (
@@ -15,6 +15,11 @@ const Sidebar = () => {
           <span>Dashboard</span>
         </NavLink>
         
+        <NavLink to="/colaboradores" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
+          <Users />
+          <span>Colaboradores</span>
+        </NavLink>
+
         <NavLink to="/armarios" className={({isActive}) => isActive ? "nav-item active" : "nav-item"}>
           <Lock />
           <span>Armários</span>
