@@ -25,6 +25,11 @@ const Sidebar = () => {
           <span>Colaboradores</span>
         </NavLink>
 
+        <NavLink to="/arquivo-morto" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
+          <Users style={{ opacity: 0.6 }} />
+          <span>Arquivo Morto</span>
+        </NavLink>
+
         <NavLink to="/armarios" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
           <Lock />
           <span>Armários</span>

@@ -80,8 +80,8 @@ const Dashboard = () => {
           <div className="stat-value">{stats.aniversariantesMes}</div>
         </div>
         <div className="glass-panel stat-card">
-          <h3>Uniformes Pendentes</h3>
-          <div className="stat-value">-</div>
+          <h3>Desligados (Mês)</h3>
+          <div className="stat-value" style={{ color: '#ef4444' }}>{stats.desligadosMes}</div>
         </div>
       </div>
       
