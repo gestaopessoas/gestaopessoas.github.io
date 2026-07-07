@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Colaboradores from './pages/Colaboradores';
+import ArquivoMorto from './pages/ArquivoMorto';
 import Armarios from './pages/Armarios';
 import Uniformes from './pages/Uniformes';
 import Ilhas from './pages/Ilhas';
@@ -18,16 +19,10 @@ function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
+        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="colaboradores" element={<Colaboradores />} />
+          <Route path="arquivo-morto" element={<ArquivoMorto />} />
           <Route path="armarios" element={<Armarios />} />
           <Route path="uniformes" element={<Uniformes />} />
           <Route path="ilhas" element={<Ilhas />} />
