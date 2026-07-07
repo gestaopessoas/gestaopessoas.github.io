@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
-  const { signIn } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Se já está logado, redireciona direto
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,9 +26,11 @@ const Login = () => {
 
     if (error) {
       setError('E-mail ou senha inválidos. Tente novamente.');
+      setLoading(false);
+    } else {
+      // Redireciona para o dashboard após login bem-sucedido
+      navigate('/', { replace: true });
     }
-
-    setLoading(false);
   };
 
   return (
