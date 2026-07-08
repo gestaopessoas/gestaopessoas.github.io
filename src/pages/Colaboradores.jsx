@@ -323,6 +323,7 @@ const Colaboradores = () => {
                   <th style={{ padding: '0.75rem 0.5rem' }}>Cargo</th>
                   <th style={{ padding: '0.75rem 0.5rem' }}>Setor</th>
                   <th style={{ padding: '0.75rem 0.5rem' }}>Unidade</th>
+                  <th style={{ padding: '0.75rem 0.5rem' }}>Observação</th>
                   <th style={{ padding: '0.75rem 0.5rem' }}>Aniversário</th>
                   {activeTab === 'Ativo' && <th style={{ padding: '0.75rem 0.5rem' }}>Admissão</th>}
                   {activeTab === 'Desligado' && <th style={{ padding: '0.75rem 0.5rem', color: '#ef4444' }}>Demissão</th>}
@@ -338,6 +339,7 @@ const Colaboradores = () => {
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.role || '—'}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.departments?.name || '—'}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.unit || '—'}</td>
+                    <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)', fontSize: '0.8rem', fontStyle: 'italic', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={emp.observation || ''}>{emp.observation || '—'}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.birthday ? emp.birthday.split('-').slice(1).reverse().join('/') : '—'}</td>
                     {activeTab === 'Ativo' && <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{formatDate(emp.admission_date)}</td>}
                     {activeTab === 'Desligado' && <td style={{ padding: '0.75rem 0.5rem', color: '#ef4444', fontWeight: 600 }}>{formatDate(emp.dismissed_at)}</td>}

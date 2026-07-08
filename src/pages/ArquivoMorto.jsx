@@ -63,7 +63,7 @@ const ArquivoMorto = () => {
     const { count } = await countQuery;
     setTotal(count || 0);
 
-    let dataQuery = supabase.from('employees').select('id, name, admission_date, dismissed_at, role, archive_box');
+    let dataQuery = supabase.from('employees').select('id, name, admission_date, dismissed_at, role, archive_box, observation');
     dataQuery = buildQuery(dataQuery)
       .order('dismissed_at', { ascending: false })
       .order('name')
@@ -174,6 +174,7 @@ const ArquivoMorto = () => {
                   <th style={{ padding: '1rem 0.75rem', textAlign: 'left' }}>Função</th>
                   <th style={{ padding: '1rem 0.75rem', textAlign: 'left' }}>Admissão</th>
                   <th style={{ padding: '1rem 0.75rem', textAlign: 'left' }}>Demissão</th>
+                  <th style={{ padding: '1rem 0.75rem', textAlign: 'left' }}>Observação</th>
                   <th style={{ padding: '1rem 0.75rem', textAlign: 'left' }}>Caixa</th>
                 </tr>
               </thead>
@@ -192,6 +193,7 @@ const ArquivoMorto = () => {
                     <td style={{ padding: '0.75rem', color: 'var(--color-text-muted)' }}>{rec.role || '—'}</td>
                     <td style={{ padding: '0.75rem', color: 'var(--color-text-muted)' }}>{formatDate(rec.admission_date)}</td>
                     <td style={{ padding: '0.75rem', color: '#ef4444' }}>{formatDate(rec.dismissed_at)}</td>
+                    <td style={{ padding: '0.75rem', fontSize: '0.8rem', color: 'var(--color-text-muted)', fontStyle: 'italic', maxWidth: '200px' }}>{rec.observation || '—'}</td>
                     <td style={{ padding: '0.75rem' }}>
                       {editingBox === rec.id ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
