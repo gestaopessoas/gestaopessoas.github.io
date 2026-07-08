@@ -18,8 +18,12 @@ const Ilhas = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    // Fetch employees for dropdown
-    const { data: emps } = await supabase.from('employees').select('id, name').order('name');
+    // Fetch employees for dropdown (somente Ativos da Sede)
+    const { data: emps } = await supabase.from('employees')
+      .select('id, name')
+      .eq('status', 'Ativo')
+      .eq('unit', 'Sede')
+      .order('name');
     if (emps) setEmployees(emps);
 
     // Fetch islands with employee relation
