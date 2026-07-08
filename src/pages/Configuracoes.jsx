@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { User, Lock, Save, Plus, Shield, Check, Trash2, Edit } from 'lucide-react';
@@ -244,9 +245,16 @@ const Configuracoes = () => {
       )}
 
       {/* Modal Novo Usuário */}
-      {showNewUserModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="fade-in" style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-xl)' }}>
+      {showNewUserModal && createPortal(
+        <div 
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setShowNewUserModal(false)}
+        >
+          <div 
+            className="fade-in" 
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-xl)' }}
+          >
             <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)', display: 'flex', justifyContent: 'space-between' }}>
               <h3 style={{ margin: 0, color: 'var(--color-text)' }}>Cadastrar Novo Usuário</h3>
               <button onClick={() => setShowNewUserModal(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.5rem', lineHeight: 1, color: 'var(--color-text-muted)' }}>&times;</button>
@@ -309,7 +317,8 @@ const Configuracoes = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
