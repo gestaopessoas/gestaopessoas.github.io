@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../supabaseClient';
 import { Trash2, UserX, UserCheck, Search, Filter, Download, FileText, Table as TableIcon, Eye } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -382,15 +383,15 @@ const Colaboradores = () => {
       )}
 
       {/* Modal Desligamento */}
-      {dismissModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '2rem', maxWidth: '420px', width: '90%', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-lg)' }}>
+      {dismissModal && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="fade-in" style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '2rem', maxWidth: '420px', width: '90%', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-lg)', color: 'var(--color-text)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
               <div style={{ background: 'rgba(245,158,11,0.12)', borderRadius: '50%', padding: '0.75rem', display: 'flex' }}>
                 <UserX size={24} color="#f59e0b" />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Desligar Colaborador</h3>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--color-text)' }}>Desligar Colaborador</h3>
                 <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>{dismissModal.name}</p>
               </div>
             </div>
@@ -408,7 +409,8 @@ const Colaboradores = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal de Perfil Completo */}
