@@ -13,6 +13,7 @@ import Ilhas from './pages/Ilhas';
 import Aniversarios from './pages/Aniversarios';
 import ControlePonto from './pages/ControlePonto';
 import ControleRGS from './pages/ControleRGS';
+import Custos from './pages/Custos';
 import MPContratacao from './pages/mp/MPContratacao';
 import MPAlteracao from './pages/mp/MPAlteracao';
 
@@ -31,6 +32,7 @@ function App() {
           <Route path="aniversarios" element={<Aniversarios />} />
           <Route path="ponto" element={<ControlePonto />} />
           <Route path="rgs" element={<ControleRGS />} />
+          <Route path="custos" element={<Custos />} />
           <Route path="mp/contratacao" element={<MPContratacao />} />
           <Route path="mp/alteracao" element={<MPAlteracao />} />
           <Route path="*" element={<Navigate to="/" replace />} />
