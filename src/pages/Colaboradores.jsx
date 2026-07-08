@@ -31,7 +31,7 @@ const Colaboradores = () => {
   const [dismissing, setDismissing] = useState(false);
 
   // Form
-  const [form, setForm] = useState({ name: '', department_id: '', birthday: '', unit: '', role: '', shirt_size: '', gender: '', phone: '', admission_date: '' });
+  const [form, setForm] = useState({ name: '', department_id: '', birthday: '', unit: '', role: '', shirt_size: '', gender: '', phone: '', admission_date: '', cpf: '', rg: '', ctps: '', ctps_serie: '', pis: '', marital_status: '', cost_center: '', cbo: '', aso_date: '' });
 
   useEffect(() => { fetchDepartments(); fetchCounts(); }, []);
   useEffect(() => { fetchData(); }, [activeTab]);
@@ -62,8 +62,8 @@ const Colaboradores = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { error } = await supabase.from('employees').insert([{ ...form, status: 'Ativo', department_id: form.department_id || null, birthday: form.birthday || null, admission_date: form.admission_date || null }]);
-    if (!error) { setForm({ name: '', department_id: '', birthday: '', unit: '', role: '', shirt_size: '', gender: '', phone: '', admission_date: '' }); setShowForm(false); fetchData(); fetchCounts(); }
+    const { error } = await supabase.from('employees').insert([{ ...form, status: 'Ativo', department_id: form.department_id || null, birthday: form.birthday || null, admission_date: form.admission_date || null, aso_date: form.aso_date || null }]);
+    if (!error) { setForm({ name: '', department_id: '', birthday: '', unit: '', role: '', shirt_size: '', gender: '', phone: '', admission_date: '', cpf: '', rg: '', ctps: '', ctps_serie: '', pis: '', marital_status: '', cost_center: '', cbo: '', aso_date: '' }); setShowForm(false); fetchData(); fetchCounts(); }
     else alert('Erro: ' + error.message);
   };
 
@@ -260,12 +260,19 @@ const Colaboradores = () => {
         <form onSubmit={handleSubmit} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginBottom: '1.25rem' }}>
           <h4 style={{ margin: '0 0 1rem' }}>Novo Colaborador</h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-            {[['name', 'Nome *', 'text'], ['role', 'Cargo', 'text'], ['phone', 'Telefone', 'text'], ['admission_date', 'Data Admissão', 'date'], ['birthday', 'Nascimento', 'date']].map(([field, lbl, type]) => (
+            {[['name', 'Nome *', 'text'], ['role', 'Cargo', 'text'], ['phone', 'Telefone', 'text'], ['admission_date', 'Data Admissão', 'date'], ['birthday', 'Nascimento', 'date'], ['cpf', 'CPF', 'text'], ['rg', 'RG', 'text'], ['pis', 'PIS', 'text'], ['ctps', 'CTPS', 'text'], ['ctps_serie', 'Série CTPS', 'text'], ['cbo', 'CBO', 'text'], ['cost_center', 'Centro Custo', 'text'], ['aso_date', 'Data ASO', 'date']].map(([field, lbl, type]) => (
               <div key={field}>
                 <label style={labelStyle}>{lbl}</label>
                 <input type={type} value={form[field]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} required={field === 'name'} style={inputStyle} />
               </div>
             ))}
+            <div>
+              <label style={labelStyle}>Estado Civil</label>
+              <select value={form.marital_status} onChange={e => setForm(f => ({ ...f, marital_status: e.target.value }))} style={inputStyle}>
+                <option value="">Selecione...</option>
+                <option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option><option>Viúvo(a)</option>
+              </select>
+            </div>
             <div>
               <label style={labelStyle}>Setor</label>
               <select value={form.department_id} onChange={e => setForm(f => ({ ...f, department_id: e.target.value }))} style={inputStyle}>
