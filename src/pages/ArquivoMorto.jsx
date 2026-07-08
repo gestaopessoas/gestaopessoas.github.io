@@ -63,14 +63,32 @@ const ArquivoMorto = () => {
 
   const fetchBoxes = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('employees')
-      .select('archive_box')
-      .eq('status', 'Arquivo Morto')
-      .limit(10000);
-      
-    if (data) {
-      const counts = data.reduce((acc, curr) => {
+    let allData = [];
+    let fetchPage = 0;
+    const limit = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data } = await supabase
+        .from('employees')
+        .select('archive_box')
+        .eq('status', 'Arquivo Morto')
+        .range(fetchPage * limit, (fetchPage + 1) * limit - 1);
+        
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+        if (data.length < limit) {
+          hasMore = false;
+        } else {
+          fetchPage++;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+
+    if (allData.length > 0) {
+      const counts = allData.reduce((acc, curr) => {
         const box = curr.archive_box ? curr.archive_box.trim() : 'Sem Caixa';
         const key = box === '' ? 'Sem Caixa' : box;
         acc[key] = (acc[key] || 0) + 1;
@@ -84,6 +102,8 @@ const ArquivoMorto = () => {
         return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
       });
       setBoxStats(stats);
+    } else {
+      setBoxStats([]);
     }
     setLoading(false);
   };

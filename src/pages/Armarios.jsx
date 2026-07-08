@@ -17,7 +17,7 @@ const Armarios = () => {
   const fetchData = async () => {
     setLoading(true);
     // Fetch employees for dropdowns
-    const { data: emps } = await supabase.from('employees').select('id, name').eq('status', 'Ativo').order('name');
+    const { data: emps } = await supabase.from('employees').select('id, name').eq('status', 'Ativo').eq('unit', 'Sede').order('name');
     if (emps) setEmployees(emps);
 
     // Fetch lockers with employee relation
