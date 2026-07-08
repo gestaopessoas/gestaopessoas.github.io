@@ -167,7 +167,7 @@ const Login = () => {
         </div>
 
         <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.8rem', marginTop: '1.5rem' }}>
-          ACPO Empreendimentos © {new Date().getFullYear()}
+          BS - Saude & Bem estar © {new Date().getFullYear()}
         </p>
       </div>
     </div>
