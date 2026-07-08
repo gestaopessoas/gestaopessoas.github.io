@@ -61,17 +61,60 @@ const MPContratacao = () => {
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.from('memos').insert([{
+    let finalEmployeeId = form.employee_id;
+    let employeeError = null;
+
+    // Se não tem ID, é um funcionário novo, então cadastra na base!
+    if (!finalEmployeeId) {
+      const { data: newEmp, error: empErr } = await supabase.from('employees').insert([{
+        name: form.employee_name,
+        role: form.from_role,
+        department: form.current_sector,
+        status: 'Ativo',
+        admission_date: form.effective_date || new Date().toISOString().split('T')[0],
+      }]).select();
+      
+      employeeError = empErr;
+      if (newEmp && newEmp.length > 0) {
+        finalEmployeeId = newEmp[0].id;
+        set('employee_id', finalEmployeeId);
+      }
+    }
+
+    if (employeeError) {
+      alert('Erro ao cadastrar funcionário: ' + employeeError.message);
+      setSaving(false);
+      return;
+    }
+
+    // 1. Salvar Memorando
+    const { error: memoError } = await supabase.from('memos').insert([{
       ...form,
+      employee_id: finalEmployeeId,
       type: 'contratacao',
       current_salary: form.current_salary ? parseFloat(form.current_salary) : null,
     }]);
+
+    // 2. Criar card no RGS automaticamente
+    const { error: rgsError } = await supabase.from('rgs_processes').insert([{
+      employee_name: form.employee_name,
+      process_type: 'Admissional',
+      status: 'Pendente',
+      role: form.from_role,
+      location: form.current_location,
+      sector: form.current_sector,
+      process_date: new Date().toISOString().split('T')[0]
+    }]);
+
     setSaving(false);
-    if (!error) {
+    
+    if (memoError) {
+      alert('Erro ao salvar memorando: ' + memoError.message);
+    } else if (rgsError) {
+      alert('Memorando salvo, mas erro ao criar RGS: ' + rgsError.message);
+    } else {
       setSaved(true);
       setTimeout(() => handlePrint(), 300);
-    } else {
-      alert('Erro ao salvar: ' + error.message);
     }
   };
 

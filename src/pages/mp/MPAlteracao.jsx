@@ -98,18 +98,43 @@ const MPAlteracao = () => {
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.from('memos').insert([{
+    
+    // 1. Atualizar base de funcionários com o novo cargo/setor (se aplicável)
+    if (form.employee_id && (form.to_role || form.new_sector || form.new_modality)) {
+      const updates = {};
+      if (form.to_role) updates.role = form.to_role;
+      if (form.new_sector) updates.department = form.new_sector;
+      if (form.new_modality) updates.contract_type = form.new_modality;
+
+      await supabase.from('employees').update(updates).eq('id', form.employee_id);
+    }
+
+    // 2. Salvar o Memorando
+    const { error: memoError } = await supabase.from('memos').insert([{
       ...form,
       type: 'alteracao',
       current_salary: form.current_salary ? parseFloat(form.current_salary) : null,
       new_salary: form.new_salary ? parseFloat(form.new_salary) : null,
     }]);
+
+    // 3. Criar card no RGS automaticamente para exame de mudança de função
+    const { error: rgsError } = await supabase.from('rgs_processes').insert([{
+      employee_name: form.employee_name,
+      process_type: form.to_role ? 'Alteração de cargo' : 'Alteração de salário',
+      status: 'Pendente',
+      role: form.to_role || form.from_role,
+      location: form.new_location || form.current_location,
+      sector: form.new_sector || form.current_sector,
+      process_date: form.effective_date || new Date().toISOString().split('T')[0]
+    }]);
+
     setSaving(false);
-    if (!error) {
+
+    if (memoError) {
+      alert('Erro ao salvar memorando: ' + memoError.message);
+    } else {
       setSaved(true);
       setTimeout(() => window.print(), 300);
-    } else {
-      alert('Erro ao salvar: ' + error.message);
     }
   };
 
