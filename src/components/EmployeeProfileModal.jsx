@@ -6,11 +6,19 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
   const [activeTab, setActiveTab] = useState('dados');
   const [benefits, setBenefits] = useState([]);
   const [newBenefit, setNewBenefit] = useState('');
+  
+  // Férias
+  const [vacations, setVacations] = useState([]);
+  const [newVacation, setNewVacation] = useState({ start_date: '', end_date: '', notes: '' });
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (employee && activeTab === 'beneficios') {
       fetchBenefits();
+    }
+    if (employee && activeTab === 'ferias') {
+      fetchVacations();
     }
   }, [employee, activeTab]);
 
@@ -23,6 +31,17 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
       .eq('active', true)
       .order('benefit_name');
     if (data) setBenefits(data);
+    setLoading(false);
+  };
+
+  const fetchVacations = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('vacations')
+      .select('*')
+      .eq('employee_id', employee.id)
+      .order('start_date', { ascending: false });
+    if (data) setVacations(data);
     setLoading(false);
   };
 
@@ -53,6 +72,36 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
       
     if (!error) {
       setBenefits(benefits.filter(b => b.id !== id));
+    }
+  };
+
+  const handleAddVacation = async (e) => {
+    e.preventDefault();
+    if (!newVacation.start_date || !newVacation.end_date) return;
+    
+    const { data, error } = await supabase
+      .from('vacations')
+      .insert([{ 
+        employee_id: employee.id, 
+        start_date: newVacation.start_date, 
+        end_date: newVacation.end_date, 
+        notes: newVacation.notes 
+      }])
+      .select();
+      
+    if (!error && data) {
+      setVacations([data[0], ...vacations]);
+      setNewVacation({ start_date: '', end_date: '', notes: '' });
+    } else {
+      alert('Erro ao agendar férias: ' + error?.message);
+    }
+  };
+
+  const handleRemoveVacation = async (id) => {
+    if (!window.confirm('Excluir este registro de férias?')) return;
+    const { error } = await supabase.from('vacations').delete().eq('id', id);
+    if (!error) {
+      setVacations(vacations.filter(v => v.id !== id));
     }
   };
 
@@ -158,10 +207,66 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
             </div>
           )}
 
-          {/* Placeholders for future implementations */}
+          {/* Férias */}
           {activeTab === 'ferias' && (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-              <p>Módulo de Gestão de Férias em desenvolvimento.</p>
+            <div>
+              <p style={{ margin: '0 0 1.5rem', color: 'var(--color-text-muted)' }}>Histórico e agendamento de férias do colaborador.</p>
+              
+              <form onSubmit={handleAddVacation} style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '130px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>Início</label>
+                  <input type="date" required value={newVacation.start_date} onChange={e => setNewVacation({...newVacation, start_date: e.target.value})} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)' }} />
+                </div>
+                <div style={{ flex: 1, minWidth: '130px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>Fim</label>
+                  <input type="date" required value={newVacation.end_date} onChange={e => setNewVacation({...newVacation, end_date: e.target.value})} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)' }} />
+                </div>
+                <div style={{ flex: 2, minWidth: '200px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>Observação (Opcional)</label>
+                  <input type="text" placeholder="Ex: Férias proporcionais..." value={newVacation.notes} onChange={e => setNewVacation({...newVacation, notes: e.target.value})} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)' }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <button type="submit" className="btn-primary" style={{ padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', height: '42px' }}>
+                    <Plus size={16} /> Agendar
+                  </button>
+                </div>
+              </form>
+
+              {loading ? <p>Carregando férias...</p> : (
+                <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                    <thead style={{ background: 'var(--color-bg)' }}>
+                      <tr style={{ color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                        <th style={{ padding: '1rem' }}>Período</th>
+                        <th style={{ padding: '1rem' }}>Status</th>
+                        <th style={{ padding: '1rem' }}>Notas</th>
+                        <th style={{ padding: '1rem', textAlign: 'right' }}>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vacations.length === 0 && (
+                        <tr><td colSpan="4" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Nenhum registro de férias.</td></tr>
+                      )}
+                      {vacations.map(v => (
+                        <tr key={v.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                          <td style={{ padding: '1rem', fontWeight: 600 }}>{formatDate(v.start_date)} até {formatDate(v.end_date)}</td>
+                          <td style={{ padding: '1rem' }}>
+                            <span style={{ padding: '0.2rem 0.6rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 600, background: v.status === 'Concluída' ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color: v.status === 'Concluída' ? '#16a34a' : '#f59e0b' }}>
+                              {v.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{v.notes || '—'}</td>
+                          <td style={{ padding: '1rem', textAlign: 'right' }}>
+                            <button onClick={() => handleRemoveVacation(v.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem' }}>
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
           {activeTab === 'exames' && (
