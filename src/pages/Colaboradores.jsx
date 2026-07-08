@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { Trash2, UserX, UserCheck, Search, Filter, Download, FileText, Table as TableIcon } from 'lucide-react';
+import { Trash2, UserX, UserCheck, Search, Filter, Download, FileText, Table as TableIcon, Eye } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import EmployeeProfileModal from '../components/EmployeeProfileModal';
 const STATUS_TABS = [
   { key: 'Ativo', label: 'Ativos', color: '#22c55e' },
   { key: 'Desligado', label: 'Desligados', color: '#ef4444' },
@@ -29,6 +30,9 @@ const Colaboradores = () => {
   const [dismissModal, setDismissModal] = useState(null);
   const [dismissDate, setDismissDate] = useState('');
   const [dismissing, setDismissing] = useState(false);
+
+  // Modal de Perfil
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
 
   // Form
   const [form, setForm] = useState({ name: '', department_id: '', birthday: '', unit: '', role: '', shirt_size: '', gender: '', phone: '', admission_date: '', cpf: '', rg: '', ctps: '', ctps_serie: '', pis: '', marital_status: '', cost_center: '', cbo: '', aso_date: '' });
@@ -339,6 +343,10 @@ const Colaboradores = () => {
                     {activeTab === 'Desligado' && <td style={{ padding: '0.75rem 0.5rem', color: '#ef4444', fontWeight: 600 }}>{formatDate(emp.dismissed_at)}</td>}
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <button onClick={() => setSelectedEmployee(emp)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-primary)', background: 'rgba(245,174,56,0.08)', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                          <Eye size={14} /> Ver Perfil
+                        </button>
                         {activeTab === 'Ativo' && (
                           <button onClick={() => { setDismissModal({ id: emp.id, name: emp.name }); setDismissDate(new Date().toISOString().split('T')[0]); }}
                             style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid #f59e0b', background: 'rgba(245,158,11,0.08)', color: '#f59e0b', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
@@ -399,6 +407,12 @@ const Colaboradores = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de Perfil Completo */}
+      <EmployeeProfileModal 
+        employee={selectedEmployee} 
+        onClose={() => setSelectedEmployee(null)} 
+      />
     </div>
   );
 };
