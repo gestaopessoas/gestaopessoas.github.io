@@ -307,7 +307,7 @@ async function run() {
                 admission_date: adm_date,
                 department_id: deptId,
                 cost_center: centro_custo,
-                status: 'Ativo', // Todos esses estão ativos
+                status: 'Ativo',
                 profile_code: pc_code,
                 level: plano_carreira
             });
@@ -316,19 +316,40 @@ async function run() {
 
     console.log(`Parsed ${records.length} records. Upserting into employees...`);
 
-    // We will do single inserts to update existing by name, or insert new
     let newCount = 0;
     let updCount = 0;
     for (let r of records) {
+        // Tenta incluir todos os campos (requer que a migration tenha rodado)
+        let recordToInsert = { ...r };
+        
         const { data: exist } = await supabase.from('employees').select('id').eq('name', r.name).maybeSingle();
         if (exist) {
-            const { error } = await supabase.from('employees').update(r).eq('id', exist.id);
-            if (error) console.error("Error updating", r.name, error);
-            else updCount++;
+            let { error } = await supabase.from('employees').update(recordToInsert).eq('id', exist.id);
+            if (error && error.code === 'PGRST204') {
+                // Colunas inexistentes (não rodou migration). Remove profile_code e level.
+                delete recordToInsert.profile_code;
+                delete recordToInsert.level;
+                let fallback = await supabase.from('employees').update(recordToInsert).eq('id', exist.id);
+                if (fallback.error) console.error("Error updating fallback", r.name, fallback.error);
+                else updCount++;
+            } else if (error) {
+                console.error("Error updating", r.name, error);
+            } else {
+                updCount++;
+            }
         } else {
-            const { error } = await supabase.from('employees').insert(r);
-            if (error) console.error("Error inserting", r.name, error);
-            else newCount++;
+            let { error } = await supabase.from('employees').insert(recordToInsert);
+            if (error && error.code === 'PGRST204') {
+                delete recordToInsert.profile_code;
+                delete recordToInsert.level;
+                let fallback = await supabase.from('employees').insert(recordToInsert);
+                if (fallback.error) console.error("Error inserting fallback", r.name, fallback.error);
+                else newCount++;
+            } else if (error) {
+                console.error("Error inserting", r.name, error);
+            } else {
+                newCount++;
+            }
         }
     }
     console.log(`Done. Updated ${updCount}, Inserted ${newCount}.`);
