@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Lock, Shirt, Map, Gift, Users, FileText, ChevronDown, Clock } from 'lucide-react';
+import { LayoutDashboard, Lock, Shirt, Map, Gift, Users, FileText, ChevronDown, Clock, ClipboardList } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { LogOut } from 'lucide-react';
 
