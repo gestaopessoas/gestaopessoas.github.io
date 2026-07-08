@@ -15,7 +15,8 @@ const Aniversarios = () => {
     setLoading(true);
     const { data: emps } = await supabase
       .from('employees')
-      .select('id, name, birthday, admission_date');
+      .select('id, name, birthday, admission_date')
+      .eq('status', 'Ativo');
       
     if (emps) {
       const currentMonth = new Date().getMonth() + 1;
