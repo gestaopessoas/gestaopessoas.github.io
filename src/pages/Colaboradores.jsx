@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { Trash2, UserX, UserCheck, Search, Filter, Download } from 'lucide-react';
-
+import { Trash2, UserX, UserCheck, Search, Filter, Download, FileText, Table as TableIcon } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 const STATUS_TABS = [
   { key: 'Ativo', label: 'Ativos', color: '#22c55e' },
   { key: 'Desligado', label: 'Desligados', color: '#ef4444' },
@@ -111,6 +113,50 @@ const Colaboradores = () => {
   const inputStyle = { width: '100%', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', boxSizing: 'border-box', fontSize: '0.9rem' };
   const labelStyle = { display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' };
 
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    doc.text(`Relatório de Colaboradores (${activeTab}s)`, 14, 15);
+    
+    const tableColumn = ["Nome", "Cargo", "Setor", "Unidade", "Admissão", activeTab === 'Desligado' ? "Demissão" : "Aniversário"];
+    const tableRows = [];
+
+    filtered.forEach(emp => {
+      const rowData = [
+        emp.name,
+        emp.role || '—',
+        emp.departments?.name || '—',
+        emp.unit || '—',
+        formatDate(emp.admission_date),
+        activeTab === 'Desligado' ? formatDate(emp.dismissed_at) : (emp.birthday ? emp.birthday.split('-').slice(1).reverse().join('/') : '—')
+      ];
+      tableRows.push(rowData);
+    });
+
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20,
+      theme: 'grid',
+    });
+    doc.save(`colaboradores_${activeTab.toLowerCase()}.pdf`);
+  };
+
+  const handleExportExcel = () => {
+    const tableData = filtered.map(emp => ({
+      Nome: emp.name,
+      Cargo: emp.role || '—',
+      Setor: emp.departments?.name || '—',
+      Unidade: emp.unit || '—',
+      'Data Admissão': formatDate(emp.admission_date),
+      [activeTab === 'Desligado' ? 'Data Demissão' : 'Aniversário']: activeTab === 'Desligado' ? formatDate(emp.dismissed_at) : (emp.birthday ? emp.birthday.split('-').slice(1).reverse().join('/') : '—')
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(tableData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Colaboradores");
+    XLSX.writeFile(wb, `colaboradores_${activeTab.toLowerCase()}.xlsx`);
+  };
+
   return (
     <div className="glass-panel p-4 fade-in">
       {/* Header */}
@@ -121,11 +167,19 @@ const Colaboradores = () => {
             {counts.Ativo} ativos · {counts.Desligado} desligados
           </p>
         </div>
-        {activeTab === 'Ativo' && (
-          <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
-            {showForm ? '✕ Cancelar' : '+ Novo Colaborador'}
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button onClick={handleExportPDF} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: '#dc2626', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }} title="Exportar PDF">
+            <FileText size={16} /> PDF
           </button>
-        )}
+          <button onClick={handleExportExcel} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: '#16a34a', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }} title="Exportar Excel">
+            <TableIcon size={16} /> Excel
+          </button>
+          {activeTab === 'Ativo' && (
+            <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
+              {showForm ? '✕ Cancelar' : '+ Novo Colaborador'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
