@@ -126,57 +126,95 @@ const Ilhas = () => {
                 }}>{sectorName}</h3>
                 
                 <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: `repeat(${desks.length <= 2 ? desks.length : Math.ceil(desks.length / 2)}, minmax(200px, 1fr))`, 
-                  gap: '1.5rem' 
+                  overflowX: 'auto',
+                  paddingBottom: '1rem'
                 }}>
-                  {desks.map(isl => {
-                    const isOccupied = !!isl.employee_id;
-                    return (
-                      <div key={isl.id} style={{ 
-                        backgroundColor: 'var(--color-surface)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-md)',
-                        padding: '1.25rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.75rem',
-                        boxShadow: 'var(--shadow-sm)'
-                      }}>
-                        <div className="flex-between">
-                          <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{isl.name}</h3>
-                          <button onClick={() => handleDelete(isl.id)} style={{ color: 'var(--color-text-muted)' }}><Trash2 size={16}/></button>
-                        </div>
-                        
-                        <div>
-                          <span style={{ 
-                            padding: '2px 8px', 
-                            borderRadius: '12px', 
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            backgroundColor: isOccupied ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                            color: isOccupied ? '#22c55e' : '#ef4444'
-                          }}>
-                            {isOccupied ? 'Ocupado' : 'Disponível'}
-                          </span>
-                        </div>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: `repeat(${desks.length <= 2 ? desks.length : Math.ceil(desks.length / 2)}, 220px)`, 
+                    gap: '2px', // Pequeno gap entre as mesas
+                    width: 'max-content',
+                    margin: '0 auto', // Centralizar o bloco no espaço
+                    backgroundColor: 'rgba(0,0,0,0.02)',
+                    padding: '2rem',
+                    borderRadius: '1rem'
+                  }}>
+                    {desks.map((isl, index) => {
+                      const cols = desks.length <= 2 ? desks.length : Math.ceil(desks.length / 2);
+                      const isTopRow = index < cols;
+                      const isOccupied = !!isl.employee_id;
 
-                        <div style={{ marginTop: '0.5rem' }}>
-                          <label style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Alocado para:</label>
-                          <select 
-                            value={isl.employee_id || ''}
-                            onChange={(e) => handleAssignEmployee(isl.id, e.target.value)}
-                            style={{ width: '100%', marginTop: '0.25rem', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--color-border)', fontSize: '0.9rem' }}
-                          >
-                            <option value="">-- Ninguém --</option>
-                            {employees.map(emp => (
-                              <option key={emp.id} value={emp.id}>{emp.name}</option>
-                            ))}
-                          </select>
+                      return (
+                        <div key={isl.id} style={{ 
+                          display: 'flex', 
+                          flexDirection: isTopRow ? 'column' : 'column-reverse',
+                          alignItems: 'center'
+                        }}>
+                          {/* Ícone de Cadeira */}
+                          <div style={{ 
+                            width: '45px', height: '45px', 
+                            backgroundColor: isOccupied ? '#94a3b8' : '#e2e8f0', 
+                            borderRadius: isTopRow ? '50% 50% 40% 40%' : '40% 40% 50% 50%', 
+                            border: '3px solid #cbd5e1',
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                            marginBottom: isTopRow ? '-15px' : '0',
+                            marginTop: !isTopRow ? '-15px' : '0',
+                            zIndex: 10,
+                            position: 'relative'
+                          }}></div>
+
+                          {/* Mesa (Madeira) */}
+                          <div style={{
+                            width: '100%',
+                            minHeight: '140px',
+                            backgroundColor: '#deab82', // Cor de madeira
+                            backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)',
+                            backgroundSize: '20px 20px',
+                            border: '1px solid #b57a4a',
+                            padding: '1rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            boxShadow: 'inset 0 0 15px rgba(139, 69, 19, 0.1)'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                              <span style={{ 
+                                fontWeight: 'bold', 
+                                fontSize: '0.85rem', 
+                                backgroundColor: 'rgba(255,255,255,0.8)',
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                color: '#333'
+                              }}>{isl.name.split(' (')[0]}</span>
+                              <button onClick={() => handleDelete(isl.id)} style={{ color: '#dc2626', backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: '50%', padding: '4px', border: 'none', cursor: 'pointer' }} title="Remover Mesa"><Trash2 size={14}/></button>
+                            </div>
+
+                            <select 
+                              value={isl.employee_id || ''}
+                              onChange={(e) => handleAssignEmployee(isl.id, e.target.value)}
+                              style={{ 
+                                width: '100%', 
+                                padding: '0.4rem', 
+                                borderRadius: '4px', 
+                                border: '1px solid #b57a4a', 
+                                fontSize: '0.85rem',
+                                backgroundColor: 'rgba(255,255,255,0.95)',
+                                fontWeight: 600,
+                                color: isOccupied ? '#15803d' : '#64748b',
+                                cursor: 'pointer',
+                                textAlign: 'center'
+                              }}
+                            >
+                              <option value="">-- Mesa Vazia --</option>
+                              {employees.map(emp => (
+                                <option key={emp.id} value={emp.id}>{emp.name}</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             ))}
