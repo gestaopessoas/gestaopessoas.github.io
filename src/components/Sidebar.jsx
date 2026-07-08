@@ -55,6 +55,11 @@ const Sidebar = () => {
           <span>Controle de Ponto</span>
         </NavLink>
 
+        <NavLink to="/rgs" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
+          <ClipboardList />
+          <span>Controle RGS</span>
+        </NavLink>
+
         {/* MPs - Submenu */}
         <div>
           <button
