@@ -3,11 +3,41 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../supabaseClient';
 import { X, Tag, Plus, Trash2 } from 'lucide-react';
 
+const BENEFITS_OPTIONS = [
+  { group: 'Alimentação', items: [
+    'Vale Refeição - Nível I (R$ 254)',
+    'Vale Refeição - Nível II (R$ 381)',
+    'Vale Refeição - Nível III (R$ 508)',
+    'Vale Refeição - Nível IV (R$ 635)',
+    'Vale Refeição - Nível V (R$ 762)',
+    'Vale Refeição - Nível VI (R$ 889)',
+    'Vale Refeição - Nível VII (R$ 1.016)',
+    'Vale Refeição - Nível VIII (R$ 1.143)',
+    'Vale Refeição - Nível IX (R$ 1.270)',
+    'Vale Refeição - Nível X (R$ 1.397)',
+    'Alimentação na empresa',
+    'Cesta Básica',
+  ]},
+  { group: 'Transporte', items: ['Vale Transporte'] },
+  { group: 'Saúde', items: [
+    'Convênio da Sulclínica',
+    'Odontoprev',
+    'Convênio Clínica de Saúde Mental',
+    'Seguro de Vida',
+  ]},
+  { group: 'Outros', items: [
+    'Convênio com Farmácia',
+    'Convênio com Instituição de Ensino Superior',
+  ]},
+];
+
 const EmployeeProfileModal = ({ employee, onClose }) => {
   const [activeTab, setActiveTab] = useState('dados');
+
+  // Benefícios — apenas em memória, não salvo no banco
   const [benefits, setBenefits] = useState([]);
   const [newBenefit, setNewBenefit] = useState('');
-  
+
   // Férias
   const [vacations, setVacations] = useState([]);
   const [newVacation, setNewVacation] = useState({ start_date: '', end_date: '', notes: '' });
@@ -15,25 +45,10 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (employee && activeTab === 'beneficios') {
-      fetchBenefits();
-    }
     if (employee && activeTab === 'ferias') {
       fetchVacations();
     }
   }, [employee, activeTab]);
-
-  const fetchBenefits = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('employee_benefits')
-      .select('*')
-      .eq('employee_id', employee.id)
-      .eq('active', true)
-      .order('benefit_name');
-    if (data) setBenefits(data);
-    setLoading(false);
-  };
 
   const fetchVacations = async () => {
     setLoading(true);
@@ -46,34 +61,20 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
     setLoading(false);
   };
 
-  const handleAddBenefit = async (e) => {
+  // Benefícios — apenas local, sem banco de dados
+  const handleAddBenefit = (e) => {
     e.preventDefault();
     if (!newBenefit.trim()) return;
-    
-    const { data, error } = await supabase
-      .from('employee_benefits')
-      .insert([{ employee_id: employee.id, benefit_name: newBenefit.trim() }])
-      .select();
-      
-    if (!error && data) {
-      setBenefits([...benefits, data[0]]);
-      setNewBenefit('');
-    } else {
-      alert('Erro ao adicionar benefício: ' + error?.message);
+    if (benefits.includes(newBenefit.trim())) {
+      alert('Este benefício já foi adicionado.');
+      return;
     }
+    setBenefits(prev => [...prev, newBenefit.trim()]);
+    setNewBenefit('');
   };
 
-  const handleRemoveBenefit = async (id) => {
-    if (!window.confirm('Remover este benefício?')) return;
-    
-    const { error } = await supabase
-      .from('employee_benefits')
-      .delete()
-      .eq('id', id);
-      
-    if (!error) {
-      setBenefits(benefits.filter(b => b.id !== id));
-    }
+  const handleRemoveBenefit = (name) => {
+    setBenefits(prev => prev.filter(b => b !== name));
   };
 
   const handleAddVacation = async (e) => {
@@ -177,8 +178,10 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
 
           {activeTab === 'beneficios' && (
             <div>
-              <p style={{ margin: '0 0 1.5rem', color: 'var(--color-text-muted)' }}>Selecione os benefícios para vincular a este colaborador.</p>
-              
+              <p style={{ margin: '0 0 0.5rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                ℹ️ Os benefícios aqui são apenas para consulta rápida durante a sessão — não são salvos no banco de dados.
+              </p>
+
               <form onSubmit={handleAddBenefit} style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
                 <select
                   value={newBenefit}
@@ -187,53 +190,33 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
                   required
                 >
                   <option value="">Selecione um benefício...</option>
-                  <optgroup label="Alimentação">
-                    <option value="Vale Refeição - Nível I">Vale Refeição - Nível I (R$ 254)</option>
-                    <option value="Vale Refeição - Nível II">Vale Refeição - Nível II (R$ 381)</option>
-                    <option value="Vale Refeição - Nível III">Vale Refeição - Nível III (R$ 508)</option>
-                    <option value="Vale Refeição - Nível IV">Vale Refeição - Nível IV (R$ 635)</option>
-                    <option value="Vale Refeição - Nível V">Vale Refeição - Nível V (R$ 762)</option>
-                    <option value="Vale Refeição - Nível VI">Vale Refeição - Nível VI (R$ 889)</option>
-                    <option value="Vale Refeição - Nível VII">Vale Refeição - Nível VII (R$ 1.016)</option>
-                    <option value="Vale Refeição - Nível VIII">Vale Refeição - Nível VIII (R$ 1.143)</option>
-                    <option value="Vale Refeição - Nível IX">Vale Refeição - Nível IX (R$ 1.270)</option>
-                    <option value="Vale Refeição - Nível X">Vale Refeição - Nível X (R$ 1.397)</option>
-                    <option value="Alimentação na empresa">Alimentação na empresa</option>
-                    <option value="Cesta Básica">Cesta Básica</option>
-                  </optgroup>
-                  <optgroup label="Transporte">
-                    <option value="Vale Transporte">Vale Transporte</option>
-                  </optgroup>
-                  <optgroup label="Saúde">
-                    <option value="Convênio da Sulclínica">Convênio da Sulclínica</option>
-                    <option value="Odontoprev">Odontoprev</option>
-                    <option value="Convênio Clínica de Saúde Mental">Convênio Clínica de Saúde Mental</option>
-                    <option value="Seguro de Vida">Seguro de Vida</option>
-                  </optgroup>
-                  <optgroup label="Outros">
-                    <option value="Convênio com Farmácia">Convênio com Farmácia</option>
-                    <option value="Convênio com Instituição de Ensino Superior">Convênio com Instituição de Ensino Superior</option>
-                  </optgroup>
+                  {BENEFITS_OPTIONS.map(({ group, items }) => (
+                    <optgroup key={group} label={group}>
+                      {items.map(item => (
+                        <option key={item} value={item}>{item}</option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
                 <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem' }}>
                   <Plus size={16} /> Adicionar
                 </button>
               </form>
 
-              {loading ? <p>Carregando benefícios...</p> : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  {benefits.length === 0 ? <p style={{ color: 'var(--color-text-muted)' }}>Nenhum benefício ativo cadastrado.</p> : null}
-                  {benefits.map(b => (
-                    <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(34,197,94,0.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.3)', padding: '0.4rem 0.8rem', borderRadius: '999px', fontSize: '0.9rem', fontWeight: 500 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                {benefits.length === 0
+                  ? <p style={{ color: 'var(--color-text-muted)' }}>Nenhum benefício adicionado nesta sessão.</p>
+                  : benefits.map(b => (
+                    <div key={b} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(34,197,94,0.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.3)', padding: '0.4rem 0.8rem', borderRadius: '999px', fontSize: '0.9rem', fontWeight: 500 }}>
                       <Tag size={14} />
-                      {b.benefit_name}
-                      <button onClick={() => handleRemoveBenefit(b.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '0.2rem', padding: '0.1rem' }}>
+                      {b}
+                      <button onClick={() => handleRemoveBenefit(b)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '0.2rem', padding: '0.1rem' }}>
                         <X size={14} />
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
+                  ))
+                }
+              </div>
             </div>
           )}
 
