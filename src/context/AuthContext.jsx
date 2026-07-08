@@ -13,8 +13,9 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(null);
       return;
     }
-    // Try to fetch the profile using maybeSingle to avoid 406 Not Acceptable error
-    let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+    // Usamos limit(1) ao invés de maybeSingle() para evitar erros 406 Not Acceptable no console do navegador
+    let { data: profileData, error } = await supabase.from('profiles').select('*').eq('id', userId).limit(1);
+    let data = profileData?.[0] || null;
     
     // Auto-fix for the specific user who doesn't have a profile yet
     if (!data) {
@@ -27,11 +28,11 @@ export const AuthProvider = ({ children }) => {
       // Using level 100 for the main admin ID that encountered the issue
       const level = userId === 'd230215a-1cf5-4470-97d1-801c91694417' ? 100 : 1;
       
-      const { data: newProfile } = await supabase.from('profiles').insert([
+      const { data: newProfileData } = await supabase.from('profiles').insert([
         { id: userId, name: defaultName, level: level, permissions: {} }
-      ]).select().maybeSingle();
+      ]).select().limit(1);
       
-      data = newProfile;
+      data = newProfileData?.[0] || null;
       
       // Fallback in case insert fails due to RLS, allow memory-only admin profile so they are not blocked
       if (!data && userId === 'd230215a-1cf5-4470-97d1-801c91694417') {
