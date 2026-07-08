@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Lock, Shirt, Map, Gift, Users, FileText, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Lock, Shirt, Map, Gift, Users, FileText, ChevronDown, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { LogOut } from 'lucide-react';
 
@@ -48,6 +48,11 @@ const Sidebar = () => {
         <NavLink to="/aniversarios" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
           <Gift />
           <span>Aniversários</span>
+        </NavLink>
+
+        <NavLink to="/ponto" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
+          <Clock />
+          <span>Controle de Ponto</span>
         </NavLink>
 
         {/* MPs - Submenu */}
