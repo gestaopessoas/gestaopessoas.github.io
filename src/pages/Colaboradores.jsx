@@ -132,7 +132,7 @@ const Colaboradores = () => {
         emp.departments?.name || '—',
         emp.unit || '—',
         formatDate(emp.admission_date),
-        activeTab === 'Desligado' ? formatDate(emp.dismissed_at) : (emp.birthday && typeof emp.birthday === 'string' && emp.birthday.includes('-') ? emp.birthday.split('-').slice(1).reverse().join('/') : emp.birthday || '—')
+        activeTab === 'Desligado' ? formatDate(emp.dismissed_at) : (emp.birthday && typeof emp.birthday === 'string' && emp.birthday.includes('-') ? emp.birthday.split('-').reverse().join('/') : emp.birthday || '—')
       ];
       tableRows.push(rowData);
     });
@@ -153,7 +153,7 @@ const Colaboradores = () => {
       Setor: emp.departments?.name || '—',
       Unidade: emp.unit || '—',
       'Data Admissão': formatDate(emp.admission_date),
-      [activeTab === 'Desligado' ? 'Data Demissão' : 'Aniversário']: activeTab === 'Desligado' ? formatDate(emp.dismissed_at) : (emp.birthday ? emp.birthday.split('-').slice(1).reverse().join('/') : '—')
+      [activeTab === 'Desligado' ? 'Data Demissão' : 'Aniversário']: activeTab === 'Desligado' ? formatDate(emp.dismissed_at) : (emp.birthday && typeof emp.birthday === 'string' && emp.birthday.includes('-') ? emp.birthday.split('-').reverse().join('/') : emp.birthday || '—')
     }));
 
     const ws = XLSX.utils.json_to_sheet(tableData);
@@ -341,7 +341,7 @@ const Colaboradores = () => {
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.departments?.name || '—'}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.unit || '—'}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)', fontSize: '0.8rem', fontStyle: 'italic', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={emp.observation || ''}>{emp.observation || '—'}</td>
-                    <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.birthday && typeof emp.birthday === 'string' && emp.birthday.includes('-') ? emp.birthday.split('-').slice(1).reverse().join('/') : emp.birthday || '—'}</td>
+                    <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.birthday && typeof emp.birthday === 'string' && emp.birthday.includes('-') ? emp.birthday.split('-').reverse().join('/') : emp.birthday || '—'}</td>
                     {activeTab === 'Ativo' && <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{formatDate(emp.admission_date)}</td>}
                     {activeTab === 'Desligado' && <td style={{ padding: '0.75rem 0.5rem', color: '#ef4444', fontWeight: 600 }}>{formatDate(emp.dismissed_at)}</td>}
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>
