@@ -187,12 +187,33 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
                   required
                 >
                   <option value="">Selecione um benefício...</option>
-                  <option value="Vale Refeição">Vale Refeição</option>
-                  <option value="Vale Transporte">Vale Transporte</option>
-                  <option value="Convênio com Farmácia">Convênio com Farmácia</option>
-                  <option value="Odontoprev">Odontoprev</option>
-                  <option value="Convênio da Sulclínica">Convênio da Sulclínica</option>
-                  <option value="Alimentação na empresa">Alimentação na empresa</option>
+                  <optgroup label="Alimentação">
+                    <option value="Vale Refeição - Nível I">Vale Refeição - Nível I (R$ 254)</option>
+                    <option value="Vale Refeição - Nível II">Vale Refeição - Nível II (R$ 381)</option>
+                    <option value="Vale Refeição - Nível III">Vale Refeição - Nível III (R$ 508)</option>
+                    <option value="Vale Refeição - Nível IV">Vale Refeição - Nível IV (R$ 635)</option>
+                    <option value="Vale Refeição - Nível V">Vale Refeição - Nível V (R$ 762)</option>
+                    <option value="Vale Refeição - Nível VI">Vale Refeição - Nível VI (R$ 889)</option>
+                    <option value="Vale Refeição - Nível VII">Vale Refeição - Nível VII (R$ 1.016)</option>
+                    <option value="Vale Refeição - Nível VIII">Vale Refeição - Nível VIII (R$ 1.143)</option>
+                    <option value="Vale Refeição - Nível IX">Vale Refeição - Nível IX (R$ 1.270)</option>
+                    <option value="Vale Refeição - Nível X">Vale Refeição - Nível X (R$ 1.397)</option>
+                    <option value="Alimentação na empresa">Alimentação na empresa</option>
+                    <option value="Cesta Básica">Cesta Básica</option>
+                  </optgroup>
+                  <optgroup label="Transporte">
+                    <option value="Vale Transporte">Vale Transporte</option>
+                  </optgroup>
+                  <optgroup label="Saúde">
+                    <option value="Convênio da Sulclínica">Convênio da Sulclínica</option>
+                    <option value="Odontoprev">Odontoprev</option>
+                    <option value="Convênio Clínica de Saúde Mental">Convênio Clínica de Saúde Mental</option>
+                    <option value="Seguro de Vida">Seguro de Vida</option>
+                  </optgroup>
+                  <optgroup label="Outros">
+                    <option value="Convênio com Farmácia">Convênio com Farmácia</option>
+                    <option value="Convênio com Instituição de Ensino Superior">Convênio com Instituição de Ensino Superior</option>
+                  </optgroup>
                 </select>
                 <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem' }}>
                   <Plus size={16} /> Adicionar

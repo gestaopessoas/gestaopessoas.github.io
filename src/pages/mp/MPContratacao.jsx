@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import cargos from '../../data/cargos.json';
+import tabelaSalarial from '../../data/tabela_salarial.json';
 import './MP.css';
 
 const UNITS = ['Sede', 'Riviera', 'Connect Duque', 'Moov', 'Moov II'];
 const MODALITIES = ['CLT', 'PJ', 'Estágio', 'Aprendiz'];
+const NIVEIS_ROMANOS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 
 const LOGOS = {
   'Sede': '/images/logo.png',
@@ -14,6 +16,28 @@ const LOGOS = {
   'Moov': '/images/logo-moov.png',
   'Moov II': '/images/logo-moov.png'
 };
+
+// Lookup de salário a partir do cargo, nível (romano) e modalidade
+function calcularSalario(cargo, nivel, modalidade) {
+  if (!cargo || !nivel || !modalidade) return null;
+  const map = tabelaSalarial.cargos[cargo];
+  if (!map) return null;
+  const tabela = tabelaSalarial.tabelas[map.tabela];
+  if (!tabela) return null;
+  // modalidade CLT ou PJ
+  const mod = (modalidade === 'CLT') ? 'CLT' : (modalidade === 'PJ') ? 'PJ' : null;
+  if (!mod) return null;
+  const valores = tabela[mod];
+  if (!valores) return null;
+  const idx = NIVEIS_ROMANOS.indexOf(nivel);
+  if (idx === -1 || idx >= valores.length) return null;
+  return valores[idx];
+}
+
+// Lookup de VR a partir do nível
+function calcularVR(nivel) {
+  return tabelaSalarial.vr[nivel] || null;
+}
 
 const MPContratacao = () => {
   const navigate = useNavigate();
@@ -35,7 +59,6 @@ const MPContratacao = () => {
     current_level: '',
     current_profile_code: '',
     current_modality: 'CLT',
-    current_salary: '',
     current_benefits: '',
     requested_by: '',
     verified_by: '',
@@ -46,12 +69,26 @@ const MPContratacao = () => {
 
   const set = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
+  // Cálculo automático — apenas visual, nunca salvo no banco
+  const salarioCalculado = useMemo(() =>
+    calcularSalario(form.from_role, form.current_level, form.current_modality),
+    [form.from_role, form.current_level, form.current_modality]
+  );
+
+  const vrCalculado = useMemo(() =>
+    calcularVR(form.current_level),
+    [form.current_level]
+  );
+
+  const formatCurrency = (v) =>
+    v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
+
   const handleSave = async () => {
     setSaving(true);
     let finalEmployeeId = form.employee_id;
     let employeeError = null;
 
-    // Se não tem ID, é um funcionário novo, então cadastra na base!
+    // Se não tem ID, é um candidato novo — cadastra o funcionário
     if (!finalEmployeeId) {
       const { data: newEmp, error: empErr } = await supabase.from('employees').insert([{
         name: form.employee_name,
@@ -74,15 +111,15 @@ const MPContratacao = () => {
       return;
     }
 
-    // 1. Salvar Memorando
+    // Salvar Memorando — SEM salary (apenas dados de cadastro e cargo)
+    const { employee_id: _eid, current_salary: _sal, ...formParaSalvar } = form;
     const { error: memoError } = await supabase.from('memos').insert([{
-      ...form,
+      ...formParaSalvar,
       employee_id: finalEmployeeId,
       type: 'contratacao',
-      current_salary: form.current_salary ? parseFloat(form.current_salary) : null,
     }]);
 
-    // 2. Criar card no RGS automaticamente
+    // Criar card no RGS automaticamente
     const { error: rgsError } = await supabase.from('rgs_processes').insert([{
       employee_name: form.employee_name,
       process_type: 'Admissional',
@@ -106,20 +143,6 @@ const MPContratacao = () => {
   };
 
   const handlePrint = () => window.print();
-
-  const Field = ({ label, value, onChange, type='text', children }) => (
-    <div className="mp-field">
-      <label className="mp-label">{label}</label>
-      {children || (
-        <input
-          type={type}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="mp-input"
-        />
-      )}
-    </div>
-  );
 
   return (
     <div className="mp-wrapper">
@@ -173,7 +196,7 @@ const MPContratacao = () => {
           </div>
         </div>
 
-        {/* Colaborador */}
+        {/* Candidato */}
         <div className="mp-section">
           <div className="mp-row">
             <div className="mp-field-group" style={{flex:3}}>
@@ -223,7 +246,10 @@ const MPContratacao = () => {
             </div>
             <div className="mp-field-group" style={{flex:1}}>
               <label className="mp-label">Nível</label>
-              <input value={form.current_level} onChange={e => set('current_level', e.target.value)} className="mp-input" />
+              <select value={form.current_level} onChange={e => set('current_level', e.target.value)} className="mp-input">
+                <option value="">—</option>
+                {NIVEIS_ROMANOS.map(n => <option key={n} value={n}>Nível {n}</option>)}
+              </select>
             </div>
             <div className="mp-field-group" style={{flex:1}}>
               <label className="mp-label">Cód. Perfil</label>
@@ -238,12 +264,40 @@ const MPContratacao = () => {
               </select>
             </div>
             <div className="mp-field-group" style={{flex:1}}>
-              <label className="mp-label">Remuneração (R$)</label>
-              <input value={form.current_salary} onChange={e => set('current_salary', e.target.value)} className="mp-input" type="number" step="0.01" />
+              <label className="mp-label">
+                Remuneração (R$)
+                {salarioCalculado != null && (
+                  <span style={{marginLeft:'0.5rem', fontSize:'0.75rem', color:'#22c55e', fontWeight:600}}>
+                    ↳ Tabela: {formatCurrency(salarioCalculado)}
+                  </span>
+                )}
+              </label>
+              <input
+                value={salarioCalculado != null ? formatCurrency(salarioCalculado) : '—'}
+                readOnly
+                className="mp-input"
+                style={{background:'var(--color-bg)', color: salarioCalculado ? 'var(--color-text)' : 'var(--color-text-muted)', cursor:'default'}}
+              />
+            </div>
+            <div className="mp-field-group" style={{flex:1}}>
+              <label className="mp-label">
+                VR (R$)
+                {vrCalculado != null && (
+                  <span style={{marginLeft:'0.5rem', fontSize:'0.75rem', color:'#3b82f6', fontWeight:600}}>
+                    ↳ Nível {form.current_level}
+                  </span>
+                )}
+              </label>
+              <input
+                value={vrCalculado != null ? formatCurrency(vrCalculado) : '—'}
+                readOnly
+                className="mp-input"
+                style={{background:'var(--color-bg)', color: vrCalculado ? 'var(--color-text)' : 'var(--color-text-muted)', cursor:'default'}}
+              />
             </div>
             <div className="mp-field-group" style={{flex:2}}>
-              <label className="mp-label">Benefícios</label>
-              <input value={form.current_benefits} onChange={e => set('current_benefits', e.target.value)} className="mp-input" />
+              <label className="mp-label">Outros Benefícios</label>
+              <input value={form.current_benefits} onChange={e => set('current_benefits', e.target.value)} className="mp-input" placeholder="Ex: Cesta Básica, Odontoprev..." />
             </div>
           </div>
         </div>
