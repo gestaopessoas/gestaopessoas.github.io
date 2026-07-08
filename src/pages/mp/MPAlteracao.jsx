@@ -7,6 +7,14 @@ import './MP.css';
 const UNITS = ['Sede', 'Riviera', 'Connect Duque', 'Moov', 'Moov II'];
 const MODALITIES = ['CLT', 'PJ', 'Estágio', 'Aprendiz'];
 
+const LOGOS = {
+  'Sede': '/images/logo.png',
+  'Riviera': '/images/logo-riviera.png',
+  'Connect Duque': '/images/logo-connect.png',
+  'Moov': '/images/logo-moov.png',
+  'Moov II': '/images/logo-moov.png'
+};
+
 const FieldCol = ({ label, value, onChange, type = 'text', isSelect, options }) => (
   <div className="mp-field-group" style={{ flex: 1 }}>
     <label className="mp-label">{label}</label>
@@ -121,7 +129,14 @@ const MPAlteracao = () => {
       <div className="mp-document">
         {/* Header */}
         <div className="mp-header">
-          <div><img src="/images/logo.png" alt="ACPO" className="mp-logo" /></div>
+          <div className="mp-logo-area">
+            <img 
+              src={LOGOS[form.unit] || '/images/logo.png'} 
+              onError={(e) => { e.target.onerror = null; e.target.src="/images/logo.png" }} 
+              alt={form.unit} 
+              className="mp-logo" 
+            />
+          </div>
           <div className="mp-title-area">
             <h1 className="mp-title">ALTERAÇÃO DE CARGO / SALÁRIO</h1>
             <p className="mp-subtitle">Memorando de Pessoal</p>

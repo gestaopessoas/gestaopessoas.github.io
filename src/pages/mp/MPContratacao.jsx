@@ -7,6 +7,14 @@ import './MP.css';
 const UNITS = ['Sede', 'Riviera', 'Connect Duque', 'Moov', 'Moov II'];
 const MODALITIES = ['CLT', 'PJ', 'Estágio', 'Aprendiz'];
 
+const LOGOS = {
+  'Sede': '/images/logo.png',
+  'Riviera': '/images/logo-riviera.png',
+  'Connect Duque': '/images/logo-connect.png',
+  'Moov': '/images/logo-moov.png',
+  'Moov II': '/images/logo-moov.png'
+};
+
 const MPContratacao = () => {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
@@ -102,7 +110,12 @@ const MPContratacao = () => {
         {/* Header */}
         <div className="mp-header">
           <div className="mp-logo-area">
-            <img src="/images/logo.png" alt="ACPO" className="mp-logo" />
+            <img 
+              src={LOGOS[form.unit] || '/images/logo.png'} 
+              onError={(e) => { e.target.onerror = null; e.target.src="/images/logo.png" }} 
+              alt={form.unit} 
+              className="mp-logo" 
+            />
           </div>
           <div className="mp-title-area">
             <h1 className="mp-title">CONTRATAÇÃO</h1>

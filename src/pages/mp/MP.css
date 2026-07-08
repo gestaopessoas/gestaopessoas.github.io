@@ -198,17 +198,25 @@
 
 /* PRINT STYLES */
 @media print {
-  .no-print { display: none !important; }
-  .mp-wrapper { padding: 0; max-width: 100%; }
+  body * {
+    visibility: hidden;
+  }
+  .mp-document, .mp-document * {
+    visibility: visible;
+  }
   .mp-document {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
     border: none;
     box-shadow: none;
-    padding: 1.5cm;
+    padding: 0 !important;
   }
   .mp-input, .mp-meta-input {
     border-bottom: 1px solid #bbb !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  body { background: #fff !important; }
 }
+
