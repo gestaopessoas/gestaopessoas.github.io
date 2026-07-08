@@ -16,32 +16,10 @@ export const AuthProvider = ({ children }) => {
     // Usamos limit(1) ao invés de maybeSingle() para evitar erros 406 Not Acceptable no console do navegador
     let { data: profileData, error } = await supabase.from('profiles').select('*').eq('id', userId).limit(1);
     let data = profileData?.[0] || null;
-    
-    // Auto-fix for the specific user who doesn't have a profile yet
-    if (!data) {
-      // Get user email
-      const { data: userData } = await supabase.auth.getUser();
-      const email = userData?.user?.email || 'admin';
-      const defaultName = email.split('@')[0];
-      
-      // If it's the admin ID or a new user without a profile, we try to create it
-      // Using level 100 for the main admin ID that encountered the issue
-      const level = userId === 'd230215a-1cf5-4470-97d1-801c91694417' ? 100 : 1;
-      
-      const { data: newProfileData } = await supabase.from('profiles').insert([
-        { id: userId, name: defaultName, level: level, permissions: {} }
-      ]).select().limit(1);
-      
-      data = newProfileData?.[0] || null;
-      
-      // Fallback in case insert fails due to RLS, allow memory-only admin profile so they are not blocked
-      if (!data && userId === 'd230215a-1cf5-4470-97d1-801c91694417') {
-        data = { id: userId, name: defaultName, level: 100, permissions: {} };
-      }
-    }
-
     if (data) {
       setUserProfile(data);
+    } else {
+      setUserProfile(null);
     }
   };
 

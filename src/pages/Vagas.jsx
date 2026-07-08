@@ -189,8 +189,15 @@ const Vagas = () => {
 
       {/* Modal de Detalhes da Vaga */}
       {selectedOpening && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="fade-in" style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '2rem', maxWidth: '600px', width: '90%', border: '1px solid var(--color-border)', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div 
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setSelectedOpening(null)}
+        >
+          <div 
+            className="fade-in" 
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '2rem', maxWidth: '600px', width: '90%', border: '1px solid var(--color-border)', maxHeight: '90vh', overflowY: 'auto' }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
               <div>
                 <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', color: 'var(--color-text)' }}>

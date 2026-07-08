@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../supabaseClient';
 import { X, Save, AlertCircle } from 'lucide-react';
 
@@ -55,9 +56,16 @@ const VagaFormModal = ({ onClose, onSuccess }) => {
   const inputStyle = { width: '100%', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', boxSizing: 'border-box', fontSize: '0.9rem' };
   const labelStyle = { display: 'block', marginBottom: '0.3rem', fontWeight: 600, fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' };
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="fade-in" style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '2rem', maxWidth: '600px', width: '90%', border: '1px solid var(--color-border)', maxHeight: '90vh', overflowY: 'auto' }}>
+  return createPortal(
+    <div 
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={onClose}
+    >
+      <div 
+        className="fade-in" 
+        onClick={e => e.stopPropagation()}
+        style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '2rem', maxWidth: '600px', width: '90%', border: '1px solid var(--color-border)', maxHeight: '90vh', overflowY: 'auto' }}
+      >
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--color-text)' }}>Solicitar Nova Vaga</h3>
@@ -185,7 +193,8 @@ const VagaFormModal = ({ onClose, onSuccess }) => {
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
