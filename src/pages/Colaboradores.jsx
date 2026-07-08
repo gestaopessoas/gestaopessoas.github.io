@@ -77,7 +77,7 @@ const Colaboradores = () => {
     const { error } = await supabase.from('employees').update({ status: 'Desligado', dismissed_at: dismissDate }).eq('id', dismissModal.id);
     setDismissing(false);
     if (!error) { setDismissModal(null); setDismissDate(''); fetchData(); fetchCounts(); }
-    else alert('Erro: ' + error.message);
+    else alert('Erro ao desligar: ' + (error.message || JSON.stringify(error)));
   };
 
   const handleReactivate = async (id) => {
