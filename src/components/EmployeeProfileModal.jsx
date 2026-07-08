@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../supabaseClient';
 import { X, Tag, Plus, Trash2 } from 'lucide-react';
 
@@ -106,8 +107,9 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
   };
 
   const formatDate = (d) => {
-    if (!d) return '—';
+    if (!d || typeof d !== 'string') return '—';
     const p = d.split('-');
+    if (p.length !== 3) return d;
     return `${p[2]}/${p[1]}/${p[0]}`;
   };
 
@@ -121,8 +123,8 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
     { id: 'epis', label: 'EPIs' }
   ];
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+  return createPortal(
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div className="fade-in" style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', width: '90%', maxWidth: '700px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-xl)', overflow: 'hidden' }}>
         
         {/* Header */}
@@ -162,7 +164,7 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
               <div><strong style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>RG</strong> {employee.rg || '—'}</div>
               <div><strong style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>CTPS / Série</strong> {employee.ctps ? `${employee.ctps} / ${employee.ctps_serie || '-'}` : '—'}</div>
               <div><strong style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>PIS</strong> {employee.pis || '—'}</div>
-              <div><strong style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Nascimento</strong> {employee.birthday ? employee.birthday.split('-').reverse().join('/') : '—'}</div>
+              <div><strong style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Nascimento</strong> {employee.birthday && typeof employee.birthday === 'string' && employee.birthday.includes('-') ? employee.birthday.split('-').reverse().join('/') : employee.birthday || '—'}</div>
               <div><strong style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Estado Civil</strong> {employee.marital_status || '—'}</div>
               <div><strong style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Gênero</strong> {employee.gender || '—'}</div>
               <div><strong style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Telefone</strong> {employee.phone || '—'}</div>
@@ -283,7 +285,8 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
 
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

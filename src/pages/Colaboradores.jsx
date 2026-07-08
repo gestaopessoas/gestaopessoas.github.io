@@ -109,8 +109,9 @@ const Colaboradores = () => {
   const hasFilters = search || filterDept || filterUnit || filterShirt || filterGender;
 
   const formatDate = (d) => {
-    if (!d) return '—';
+    if (!d || typeof d !== 'string') return '—';
     const p = d.split('-');
+    if (p.length !== 3) return d;
     return `${p[2]}/${p[1]}/${p[0]}`;
   };
 
@@ -131,7 +132,7 @@ const Colaboradores = () => {
         emp.departments?.name || '—',
         emp.unit || '—',
         formatDate(emp.admission_date),
-        activeTab === 'Desligado' ? formatDate(emp.dismissed_at) : (emp.birthday ? emp.birthday.split('-').slice(1).reverse().join('/') : '—')
+        activeTab === 'Desligado' ? formatDate(emp.dismissed_at) : (emp.birthday && typeof emp.birthday === 'string' && emp.birthday.includes('-') ? emp.birthday.split('-').slice(1).reverse().join('/') : emp.birthday || '—')
       ];
       tableRows.push(rowData);
     });
@@ -340,7 +341,7 @@ const Colaboradores = () => {
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.departments?.name || '—'}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.unit || '—'}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)', fontSize: '0.8rem', fontStyle: 'italic', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={emp.observation || ''}>{emp.observation || '—'}</td>
-                    <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.birthday ? emp.birthday.split('-').slice(1).reverse().join('/') : '—'}</td>
+                    <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.birthday && typeof emp.birthday === 'string' && emp.birthday.includes('-') ? emp.birthday.split('-').slice(1).reverse().join('/') : emp.birthday || '—'}</td>
                     {activeTab === 'Ativo' && <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{formatDate(emp.admission_date)}</td>}
                     {activeTab === 'Desligado' && <td style={{ padding: '0.75rem 0.5rem', color: '#ef4444', fontWeight: 600 }}>{formatDate(emp.dismissed_at)}</td>}
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>

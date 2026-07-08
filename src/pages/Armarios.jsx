@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { Trash2 } from 'lucide-react';
 
 const Armarios = () => {
   const [lockers, setLockers] = useState([]);
@@ -18,7 +17,7 @@ const Armarios = () => {
   const fetchData = async () => {
     setLoading(true);
     // Fetch employees for dropdowns
-    const { data: emps } = await supabase.from('employees').select('id, name').order('name');
+    const { data: emps } = await supabase.from('employees').select('id, name').eq('status', 'Ativo').order('name');
     if (emps) setEmployees(emps);
 
     // Fetch lockers with employee relation
@@ -46,13 +45,6 @@ const Armarios = () => {
       fetchData();
     } else {
       alert("Erro ao criar armário: " + error.message);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if(window.confirm('Excluir este armário?')) {
-      await supabase.from('lockers').delete().eq('id', id);
-      fetchData();
     }
   };
 
@@ -105,8 +97,7 @@ const Armarios = () => {
                       <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
                         <th style={{ padding: '0.75rem 0', width: '20%' }}>Número</th>
                         <th style={{ padding: '0.75rem 0', width: '20%' }}>Status</th>
-                        <th style={{ padding: '0.75rem 0', width: '40%' }}>Colaborador (Atribuição)</th>
-                        <th style={{ padding: '0.75rem 0', textAlign: 'right', width: '20%' }}>Ações</th>
+                        <th style={{ padding: '0.75rem 0', width: '60%' }}>Colaborador (Atribuição)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -138,15 +129,6 @@ const Armarios = () => {
                                   <option key={emp.id} value={emp.id}>{emp.name}</option>
                                 ))}
                               </select>
-                            </td>
-                            <td style={{ padding: '0.75rem 0', textAlign: 'right' }}>
-                              <button 
-                                onClick={() => handleDelete(lk.id)}
-                                style={{ color: '#ef4444', padding: '0.25rem' }}
-                                title="Excluir"
-                              >
-                                <Trash2 size={18} />
-                              </button>
                             </td>
                           </tr>
                         );
