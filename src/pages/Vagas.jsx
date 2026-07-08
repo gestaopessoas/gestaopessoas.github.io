@@ -190,13 +190,13 @@ const Vagas = () => {
       {/* Modal de Detalhes da Vaga */}
       {selectedOpening && createPortal(
         <div 
-          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
           onClick={() => setSelectedOpening(null)}
         >
           <div 
             className="fade-in" 
             onClick={(e) => e.stopPropagation()}
-            style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '2rem', maxWidth: '600px', width: '90%', border: '1px solid var(--color-border)', maxHeight: '90vh', overflowY: 'auto' }}
+            style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '2rem', maxWidth: '600px', width: '100%', border: '1px solid var(--color-border)', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
               <div>

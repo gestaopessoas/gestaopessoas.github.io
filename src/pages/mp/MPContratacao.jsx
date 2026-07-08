@@ -17,7 +17,6 @@ const LOGOS = {
 
 const MPContratacao = () => {
   const navigate = useNavigate();
-  const [employees, setEmployees] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -45,19 +44,7 @@ const MPContratacao = () => {
     effective_date: '',
   });
 
-  useEffect(() => {
-    supabase.from('employees').select('id,name').eq('status','Ativo').order('name').then(({data}) => {
-      if (data) setEmployees(data);
-    });
-  }, []);
-
   const set = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
-
-  const handleEmployeeChange = (id) => {
-    const emp = employees.find(e => e.id === id);
-    set('employee_id', id);
-    if (emp) set('employee_name', emp.name);
-  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -190,17 +177,12 @@ const MPContratacao = () => {
         <div className="mp-section">
           <div className="mp-row">
             <div className="mp-field-group" style={{flex:3}}>
-              <label className="mp-label">Nome do(a) colaborador(a)</label>
-              <select value={form.employee_id} onChange={e => handleEmployeeChange(e.target.value)} className="mp-input">
-                <option value="">Selecione ou digite abaixo...</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
+              <label className="mp-label">Nome do(a) candidato(a)</label>
               <input
-                placeholder="Ou digite o nome manualmente..."
+                placeholder="Digite o nome do candidato..."
                 value={form.employee_name}
                 onChange={e => set('employee_name', e.target.value)}
                 className="mp-input"
-                style={{marginTop:'4px'}}
               />
             </div>
             <div className="mp-field-group" style={{flex:1}}>

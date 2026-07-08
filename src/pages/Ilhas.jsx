@@ -16,8 +16,8 @@ const Ilhas = () => {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     // Fetch employees for dropdown (somente Ativos da Sede)
     const { data: emps } = await supabase.from('employees')
       .select('id, name')
@@ -37,7 +37,7 @@ const Ilhas = () => {
       .order('position_index', { ascending: true, nullsFirst: false });
     if (isls) setIslands(isls);
     
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
   const handleCreate = async (e) => {
@@ -50,7 +50,7 @@ const Ilhas = () => {
       setName('');
       setSector('');
       setShowForm(false);
-      fetchData();
+      fetchData(false);
     } else {
       alert("Erro ao criar ilha/setor: " + error.message);
     }
@@ -59,52 +59,20 @@ const Ilhas = () => {
   const handleDelete = async (id) => {
     if(window.confirm('Excluir este local?')) {
       await supabase.from('islands').delete().eq('id', id);
-      fetchData();
+      fetchData(false);
     }
   };
 
   const handleAssignEmployee = async (islandId, employeeId) => {
     await supabase.from('islands').update({ employee_id: employeeId || null }).eq('id', islandId);
-    fetchData(); 
+    fetchData(false); 
   };
 
   return (
     <div className="glass-panel p-4 fade-in">
       <div className="flex-between">
         <h2>Mapeamento de Ilhas / Setores / Mesas</h2>
-        <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancelar' : 'Adicionar Local'}
-        </button>
       </div>
-
-      {showForm && (
-        <form onSubmit={handleCreate} className="mt-4 p-4" style={{ backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-md)' }}>
-          <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Nome da Mesa / Ilha *</label>
-              <input 
-                type="text" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                placeholder="Ex: Mesa 01, Ilha de Atendimento..."
-                required
-                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)' }}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Setor</label>
-              <input 
-                type="text" 
-                value={sector} 
-                onChange={(e) => setSector(e.target.value)} 
-                placeholder="Ex: Financeiro, TI..."
-                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)' }}
-              />
-            </div>
-          </div>
-          <button type="submit" className="btn-primary">Salvar Local</button>
-        </form>
-      )}
 
       <div className="mt-4">
         {loading ? (
@@ -148,6 +116,10 @@ const Ilhas = () => {
                       const isTopRow = index < cols;
                       const isOccupied = !!isl.employee_id;
 
+                      if (isl.name === 'ESPAÇO VAZIO') {
+                        return <div key={isl.id} style={{ visibility: 'hidden', minHeight: '185px' }}></div>;
+                      }
+
                       return (
                         <div key={isl.id} style={{ 
                           display: 'flex', 
@@ -190,7 +162,6 @@ const Ilhas = () => {
                                 borderRadius: '12px',
                                 color: '#333'
                               }}>{isl.name.split(' (')[0]}</span>
-                              <button onClick={() => handleDelete(isl.id)} style={{ color: '#dc2626', backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: '50%', padding: '4px', border: 'none', cursor: 'pointer' }} title="Remover Mesa"><Trash2 size={14}/></button>
                             </div>
 
                             <select 

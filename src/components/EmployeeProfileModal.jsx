@@ -177,16 +177,23 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
 
           {activeTab === 'beneficios' && (
             <div>
-              <p style={{ margin: '0 0 1.5rem', color: 'var(--color-text-muted)' }}>Adicione tags de benefícios (Ex: Vale Transporte, Plano de Saúde Unimed, Gympass) para visualizar rapidamente o que este colaborador possui ativo.</p>
+              <p style={{ margin: '0 0 1.5rem', color: 'var(--color-text-muted)' }}>Selecione os benefícios para vincular a este colaborador.</p>
               
               <form onSubmit={handleAddBenefit} style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
-                <input 
-                  type="text" 
-                  value={newBenefit} 
-                  onChange={e => setNewBenefit(e.target.value)} 
-                  placeholder="Nome do benefício..." 
+                <select
+                  value={newBenefit}
+                  onChange={e => setNewBenefit(e.target.value)}
                   style={{ flex: 1, padding: '0.6rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)' }}
-                />
+                  required
+                >
+                  <option value="">Selecione um benefício...</option>
+                  <option value="Vale Refeição">Vale Refeição</option>
+                  <option value="Vale Transporte">Vale Transporte</option>
+                  <option value="Convênio com Farmácia">Convênio com Farmácia</option>
+                  <option value="Odontoprev">Odontoprev</option>
+                  <option value="Convênio da Sulclínica">Convênio da Sulclínica</option>
+                  <option value="Alimentação na empresa">Alimentação na empresa</option>
+                </select>
                 <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem' }}>
                   <Plus size={16} /> Adicionar
                 </button>

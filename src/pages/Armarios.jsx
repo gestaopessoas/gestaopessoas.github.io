@@ -14,8 +14,8 @@ const Armarios = () => {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     // Fetch active employees
     const { data: emps } = await supabase.from('employees').select('id, name').eq('status', 'Ativo').order('name');
     if (emps) setEmployees(emps);
@@ -27,14 +27,14 @@ const Armarios = () => {
       .order('number');
     if (lks) setLockers(lks);
     
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
   const handleAssign = async () => {
     if (!selectedLocker) return;
     await supabase.from('lockers').update({ employee_id: selectedEmployeeId || null }).eq('id', selectedLocker.id);
     setSelectedLocker(null);
-    fetchData();
+    fetchData(false);
   };
 
   const openLocker = (lk) => {
