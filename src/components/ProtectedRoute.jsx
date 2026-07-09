@@ -2,8 +2,8 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth();
+const ProtectedRoute = ({ children, module, action = 'view' }) => {
+  const { user, loading, can } = useAuth();
 
   if (loading) {
     return (
@@ -31,6 +31,10 @@ const ProtectedRoute = ({ children }) => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (!can(module, action)) {
+    return <Navigate to="/" replace />;
   }
 
   return children;

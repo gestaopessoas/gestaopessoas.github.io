@@ -1,17 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../supabaseClient';
-import { Trash2, UserX, UserCheck, Search, Filter, Download, FileText, Table as TableIcon, Eye } from 'lucide-react';
+import { Trash2, UserX, UserCheck, Search, Filter, FileText, Table as TableIcon, Eye, Edit3 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import EmployeeProfileModal from '../components/EmployeeProfileModal';
+
+const EMPTY_FORM = { name: '', department_id: '', birthday: '', unit: '', role: '', shirt_size: '', gender: '', phone: '', admission_date: '', cpf: '', rg: '', ctps: '', ctps_serie: '', pis: '', marital_status: '', cost_center: '', cbo: '', aso_date: '' };
+
 const STATUS_TABS = [
   { key: 'Ativo', label: 'Ativos', color: '#22c55e' },
   { key: 'Desligado', label: 'Desligados', color: '#ef4444' },
 ];
 
 const Colaboradores = () => {
+  const { can } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [activeTab, setActiveTab] = useState('Ativo');
@@ -34,9 +39,14 @@ const Colaboradores = () => {
 
   // Modal de Perfil
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [editingEmployee, setEditingEmployee] = useState(null);
 
   // Form
-  const [form, setForm] = useState({ name: '', department_id: '', birthday: '', unit: '', role: '', shirt_size: '', gender: '', phone: '', admission_date: '', cpf: '', rg: '', ctps: '', ctps_serie: '', pis: '', marital_status: '', cost_center: '', cbo: '', aso_date: '' });
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  const canCreate = can('colaboradores', 'create');
+  const canEdit = can('colaboradores', 'edit');
+  const canDelete = can('colaboradores', 'delete');
 
   useEffect(() => { fetchDepartments(); fetchCounts(); }, []);
   useEffect(() => { fetchData(); }, [activeTab]);
@@ -65,10 +75,41 @@ const Colaboradores = () => {
     setLoading(false);
   };
 
+  const closeForm = () => {
+    setForm(EMPTY_FORM);
+    setEditingEmployee(null);
+    setShowForm(false);
+  };
+
+  const startCreate = () => {
+    setForm(EMPTY_FORM);
+    setEditingEmployee(null);
+    setShowForm(true);
+  };
+
+  const startEdit = (employee) => {
+    setForm(Object.fromEntries(Object.keys(EMPTY_FORM).map(key => [key, employee[key] || ''])));
+    setEditingEmployee(employee);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const normalizedForm = () => ({
+    ...form,
+    department_id: form.department_id || null,
+    birthday: form.birthday || null,
+    admission_date: form.admission_date || null,
+    aso_date: form.aso_date || null
+  });
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { error } = await supabase.from('employees').insert([{ ...form, status: 'Ativo', department_id: form.department_id || null, birthday: form.birthday || null, admission_date: form.admission_date || null, aso_date: form.aso_date || null }]);
-    if (!error) { setForm({ name: '', department_id: '', birthday: '', unit: '', role: '', shirt_size: '', gender: '', phone: '', admission_date: '', cpf: '', rg: '', ctps: '', ctps_serie: '', pis: '', marital_status: '', cost_center: '', cbo: '', aso_date: '' }); setShowForm(false); fetchData(); fetchCounts(); }
+    if (editingEmployee ? !canEdit : !canCreate) return;
+    const payload = normalizedForm();
+    const { error } = editingEmployee
+      ? await supabase.from('employees').update(payload).eq('id', editingEmployee.id)
+      : await supabase.from('employees').insert([{ ...payload, status: 'Ativo' }]);
+    if (!error) { closeForm(); fetchData(); fetchCounts(); }
     else alert('Erro: ' + error.message);
   };
 
@@ -93,16 +134,21 @@ const Colaboradores = () => {
     fetchData(); fetchCounts();
   };
 
+  const clean = (value) => String(value || '').trim();
+  const key = (value) => clean(value).toLowerCase();
+
   // Units derived from data
-  const units = [...new Set(employees.map(e => e.unit).filter(Boolean))].sort();
-  const shirtSizes = [...new Set(employees.map(e => e.shirt_size).filter(Boolean))].sort();
+  const units = [...new Set(employees.map(e => clean(e.unit)).filter(Boolean))].sort();
+  const shirtSizes = [...new Set(employees.map(e => clean(e.shirt_size)).filter(Boolean))].sort();
 
   const filtered = employees.filter(e => {
-    const matchSearch = !search || e.name.toLowerCase().includes(search.toLowerCase()) || (e.role || '').toLowerCase().includes(search.toLowerCase());
-    const matchDept = !filterDept || e.department_id === filterDept;
-    const matchUnit = !filterUnit || e.unit === filterUnit;
-    const matchShirt = !filterShirt || e.shirt_size === filterShirt;
-    const matchGender = !filterGender || e.gender === filterGender;
+    const term = key(search);
+    const haystack = [e.name, e.role, e.departments?.name, e.unit, e.cpf, e.rg].map(key).join(' ');
+    const matchSearch = !term || haystack.includes(term);
+    const matchDept = !filterDept || String(e.department_id || '') === String(filterDept);
+    const matchUnit = !filterUnit || key(e.unit) === key(filterUnit);
+    const matchShirt = !filterShirt || key(e.shirt_size) === key(filterShirt);
+    const matchGender = !filterGender || key(e.gender) === key(filterGender);
     return matchSearch && matchDept && matchUnit && matchShirt && matchGender;
   });
 
@@ -180,8 +226,8 @@ const Colaboradores = () => {
           <button onClick={handleExportExcel} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: '#16a34a', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }} title="Exportar Excel">
             <TableIcon size={16} /> Excel
           </button>
-          {activeTab === 'Ativo' && (
-            <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
+          {activeTab === 'Ativo' && canCreate && (
+            <button className="btn-primary" onClick={showForm ? closeForm : startCreate}>
               {showForm ? '✕ Cancelar' : '+ Novo Colaborador'}
             </button>
           )}
@@ -264,7 +310,7 @@ const Colaboradores = () => {
       {/* Form Novo */}
       {showForm && (
         <form onSubmit={handleSubmit} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginBottom: '1.25rem' }}>
-          <h4 style={{ margin: '0 0 1rem' }}>Novo Colaborador</h4>
+          <h4 style={{ margin: '0 0 1rem' }}>{editingEmployee ? 'Editar Colaborador' : 'Novo Colaborador'}</h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
             {[['name', 'Nome *', 'text'], ['role', 'Cargo', 'text'], ['phone', 'Telefone', 'text'], ['admission_date', 'Data Admissão', 'date'], ['birthday', 'Nascimento', 'date'], ['cpf', 'CPF', 'text'], ['rg', 'RG', 'text'], ['pis', 'PIS', 'text'], ['ctps', 'CTPS', 'text'], ['ctps_serie', 'Série CTPS', 'text'], ['cbo', 'CBO', 'text'], ['cost_center', 'Centro Custo', 'text'], ['aso_date', 'Data ASO', 'date']].map(([field, lbl, type]) => (
               <div key={field}>
@@ -307,7 +353,7 @@ const Colaboradores = () => {
           </div>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button type="submit" className="btn-primary">Salvar</button>
-            <button type="button" onClick={() => setShowForm(false)} style={{ padding: '0.6rem 1.2rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'none', cursor: 'pointer' }}>Cancelar</button>
+            <button type="button" onClick={closeForm} style={{ padding: '0.6rem 1.2rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'none', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </form>
       )}
@@ -351,24 +397,30 @@ const Colaboradores = () => {
                           style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-primary)', background: 'rgba(245,174,56,0.08)', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
                           <Eye size={14} /> Ver Perfil
                         </button>
-                        {activeTab === 'Ativo' && (
+                        {canEdit && (
+                          <button onClick={() => startEdit(emp)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid #3b82f6', background: 'rgba(59,130,246,0.08)', color: '#3b82f6', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                            <Edit3 size={14} /> Editar
+                          </button>
+                        )}
+                        {activeTab === 'Ativo' && canEdit && (
                           <button onClick={() => { setDismissModal({ id: emp.id, name: emp.name }); setDismissDate(new Date().toISOString().split('T')[0]); }}
                             style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid #f59e0b', background: 'rgba(245,158,11,0.08)', color: '#f59e0b', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
                             <UserX size={14} /> Desligar
                           </button>
                         )}
-                        {activeTab === 'Desligado' && (
+                        {activeTab === 'Desligado' && canEdit && (
                           <button onClick={() => handleReactivate(emp.id)}
                             style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid #22c55e', background: 'rgba(34,197,94,0.08)', color: '#22c55e', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
                             <UserCheck size={14} /> Reativar
                           </button>
                         )}
-                        <button onClick={() => handleDelete(emp.id)} title="Excluir"
+                        {canDelete && <button onClick={() => handleDelete(emp.id)} title="Excluir"
                           style={{ padding: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', transition: 'color 0.2s' }}
                           onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
                           onMouseOut={e => e.currentTarget.style.color = 'var(--color-text-muted)'}>
                           <Trash2 size={15} />
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   </tr>

@@ -2,6 +2,19 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext({});
+const ADMIN_LEVEL = 50;
+
+const parsePermissions = (permissions) => {
+  if (!permissions) return {};
+  if (typeof permissions === 'string') {
+    try {
+      return JSON.parse(permissions);
+    } catch {
+      return {};
+    }
+  }
+  return permissions;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -14,7 +27,7 @@ export const AuthProvider = ({ children }) => {
       return;
     }
     // Usamos limit(1) ao invés de maybeSingle() para evitar erros 406 Not Acceptable no console do navegador
-    let { data: profileData, error } = await supabase.from('profiles').select('*').eq('id', userId).limit(1);
+    let { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).limit(1);
     let data = profileData?.[0] || null;
     if (data) {
       setUserProfile(data);
@@ -63,8 +76,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const can = (module, action = 'view') => {
+    if (!module) return true;
+    if (userProfile?.level >= ADMIN_LEVEL) return true;
+    const permissions = parsePermissions(userProfile?.permissions);
+    if (!Object.keys(permissions).length) return true;
+    return Boolean(permissions[module]?.[action]);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, userProfile, loading, signIn, signOut, refreshProfile, can }}>
       {children}
     </AuthContext.Provider>
   );

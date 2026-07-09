@@ -26,18 +26,18 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
-          <Route path="colaboradores" element={<Colaboradores />} />
-          <Route path="arquivo-morto" element={<ArquivoMorto />} />
-          <Route path="armarios" element={<Armarios />} />
-          <Route path="uniformes" element={<Uniformes />} />
-          <Route path="ilhas" element={<Ilhas />} />
+          <Route path="colaboradores" element={<ProtectedRoute module="colaboradores"><Colaboradores /></ProtectedRoute>} />
+          <Route path="arquivo-morto" element={<ProtectedRoute module="arquivo_morto"><ArquivoMorto /></ProtectedRoute>} />
+          <Route path="armarios" element={<ProtectedRoute module="armarios"><Armarios /></ProtectedRoute>} />
+          <Route path="uniformes" element={<ProtectedRoute module="uniformes"><Uniformes /></ProtectedRoute>} />
+          <Route path="ilhas" element={<ProtectedRoute module="ilhas"><Ilhas /></ProtectedRoute>} />
           <Route path="aniversarios" element={<Aniversarios />} />
-          <Route path="ponto" element={<ControlePonto />} />
-          <Route path="rgs" element={<ControleRGS />} />
-          <Route path="custos" element={<Custos />} />
-          <Route path="vagas" element={<Vagas />} />
-          <Route path="mp/contratacao" element={<MPContratacao />} />
-          <Route path="mp/alteracao" element={<MPAlteracao />} />
+          <Route path="ponto" element={<ProtectedRoute module="ponto"><ControlePonto /></ProtectedRoute>} />
+          <Route path="rgs" element={<ProtectedRoute module="rgs"><ControleRGS /></ProtectedRoute>} />
+          <Route path="custos" element={<ProtectedRoute module="custos"><Custos /></ProtectedRoute>} />
+          <Route path="vagas" element={<ProtectedRoute module="vagas"><Vagas /></ProtectedRoute>} />
+          <Route path="mp/contratacao" element={<ProtectedRoute module="mp"><MPContratacao /></ProtectedRoute>} />
+          <Route path="mp/alteracao" element={<ProtectedRoute module="mp"><MPAlteracao /></ProtectedRoute>} />
           <Route path="configuracoes" element={<Configuracoes />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
