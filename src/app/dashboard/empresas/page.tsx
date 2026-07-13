@@ -1,95 +1,138 @@
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Search, Plus, MoreHorizontal, Building2, Users, CheckCircle2 } from "lucide-react"
+"use client";
 
-const empresas = [
-  {
-    id: "1",
-    cnpj: "00.123.456/0001-10",
-    razaoSocial: "ACPO Empreendimentos Ltda.",
-    totalColaboradores: 84,
-    status: "Ativo",
-  },
-  {
-    id: "2",
-    cnpj: "12.345.678/0001-22",
-    razaoSocial: "ACPO SPE Residencial Sul S/A",
-    totalColaboradores: 31,
-    status: "Ativo",
-  },
-  {
-    id: "3",
-    cnpj: "23.456.789/0001-33",
-    razaoSocial: "Consórcio Obra Norte ACPO",
-    totalColaboradores: 27,
-    status: "Ativo",
-  },
-  {
-    id: "4",
-    cnpj: "34.567.890/0001-44",
-    razaoSocial: "ACPO Infraestrutura ME",
-    totalColaboradores: 0,
-    status: "Inativo",
-  },
-]
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { createClient } from "@/utils/supabase/client";
+import { Building2, Edit3, Plus, Search, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+type Company = {
+  id: string;
+  cnpj: string;
+  name: string;
+  trading_name: string | null;
+};
+
+const emptyForm = { cnpj: "", name: "", trading_name: "" };
 
 export default function EmpresasPage() {
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [query, setQuery] = useState("");
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    const loadCompanies = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase.from("companies").select("id, cnpj, name, trading_name").order("name");
+
+      if (!active) return;
+      setLoading(false);
+      if (error) {
+        setError("Não foi possível carregar empresas. Confira login, permissões e migração do Supabase.");
+        return;
+      }
+      setCompanies((data ?? []) as Company[]);
+    };
+
+    loadCompanies();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return companies;
+    return companies.filter((company) => [company.name, company.trading_name, company.cnpj].some((value) => value?.toLowerCase().includes(term)));
+  }, [companies, query]);
+
+  const startNew = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setError("");
+  };
+
+  const startEdit = (company: Company) => {
+    setEditingId(company.id);
+    setForm({ cnpj: company.cnpj, name: company.name, trading_name: company.trading_name ?? "" });
+    setError("");
+  };
+
+  const save = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+
+    const payload = {
+      cnpj: form.cnpj.replace(/\D/g, ""),
+      name: form.name.trim(),
+      trading_name: form.trading_name.trim() || null,
+    };
+
+    const supabase = createClient();
+    const result = editingId
+      ? await supabase.from("companies").update(payload).eq("id", editingId).select().single()
+      : await supabase.from("companies").insert(payload).select().single();
+
+    setSaving(false);
+    if (result.error) {
+      setError("Não foi possível salvar a empresa.");
+      return;
+    }
+
+    const saved = result.data as Company;
+    setCompanies((prev) => editingId ? prev.map((item) => item.id === editingId ? saved : item) : [...prev, saved].sort((a, b) => a.name.localeCompare(b.name)));
+    startNew();
+  };
+
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex-1 p-8 space-y-6 max-w-7xl mx-auto w-full">
-        <header className="flex items-center justify-between">
+        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Empresas (Vínculos Jurídicos)</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              CNPJs e entidades legais que vinculam colaboradores.
-            </p>
+            <h1 className="text-2xl font-semibold tracking-tight">Empresas</h1>
+            <p className="text-sm text-muted-foreground mt-1">CNPJs e vínculos jurídicos usados no Core HR.</p>
           </div>
-          <Button size="sm" className="h-9">
+          <Button size="sm" className="h-9" onClick={startNew}>
             <Plus className="mr-2 h-4 w-4" />
-            Nova Empresa
+            Nova empresa
           </Button>
         </header>
 
-        <div className="flex items-center">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar por CNPJ ou Razão Social..."
-              className="pl-9 bg-muted/30 border-border/50 h-9 text-sm rounded-md"
-            />
-          </div>
+        {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <Metric label="Total de CNPJs" value={companies.length} />
+          <Metric label="Com nome fantasia" value={companies.filter((company) => company.trading_name).length} />
+          <Metric label="Ativos" value={companies.length} />
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Building2 className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total de CNPJs</p>
-              <p className="text-xl font-bold">{empresas.length}</p>
-            </div>
+        <form onSubmit={save} className="rounded-lg border bg-card p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-semibold">{editingId ? "Editar empresa" : "Adicionar empresa"}</h2>
+            {editingId && <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={startNew}><X className="h-4 w-4" /></Button>}
           </div>
-          <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Ativos</p>
-              <p className="text-xl font-bold">{empresas.filter(e => e.status === "Ativo").length}</p>
-            </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="CNPJ *"><Input required value={form.cnpj} onChange={(event) => setForm({ ...form, cnpj: event.target.value })} /></Field>
+            <Field label="Razão social *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
+            <Field label="Nome fantasia"><Input value={form.trading_name} onChange={(event) => setForm({ ...form, trading_name: event.target.value })} /></Field>
           </div>
-          <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-              <Users className="h-4 w-4 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total de Colaboradores</p>
-              <p className="text-xl font-bold">{empresas.reduce((acc, e) => acc + e.totalColaboradores, 0)}</p>
-            </div>
+          <div className="mt-4 flex justify-end">
+            <Button disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
           </div>
+        </form>
+
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Buscar por CNPJ ou razão social..." className="pl-9 bg-muted/30 border-border/50 h-9 text-sm rounded-md" />
         </div>
 
         <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
@@ -97,42 +140,23 @@ export default function EmpresasPage() {
             <table className="w-full text-sm text-left whitespace-nowrap">
               <thead className="bg-muted/50 border-b border-border">
                 <tr className="text-muted-foreground font-medium">
-                  <th className="px-4 py-3 align-middle">Razão Social</th>
-                  <th className="px-4 py-3 align-middle w-44">CNPJ</th>
-                  <th className="px-4 py-3 align-middle text-center w-40">Colaboradores</th>
-                  <th className="px-4 py-3 align-middle text-center w-24">Status</th>
-                  <th className="px-4 py-3 align-middle w-10"></th>
+                  <th className="px-4 py-3">Razão social</th>
+                  <th className="px-4 py-3">Nome fantasia</th>
+                  <th className="px-4 py-3">CNPJ</th>
+                  <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {empresas.map((empresa) => (
-                  <tr key={empresa.id} className="hover:bg-muted/30 transition-colors group">
-                    <td className="px-4 py-3 align-middle">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <Building2 className="h-4 w-4 text-primary" />
-                        </div>
-                        <span className="font-medium text-foreground">{empresa.razaoSocial}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-middle text-muted-foreground font-mono text-xs tabular-nums">
-                      {empresa.cnpj}
-                    </td>
-                    <td className="px-4 py-3 align-middle text-center text-muted-foreground tabular-nums">
-                      {empresa.totalColaboradores}
-                    </td>
-                    <td className="px-4 py-3 align-middle text-center">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase ${
-                        empresa.status === "Ativo"
-                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                          : "bg-zinc-500/10 text-zinc-500"
-                      }`}>
-                        {empresa.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 align-middle text-right">
-                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                {loading && <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={4}>Carregando empresas...</td></tr>}
+                {!loading && filtered.length === 0 && <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={4}>Nenhuma empresa encontrada.</td></tr>}
+                {!loading && filtered.map((company) => (
+                  <tr key={company.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3 font-medium text-foreground">{company.name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{company.trading_name || "-"}</td>
+                    <td className="px-4 py-3 text-muted-foreground font-mono text-xs tabular-nums">{company.cnpj}</td>
+                    <td className="px-4 py-3 text-right">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(company)}>
+                        <Edit3 className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     </td>
                   </tr>
@@ -142,10 +166,31 @@ export default function EmpresasPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-          <span>Mostrando {empresas.length} de {empresas.length} empresas</span>
-        </div>
+        <div className="text-xs text-muted-foreground pt-1">Mostrando {filtered.length} de {companies.length} empresas</div>
       </div>
     </div>
-  )
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
+      <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+        <Building2 className="h-4 w-4 text-primary" />
+      </div>
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-xl font-bold">{value}</p>
+      </div>
+    </div>
+  );
 }
