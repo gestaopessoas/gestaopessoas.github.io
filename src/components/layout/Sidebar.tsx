@@ -1,90 +1,64 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { 
-  Home, 
-  Users, 
-  Building2, 
-  MapPin, 
-  Briefcase 
-} from "lucide-react";
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { cn } from "@/lib/utils"
+import { LayoutDashboard, Users, Briefcase, FileText, BarChart3, Settings, LogOut } from "lucide-react"
 
-const mainNav = { name: "Home", href: "/dashboard", icon: Home };
-
-const navigationGroups = [
-  {
-    name: "Core HR",
-    items: [
-      { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users },
-      { name: "Centros de Custo", href: "/dashboard/centros-de-custo", icon: Briefcase },
-    ],
-  },
-  {
-    name: "Organização",
-    items: [
-      { name: "Empresas", href: "/dashboard/empresas", icon: Building2 },
-      { name: "Obras", href: "/dashboard/obras", icon: MapPin },
-    ],
-  },
-];
+const sidebarItems = [
+  { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Vagas", href: "/dashboard/vagas", icon: Briefcase },
+  { name: "Talentos", href: "/dashboard/talentos", icon: Users },
+  { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users },
+  { name: "Admissão", href: "/dashboard/admissao", icon: FileText },
+  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+  { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
+]
 
 export function Sidebar() {
-  const pathname = usePathname() || "";
+  const pathname = usePathname()
 
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-background">
-      <div className="flex h-16 items-center border-b px-6">
-        <Link href="/dashboard" className="flex items-center gap-2 font-bold tracking-tight">
-          <div className="h-6 w-6 rounded bg-primary" />
-          <span className="text-lg">ATS Core HR</span>
-        </Link>
+    <aside className="w-64 h-screen border-r border-border/50 bg-background/60 backdrop-blur-xl flex flex-col fixed left-0 top-0 z-40">
+      <div className="h-16 flex items-center px-6 border-b border-border/50">
+        <span className="text-lg font-bold tracking-tight text-foreground">
+          Gente & Gestão
+        </span>
       </div>
-      
-      <div className="flex-1 overflow-auto py-4">
-        <nav className="space-y-6 px-4">
-          <div className="space-y-1">
+
+      <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
+        {sidebarItems.map((item) => {
+          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+          return (
             <Link
-              href={mainNav.href}
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                pathname === mainNav.href
-                  ? "bg-muted text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-primary"
-              }`}
+              key={item.name}
+              href={item.href}
+              className={cn(
+                "group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200",
+                isActive
+                  ? "bg-muted text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              )}
             >
-              <mainNav.icon className="h-4 w-4" />
-              {mainNav.name}
+              <item.icon
+                className={cn(
+                  "mr-3 h-4 w-4 shrink-0 transition-colors",
+                  isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                )}
+                aria-hidden="true"
+              />
+              {item.name}
             </Link>
-          </div>
-          
-          {navigationGroups.map((group) => (
-            <div key={group.name} className="space-y-2">
-              <h4 className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {group.name}
-              </h4>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const isActive = pathname.startsWith(item.href);
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                        isActive
-                          ? "bg-muted text-primary"
-                          : "text-muted-foreground hover:bg-muted hover:text-primary"
-                      }`}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {item.name}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
+          )
+        })}
+      </nav>
+
+      <div className="p-4 border-t border-border/50">
+        <button className="group flex w-full items-center px-3 py-2 text-sm font-medium text-muted-foreground rounded-lg transition-all duration-200 hover:bg-muted/50 hover:text-destructive">
+          <LogOut className="mr-3 h-4 w-4 shrink-0 transition-colors group-hover:text-destructive" />
+          Sair
+        </button>
       </div>
-    </div>
-  );
+    </aside>
+  )
 }
