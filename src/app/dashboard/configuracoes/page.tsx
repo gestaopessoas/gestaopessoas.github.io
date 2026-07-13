@@ -24,7 +24,7 @@ export default function ConfiguracoesPage() {
           
           <TabsContent value="modulos" className="mt-6 space-y-6">
             <Card className="border-border/60 shadow-sm">
-              <CardHeader className="pb-4">
+              <CardHeader className="pb-4 border-b border-border/40 mb-4">
                 <CardTitle className="text-lg">Módulos Ativos</CardTitle>
                 <CardDescription>Habilite ou desabilite as funcionalidades principais da plataforma.</CardDescription>
               </CardHeader>
@@ -69,7 +69,7 @@ export default function ConfiguracoesPage() {
 
           <TabsContent value="permissoes" className="mt-6 space-y-6">
             <Card className="border-border/60 shadow-sm">
-              <CardHeader className="pb-4">
+              <CardHeader className="pb-4 border-b border-border/40 mb-4">
                 <CardTitle className="text-lg">Permissões de Acesso</CardTitle>
                 <CardDescription>Configure o nível de segurança e políticas de acesso.</CardDescription>
               </CardHeader>

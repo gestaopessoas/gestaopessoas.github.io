@@ -11,6 +11,9 @@ const sidebarItems = [
   { name: "Talentos", href: "/dashboard/talentos", icon: Users },
   { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users },
   { name: "Admissão", href: "/dashboard/admissao", icon: FileText },
+  { name: "Centros de Custo", href: "/dashboard/centros-de-custo", icon: Briefcase },
+  { name: "Empresas", href: "/dashboard/empresas", icon: LayoutDashboard },
+  { name: "Obras", href: "/dashboard/obras", icon: LayoutDashboard },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
 ]

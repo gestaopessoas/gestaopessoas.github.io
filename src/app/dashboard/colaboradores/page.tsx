@@ -4,11 +4,11 @@ import { Search, Plus, Filter, MoreHorizontal } from "lucide-react"
 
 export default function ColaboradoresPage() {
   const colaboradores = [
-    { id: "1", matricula: "00142", nome: "Ana Beatriz Silva", cargo: "Desenvolvedor(a) Frontend Sênior", departamento: "Tecnologia", dataAdmissao: "12/03/2021", status: "Ativo" },
-    { id: "2", matricula: "00145", nome: "Carlos Eduardo Souza", cargo: "Product Manager", departamento: "Produto", dataAdmissao: "05/06/2022", status: "Ativo" },
-    { id: "3", matricula: "00156", nome: "Mariana Costa Alves", cargo: "Analista de RH", departamento: "Recursos Humanos", dataAdmissao: "18/01/2023", status: "Férias" },
-    { id: "4", matricula: "00162", nome: "Rafael Lima", cargo: "Engenheiro(a) de Dados", departamento: "Tecnologia", dataAdmissao: "01/09/2023", status: "Ativo" },
-    { id: "5", matricula: "00170", nome: "Juliana Mendes", cargo: "Designer UX/UI", departamento: "Produto", dataAdmissao: "10/02/2024", status: "Ativo" },
+    { id: "1", cpf: "123.456.789-00", nome: "Ana Beatriz Silva", empresa: "Acme Corp Ltda.", obra: "Sede Central", cCusto: "CC-001", status: "Ativo" },
+    { id: "2", cpf: "234.567.890-11", nome: "Carlos Eduardo Souza", empresa: "Acme Corp Ltda.", obra: "Obra Sul", cCusto: "CC-002", status: "Ativo" },
+    { id: "3", cpf: "345.678.901-22", nome: "Mariana Costa Alves", empresa: "Gestão RH SA", obra: "Sede Central", cCusto: "CC-001", status: "Férias" },
+    { id: "4", cpf: "456.789.012-33", nome: "Rafael Lima", empresa: "Acme Corp Ltda.", obra: "Obra Norte", cCusto: "CC-003", status: "Ativo" },
+    { id: "5", cpf: "567.890.123-44", nome: "Juliana Mendes", empresa: "Design Tech", obra: "Sede Central", cCusto: "CC-001", status: "Ativo" },
   ]
 
   return (
@@ -47,21 +47,18 @@ export default function ColaboradoresPage() {
             <table className="w-full text-sm text-left whitespace-nowrap">
               <thead className="bg-muted/50 border-b border-border">
                 <tr className="text-muted-foreground font-medium">
-                  <th className="px-4 py-3 align-middle w-16">Matrícula</th>
                   <th className="px-4 py-3 align-middle">Colaborador</th>
-                  <th className="px-4 py-3 align-middle">Cargo</th>
-                  <th className="px-4 py-3 align-middle">Departamento</th>
-                  <th className="px-4 py-3 align-middle text-right">Admissão</th>
+                  <th className="px-4 py-3 align-middle w-32">CPF</th>
+                  <th className="px-4 py-3 align-middle">Empresa</th>
+                  <th className="px-4 py-3 align-middle">Obra</th>
+                  <th className="px-4 py-3 align-middle">C. Custo</th>
                   <th className="px-4 py-3 align-middle text-center w-24">Status</th>
-                  <th className="px-4 py-3 align-middle w-10"></th>
+                  <th className="px-4 py-3 align-middle w-10">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
                 {colaboradores.map((colaborador) => (
                   <tr key={colaborador.id} className="hover:bg-muted/30 transition-colors group">
-                    <td className="px-4 py-3 align-middle text-muted-foreground tabular-nums font-mono text-xs">
-                      {colaborador.matricula}
-                    </td>
                     <td className="px-4 py-3 align-middle">
                       <div className="flex items-center space-x-3">
                         <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-xs shrink-0">
@@ -70,14 +67,17 @@ export default function ColaboradoresPage() {
                         <span className="font-medium text-foreground">{colaborador.nome}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 align-middle text-muted-foreground">
-                      {colaborador.cargo}
+                    <td className="px-4 py-3 align-middle text-muted-foreground tabular-nums font-mono text-xs">
+                      {colaborador.cpf}
                     </td>
                     <td className="px-4 py-3 align-middle text-muted-foreground">
-                      {colaborador.departamento}
+                      {colaborador.empresa}
                     </td>
-                    <td className="px-4 py-3 align-middle text-right text-muted-foreground tabular-nums">
-                      {colaborador.dataAdmissao}
+                    <td className="px-4 py-3 align-middle text-muted-foreground">
+                      {colaborador.obra}
+                    </td>
+                    <td className="px-4 py-3 align-middle text-muted-foreground tabular-nums">
+                      {colaborador.cCusto}
                     </td>
                     <td className="px-4 py-3 align-middle text-center">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase ${
