@@ -3,6 +3,17 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeft, GripVertical, MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 
+// Required for Next.js static export with dynamic routes
+export function generateStaticParams() {
+  return [
+    { id: "req-042" },
+    { id: "req-043" },
+    { id: "req-044" },
+    { id: "req-040" },
+    { id: "req-039" },
+  ]
+}
+
 export default function KanbanBoardPage() {
   const columns = [
     { id: "triagem", title: "Triagem", count: 3 },
