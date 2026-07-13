@@ -3,12 +3,12 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Lock, Shirt, Map, Gift, Users, FileText,
   ChevronDown, Clock, ClipboardList, DollarSign, Briefcase,
-  LogOut, PanelLeftClose, PanelLeftOpen
+  PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = () => {
-  const { user, signOut, can } = useAuth();
+  const { can } = useAuth();
   const [mpOpen, setMpOpen] = React.useState(false);
   const [collapsed, setCollapsed] = React.useState(false);
 
@@ -85,43 +85,7 @@ const Sidebar = () => {
         )}
       </nav>
 
-      <div style={{
-        marginTop: 'auto',
-        padding: collapsed ? '1rem 0.5rem' : '1rem',
-        borderTop: '1px solid var(--color-border)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: collapsed ? 0 : '0.75rem',
-        justifyContent: collapsed ? 'center' : 'flex-start',
-      }}>
-        <div style={{
-          width: '36px', height: '36px', borderRadius: '50%',
-          background: 'var(--color-primary)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontWeight: 700, color: '#fff', fontSize: '0.9rem', flexShrink: 0,
-        }}>
-          {user?.email?.[0]?.toUpperCase() ?? 'U'}
-        </div>
-        {!collapsed && (
-          <>
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-text)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.email}
-              </p>
-              <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Gestao de Pessoas</p>
-            </div>
-            <button
-              onClick={signOut}
-              title="Sair"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: '0.25rem', borderRadius: '6px', transition: 'color 0.2s', display: 'flex', alignItems: 'center' }}
-              onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
-              onMouseOut={e => e.currentTarget.style.color = 'var(--color-text-muted)'}
-            >
-              <LogOut size={18} />
-            </button>
-          </>
-        )}
-      </div>
+
     </aside>
   );
 };
