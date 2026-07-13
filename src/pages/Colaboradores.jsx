@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../supabaseClient';
-import { Trash2, UserX, UserCheck, Search, Filter, FileText, Table as TableIcon, Eye, Edit3 } from 'lucide-react';
+import { UserX, UserCheck, Search, Filter, FileText, Table as TableIcon, Eye, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
