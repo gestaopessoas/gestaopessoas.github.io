@@ -51,7 +51,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">2.4%</div>
-            <p className="text-xs text-muted-foreground">Dentro da meta (< 5%)</p>
+            <p className="text-xs text-muted-foreground">Dentro da meta (&lt; 5%)</p>
           </CardContent>
         </Card>
       </div>
