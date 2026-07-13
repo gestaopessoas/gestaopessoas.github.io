@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Plus, Monitor, Users, Map } from 'lucide-react';
+import './Ilhas.css';
 
 const Ilhas = () => {
   const [islands, setIslands] = useState([]);
-  const [employees, setEmployees] = useState([]);
+  const [activeEmployees, setActiveEmployees] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -18,23 +19,25 @@ const Ilhas = () => {
 
   const fetchData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
-    // Fetch employees for dropdown (somente Ativos da Sede)
+    
+    // Filtro estrito: apenas ATIVOS e da SEDE
     const { data: emps } = await supabase.from('employees')
       .select('id, name')
       .eq('status', 'Ativo')
       .eq('unit', 'Sede')
       .order('name');
-    if (emps) setEmployees(emps);
+    if (emps) setActiveEmployees(emps);
 
-    // Fetch islands with employee relation
+    // Fetch islands
     const { data: isls } = await supabase
       .from('islands')
       .select(`
         *,
-        employees (name)
+        employees (name, status, unit)
       `)
       .order('sector', { ascending: true, nullsFirst: false })
       .order('position_index', { ascending: true, nullsFirst: false });
+      
     if (isls) setIslands(isls);
     
     if (showLoading) setLoading(false);
@@ -57,7 +60,7 @@ const Ilhas = () => {
   };
 
   const handleDelete = async (id) => {
-    if(window.confirm('Excluir este local?')) {
+    if(window.confirm('Tem certeza que deseja excluir esta mesa do mapeamento?')) {
       await supabase.from('islands').delete().eq('id', id);
       fetchData(false);
     }
@@ -69,18 +72,59 @@ const Ilhas = () => {
   };
 
   return (
-    <div className="glass-panel p-4 fade-in">
-      <div className="flex-between">
-        <h2>Mapeamento de Ilhas / Setores / Mesas</h2>
-      </div>
+    <div className="ilhas-container fade-in">
+      <header className="ilhas-header">
+        <div>
+          <h1 className="ilhas-title">Ilhas e Setores</h1>
+          <p className="text-muted">Mapeamento de mesas e alocação de colaboradores da Sede.</p>
+        </div>
+        <button className="btn btn-primary btn-icon" onClick={() => setShowForm(!showForm)}>
+          <Plus size={18} /> {showForm ? 'Cancelar' : 'Adicionar Mesa'}
+        </button>
+      </header>
 
-      <div className="mt-4">
+      {showForm && (
+        <div className="glass-panel form-panel fade-in">
+          <h3>Nova Mesa/Posição</h3>
+          <form onSubmit={handleCreate} className="ilhas-form">
+            <div className="form-group">
+              <label>Nome da Mesa (ex: Mesa 01)</label>
+              <input 
+                type="text" 
+                value={name} 
+                onChange={e => setName(e.target.value)} 
+                required 
+                placeholder="Ex: Mesa 01"
+              />
+            </div>
+            <div className="form-group">
+              <label>Setor/Ilha</label>
+              <input 
+                type="text" 
+                value={sector} 
+                onChange={e => setSector(e.target.value)} 
+                placeholder="Ex: Engenharia"
+              />
+            </div>
+            <button type="submit" className="btn btn-success">Salvar</button>
+          </form>
+        </div>
+      )}
+
+      <div className="ilhas-content mt-4">
         {loading ? (
-          <p className="text-muted">Carregando...</p>
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <p>Carregando mapa de ilhas...</p>
+          </div>
         ) : islands.length === 0 ? (
-          <p className="text-muted">Nenhum local mapeado no momento.</p>
+          <div className="empty-state glass-panel">
+            <Map size={48} className="text-muted mb-2" />
+            <p className="text-muted">Nenhuma mesa ou ilha mapeada no momento.</p>
+            <button className="btn btn-outline mt-2" onClick={() => setShowForm(true)}>Criar Primeira Mesa</button>
+          </div>
         ) : (
-          <div>
+          <div className="sectors-wrapper">
             {Object.entries(
               islands.reduce((acc, isl) => {
                 const s = isl.sector || 'Outros';
@@ -89,102 +133,69 @@ const Ilhas = () => {
                 return acc;
               }, {})
             ).map(([sectorName, desks]) => (
-              <div key={sectorName} style={{ marginBottom: '3rem' }}>
-                <h3 style={{ 
-                  borderBottom: '2px solid var(--color-border)', 
-                  paddingBottom: '0.5rem', 
-                  marginBottom: '1.5rem',
-                  color: 'var(--color-primary)'
-                }}>{sectorName}</h3>
+              <div key={sectorName} className="sector-block glass-panel fade-in delay-1">
+                <div className="sector-header">
+                  <h3 className="sector-title">
+                    <Users size={20} className="sector-icon" />
+                    {sectorName}
+                  </h3>
+                  <span className="sector-badge">{desks.filter(d => d.employee_id).length} / {desks.length} ocupadas</span>
+                </div>
                 
-                <div style={{ 
-                  overflowX: 'auto',
-                  paddingBottom: '1rem'
-                }}>
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: `repeat(${desks.length <= 2 ? desks.length : Math.ceil(desks.length / 2)}, 220px)`, 
-                    gap: '2px', // Pequeno gap entre as mesas
-                    width: 'max-content',
-                    margin: '0 auto', // Centralizar o bloco no espaço
-                    backgroundColor: 'rgba(0,0,0,0.02)',
-                    padding: '2rem',
-                    borderRadius: '1rem'
+                <div className="desks-scroll-area">
+                  <div className="desks-grid" style={{
+                    gridTemplateColumns: `repeat(${desks.length <= 2 ? desks.length : Math.ceil(desks.length / 2)}, minmax(240px, 1fr))`
                   }}>
                     {desks.map((isl, index) => {
                       const cols = desks.length <= 2 ? desks.length : Math.ceil(desks.length / 2);
                       const isTopRow = index < cols;
                       const isOccupied = !!isl.employee_id;
+                      
+                      // Check se o funcionário na mesa ainda é valido.
+                      const isInvalidEmployee = isOccupied && (!isl.employees || isl.employees.status !== 'Ativo' || isl.employees.unit !== 'Sede');
 
                       if (isl.name === 'ESPAÇO VAZIO') {
-                        return <div key={isl.id} style={{ visibility: 'hidden', minHeight: '185px' }}></div>;
+                        return <div key={isl.id} className="desk-empty-space"></div>;
                       }
 
                       return (
-                        <div key={isl.id} style={{ 
-                          display: 'flex', 
-                          flexDirection: isTopRow ? 'column' : 'column-reverse',
-                          alignItems: 'center'
-                        }}>
+                        <div key={isl.id} className={`desk-wrapper ${isTopRow ? 'top-row' : 'bottom-row'}`}>
+                          
                           {/* Ícone de Cadeira */}
-                          <div style={{ 
-                            width: '45px', height: '45px', 
-                            backgroundColor: isOccupied ? '#94a3b8' : '#e2e8f0', 
-                            borderRadius: isTopRow ? '50% 50% 40% 40%' : '40% 40% 50% 50%', 
-                            border: '3px solid #cbd5e1',
-                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                            marginBottom: isTopRow ? '-15px' : '0',
-                            marginTop: !isTopRow ? '-15px' : '0',
-                            zIndex: 10,
-                            position: 'relative'
-                          }}></div>
+                          <div className={`chair ${isOccupied ? 'occupied' : 'empty'} ${isTopRow ? 'chair-top' : 'chair-bottom'}`}></div>
 
-                          {/* Mesa (Madeira) */}
-                          <div style={{
-                            width: '100%',
-                            minHeight: '140px',
-                            backgroundColor: '#deab82', // Cor de madeira
-                            backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)',
-                            backgroundSize: '20px 20px',
-                            border: '1px solid #b57a4a',
-                            padding: '1rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                            boxShadow: 'inset 0 0 15px rgba(139, 69, 19, 0.1)'
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                              <span style={{ 
-                                fontWeight: 'bold', 
-                                fontSize: '0.85rem', 
-                                backgroundColor: 'rgba(255,255,255,0.8)',
-                                padding: '2px 8px',
-                                borderRadius: '12px',
-                                color: '#333'
-                              }}>{isl.name.split(' (')[0]}</span>
+                          {/* Mesa */}
+                          <div className={`desk-card ${isOccupied ? 'desk-occupied' : 'desk-free'}`}>
+                            <div className="desk-card-header">
+                              <span className="desk-name"><Monitor size={14} /> {isl.name.split(' (')[0]}</span>
+                              <button className="btn-delete-icon" onClick={() => handleDelete(isl.id)} title="Excluir Mesa">
+                                <Trash2 size={14} />
+                              </button>
                             </div>
 
-                            <select 
-                              value={isl.employee_id || ''}
-                              onChange={(e) => handleAssignEmployee(isl.id, e.target.value)}
-                              style={{ 
-                                width: '100%', 
-                                padding: '0.4rem', 
-                                borderRadius: '4px', 
-                                border: '1px solid #b57a4a', 
-                                fontSize: '0.85rem',
-                                backgroundColor: 'rgba(255,255,255,0.95)',
-                                fontWeight: 600,
-                                color: isOccupied ? '#15803d' : '#64748b',
-                                cursor: 'pointer',
-                                textAlign: 'center'
-                              }}
-                            >
-                              <option value="">-- Mesa Vazia --</option>
-                              {employees.map(emp => (
-                                <option key={emp.id} value={emp.id}>{emp.name}</option>
-                              ))}
-                            </select>
+                            {isInvalidEmployee && (
+                              <div className="invalid-employee-warning">
+                                Funcionário Inativo/Outro
+                              </div>
+                            )}
+
+                            <div className="desk-assign-container">
+                              <select 
+                                value={isl.employee_id || ''}
+                                onChange={(e) => handleAssignEmployee(isl.id, e.target.value)}
+                                className={`desk-select ${isOccupied ? 'select-occupied' : 'select-empty'}`}
+                              >
+                                <option value="">-- Mesa Vazia --</option>
+                                {/* Mapeia apenas funcionários ATIVOS e da SEDE */}
+                                {activeEmployees.map(emp => (
+                                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                ))}
+                                {/* Mantém visualização se funcionário for inativo mas ainda estiver lotado na mesa */}
+                                {isOccupied && !activeEmployees.find(e => e.id === isl.employee_id) && isl.employees && (
+                                  <option value={isl.employee_id}>{isl.employees.name} (Inativo)</option>
+                                )}
+                              </select>
+                            </div>
                           </div>
                         </div>
                       );

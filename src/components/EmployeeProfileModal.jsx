@@ -34,7 +34,7 @@ const BENEFITS_OPTIONS = [
 const EmployeeProfileModal = ({ employee, onClose }) => {
   const [activeTab, setActiveTab] = useState('dados');
 
-  // Benefícios — apenas em memória, não salvo no banco
+  // Benefícios
   const [benefits, setBenefits] = useState([]);
   const [newBenefit, setNewBenefit] = useState('');
 
@@ -42,11 +42,17 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
   const [vacations, setVacations] = useState([]);
   const [newVacation, setNewVacation] = useState({ start_date: '', end_date: '', notes: '' });
 
+  // Exames
+  const [exams, setExams] = useState([]);
+  const [newExam, setNewExam] = useState({ exam_type: 'Admissional', exam_name: '', exam_date: '', status: 'Agendado', result: 'Pendente' });
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (employee && activeTab === 'ferias') {
-      fetchVacations();
+    if (employee) {
+      if (activeTab === 'ferias') fetchVacations();
+      else if (activeTab === 'beneficios') fetchBenefits();
+      else if (activeTab === 'exames') fetchExams();
     }
   }, [employee, activeTab]);
 
@@ -61,20 +67,74 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
     setLoading(false);
   };
 
-  // Benefícios — apenas local, sem banco de dados
-  const handleAddBenefit = (e) => {
-    e.preventDefault();
-    if (!newBenefit.trim()) return;
-    if (benefits.includes(newBenefit.trim())) {
-      alert('Este benefício já foi adicionado.');
-      return;
-    }
-    setBenefits(prev => [...prev, newBenefit.trim()]);
-    setNewBenefit('');
+  const fetchBenefits = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('employee_benefits').select('*').eq('employee_id', employee.id);
+    if (data) setBenefits(data);
+    setLoading(false);
   };
 
-  const handleRemoveBenefit = (name) => {
-    setBenefits(prev => prev.filter(b => b !== name));
+  const fetchExams = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('occupational_exams').select('*').eq('employee_id', employee.id).order('exam_date', { ascending: false });
+    if (data) setExams(data);
+    setLoading(false);
+  };
+
+  const handleAddBenefit = async (e) => {
+    e.preventDefault();
+    if (!newBenefit.trim()) return;
+    
+    const { data, error } = await supabase
+      .from('employee_benefits')
+      .insert([{ employee_id: employee.id, benefit_name: newBenefit.trim(), active: true }])
+      .select();
+      
+    if (!error && data) {
+      setBenefits(prev => [...prev, data[0]]);
+      setNewBenefit('');
+    } else {
+      alert('Erro ao adicionar benefício: ' + error?.message);
+    }
+  };
+
+  const handleRemoveBenefit = async (id) => {
+    const { error } = await supabase.from('employee_benefits').delete().eq('id', id);
+    if (!error) {
+      setBenefits(prev => prev.filter(b => b.id !== id));
+    }
+  };
+
+  const handleAddExam = async (e) => {
+    e.preventDefault();
+    if (!newExam.exam_date || !newExam.exam_name || !newExam.exam_type) return;
+    
+    const { data, error } = await supabase
+      .from('occupational_exams')
+      .insert([{ 
+        employee_id: employee.id, 
+        exam_type: newExam.exam_type, 
+        exam_name: newExam.exam_name,
+        exam_date: newExam.exam_date,
+        status: newExam.status,
+        result: newExam.result
+      }])
+      .select();
+      
+    if (!error && data) {
+      setExams([data[0], ...exams]);
+      setNewExam({ exam_type: 'Admissional', exam_name: '', exam_date: '', status: 'Agendado', result: 'Pendente' });
+    } else {
+      alert('Erro ao agendar exame: ' + error?.message);
+    }
+  };
+
+  const handleRemoveExam = async (id) => {
+    if (!window.confirm('Excluir este exame?')) return;
+    const { error } = await supabase.from('occupational_exams').delete().eq('id', id);
+    if (!error) {
+      setExams(exams.filter(e => e.id !== id));
+    }
   };
 
   const handleAddVacation = async (e) => {
@@ -178,8 +238,8 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
 
           {activeTab === 'beneficios' && (
             <div>
-              <p style={{ margin: '0 0 0.5rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-                ℹ️ Os benefícios aqui são apenas para consulta rápida durante a sessão — não são salvos no banco de dados.
+              <p style={{ margin: '0 0 1.5rem', color: 'var(--color-text-muted)' }}>
+                Gerencie os benefícios ativos para este colaborador.
               </p>
 
               <form onSubmit={handleAddBenefit} style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
@@ -203,20 +263,22 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
                 </button>
               </form>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                {benefits.length === 0
-                  ? <p style={{ color: 'var(--color-text-muted)' }}>Nenhum benefício adicionado nesta sessão.</p>
-                  : benefits.map(b => (
-                    <div key={b} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(34,197,94,0.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.3)', padding: '0.4rem 0.8rem', borderRadius: '999px', fontSize: '0.9rem', fontWeight: 500 }}>
-                      <Tag size={14} />
-                      {b}
-                      <button onClick={() => handleRemoveBenefit(b)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '0.2rem', padding: '0.1rem' }}>
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ))
-                }
-              </div>
+              {loading ? <p>Carregando benefícios...</p> : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  {benefits.length === 0
+                    ? <p style={{ color: 'var(--color-text-muted)' }}>Nenhum benefício cadastrado.</p>
+                    : benefits.map(b => (
+                      <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(34,197,94,0.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.3)', padding: '0.4rem 0.8rem', borderRadius: '999px', fontSize: '0.9rem', fontWeight: 500 }}>
+                        <Tag size={14} />
+                        {b.benefit_name}
+                        <button onClick={() => handleRemoveBenefit(b.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '0.2rem', padding: '0.1rem' }}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))
+                  }
+                </div>
+              )}
             </div>
           )}
 
@@ -283,9 +345,85 @@ const EmployeeProfileModal = ({ employee, onClose }) => {
             </div>
           )}
           {activeTab === 'exames' && (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-              <p>Último ASO registrado no cadastro: <strong>{formatDate(employee.aso_date)}</strong></p>
-              <p>Módulo completo de Exames Ocupacionais em desenvolvimento.</p>
+            <div>
+              <p style={{ margin: '0 0 1.5rem', color: 'var(--color-text-muted)' }}>Histórico de exames ocupacionais (ASO, periódicos, etc).</p>
+              
+              <form onSubmit={handleAddExam} style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '130px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>Tipo de Exame</label>
+                  <select required value={newExam.exam_type} onChange={e => setNewExam({...newExam, exam_type: e.target.value})} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)' }}>
+                    <option value="Admissional">Admissional</option>
+                    <option value="Periódico">Periódico</option>
+                    <option value="Demissional">Demissional</option>
+                    <option value="Retorno ao Trabalho">Retorno ao Trabalho</option>
+                    <option value="Mudança de Função">Mudança de Função</option>
+                  </select>
+                </div>
+                <div style={{ flex: 2, minWidth: '200px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>Nome do Exame</label>
+                  <input type="text" required placeholder="Ex: Clínico (ASO), Audiometria..." value={newExam.exam_name} onChange={e => setNewExam({...newExam, exam_name: e.target.value})} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)' }} />
+                </div>
+                <div style={{ flex: 1, minWidth: '130px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>Data</label>
+                  <input type="date" required value={newExam.exam_date} onChange={e => setNewExam({...newExam, exam_date: e.target.value})} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)' }} />
+                </div>
+                <div style={{ flex: 1, minWidth: '130px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>Status / Resultado</label>
+                  <select required value={newExam.result} onChange={e => setNewExam({...newExam, result: e.target.value, status: e.target.value === 'Pendente' ? 'Agendado' : 'Realizado'})} style={{ width: '100%', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)' }}>
+                    <option value="Pendente">Pendente / Agendado</option>
+                    <option value="Apto">Apto</option>
+                    <option value="Apto com Restrições">Apto com Restrições</option>
+                    <option value="Inapto">Inapto</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <button type="submit" className="btn-primary" style={{ padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', height: '42px' }}>
+                    <Plus size={16} /> Adicionar
+                  </button>
+                </div>
+              </form>
+
+              {loading ? <p>Carregando exames...</p> : (
+                <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                    <thead style={{ background: 'var(--color-bg)' }}>
+                      <tr style={{ color: 'var(--color-text-muted)', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                        <th style={{ padding: '1rem' }}>Data</th>
+                        <th style={{ padding: '1rem' }}>Exame / Tipo</th>
+                        <th style={{ padding: '1rem' }}>Resultado</th>
+                        <th style={{ padding: '1rem', textAlign: 'right' }}>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {exams.length === 0 && (
+                        <tr><td colSpan="4" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Nenhum exame registrado.</td></tr>
+                      )}
+                      {exams.map(e => (
+                        <tr key={e.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                          <td style={{ padding: '1rem', fontWeight: 600 }}>{formatDate(e.exam_date)}</td>
+                          <td style={{ padding: '1rem' }}>
+                            <div style={{ fontWeight: 500 }}>{e.exam_name}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{e.exam_type}</div>
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            <span style={{ padding: '0.2rem 0.6rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 600, 
+                              background: e.result.includes('Apto') ? 'rgba(34,197,94,0.1)' : e.result === 'Inapto' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)', 
+                              color: e.result.includes('Apto') ? '#16a34a' : e.result === 'Inapto' ? '#ef4444' : '#f59e0b' 
+                            }}>
+                              {e.result}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'right' }}>
+                            <button onClick={() => handleRemoveExam(e.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem' }}>
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
           {activeTab === 'epis' && (

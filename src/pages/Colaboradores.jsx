@@ -229,6 +229,7 @@ const Colaboradores = () => {
           {activeTab === 'Ativo' && canCreate && (
             <button className="btn-primary" onClick={showForm ? closeForm : startCreate}>
               {showForm ? '✕ Cancelar' : '+ Novo Colaborador'}
+              {showForm ? '✕ Cancelar' : '+ Novo Colaborador'}
             </button>
           )}
         </div>
@@ -247,7 +248,7 @@ const Colaboradores = () => {
               display: 'flex', alignItems: 'center', gap: '0.5rem'
             }}>
             {tab.label}
-            <span style={{ background: activeTab === tab.key ? tab.color : 'var(--color-border)', color: activeTab === tab.key ? '#fff' : 'var(--color-text-muted)', borderRadius: '999px', padding: '0.1rem 0.5rem', fontSize: '0.75rem', fontWeight: 700 }}>
+            <span className={`badge ${activeTab === tab.key ? (tab.key === 'Ativo' ? 'badge-active' : 'badge-inactive') : ''}`} style={activeTab !== tab.key ? { background: 'var(--color-border)', color: 'var(--color-text-muted)' } : {}}>
               {counts[tab.key]}
             </span>
           </button>
@@ -274,7 +275,7 @@ const Colaboradores = () => {
 
       {/* Filter Panel */}
       {showFilters && (
-        <div style={{ background: 'var(--color-bg)', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--color-border)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
+        <div className="glass-card" style={{ padding: '1rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
           <div>
             <label style={labelStyle}>Setor / Depto.</label>
             <select value={filterDept} onChange={e => setFilterDept(e.target.value)} style={inputStyle}>
@@ -309,7 +310,7 @@ const Colaboradores = () => {
 
       {/* Form Novo */}
       {showForm && (
-        <form onSubmit={handleSubmit} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginBottom: '1.25rem' }}>
+        <form onSubmit={handleSubmit} className="glass-card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
           <h4 style={{ margin: '0 0 1rem' }}>{editingEmployee ? 'Editar Colaborador' : 'Novo Colaborador'}</h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
             {[['name', 'Nome *', 'text'], ['role', 'Cargo', 'text'], ['phone', 'Telefone', 'text'], ['admission_date', 'Data Admissão', 'date'], ['birthday', 'Nascimento', 'date'], ['cpf', 'CPF', 'text'], ['rg', 'RG', 'text'], ['pis', 'PIS', 'text'], ['ctps', 'CTPS', 'text'], ['ctps_serie', 'Série CTPS', 'text'], ['cbo', 'CBO', 'text'], ['cost_center', 'Centro Custo', 'text'], ['aso_date', 'Data ASO', 'date']].map(([field, lbl, type]) => (
@@ -379,10 +380,8 @@ const Colaboradores = () => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(emp => (
-                  <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background 0.15s' }}
-                    onMouseOver={e => e.currentTarget.style.background = 'var(--color-bg)'}
-                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                {filtered.map((emp, index) => (
+                  <tr key={emp.id} className="stagger-row hover-bg-transition" style={{ borderBottom: '1px solid var(--color-border)', animationDelay: `${index * 0.04}s` }}>
                     <td style={{ padding: '0.75rem 0.5rem', fontWeight: 600 }}>{emp.name}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.role || '—'}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.departments?.name || '—'}</td>
@@ -392,35 +391,25 @@ const Colaboradores = () => {
                     {activeTab === 'Ativo' && <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{formatDate(emp.admission_date)}</td>}
                     {activeTab === 'Desligado' && <td style={{ padding: '0.75rem 0.5rem', color: '#ef4444', fontWeight: 600 }}>{formatDate(emp.dismissed_at)}</td>}
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                        <button onClick={() => setSelectedEmployee(emp)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-primary)', background: 'rgba(245,174,56,0.08)', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                          <Eye size={14} /> Ver Perfil
+                      <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <button onClick={() => setSelectedEmployee(emp)} className="btn-action btn-action-view" title="Ver Perfil">
+                          <Eye size={16} />
                         </button>
                         {canEdit && (
-                          <button onClick={() => startEdit(emp)}
-                            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid #3b82f6', background: 'rgba(59,130,246,0.08)', color: '#3b82f6', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                            <Edit3 size={14} /> Editar
+                          <button onClick={() => startEdit(emp)} className="btn-action btn-action-edit" title="Editar">
+                            <Edit3 size={16} />
                           </button>
                         )}
                         {activeTab === 'Ativo' && canEdit && (
-                          <button onClick={() => { setDismissModal({ id: emp.id, name: emp.name }); setDismissDate(new Date().toISOString().split('T')[0]); }}
-                            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid #f59e0b', background: 'rgba(245,158,11,0.08)', color: '#f59e0b', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                            <UserX size={14} /> Desligar
+                          <button onClick={() => { setDismissModal({ id: emp.id, name: emp.name }); setDismissDate(new Date().toISOString().split('T')[0]); }} className="btn-action btn-action-dismiss" title="Desligar">
+                            <UserX size={16} />
                           </button>
                         )}
                         {activeTab === 'Desligado' && canEdit && (
-                          <button onClick={() => handleReactivate(emp.id)}
-                            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid #22c55e', background: 'rgba(34,197,94,0.08)', color: '#22c55e', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                            <UserCheck size={14} /> Reativar
+                          <button onClick={() => reactivateEmployee(emp.id)} className="btn-action btn-action-reactivate" title="Reativar">
+                            <UserCheck size={16} />
                           </button>
                         )}
-                        {canDelete && <button onClick={() => handleDelete(emp.id)} title="Excluir"
-                          style={{ padding: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', transition: 'color 0.2s' }}
-                          onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
-                          onMouseOut={e => e.currentTarget.style.color = 'var(--color-text-muted)'}>
-                          <Trash2 size={15} />
-                        </button>}
                       </div>
                     </td>
                   </tr>
