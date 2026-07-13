@@ -6,6 +6,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import VagaFormModal from '../components/VagaFormModal';
+import ATSBoard from '../components/ATSBoard';
 
 const Vagas = () => {
   const [openings, setOpenings] = useState([]);
@@ -16,6 +17,9 @@ const Vagas = () => {
   
   // Detalhes da vaga (Visualização)
   const [selectedOpening, setSelectedOpening] = useState(null);
+  
+  // ATS Board
+  const [atsJobId, setAtsJobId] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -170,6 +174,10 @@ const Vagas = () => {
                         style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', fontSize: '0.8rem' }}>
                         <Eye size={14} /> Detalhes
                       </button>
+                      <button onClick={() => setAtsJobId(op.id)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-primary)', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+                        Candidatos
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -249,6 +257,11 @@ const Vagas = () => {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* Kanban ATS */}
+      {atsJobId && (
+        <ATSBoard jobId={atsJobId} onClose={() => setAtsJobId(null)} />
       )}
     </div>
   );

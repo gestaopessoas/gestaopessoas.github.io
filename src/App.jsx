@@ -12,6 +12,7 @@ import Uniformes from './pages/Uniformes';
 import Ilhas from './pages/Ilhas';
 import Aniversarios from './pages/Aniversarios';
 import ControlePonto from './pages/ControlePonto';
+
 import ControleRGS from './pages/ControleRGS';
 import Custos from './pages/Custos';
 import Vagas from './pages/Vagas';
@@ -19,6 +20,9 @@ import PublicJobRequest from './pages/PublicJobRequest';
 import MPContratacao from './pages/mp/MPContratacao';
 import MPAlteracao from './pages/mp/MPAlteracao';
 import Configuracoes from './pages/Configuracoes';
+import PublicJobs from './pages/PublicJobs';
+import CandidateApplicationForm from './pages/CandidateApplicationForm';
+import CandidateReview from './pages/CandidateReview';
 
 function App() {
   return (
@@ -26,6 +30,9 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/solicitar-vaga" element={<PublicJobRequest />} />
+        <Route path="/carreiras" element={<PublicJobs />} />
+        <Route path="/carreiras/:id/candidatar" element={<CandidateApplicationForm />} />
+        <Route path="/review-candidato/:id" element={<CandidateReview />} />
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="colaboradores" element={<ProtectedRoute module="colaboradores"><Colaboradores /></ProtectedRoute>} />

@@ -402,10 +402,13 @@ const ArquivoMorto = () => {
       )}
 
       {/* Modal de Perfil Completo */}
-      <EmployeeProfileModal 
-        employee={selectedEmployee} 
-        onClose={() => setSelectedEmployee(null)} 
-      />
+      {selectedEmployee && (
+        <EmployeeProfileModal 
+          employee={selectedEmployee} 
+          onClose={() => setSelectedEmployee(null)} 
+          onUpdate={fetchData}
+        />
+      )}
     </div>
   );
 };

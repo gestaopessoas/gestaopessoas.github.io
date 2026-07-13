@@ -32,6 +32,7 @@ const Colaboradores = () => {
   const [filterGender, setFilterGender] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
+
   // Modal desligamento
   const [dismissModal, setDismissModal] = useState(null);
   const [dismissDate, setDismissDate] = useState('');
@@ -39,7 +40,6 @@ const Colaboradores = () => {
 
   // Modal de Perfil
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [editingEmployee, setEditingEmployee] = useState(null);
 
   // Form
   const [form, setForm] = useState(EMPTY_FORM);
@@ -77,21 +77,12 @@ const Colaboradores = () => {
 
   const closeForm = () => {
     setForm(EMPTY_FORM);
-    setEditingEmployee(null);
     setShowForm(false);
   };
 
   const startCreate = () => {
     setForm(EMPTY_FORM);
-    setEditingEmployee(null);
     setShowForm(true);
-  };
-
-  const startEdit = (employee) => {
-    setForm(Object.fromEntries(Object.keys(EMPTY_FORM).map(key => [key, employee[key] || ''])));
-    setEditingEmployee(employee);
-    setShowForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const normalizedForm = () => ({
@@ -104,11 +95,9 @@ const Colaboradores = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingEmployee ? !canEdit : !canCreate) return;
+    if (!canCreate) return;
     const payload = normalizedForm();
-    const { error } = editingEmployee
-      ? await supabase.from('employees').update(payload).eq('id', editingEmployee.id)
-      : await supabase.from('employees').insert([{ ...payload, status: 'Ativo' }]);
+    const { error } = await supabase.from('employees').insert([{ ...payload, status: 'Ativo' }]);
     if (!error) { closeForm(); fetchData(); fetchCounts(); }
     else alert('Erro: ' + error.message);
   };
@@ -122,22 +111,15 @@ const Colaboradores = () => {
     else alert('Erro ao desligar: ' + (error.message || JSON.stringify(error)));
   };
 
-  const handleReactivate = async (id) => {
+  const reactivateEmployee = async (id) => {
     if (!window.confirm('Reativar este colaborador?')) return;
     await supabase.from('employees').update({ status: 'Ativo', dismissed_at: null }).eq('id', id);
-    fetchData(); fetchCounts();
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Excluir permanentemente? Esta ação não pode ser desfeita.')) return;
-    await supabase.from('employees').delete().eq('id', id);
     fetchData(); fetchCounts();
   };
 
   const clean = (value) => String(value || '').trim();
   const key = (value) => clean(value).toLowerCase();
 
-  // Units derived from data
   const units = [...new Set(employees.map(e => clean(e.unit)).filter(Boolean))].sort();
   const shirtSizes = [...new Set(employees.map(e => clean(e.shirt_size)).filter(Boolean))].sort();
 
@@ -211,7 +193,6 @@ const Colaboradores = () => {
 
   return (
     <div className="glass-panel p-4 fade-in">
-      {/* Header */}
       <div className="flex-between" style={{ marginBottom: '1.25rem' }}>
         <div>
           <h2 style={{ margin: 0 }}>Colaboradores</h2>
@@ -229,13 +210,11 @@ const Colaboradores = () => {
           {activeTab === 'Ativo' && canCreate && (
             <button className="btn-primary" onClick={showForm ? closeForm : startCreate}>
               {showForm ? '✕ Cancelar' : '+ Novo Colaborador'}
-              {showForm ? '✕ Cancelar' : '+ Novo Colaborador'}
             </button>
           )}
         </div>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '2px solid var(--color-border)' }}>
         {STATUS_TABS.map(tab => (
           <button key={tab.key} onClick={() => { setActiveTab(tab.key); clearFilters(); }}
@@ -255,7 +234,6 @@ const Colaboradores = () => {
         ))}
       </div>
 
-      {/* Search + Filter Bar */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <Search size={15} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
@@ -273,7 +251,6 @@ const Colaboradores = () => {
         )}
       </div>
 
-      {/* Filter Panel */}
       {showFilters && (
         <div className="glass-card" style={{ padding: '1rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
           <div>
@@ -308,11 +285,13 @@ const Colaboradores = () => {
         </div>
       )}
 
-      {/* Form Novo */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="glass-card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-          <h4 style={{ margin: '0 0 1rem' }}>{editingEmployee ? 'Editar Colaborador' : 'Novo Colaborador'}</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+      {showForm && canCreate && (
+        <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0, color: 'var(--color-text)' }}>Novo Colaborador</h3>
+            <button onClick={closeForm} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}><X size={20} /></button>
+          </div>
+          <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
             {[['name', 'Nome *', 'text'], ['role', 'Cargo', 'text'], ['phone', 'Telefone', 'text'], ['admission_date', 'Data Admissão', 'date'], ['birthday', 'Nascimento', 'date'], ['cpf', 'CPF', 'text'], ['rg', 'RG', 'text'], ['pis', 'PIS', 'text'], ['ctps', 'CTPS', 'text'], ['ctps_serie', 'Série CTPS', 'text'], ['cbo', 'CBO', 'text'], ['cost_center', 'Centro Custo', 'text'], ['aso_date', 'Data ASO', 'date']].map(([field, lbl, type]) => (
               <div key={field}>
                 <label style={labelStyle}>{lbl}</label>
@@ -351,15 +330,16 @@ const Colaboradores = () => {
               <label style={labelStyle}>Camisa</label>
               <input value={form.shirt_size} onChange={e => setForm(f => ({ ...f, shirt_size: e.target.value }))} placeholder="P, M, G..." style={inputStyle} />
             </div>
+          </form>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+            <button type="button" className="btn-secondary" onClick={closeForm}>Cancelar</button>
+            <button type="submit" onClick={handleSubmit} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              Cadastrar
+            </button>
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button type="submit" className="btn-primary">Salvar</button>
-            <button type="button" onClick={closeForm} style={{ padding: '0.6rem 1.2rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'none', cursor: 'pointer' }}>Cancelar</button>
-          </div>
-        </form>
+        </div>
       )}
 
-      {/* Table */}
       {loading ? <p className="text-muted">Carregando...</p> : filtered.length === 0 ? (
         <p className="text-muted" style={{ textAlign: 'center', padding: '2rem' }}>Nenhum colaborador encontrado com esses filtros.</p>
       ) : (
@@ -372,7 +352,6 @@ const Colaboradores = () => {
                   <th style={{ padding: '0.75rem 0.5rem' }}>Cargo</th>
                   <th style={{ padding: '0.75rem 0.5rem' }}>Setor</th>
                   <th style={{ padding: '0.75rem 0.5rem' }}>Unidade</th>
-                  <th style={{ padding: '0.75rem 0.5rem' }}>Observação</th>
                   <th style={{ padding: '0.75rem 0.5rem' }}>Aniversário</th>
                   {activeTab === 'Ativo' && <th style={{ padding: '0.75rem 0.5rem' }}>Admissão</th>}
                   {activeTab === 'Desligado' && <th style={{ padding: '0.75rem 0.5rem', color: '#ef4444' }}>Demissão</th>}
@@ -386,7 +365,6 @@ const Colaboradores = () => {
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.role || '—'}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.departments?.name || '—'}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.unit || '—'}</td>
-                    <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)', fontSize: '0.8rem', fontStyle: 'italic', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={emp.observation || ''}>{emp.observation || '—'}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{emp.birthday && typeof emp.birthday === 'string' && emp.birthday.includes('-') ? emp.birthday.split('-').reverse().join('/') : emp.birthday || '—'}</td>
                     {activeTab === 'Ativo' && <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>{formatDate(emp.admission_date)}</td>}
                     {activeTab === 'Desligado' && <td style={{ padding: '0.75rem 0.5rem', color: '#ef4444', fontWeight: 600 }}>{formatDate(emp.dismissed_at)}</td>}
@@ -395,11 +373,6 @@ const Colaboradores = () => {
                         <button onClick={() => setSelectedEmployee(emp)} className="btn-action btn-action-view" title="Ver Perfil">
                           <Eye size={16} />
                         </button>
-                        {canEdit && (
-                          <button onClick={() => startEdit(emp)} className="btn-action btn-action-edit" title="Editar">
-                            <Edit3 size={16} />
-                          </button>
-                        )}
                         {activeTab === 'Ativo' && canEdit && (
                           <button onClick={() => { setDismissModal({ id: emp.id, name: emp.name }); setDismissDate(new Date().toISOString().split('T')[0]); }} className="btn-action btn-action-dismiss" title="Desligar">
                             <UserX size={16} />
@@ -423,7 +396,6 @@ const Colaboradores = () => {
         </>
       )}
 
-      {/* Modal Desligamento */}
       {dismissModal && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="fade-in" style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: '2rem', maxWidth: '420px', width: '90%', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-lg)', color: 'var(--color-text)' }}>
@@ -454,11 +426,13 @@ const Colaboradores = () => {
         document.body
       )}
 
-      {/* Modal de Perfil Completo */}
-      <EmployeeProfileModal 
-        employee={selectedEmployee} 
-        onClose={() => setSelectedEmployee(null)} 
-      />
+      {selectedEmployee && (
+        <EmployeeProfileModal 
+          employee={selectedEmployee} 
+          onClose={() => setSelectedEmployee(null)} 
+          onUpdate={() => { fetchData(); fetchCounts(); }}
+        />
+      )}
     </div>
   );
 };

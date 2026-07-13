@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, MessageCircle, Send, Sparkles } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
@@ -50,9 +51,19 @@ const initialForm = {
 };
 
 const PublicJobRequest = () => {
+  const [searchParams] = useSearchParams();
   const [profiles, setProfiles] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [form, setForm] = useState(initialForm);
+  
+  // Smart Link Support: Initialize form with query params
+  const [form, setForm] = useState({
+    ...initialForm,
+    requester_name: searchParams.get('nome') || initialForm.requester_name,
+    requester_area: searchParams.get('area') || initialForm.requester_area,
+    department_id: searchParams.get('dept') || initialForm.department_id,
+    profile_id: searchParams.get('perfil') || initialForm.profile_id,
+  });
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');

@@ -1,4 +1,4 @@
-﻿-- Arquivo de criaÃ§Ã£o do Banco de Dados - Cole e rode no "SQL Editor" do Supabase
+-- Arquivo de criaÃ§Ã£o do Banco de Dados - Cole e rode no "SQL Editor" do Supabase
 
 -- 1. CriaÃ§Ã£o das Tabelas
 
