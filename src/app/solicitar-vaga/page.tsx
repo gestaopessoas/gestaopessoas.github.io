@@ -83,25 +83,57 @@ export default function SolicitarVagaPage() {
   const [profiles, setProfiles] = useState<JobProfile[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [form, setForm] = useState(initialForm);
-  const [loading, setLoading] = useState(true);
+  const [accessCode, setAccessCode] = useState("");
+  const [authorized, setAuthorized] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!authorized) return;
+
     const supabase = createClient();
-    supabase.rpc("get_public_job_form_options").then(({ data, error }) => {
-      if (error) setError("Não foi possível carregar cargos e setores. Avise o RH.");
+    supabase.rpc("get_public_job_form_options").then(async ({ data, error }) => {
+      if (error) {
+        const [profilesResult, departmentsResult] = await Promise.all([
+          supabase.from("job_profiles").select("id, profile_code, title, min_education, desired_education, min_experience, desired_experience, cnh, knowledge, competencies").order("title"),
+          supabase.from("departments").select("id, name").order("name"),
+        ]);
+
+        if (profilesResult.error || departmentsResult.error) {
+          setError("Não foi possível carregar cargos e setores. Avise o RH para conferir a migração do Supabase.");
+          setLoading(false);
+          return;
+        }
+
+        setProfiles((profilesResult.data ?? []) as JobProfile[]);
+        setDepartments((departmentsResult.data ?? []) as Department[]);
+        setLoading(false);
+        return;
+      }
+
       setProfiles((data?.profiles ?? []) as JobProfile[]);
       setDepartments((data?.departments ?? []) as Department[]);
       setLoading(false);
     });
-  }, []);
+  }, [authorized]);
 
   const whatsappDigits = form.requester_phone.replace(/\D/g, "");
   const whatsappUrl = whatsappDigits ? `https://wa.me/${whatsappDigits.startsWith("55") ? whatsappDigits : `55${whatsappDigits}`}` : "";
-
   const set = (field: keyof typeof initialForm, value: string | string[]) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  const validateAccess = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const expected = process.env.NEXT_PUBLIC_JOB_REQUEST_CODE || "ACPO-GP";
+    if (accessCode.trim().toUpperCase() !== expected.trim().toUpperCase()) {
+      setError("Código interno inválido. Solicite o código ao RH.");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    setAuthorized(true);
+  };
 
   const toggleTag = (field: "behavioral_tags" | "search_tags", tag: string) => {
     setForm((prev) => ({
@@ -132,9 +164,13 @@ export default function SolicitarVagaPage() {
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!authorized) {
+      setError("Informe o código interno antes de solicitar uma vaga.");
+      return;
+    }
+
     setError("");
     setSaving(true);
-
     const supabase = createClient();
     const { error } = await supabase.from("job_requests").insert([{
       ...form,
@@ -177,6 +213,26 @@ export default function SolicitarVagaPage() {
     </div>
   );
 
+  if (!authorized) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-muted/30 p-6">
+        <form onSubmit={validateAccess} className="w-full max-w-md rounded-lg border bg-card p-6 shadow-sm">
+          <p className="text-sm font-medium text-muted-foreground">ACPO Gestão de Pessoas</p>
+          <h1 className="mt-2 text-2xl font-semibold">Solicitar nova vaga</h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            Este formulário é exclusivo para gestores internos. Informe o código recebido do RH para continuar.
+          </p>
+          {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+          <div className="mt-5 space-y-2">
+            <Label>Código interno</Label>
+            <Input value={accessCode} onChange={(event) => setAccessCode(event.target.value)} autoFocus />
+          </div>
+          <Button className="mt-5 w-full">Continuar</Button>
+        </form>
+      </main>
+    );
+  }
+
   if (sent) {
     return (
       <main className="grid min-h-screen place-items-center bg-muted/30 p-6">
@@ -206,11 +262,11 @@ export default function SolicitarVagaPage() {
         <section className="rounded-lg border bg-card p-5">
           <h2 className="mb-4 text-lg font-semibold">Solicitante</h2>
           <div className="grid gap-4 md:grid-cols-3">
-            <Field label="Nome *"><Input required value={form.requester_name} onChange={(e) => set("requester_name", e.target.value)} /></Field>
-            <Field label="Área"><Input value={form.requester_area} onChange={(e) => set("requester_area", e.target.value)} /></Field>
+            <Field label="Nome *"><Input required value={form.requester_name} onChange={(event) => set("requester_name", event.target.value)} /></Field>
+            <Field label="Área"><Input value={form.requester_area} onChange={(event) => set("requester_area", event.target.value)} /></Field>
             <Field label="WhatsApp *">
               <div className="flex gap-2">
-                <Input required type="tel" value={form.requester_phone} onChange={(e) => set("requester_phone", e.target.value)} placeholder="(47) 99999-9999" />
+                <Input required type="tel" value={form.requester_phone} onChange={(event) => set("requester_phone", event.target.value)} placeholder="(47) 99999-9999" />
                 <a href={whatsappUrl || undefined} target="_blank" rel="noreferrer" className={`grid h-10 w-11 place-items-center rounded-md border ${whatsappUrl ? "bg-emerald-500 text-white" : "pointer-events-none bg-muted text-muted-foreground"}`} aria-label="Abrir WhatsApp">
                   <MessageCircle className="h-5 w-5" />
                 </a>
@@ -224,36 +280,36 @@ export default function SolicitarVagaPage() {
           {loading ? <p className="text-muted-foreground">Carregando cargos...</p> : (
             <div className="grid gap-4 md:grid-cols-3">
               <Field label="Cargo do perfil de competência *" className="md:col-span-3">
-                <select required value={form.profile_id} onChange={(e) => handleProfileChange(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <select required value={form.profile_id} onChange={(event) => handleProfileChange(event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   <option value="">Selecione...</option>
                   {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.title} (PC: {profile.profile_code})</option>)}
                 </select>
               </Field>
-              <Field label="Título da vaga *"><Input required value={form.position_title} onChange={(e) => set("position_title", e.target.value)} /></Field>
+              <Field label="Título da vaga *"><Input required value={form.position_title} onChange={(event) => set("position_title", event.target.value)} /></Field>
               <Field label="Departamento">
-                <select value={form.department_id} onChange={(e) => set("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <select value={form.department_id} onChange={(event) => set("department_id", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   <option value="">Selecione...</option>
                   {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                 </select>
               </Field>
-              <Field label="Unidade"><Input value={form.unit} onChange={(e) => set("unit", e.target.value)} placeholder="Sede, obra..." /></Field>
-              <Field label="Quantidade"><Input type="number" min="1" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} /></Field>
+              <Field label="Unidade"><Input value={form.unit} onChange={(event) => set("unit", event.target.value)} placeholder="Sede, obra..." /></Field>
+              <Field label="Quantidade"><Input type="number" min="1" value={form.quantity} onChange={(event) => set("quantity", event.target.value)} /></Field>
               <Field label="Contrato *">
-                <select value={form.contract_type} onChange={(e) => set("contract_type", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <select value={form.contract_type} onChange={(event) => set("contract_type", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   {["CLT", "Estágio", "Jovem Aprendiz", "Temporário", "Terceirizado", "PJ"].map((item) => <option key={item}>{item}</option>)}
                 </select>
               </Field>
               <Field label="Motivo *">
-                <select value={form.reason} onChange={(e) => set("reason", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <select value={form.reason} onChange={(event) => set("reason", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   {["Substituição", "Aumento de quadro", "Novo projeto/obra", "Temporário", "Banco de talentos", "Outro"].map((item) => <option key={item}>{item}</option>)}
                 </select>
               </Field>
               <Field label="Urgência *">
-                <select value={form.urgency} onChange={(e) => set("urgency", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <select value={form.urgency} onChange={(event) => set("urgency", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   {["Baixa", "Média", "Alta", "Crítica"].map((item) => <option key={item}>{item}</option>)}
                 </select>
               </Field>
-              <Field label="Data limite"><Input type="date" value={form.target_date} onChange={(e) => set("target_date", e.target.value)} /></Field>
+              <Field label="Data limite"><Input type="date" value={form.target_date} onChange={(event) => set("target_date", event.target.value)} /></Field>
             </div>
           )}
         </section>
@@ -262,8 +318,8 @@ export default function SolicitarVagaPage() {
           <section className="rounded-lg border bg-card p-5">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><Sparkles className="h-5 w-5" /> Requisitos do perfil cadastrado</h2>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Mínimo para a vaga"><textarea rows={7} value={form.required_requirements} onChange={(e) => set("required_requirements", e.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" /></Field>
-              <Field label="Desejável para a vaga"><textarea rows={7} value={form.desired_requirements} onChange={(e) => set("desired_requirements", e.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" /></Field>
+              <Field label="Mínimo para a vaga"><textarea rows={7} value={form.required_requirements} onChange={(event) => set("required_requirements", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" /></Field>
+              <Field label="Desejável para a vaga"><textarea rows={7} value={form.desired_requirements} onChange={(event) => set("desired_requirements", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" /></Field>
             </div>
           </section>
         )}
@@ -271,10 +327,10 @@ export default function SolicitarVagaPage() {
         <section className="rounded-lg border bg-card p-5">
           <h2 className="mb-4 text-lg font-semibold">Salário e horário</h2>
           <div className="grid gap-4 md:grid-cols-4">
-            <Field label="Salário mínimo"><Input type="number" min="0" step="0.01" value={form.salary_min} onChange={(e) => set("salary_min", e.target.value)} /></Field>
-            <Field label="Salário máximo"><Input type="number" min="0" step="0.01" value={form.salary_max} onChange={(e) => set("salary_max", e.target.value)} /></Field>
-            <Field label="Horário / escala" className="md:col-span-2"><Input value={form.work_schedule} onChange={(e) => set("work_schedule", e.target.value)} placeholder="Segunda a sexta, 08h às 18h" /></Field>
-            <Field label="Observação de salário" className="md:col-span-4"><Input value={form.salary_notes} onChange={(e) => set("salary_notes", e.target.value)} placeholder="Ex: combinar conforme experiência e faixa aprovada" /></Field>
+            <Field label="Salário mínimo"><Input type="number" min="0" step="0.01" value={form.salary_min} onChange={(event) => set("salary_min", event.target.value)} /></Field>
+            <Field label="Salário máximo"><Input type="number" min="0" step="0.01" value={form.salary_max} onChange={(event) => set("salary_max", event.target.value)} /></Field>
+            <Field label="Horário / escala" className="md:col-span-2"><Input value={form.work_schedule} onChange={(event) => set("work_schedule", event.target.value)} placeholder="Segunda a sexta, 08h às 18h" /></Field>
+            <Field label="Observação de salário" className="md:col-span-4"><Input value={form.salary_notes} onChange={(event) => set("salary_notes", event.target.value)} placeholder="Ex: combinar conforme experiência e faixa aprovada" /></Field>
           </div>
         </section>
 
@@ -293,8 +349,8 @@ export default function SolicitarVagaPage() {
         <section className="rounded-lg border bg-card p-5">
           <h2 className="mb-4 text-lg font-semibold">Expectativa do gestor</h2>
           <div className="grid gap-4">
-            <Field label="O que você busca nesse colaborador?"><textarea rows={4} value={form.manager_expectations} onChange={(e) => set("manager_expectations", e.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" /></Field>
-            <Field label="Observações finais"><textarea rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" /></Field>
+            <Field label="O que você busca nesse colaborador?"><textarea rows={4} value={form.manager_expectations} onChange={(event) => set("manager_expectations", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" /></Field>
+            <Field label="Observações finais"><textarea rows={3} value={form.notes} onChange={(event) => set("notes", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" /></Field>
           </div>
         </section>
 

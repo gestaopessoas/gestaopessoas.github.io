@@ -1,50 +1,220 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { createClient } from "@/utils/supabase/client";
+import { Briefcase, CheckCircle2, MapPin, Send } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+type Career = {
+  id: string;
+  status: string;
+  cost_center: string | null;
+  contract_type: string | null;
+  target_date: string | null;
+  observations: string | null;
+  created_at: string;
+  department: string | null;
+  profile: {
+    title: string | null;
+    profile_code: string | null;
+    min_education: string | null;
+    desired_education: string | null;
+    min_experience: string | null;
+    desired_experience: string | null;
+    knowledge: string | null;
+    activities: string | null;
+    competencies: string | null;
+  } | null;
+};
+
+const emptyCandidate = {
+  full_name: "",
+  email: "",
+  phone: "",
+  city: "",
+  state: "",
+  linkedin_url: "",
+};
 
 export default function CarreirasPage() {
+  const [careers, setCareers] = useState<Career[]>([]);
+  const [query, setQuery] = useState("");
+  const [selectedJob, setSelectedJob] = useState<Career | null>(null);
+  const [candidate, setCandidate] = useState(emptyCandidate);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.rpc("get_public_careers").then(({ data, error }) => {
+      if (error) setError("Não foi possível carregar vagas abertas.");
+      setCareers((data ?? []) as Career[]);
+      setLoading(false);
+    });
+  }, []);
+
+  const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return careers;
+    return careers.filter((career) => [
+      career.profile?.title,
+      career.department,
+      career.cost_center,
+      career.contract_type,
+      career.profile?.knowledge,
+      career.profile?.competencies,
+    ].some((value) => value?.toLowerCase().includes(term)));
+  }, [careers, query]);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedJob) return;
+    setSaving(true);
+    setError("");
+
+    const [firstName, ...lastParts] = candidate.full_name.trim().split(/\s+/);
+    const supabase = createClient();
+    const { data: candidateData, error: candidateError } = await supabase
+      .from("candidates")
+      .insert({
+        full_name: candidate.full_name.trim(),
+        first_name: firstName,
+        last_name: lastParts.join(" ") || firstName,
+        email: candidate.email.trim(),
+        phone: candidate.phone.trim() || null,
+        city: candidate.city.trim() || null,
+        state: candidate.state.trim() || null,
+        linkedin_url: candidate.linkedin_url.trim() || null,
+        role_interest: selectedJob.profile?.title || null,
+        search_tags: [selectedJob.profile?.title, selectedJob.department, selectedJob.cost_center].filter(Boolean),
+      })
+      .select("id")
+      .single();
+
+    if (candidateError || !candidateData) {
+      setSaving(false);
+      setError("Não foi possível cadastrar seus dados. Confira o e-mail e tente novamente.");
+      return;
+    }
+
+    const { error: applicationError } = await supabase
+      .from("job_applications")
+      .insert({ candidate_id: candidateData.id, job_opening_id: selectedJob.id, status: "Nova Aplicação" });
+
+    setSaving(false);
+    if (applicationError) {
+      setError("Dados recebidos, mas não foi possível vincular à vaga. Avise o RH.");
+      return;
+    }
+
+    setSent(true);
+    setCandidate(emptyCandidate);
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center">
-      {/* Hero Section with Glassmorphism */}
-      <section className="relative flex w-full flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-primary/10 via-background to-background py-32 px-4 text-center">
-        <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0))] dark:bg-grid-black/10" />
-        <div className="relative z-10 mx-auto max-w-3xl rounded-3xl border border-white/20 bg-white/10 p-12 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-black/10">
-          <h1 className="mb-4 text-5xl font-extrabold tracking-tight sm:text-6xl text-foreground">
-            Construa seu futuro conosco
-          </h1>
-          <p className="mb-8 text-lg text-muted-foreground sm:text-xl">
-            Vagas abertas para talentos excepcionais. Descubra oportunidades que impulsionam sua carreira e a nossa inovação.
+    <main className="min-h-screen bg-background">
+      <section className="border-b bg-muted/30 px-4 py-14">
+        <div className="mx-auto max-w-5xl">
+          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Carreiras ACPO</h1>
+          <p className="mt-4 max-w-2xl text-lg leading-8 text-muted-foreground">
+            Vagas abertas conectadas ao perfil de competência e ao processo seletivo interno.
           </p>
-          <div className="flex w-full max-w-sm mx-auto items-center space-x-2">
-            <Input type="text" placeholder="Buscar vagas..." className="bg-background/80 backdrop-blur-sm" />
-            <Button type="submit">Buscar</Button>
+          <div className="mt-6 flex w-full max-w-md items-center gap-2">
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Buscar por cargo, área ou requisito..." />
+            <Button type="button">Buscar</Button>
           </div>
         </div>
       </section>
 
-      {/* Placeholder Job Listings */}
-      <section className="container mx-auto px-4 py-20 max-w-5xl">
-        <div className="mb-10 flex items-center justify-between">
-          <h2 className="text-3xl font-bold tracking-tight">Vagas em Destaque</h2>
+      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-10 lg:grid-cols-[1fr_360px]">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold">Vagas abertas</h2>
+            <span className="text-sm text-muted-foreground">{filtered.length} vaga(s)</span>
+          </div>
+
+          {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
+          {loading && <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">Carregando vagas...</div>}
+          {!loading && filtered.length === 0 && <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">Nenhuma vaga aberta no momento.</div>}
+
+          <div className="grid gap-4">
+            {filtered.map((career) => (
+              <Card key={career.id} className={selectedJob?.id === career.id ? "border-primary" : ""}>
+                <CardHeader>
+                  <CardTitle>{career.profile?.title || "Vaga sem título"}</CardTitle>
+                  <CardDescription className="flex flex-wrap gap-x-3 gap-y-1">
+                    <span className="inline-flex items-center"><Briefcase className="mr-1.5 h-3.5 w-3.5" />{career.contract_type || "Contrato não informado"}</span>
+                    <span className="inline-flex items-center"><MapPin className="mr-1.5 h-3.5 w-3.5" />{career.cost_center || career.department || "Área não informada"}</span>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="mb-3 text-sm leading-6 text-muted-foreground">{career.profile?.activities || career.observations || "Detalhes em alinhamento com o RH."}</p>
+                  <div className="grid gap-2 text-sm md:grid-cols-2">
+                    <Requirement title="Mínimo" text={[career.profile?.min_education, career.profile?.min_experience].filter(Boolean).join(" · ")} />
+                    <Requirement title="Desejável" text={[career.profile?.desired_education, career.profile?.desired_experience, career.profile?.knowledge].filter(Boolean).join(" · ")} />
+                  </div>
+                  <Button className="mt-4" variant={selectedJob?.id === career.id ? "default" : "outline"} onClick={() => { setSelectedJob(career); setSent(false); }}>
+                    Candidatar-se
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Example Job Card */}
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="hover:shadow-lg transition-shadow bg-card">
-              <CardHeader>
-                <CardTitle>Engenheiro(a) de Software Pleno</CardTitle>
-                <CardDescription>Tecnologia • Híbrido • Pelotas/RS</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-                  Buscamos um talento inovador para desenvolver soluções de ponta. Experiência com React e Node.js desejada.
-                </p>
-                <Button variant="outline" className="w-full">Ver detalhes</Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+
+        <aside className="h-fit rounded-lg border bg-card p-5">
+          {sent ? (
+            <div className="text-center">
+              <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-emerald-500" />
+              <h2 className="text-lg font-semibold">Candidatura enviada</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Recebemos seus dados. O RH vai avaliar a aderência ao perfil.</p>
+            </div>
+          ) : (
+            <form onSubmit={submit} className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold">Enviar candidatura</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{selectedJob ? selectedJob.profile?.title : "Selecione uma vaga para começar."}</p>
+              </div>
+              <Field label="Nome completo *"><Input required disabled={!selectedJob} value={candidate.full_name} onChange={(event) => setCandidate({ ...candidate, full_name: event.target.value })} /></Field>
+              <Field label="E-mail *"><Input required disabled={!selectedJob} type="email" value={candidate.email} onChange={(event) => setCandidate({ ...candidate, email: event.target.value })} /></Field>
+              <Field label="Telefone"><Input disabled={!selectedJob} value={candidate.phone} onChange={(event) => setCandidate({ ...candidate, phone: event.target.value })} /></Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Cidade"><Input disabled={!selectedJob} value={candidate.city} onChange={(event) => setCandidate({ ...candidate, city: event.target.value })} /></Field>
+                <Field label="UF"><Input disabled={!selectedJob} value={candidate.state} onChange={(event) => setCandidate({ ...candidate, state: event.target.value })} /></Field>
+              </div>
+              <Field label="LinkedIn"><Input disabled={!selectedJob} value={candidate.linkedin_url} onChange={(event) => setCandidate({ ...candidate, linkedin_url: event.target.value })} /></Field>
+              <Button className="w-full" disabled={!selectedJob || saving}>
+                <Send className="mr-2 h-4 w-4" />
+                {saving ? "Enviando..." : "Enviar candidatura"}
+              </Button>
+            </form>
+          )}
+        </aside>
       </section>
     </main>
-  )
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function Requirement({ title, text }: { title: string; text: string }) {
+  if (!text) return null;
+  return (
+    <div className="rounded-md bg-muted/40 p-3">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <div className="mt-1 text-sm text-foreground">{text}</div>
+    </div>
+  );
 }
