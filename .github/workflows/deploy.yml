@@ -39,7 +39,6 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_JOB_REQUEST_CODE: ${{ secrets.JOB_REQUEST_CODE }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

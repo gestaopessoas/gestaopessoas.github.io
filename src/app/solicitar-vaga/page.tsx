@@ -125,9 +125,8 @@ export default function SolicitarVagaPage() {
 
   const validateAccess = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const expected = process.env.NEXT_PUBLIC_JOB_REQUEST_CODE || "ACPO-GP";
-    if (accessCode.trim().toUpperCase() !== expected.trim().toUpperCase()) {
-      setError("Código interno inválido. Solicite o código ao RH.");
+    if (!accessCode.trim()) {
+      setError("Informe o código interno recebido do RH.");
       return;
     }
     setError("");
@@ -172,7 +171,7 @@ export default function SolicitarVagaPage() {
     setError("");
     setSaving(true);
     const supabase = createClient();
-    const { error } = await supabase.from("job_requests").insert([{
+    const payload = {
       ...form,
       requester_whatsapp: whatsappUrl,
       profile_id: form.profile_id || null,
@@ -181,10 +180,23 @@ export default function SolicitarVagaPage() {
       salary_min: form.salary_min ? Number(form.salary_min) : null,
       salary_max: form.salary_max ? Number(form.salary_max) : null,
       target_date: form.target_date || null,
-    }]);
+    };
+
+    const { error } = await supabase.rpc("submit_job_request", {
+      payload,
+      access_code: accessCode.trim(),
+    });
 
     setSaving(false);
     if (error) {
+      if (error.message.includes("invalid_job_request_code")) {
+        setError("Código interno inválido. Solicite o código ao RH.");
+        return;
+      }
+      if (error.message.includes("job_request_code_not_configured")) {
+        setError("O código interno ainda não foi configurado no Supabase. Avise o RH.");
+        return;
+      }
       setError("Não foi possível enviar agora. Confira os campos e tente novamente.");
       return;
     }
