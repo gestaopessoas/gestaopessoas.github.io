@@ -4,6 +4,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PlusCircle, Save, Trash2, ShieldAlert } from "lucide-react"
 
+// Required for Next.js static export with dynamic routes
+export function generateStaticParams() {
+  return [
+    { id: "req-042" },
+    { id: "req-043" },
+    { id: "req-044" },
+    { id: "req-040" },
+    { id: "req-039" },
+  ]
+}
+
 export default function TriagemQuestionsPage() {
   return (
     <div className="flex flex-col gap-6 p-8 max-w-4xl mx-auto">
