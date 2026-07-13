@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PlusCircle, Save, Trash2, ShieldAlert } from "lucide-react"
@@ -45,7 +45,7 @@ export default function TriagemQuestionsPage() {
             <div className="grid gap-2">
               <Label>Critério de Aceitação (Knockout Rule)</Label>
               <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                <option>Obrigatório responder "Sim"</option>
+                <option>Obrigatório responder &quot;Sim&quot;</option>
                 <option>Análise Semântica (AIA) - Requer contexto</option>
               </select>
             </div>
