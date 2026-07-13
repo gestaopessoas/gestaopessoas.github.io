@@ -51,8 +51,31 @@ export default function CarreirasPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.rpc("get_public_careers").then(({ data, error }) => {
-      if (error) setError("Não foi possível carregar vagas abertas.");
+    supabase.rpc("get_public_careers").then(async ({ data, error }) => {
+      if (error) {
+        const fallback = await supabase
+          .from("job_openings")
+          .select("id,status,cost_center,contract_type,target_date,observations,created_at,profile:job_profiles(title,profile_code,min_education,desired_education,min_experience,desired_experience,knowledge,activities,competencies),department:departments(name)")
+          .eq("status", "Aberta")
+          .order("created_at", { ascending: false });
+
+        if (fallback.error) {
+          setError("Não foi possível carregar vagas abertas.");
+          setCareers([]);
+        } else {
+          const rows = (fallback.data ?? []) as unknown as Array<Career & {
+            department: { name: string | null } | { name: string | null }[] | null;
+            profile: Career["profile"] | Career["profile"][];
+          }>;
+          setCareers(rows.map((item) => ({
+            ...item,
+            profile: Array.isArray(item.profile) ? item.profile[0] ?? null : item.profile ?? null,
+            department: Array.isArray(item.department) ? item.department[0]?.name ?? null : item.department?.name ?? null,
+          })));
+        }
+        setLoading(false);
+        return;
+      }
       setCareers((data ?? []) as Career[]);
       setLoading(false);
     });
