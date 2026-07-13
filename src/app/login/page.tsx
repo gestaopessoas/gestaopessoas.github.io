@@ -13,11 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { LogIn } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -28,16 +26,24 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim(),
+      });
 
-    setLoading(false);
-    if (error) {
-      setError("E-mail ou senha inválidos.");
-      return;
+      if (error || !data.session) {
+        setError(error?.message || "E-mail ou senha invalidos.");
+        setLoading(false);
+        return;
+      }
+
+      window.location.assign("/dashboard/vagas/");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Nao foi possivel entrar agora.");
+      setLoading(false);
     }
-
-    router.push("/dashboard/vagas");
   };
 
   return (
@@ -46,7 +52,7 @@ export default function LoginPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Entrar</CardTitle>
-            <CardDescription>Acesse o painel de gestão de pessoas da ACPO.</CardDescription>
+            <CardDescription>Acesse o painel de gestao de pessoas da ACPO.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
