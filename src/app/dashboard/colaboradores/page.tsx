@@ -4,303 +4,264 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Plus, Search, Users, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Edit3, Plus, Search, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
-type Employee = {
-  id: string;
-  name: string;
-  cpf: string | null;
-  role: string | null;
-  unit: string | null;
-  cost_center: string | null;
-  status: string | null;
-  admission_date: string | null;
-  profile_code: string | null;
-  level: string | null;
-  departments?: { name: string | null } | null;
-};
+type Department = { id: string; name: string };
+type Employee = Record<string, string | null | Department> & { id: string; name: string; departments: Department | null };
+type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
+
+const pageSize = 100;
+const fields = [
+  "id", "name", "department_id", "birthday", "status", "dismissed_at", "role", "phone",
+  "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "gender",
+  "unit", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cost_center", "cbo",
+  "aso_date", "observation", "archive_box", "workplace",
+].join(", ");
 
 const emptyForm = {
-  name: "",
-  cpf: "",
-  role: "",
-  unit: "",
-  cost_center: "",
-  status: "Ativo",
-  admission_date: "",
-  profile_code: "",
-  level: "",
+  name: "", department_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", phone: "",
+  email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "",
+  gender: "", unit: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
+  cost_center: "", cbo: "", aso_date: "", observation: "", archive_box: "", workplace: "",
 };
 
-const statusStyle: Record<string, string> = {
-  Ativo: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  "Férias": "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  Afastado: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  Inativo: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-300",
-  "Arquivo Morto": "bg-zinc-500/10 text-zinc-600 dark:text-zinc-300",
-};
+type EmployeeForm = typeof emptyForm;
 
 export default function ColaboradoresPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [form, setForm] = useState<EmployeeForm>(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
-    let active = true;
-
-    const loadEmployees = async () => {
-      const supabase = createClient();
-      const fullSelect = "id, name, cpf, role, unit, cost_center, status, admission_date, profile_code, level, departments(name)";
-      const fullResult = await supabase.from("employees").select(fullSelect).order("name", { ascending: true }).limit(500);
-      let data = fullResult.data as Employee[] | null;
-      let error = fullResult.error;
-
-      if (error) {
-        const minimalResult = await supabase.from("employees").select("id, name, status").order("name", { ascending: true }).limit(500);
-        data = minimalResult.data as Employee[] | null;
-        error = minimalResult.error;
-      }
-
-      if (!active) return;
-      setLoading(false);
-      if (error) {
-        setError("Não foi possível carregar colaboradores. Confira login e permissões no Supabase.");
-        return;
-      }
-      setEmployees(data ?? []);
-    };
-
-    loadEmployees();
-
-    return () => {
-      active = false;
-    };
+    const supabase = createClient();
+    supabase.from("departments").select("id, name").order("name").then(({ data }) => setDepartments((data ?? []) as Department[]));
   }, []);
 
-  const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return employees;
-    return employees.filter((employee) => [
-      employee.name,
-      employee.cpf,
-      employee.role,
-      employee.unit,
-      employee.cost_center,
-      employee.status,
-      employee.departments?.name,
-    ].some((value) => value?.toLowerCase().includes(term)));
-  }, [employees, query]);
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      setError("");
+      const supabase = createClient();
+      let request = supabase
+        .from("employees")
+        .select(`${fields}, departments(name)`, { count: "exact" })
+        .neq("status", "Arquivo Morto")
+        .order("name")
+        .range(page * pageSize, page * pageSize + pageSize - 1);
+      const term = query.trim().replace(/[,%()]/g, " ");
+      if (term) request = request.or(`name.ilike.%${term}%,cpf.ilike.%${term}%,rg.ilike.%${term}%,role.ilike.%${term}%`);
+      const { data, error: loadError, count } = await request;
+      setLoading(false);
+      if (loadError) {
+        setError(`Não foi possível carregar os colaboradores: ${loadError.message}`);
+        return;
+      }
+      setEmployees((data ?? []) as unknown as Employee[]);
+      setTotal(count ?? 0);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [page, query, refresh]);
+
+  const update = (field: keyof EmployeeForm, value: string) => setForm((current) => ({ ...current, [field]: value }));
 
   const startNew = () => {
     setEditingId(null);
     setForm(emptyForm);
-    setError("");
+    setShowForm(true);
   };
 
   const startEdit = (employee: Employee) => {
+    const next = { ...emptyForm };
+    for (const key of Object.keys(next) as (keyof EmployeeForm)[]) next[key] = String(employee[key] ?? "");
     setEditingId(employee.id);
-    setForm({
-      name: employee.name ?? "",
-      cpf: employee.cpf ?? "",
-      role: employee.role ?? "",
-      unit: employee.unit ?? "",
-      cost_center: employee.cost_center ?? "",
-      status: employee.status ?? "Ativo",
-      admission_date: employee.admission_date ?? "",
-      profile_code: employee.profile_code ?? "",
-      level: employee.level ?? "",
-    });
-    setError("");
+    setForm(next);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     setError("");
-
-    const payload = {
-      name: form.name.trim(),
-      cpf: form.cpf.trim() || null,
-      role: form.role.trim() || null,
-      unit: form.unit.trim() || null,
-      cost_center: form.cost_center.trim() || null,
-      status: form.status,
-      admission_date: form.admission_date || null,
-      profile_code: form.profile_code.trim() || null,
-      level: form.level.trim() || null,
-    };
-
+    const nullableDates = new Set(["birthday", "dismissed_at", "admission_date", "aso_date"]);
+    const payload = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || key === "department_id" ? value || null : value.trim() || null]));
+    payload.name = form.name.trim();
+    payload.status = form.status;
     const supabase = createClient();
     const result = editingId
-      ? await supabase.from("employees").update(payload).eq("id", editingId).select().single()
-      : await supabase.from("employees").insert(payload).select().single();
-
+      ? await supabase.from("employees").update(payload).eq("id", editingId)
+      : await supabase.from("employees").insert(payload);
     setSaving(false);
     if (result.error) {
-      setError("Não foi possível salvar. Verifique permissões e colunas da tabela employees.");
+      setError(`Não foi possível salvar: ${result.error.message}`);
       return;
     }
-
-    const saved = result.data as Employee;
-    setEmployees((prev) => editingId ? prev.map((item) => item.id === editingId ? { ...item, ...saved } : item) : [...prev, saved].sort((a, b) => a.name.localeCompare(b.name)));
+    setShowForm(false);
     setEditingId(null);
     setForm(emptyForm);
+    setRefresh((value) => value + 1);
   };
 
-  const activeCount = employees.filter((employee) => (employee.status ?? "Ativo") === "Ativo").length;
-  const units = new Set(employees.map((employee) => employee.unit).filter(Boolean)).size;
-  const costCenters = new Set(employees.map((employee) => employee.cost_center).filter(Boolean)).size;
-
   return (
-    <div className="flex flex-col h-full bg-background">
-      <div className="flex-1 p-8 space-y-6 max-w-7xl mx-auto w-full">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Colaboradores</h1>
-            <p className="text-sm text-muted-foreground mt-1">Diretório mestre conectado ao Supabase.</p>
-          </div>
-          <Button size="sm" className="h-9" onClick={startNew}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo colaborador
-          </Button>
-        </header>
-
-        {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Metric label="Total" value={employees.length} />
-          <Metric label="Ativos" value={activeCount} />
-          <Metric label="Unidades" value={units} />
-          <Metric label="C. custo" value={costCenters} />
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Colaboradores</h1>
+          <p className="text-sm text-muted-foreground">{total.toLocaleString("pt-BR")} registros ativos ou em movimentação.</p>
         </div>
+        <Button onClick={startNew}><Plus className="mr-2 h-4 w-4" />Novo colaborador</Button>
+      </header>
 
-        <form onSubmit={save} className="rounded-lg border bg-card p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold">{editingId ? "Editar colaborador" : "Adicionar colaborador"}</h2>
-            {editingId && (
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={startNew}>
-                <X className="h-4 w-4" />
-              </Button>
-            )}
+      {error && <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+      {showForm && (
+        <form onSubmit={save} className="rounded-lg border bg-card p-5">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">{editingId ? "Registro completo do colaborador" : "Novo colaborador"}</h2>
+              <p className="text-sm text-muted-foreground">Dados pessoais, contratuais, documentos e saúde ocupacional.</p>
+            </div>
+            <Button type="button" variant="ghost" size="icon" onClick={() => setShowForm(false)} aria-label="Fechar"><X className="h-4 w-4" /></Button>
           </div>
-          <div className="grid gap-3 md:grid-cols-4">
-            <Field label="Nome *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
-            <Field label="CPF"><Input value={form.cpf} onChange={(event) => setForm({ ...form, cpf: event.target.value })} /></Field>
-            <Field label="Cargo"><Input value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })} /></Field>
-            <Field label="Status">
-              <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                {["Ativo", "Férias", "Afastado", "Inativo", "Arquivo Morto"].map((status) => <option key={status}>{status}</option>)}
-              </select>
-            </Field>
-            <Field label="Unidade / obra"><Input value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} /></Field>
-            <Field label="Centro de custo"><Input value={form.cost_center} onChange={(event) => setForm({ ...form, cost_center: event.target.value })} /></Field>
-            <Field label="PC"><Input value={form.profile_code} onChange={(event) => setForm({ ...form, profile_code: event.target.value })} /></Field>
-            <Field label="Nível"><Input value={form.level} onChange={(event) => setForm({ ...form, level: event.target.value })} /></Field>
-            <Field label="Admissão"><Input type="date" value={form.admission_date} onChange={(event) => setForm({ ...form, admission_date: event.target.value })} /></Field>
-          </div>
-          <div className="mt-4 flex justify-end">
-            <Button disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
+
+          <Section title="Identificação">
+            <Field label="Nome completo *" span><Input required value={form.name} onChange={(e) => update("name", e.target.value)} /></Field>
+            <Field label="CPF"><Input value={form.cpf} onChange={(e) => update("cpf", e.target.value)} /></Field>
+            <Field label="RG"><Input value={form.rg} onChange={(e) => update("rg", e.target.value)} /></Field>
+            <Field label="Nascimento"><Input type="date" value={form.birthday} onChange={(e) => update("birthday", e.target.value)} /></Field>
+            <Field label="Gênero"><Input value={form.gender} onChange={(e) => update("gender", e.target.value)} /></Field>
+            <Field label="Estado civil"><Input value={form.marital_status} onChange={(e) => update("marital_status", e.target.value)} /></Field>
+            <Field label="Telefone"><Input value={form.phone} onChange={(e) => update("phone", e.target.value)} /></Field>
+            <Field label="E-mail pessoal"><Input type="email" value={form.email_personal} onChange={(e) => update("email_personal", e.target.value)} /></Field>
+            <Field label="E-mail corporativo"><Input type="email" value={form.email_corporate} onChange={(e) => update("email_corporate", e.target.value)} /></Field>
+          </Section>
+
+          <Section title="Vínculo e lotação">
+            <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "Férias", "Afastado", "Inativo", "Desligado", "Arquivo Morto"]} /></Field>
+            <Field label="Cargo"><Input value={form.role} onChange={(e) => update("role", e.target.value)} /></Field>
+            <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></Field>
+            <Field label="Tipo de contrato"><Input value={form.contract_type} onChange={(e) => update("contract_type", e.target.value)} /></Field>
+            <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
+            <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
+            <Field label="Unidade / obra"><Input value={form.unit} onChange={(e) => update("unit", e.target.value)} /></Field>
+            <Field label="Local de trabalho"><Input value={form.workplace} onChange={(e) => update("workplace", e.target.value)} /></Field>
+            <Field label="Centro de custo"><Input value={form.cost_center} onChange={(e) => update("cost_center", e.target.value)} /></Field>
+            <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} /></Field>
+            <Field label="Tamanho da camisa"><Input value={form.shirt_size} onChange={(e) => update("shirt_size", e.target.value)} /></Field>
+          </Section>
+
+          <Section title="Documentos e arquivo">
+            <Field label="CTPS"><Input value={form.ctps} onChange={(e) => update("ctps", e.target.value)} /></Field>
+            <Field label="Série CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
+            <Field label="PIS"><Input value={form.pis} onChange={(e) => update("pis", e.target.value)} /></Field>
+            <Field label="Data do ASO"><Input type="date" value={form.aso_date} onChange={(e) => update("aso_date", e.target.value)} /></Field>
+            <Field label="Caixa do arquivo morto"><Input value={form.archive_box} onChange={(e) => update("archive_box", e.target.value)} /></Field>
+            <Field label="Observações" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
+          </Section>
+
+          {editingId && <RelatedRecords employeeId={editingId} />}
+
+          <div className="mt-5 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button disabled={saving}>{saving ? "Salvando..." : "Salvar registro"}</Button>
           </div>
         </form>
+      )}
 
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por nome, CPF, cargo, obra..."
-            className="pl-9 bg-muted/30 border-border/50 h-9 text-sm rounded-md"
-          />
-        </div>
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nome, CPF, RG ou cargo" className="pl-9" />
+      </div>
 
-        <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left whitespace-nowrap">
-              <thead className="bg-muted/50 border-b border-border">
-                <tr className="text-muted-foreground font-medium">
-                  <th className="px-4 py-3">Colaborador</th>
-                  <th className="px-4 py-3">CPF</th>
-                  <th className="px-4 py-3">Cargo</th>
-                  <th className="px-4 py-3">Unidade</th>
-                  <th className="px-4 py-3">C. custo</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {loading && <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>Carregando colaboradores...</td></tr>}
-                {!loading && filtered.length === 0 && <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>Nenhum colaborador encontrado.</td></tr>}
-                {!loading && filtered.map((employee) => (
-                  <tr key={employee.id} className="hover:bg-muted/30 transition-colors group">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-xs shrink-0">
-                          {initials(employee.name)}
-                        </div>
-                        <div>
-                          <div className="font-medium text-foreground">{employee.name}</div>
-                          <div className="text-xs text-muted-foreground">{employee.profile_code || "Sem PC"} · {employee.level || "Sem nível"}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground tabular-nums font-mono text-xs">{employee.cpf || "-"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{employee.role || "-"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{employee.unit || "-"}</td>
-                    <td className="px-4 py-3 text-muted-foreground tabular-nums">{employee.cost_center || employee.departments?.name || "-"}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase ${statusStyle[employee.status || "Ativo"] ?? statusStyle.Inativo}`}>
-                        {employee.status || "Ativo"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(employee)}>
-                        <Edit3 className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <div className="overflow-x-auto rounded-lg border bg-card">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotação</th><th className="p-3">Status</th><th className="p-3 text-right">Ações</th></tr></thead>
+          <tbody>
+            {loading ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : employees.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum colaborador encontrado.</td></tr> : employees.map((employee) => (
+              <tr key={employee.id} className="border-b last:border-0">
+                <td className="p-3"><div className="font-medium">{employee.name}</div><div className="text-xs text-muted-foreground">{String(employee.email_corporate ?? employee.email_personal ?? "")}</div></td>
+                <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
+                <td className="p-3"><div>{String(employee.role ?? "-")}</div><div className="text-xs text-muted-foreground">{employee.departments?.name ?? String(employee.unit ?? employee.workplace ?? "-")}</div></td>
+                <td className="p-3">{String(employee.status ?? "-")}</td>
+                <td className="p-3 text-right"><Button size="sm" variant="outline" onClick={() => startEdit(employee)}><Edit3 className="mr-2 h-3.5 w-3.5" />Abrir registro</Button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-        <div className="text-xs text-muted-foreground pt-2">
-          Mostrando {filtered.length} de {employees.length} colaboradores
-        </div>
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
+        <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button></div>
       </div>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function RelatedRecords({ employeeId }: { employeeId: string }) {
+  const [benefits, setBenefits] = useState<RelatedRow[]>([]);
+  const [epis, setEpis] = useState<RelatedRow[]>([]);
+  const [vacations, setVacations] = useState<RelatedRow[]>([]);
+  const [exams, setExams] = useState<RelatedRow[]>([]);
+  const [benefit, setBenefit] = useState("");
+  const [epi, setEpi] = useState({ epi_name: "", ca_number: "", received_date: "" });
+  const [vacation, setVacation] = useState({ start_date: "", end_date: "" });
+  const [exam, setExam] = useState({ exam_type: "Admissional", exam_name: "", exam_date: "" });
+
+  const load = useCallback(async () => {
+    const supabase = createClient();
+    const [b, e, v, x] = await Promise.all([
+      supabase.from("employee_benefits").select("*").eq("employee_id", employeeId).order("created_at"),
+      supabase.from("employee_epis").select("*").eq("employee_id", employeeId).order("created_at"),
+      supabase.from("vacations").select("*").eq("employee_id", employeeId).order("start_date", { ascending: false }),
+      supabase.from("occupational_exams").select("*").eq("employee_id", employeeId).order("exam_date", { ascending: false }),
+    ]);
+    setBenefits((b.data ?? []) as RelatedRow[]); setEpis((e.data ?? []) as RelatedRow[]); setVacations((v.data ?? []) as RelatedRow[]); setExams((x.data ?? []) as RelatedRow[]);
+  }, [employeeId]);
+
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+
+  const add = async (table: "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams", payload: Record<string, string | null>) => {
+    const { error } = await createClient().from(table).insert({ employee_id: employeeId, ...payload });
+    if (!error) void load();
+  };
+  const remove = async (table: "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams", id: string) => {
+    if (!window.confirm("Excluir este registro?")) return;
+    const { error } = await createClient().from(table).delete().eq("id", id);
+    if (!error) void load();
+  };
+
   return (
-    <div className="space-y-2">
-      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>
-      {children}
+    <div className="mt-6 space-y-3 border-t pt-5">
+      <h3 className="font-medium">Histórico vinculado</h3>
+      <Related title="Benefícios" rows={benefits} render={(row) => `${row.benefit_name}${row.value ? ` · R$ ${row.value}` : ""}`} onRemove={(id) => remove("employee_benefits", id)}>
+        <Input value={benefit} onChange={(e) => setBenefit(e.target.value)} placeholder="Nome do benefício" />
+        <Button type="button" variant="outline" onClick={() => { if (benefit.trim()) { void add("employee_benefits", { benefit_name: benefit.trim() }); setBenefit(""); } }}>Adicionar</Button>
+      </Related>
+      <Related title="EPIs" rows={epis} render={(row) => `${row.epi_name} · CA ${row.ca_number || "-"} · ${row.received_date || "sem data"}`} onRemove={(id) => remove("employee_epis", id)}>
+        <Input value={epi.epi_name} onChange={(e) => setEpi({ ...epi, epi_name: e.target.value })} placeholder="EPI" /><Input value={epi.ca_number} onChange={(e) => setEpi({ ...epi, ca_number: e.target.value })} placeholder="Número CA" /><Input type="date" value={epi.received_date} onChange={(e) => setEpi({ ...epi, received_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (epi.epi_name) { void add("employee_epis", { ...epi, received_date: epi.received_date || null, status: "Ativo" }); setEpi({ epi_name: "", ca_number: "", received_date: "" }); } }}>Adicionar</Button>
+      </Related>
+      <Related title="Férias" rows={vacations} render={(row) => `${row.start_date} até ${row.end_date} · ${row.status || "Programada"}`} onRemove={(id) => remove("vacations", id)}>
+        <Input type="date" value={vacation.start_date} onChange={(e) => setVacation({ ...vacation, start_date: e.target.value })} /><Input type="date" value={vacation.end_date} onChange={(e) => setVacation({ ...vacation, end_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (vacation.start_date && vacation.end_date) { void add("vacations", { ...vacation, status: "Programada" }); setVacation({ start_date: "", end_date: "" }); } }}>Adicionar</Button>
+      </Related>
+      <Related title="Exames ocupacionais" rows={exams} render={(row) => `${row.exam_type} · ${row.exam_name} · ${row.exam_date}`} onRemove={(id) => remove("occupational_exams", id)}>
+        <Select value={exam.exam_type} onChange={(value) => setExam({ ...exam, exam_type: value })} options={["Admissional", "Periódico", "Retorno", "Mudança de risco", "Demissional"]} /><Input value={exam.exam_name} onChange={(e) => setExam({ ...exam, exam_name: e.target.value })} placeholder="Exame" /><Input type="date" value={exam.exam_date} onChange={(e) => setExam({ ...exam, exam_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (exam.exam_name && exam.exam_date) { void add("occupational_exams", { ...exam, status: "Realizado", result: "Pendente" }); setExam({ exam_type: "Admissional", exam_name: "", exam_date: "" }); } }}>Adicionar</Button>
+      </Related>
     </div>
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
-      <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-        <Users className="h-4 w-4 text-primary" />
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-xl font-bold">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function initials(name: string) {
-  return name.split(" ").filter(Boolean).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
-}
+function Section({ title, children }: { title: string; children: React.ReactNode }) { return <section className="mb-6"><h3 className="mb-3 text-sm font-semibold text-muted-foreground">{title}</h3><div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">{children}</div></section>; }
+function Field({ label, span, children }: { label: string; span?: boolean; children: React.ReactNode }) { return <div className={span ? "space-y-1.5 md:col-span-2" : "space-y-1.5"}><Label>{label}</Label>{children}</div>; }
+function Select({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) { return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
+function Related({ title, rows, render, onRemove, children }: { title: string; rows: RelatedRow[]; render: (row: RelatedRow) => string; onRemove: (id: string) => void; children: React.ReactNode }) { return <details className="rounded-md border p-3"><summary className="cursor-pointer font-medium">{title} ({rows.length})</summary><div className="mt-3 space-y-2">{rows.map((row) => <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm"><span>{render(row)}</span><Button type="button" size="icon" variant="ghost" onClick={() => onRemove(row.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button></div>)}<div className="grid gap-2 md:grid-cols-4">{children}</div></div></details>; }

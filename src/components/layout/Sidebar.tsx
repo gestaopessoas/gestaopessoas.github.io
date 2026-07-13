@@ -3,13 +3,17 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Briefcase, FileText, BarChart3, Settings, LogOut } from "lucide-react"
+import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users } from "lucide-react"
 
 const sidebarItems = [
   { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
   { name: "Vagas", href: "/dashboard/vagas", icon: Briefcase },
   { name: "Talentos", href: "/dashboard/talentos", icon: Users },
   { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users },
+  { name: "Arquivo Morto", href: "/dashboard/arquivo-morto", icon: Archive },
+  { name: "Armários", href: "/dashboard/armarios", icon: LockKeyhole },
+  { name: "Mesas & Ilhas", href: "/dashboard/mesas", icon: Armchair },
+  { name: "Controle RGS", href: "/dashboard/rgs", icon: ClipboardList },
   { name: "Admissão", href: "/dashboard/admissao", icon: FileText },
   { name: "Centros de Custo", href: "/dashboard/centros-de-custo", icon: Briefcase },
   { name: "Empresas", href: "/dashboard/empresas", icon: LayoutDashboard },
