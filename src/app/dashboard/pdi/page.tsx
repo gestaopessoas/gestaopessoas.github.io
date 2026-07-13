@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Target, BookOpen, Award, ArrowRight } from "lucide-react"
+import { Target, BookOpen, ArrowRight } from "lucide-react"
 
 export default function PDIPage() {
   return (
