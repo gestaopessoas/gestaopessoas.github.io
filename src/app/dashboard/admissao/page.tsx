@@ -1,95 +1,184 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle2, Circle, FileText, UploadCloud, ShieldCheck } from "lucide-react"
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { createClient } from "@/utils/supabase/client";
+import { CheckCircle2, Circle, FileText, Search, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+type Admission = {
+  id: string;
+  status: string | null;
+  created_at: string | null;
+  candidate: {
+    full_name: string | null;
+    email: string | null;
+    phone: string | null;
+    city: string | null;
+    state: string | null;
+  } | null;
+  job_opening: {
+    cost_center: string | null;
+    contract_type: string | null;
+    profile: { title: string | null; profile_code: string | null } | null;
+  } | null;
+};
+
+const checklist = [
+  "Documentos pessoais",
+  "Comprovante de residência",
+  "ASO admissional",
+  "Dados bancários",
+  "Contrato assinado",
+];
+
+const doneByStatus: Record<string, number> = {
+  "Nova Aplicação": 1,
+  Triagem: 1,
+  "Entrevista RH": 2,
+  "Entrevista Gestor": 2,
+  Proposta: 3,
+  Contratado: 5,
+};
 
 export default function AdmissaoDigitalPage() {
-  const requirements = [
-    { id: 1, title: "Documento de Identidade (RG/CNH)", status: "approved", type: "document" },
-    { id: 2, title: "Comprovante de Residência", status: "pending", type: "document" },
-    { id: 3, title: "Atestado de Saúde Ocupacional (ASO)", status: "uploaded", type: "medical" },
-    { id: 4, title: "Dados Bancários", status: "pending", type: "form" },
-  ]
+  const [items, setItems] = useState<Admission[]>([]);
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("job_applications")
+      .select("id,status,created_at,candidate:candidates(full_name,email,phone,city,state),job_opening:job_openings(cost_center,contract_type,profile:job_profiles(title,profile_code))")
+      .order("created_at", { ascending: false })
+      .limit(100)
+      .then(({ data, error }) => {
+        setLoading(false);
+        if (error) {
+          setError("Não foi possível carregar admissões. Rode o repair SQL do Supabase para criar job_applications e liberar leitura autenticada.");
+          return;
+        }
+        setItems((data ?? []) as unknown as Admission[]);
+      });
+  }, []);
+
+  const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((item) => [
+      item.candidate?.full_name,
+      item.candidate?.email,
+      item.candidate?.phone,
+      item.job_opening?.profile?.title,
+      item.job_opening?.cost_center,
+      item.status,
+    ].some((value) => value?.toLowerCase().includes(term)));
+  }, [items, query]);
+
+  const moveToHired = async (item: Admission) => {
+    setSavingId(item.id);
+    setError("");
+    const supabase = createClient();
+    const { error } = await supabase.from("job_applications").update({ status: "Contratado" }).eq("id", item.id);
+    setSavingId(null);
+    if (error) {
+      setError("Não foi possível atualizar a admissão. Confira permissões no Supabase.");
+      return;
+    }
+    setItems((prev) => prev.map((current) => current.id === item.id ? { ...current, status: "Contratado" } : current));
+  };
+
+  const total = items.length;
+  const hired = items.filter((item) => item.status === "Contratado").length;
+  const pending = Math.max(total - hired, 0);
 
   return (
-    <div className="flex flex-col gap-8 p-8 max-w-5xl mx-auto">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Admissão Digital</h1>
-          <p className="text-muted-foreground">Acompanhamento de onboarding e documentação segura.</p>
-        </div>
-        <div className="flex items-center space-x-2 bg-green-500/10 text-green-700 px-4 py-2 rounded-lg dark:text-green-400">
-          <ShieldCheck className="h-5 w-5" />
-          <span className="font-semibold text-sm">Criptografia End-to-End Ativa</span>
-        </div>
-      </header>
+    <div className="flex h-full flex-col bg-background">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-8">
+        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Admissão Digital</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Checklist de entrada a partir das candidaturas do ATS.</p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm text-muted-foreground">
+            <ShieldCheck className="h-4 w-4" />
+            Dados protegidos por login e RLS
+          </div>
+        </header>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        {/* Progress Sidebar */}
-        <div className="md:col-span-1 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Progresso do Candidato</CardTitle>
-              <CardDescription>Rafael Lima (Frontend Dev)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center mb-6">
-                <div className="relative h-32 w-32 rounded-full border-8 border-muted flex items-center justify-center">
-                  <svg className="absolute inset-0 h-full w-full transform -rotate-90" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="46" fill="transparent" stroke="currentColor" strokeWidth="8" className="text-primary" strokeDasharray="289" strokeDashoffset="216" />
-                  </svg>
-                  <span className="text-2xl font-bold">25%</span>
-                </div>
-              </div>
-              <ul className="space-y-3">
-                {requirements.map((req) => (
-                  <li key={req.id} className="flex items-center space-x-3 text-sm">
-                    {req.status === 'approved' && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-                    {req.status === 'uploaded' && <CheckCircle2 className="h-4 w-4 text-amber-500" />}
-                    {req.status === 'pending' && <Circle className="h-4 w-4 text-muted-foreground" />}
-                    <span className={req.status === 'pending' ? 'text-muted-foreground' : 'font-medium'}>
-                      {req.title}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+        {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <Metric title="Processos" value={total} />
+          <Metric title="Pendentes" value={pending} />
+          <Metric title="Contratados" value={hired} />
         </div>
 
-        {/* Action Area */}
-        <div className="md:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ações Pendentes</CardTitle>
-              <CardDescription>Revise os documentos enviados para continuar o processo.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Document Review Item */}
-              <div className="flex items-start p-4 border rounded-lg bg-card">
-                <FileText className="h-8 w-8 text-primary shrink-0 mr-4 mt-1" />
-                <div className="flex-1">
-                  <h4 className="font-semibold">Atestado de Saúde Ocupacional (ASO)</h4>
-                  <p className="text-sm text-muted-foreground mt-1">Enviado hoje às 14:32</p>
-                  <div className="mt-4 flex gap-3">
-                    <Button size="sm">Analisar Documento</Button>
-                    <Button size="sm" variant="outline" className="text-destructive">Rejeitar</Button>
+        <div className="relative max-w-md">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Buscar por candidato, vaga ou obra..." className="pl-9" />
+        </div>
+
+        <div className="grid gap-4">
+          {loading && <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando admissões...</CardContent></Card>}
+          {!loading && filtered.length === 0 && <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhuma admissão encontrada.</CardContent></Card>}
+
+          {filtered.map((item) => {
+            const done = doneByStatus[item.status ?? ""] ?? 1;
+            const percent = Math.round((done / checklist.length) * 100);
+            return (
+              <Card key={item.id}>
+                <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <CardTitle>{item.candidate?.full_name || "Candidato sem nome"}</CardTitle>
+                    <CardDescription>
+                      {item.job_opening?.profile?.title || "Vaga não informada"} · {item.job_opening?.cost_center || "Área não informada"}
+                    </CardDescription>
                   </div>
-                </div>
-              </div>
-
-              {/* Upload Item */}
-              <div className="flex items-center justify-center p-8 border-2 border-dashed rounded-lg bg-muted/30">
-                <div className="flex flex-col items-center text-center">
-                  <UploadCloud className="h-10 w-10 text-muted-foreground mb-4" />
-                  <h4 className="font-medium">Anexar Contrato de Trabalho Assinado</h4>
-                  <p className="text-sm text-muted-foreground mt-1 mb-4">Arraste o PDF ou clique para buscar</p>
-                  <Button variant="secondary">Procurar Arquivo</Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  <Button size="sm" variant={item.status === "Contratado" ? "secondary" : "default"} disabled={item.status === "Contratado" || savingId === item.id} onClick={() => moveToHired(item)}>
+                    {savingId === item.id ? "Atualizando..." : item.status === "Contratado" ? "Concluído" : "Marcar contratado"}
+                  </Button>
+                </CardHeader>
+                <CardContent className="grid gap-5 md:grid-cols-[180px_1fr]">
+                  <div>
+                    <div className="text-3xl font-semibold">{percent}%</div>
+                    <p className="mt-1 text-sm text-muted-foreground">{item.status || "Nova Aplicação"}</p>
+                    <p className="mt-3 text-sm text-muted-foreground">{item.candidate?.email || "E-mail não informado"}</p>
+                    <p className="text-sm text-muted-foreground">{item.candidate?.phone || "Telefone não informado"}</p>
+                  </div>
+                  <ul className="grid gap-2 md:grid-cols-2">
+                    {checklist.map((label, index) => {
+                      const complete = index < done;
+                      return (
+                        <li key={label} className="flex items-center gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                          {complete ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          {label}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
     </div>
-  )
+  );
+}
+
+function Metric({ title, value }: { title: string; value: number }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardDescription>{title}</CardDescription>
+        <CardTitle className="text-3xl">{value}</CardTitle>
+      </CardHeader>
+    </Card>
+  );
 }

@@ -248,6 +248,11 @@ ALTER TABLE public.job_openings ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public can insert candidates" ON public.candidates;
 DROP POLICY IF EXISTS "Public can insert applications" ON public.job_applications;
+DROP POLICY IF EXISTS "Authenticated users can select candidates" ON public.candidates;
+DROP POLICY IF EXISTS "Authenticated users can update candidates" ON public.candidates;
+DROP POLICY IF EXISTS "Authenticated users can select applications" ON public.job_applications;
+DROP POLICY IF EXISTS "Authenticated users can update applications" ON public.job_applications;
+DROP POLICY IF EXISTS "Authenticated users can delete applications" ON public.job_applications;
 DROP POLICY IF EXISTS "job_openings_public_select" ON public.job_openings;
 
 CREATE POLICY "Public can insert candidates"
@@ -262,6 +267,38 @@ CREATE POLICY "Public can insert applications"
   TO anon
   WITH CHECK (true);
 
+CREATE POLICY "Authenticated users can select candidates"
+  ON public.candidates
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Authenticated users can update candidates"
+  ON public.candidates
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can select applications"
+  ON public.job_applications
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Authenticated users can update applications"
+  ON public.job_applications
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can delete applications"
+  ON public.job_applications
+  FOR DELETE
+  TO authenticated
+  USING (true);
+
 CREATE POLICY "job_openings_public_select"
   ON public.job_openings
   FOR SELECT
@@ -270,6 +307,8 @@ CREATE POLICY "job_openings_public_select"
 
 GRANT INSERT ON public.candidates TO anon;
 GRANT INSERT ON public.job_applications TO anon;
+GRANT SELECT, UPDATE ON public.candidates TO authenticated;
+GRANT SELECT, UPDATE, DELETE ON public.job_applications TO authenticated;
 GRANT SELECT ON public.job_openings TO anon;
 
 CREATE OR REPLACE FUNCTION public.get_public_careers()
