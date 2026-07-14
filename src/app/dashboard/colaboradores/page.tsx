@@ -65,6 +65,7 @@ export default function ColaboradoresPage() {
       let request = supabase
         .from("employees")
         .select(`${fields}, departments(name)`, { count: "exact" })
+        .neq("status", "Desligado")
         .neq("status", "Arquivo Morto")
         .order("name")
         .range(page * pageSize, page * pageSize + pageSize - 1);
