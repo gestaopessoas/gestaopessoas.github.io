@@ -4,14 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Plus, Search, Trash2, X } from "lucide-react";
+import { AlertCircle, Cake, CalendarDays, Edit3, Plus, Search, Trash2, Users, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 
 type Department = { id: string; name: string };
 type Employee = Record<string, string | null | Department> & { id: string; name: string; departments: Department | null };
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
-const pageSize = 100;
+const pageSize = 1000; // Increased to load all for client-side filtering on special tabs
 const fields = [
   "id", "name", "department_id", "birthday", "status", "dismissed_at", "role", "phone",
   "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "gender",
@@ -28,12 +29,21 @@ const emptyForm = {
 
 type EmployeeForm = typeof emptyForm;
 
+const MONTHS = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+];
+
 export default function ColaboradoresPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  
+  const [activeTab, setActiveTab] = useState<"todos" | "experiencia" | "aniversarios">("todos");
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
@@ -58,8 +68,10 @@ export default function ColaboradoresPage() {
         .neq("status", "Arquivo Morto")
         .order("name")
         .range(page * pageSize, page * pageSize + pageSize - 1);
+      
       const term = query.trim().replace(/[,%()]/g, " ");
       if (term) request = request.or(`name.ilike.%${term}%,cpf.ilike.%${term}%,rg.ilike.%${term}%,role.ilike.%${term}%`);
+      
       const { data, error: loadError, count } = await request;
       setLoading(false);
       if (loadError) {
@@ -112,6 +124,46 @@ export default function ColaboradoresPage() {
     setRefresh((value) => value + 1);
   };
 
+  const getTrialInfo = (admissionDateStr: string | null) => {
+    if (!admissionDateStr) return null;
+    const admission = parseISO(admissionDateStr);
+    if (!isValid(admission)) return null;
+    const today = new Date();
+    const daysElapsed = differenceInDays(today, admission);
+    const daysRemaining = 90 - daysElapsed;
+    
+    if (daysRemaining < 0) return null;
+    return { daysRemaining, isWarning: daysRemaining <= 7 };
+  };
+
+  const employeesInTrial = employees.filter(e => {
+    const info = getTrialInfo(e.admission_date as string | null);
+    return info !== null;
+  }).sort((a, b) => {
+    const infoA = getTrialInfo(a.admission_date as string | null)!;
+    const infoB = getTrialInfo(b.admission_date as string | null)!;
+    return infoA.daysRemaining - infoB.daysRemaining; // Sort by closest to end
+  });
+
+  const getBirthdayInfo = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    const date = parseISO(dateStr);
+    if (!isValid(date)) return null;
+    return { month: date.getMonth(), date, day: date.getDate() };
+  };
+
+  const birthdaysThisMonth = employees.filter(e => {
+    const info = getBirthdayInfo(e.birthday as string | null);
+    return info && info.month === selectedMonth;
+  }).sort((a, b) => getBirthdayInfo(a.birthday as string | null)!.day - getBirthdayInfo(b.birthday as string | null)!.day);
+
+  const workAnniversariesThisMonth = employees.filter(e => {
+    const info = getBirthdayInfo(e.admission_date as string | null);
+    if (!info || info.month !== selectedMonth) return false;
+    const years = differenceInYears(new Date(), info.date);
+    return years > 0; // At least 1 year
+  }).sort((a, b) => getBirthdayInfo(a.admission_date as string | null)!.day - getBirthdayInfo(b.admission_date as string | null)!.day);
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -121,6 +173,31 @@ export default function ColaboradoresPage() {
         </div>
         <Button onClick={startNew}><Plus className="mr-2 h-4 w-4" />Novo colaborador</Button>
       </header>
+
+      {/* Tabs */}
+      <div className="flex w-full flex-wrap gap-2 rounded-md bg-muted p-1 sm:w-fit">
+        <Button
+          variant={activeTab === "todos" ? "default" : "ghost"}
+          className="flex-1 sm:flex-none"
+          onClick={() => setActiveTab("todos")}
+        >
+          <Users className="mr-2 h-4 w-4" /> Todos
+        </Button>
+        <Button
+          variant={activeTab === "experiencia" ? "default" : "ghost"}
+          className="flex-1 sm:flex-none"
+          onClick={() => setActiveTab("experiencia")}
+        >
+          <AlertCircle className="mr-2 h-4 w-4" /> Fim de Experiência
+        </Button>
+        <Button
+          variant={activeTab === "aniversarios" ? "default" : "ghost"}
+          className="flex-1 sm:flex-none"
+          onClick={() => setActiveTab("aniversarios")}
+        >
+          <Cake className="mr-2 h-4 w-4" /> Aniversariantes
+        </Button>
+      </div>
 
       {error && <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
@@ -178,32 +255,148 @@ export default function ColaboradoresPage() {
         </form>
       )}
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-        <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nome, CPF, RG ou cargo" className="pl-9" />
-      </div>
+      {/* TABS CONTENT */}
+      {activeTab === "todos" && (
+        <>
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nome, CPF, RG ou cargo" className="pl-9" />
+          </div>
 
-      <div className="overflow-x-auto rounded-lg border bg-card">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotação</th><th className="p-3">Status</th><th className="p-3 text-right">Ações</th></tr></thead>
-          <tbody>
-            {loading ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : employees.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum colaborador encontrado.</td></tr> : employees.map((employee) => (
-              <tr key={employee.id} className="border-b last:border-0">
-                <td className="p-3"><div className="font-medium">{employee.name}</div><div className="text-xs text-muted-foreground">{String(employee.email_corporate ?? employee.email_personal ?? "")}</div></td>
-                <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
-                <td className="p-3"><div>{String(employee.role ?? "-")}</div><div className="text-xs text-muted-foreground">{employee.departments?.name ?? String(employee.unit ?? employee.workplace ?? "-")}</div></td>
-                <td className="p-3">{String(employee.status ?? "-")}</td>
-                <td className="p-3 text-right"><Button size="sm" variant="outline" onClick={() => startEdit(employee)}><Edit3 className="mr-2 h-3.5 w-3.5" />Visualizar</Button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          <div className="overflow-x-auto rounded-lg border bg-card">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotação</th><th className="p-3">Status</th><th className="p-3 text-right">Ações</th></tr></thead>
+              <tbody>
+                {loading ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : employees.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum colaborador encontrado.</td></tr> : employees.map((employee) => {
+                  const trialInfo = getTrialInfo(employee.admission_date as string | null);
+                  return (
+                  <tr key={employee.id} className="border-b last:border-0">
+                    <td className="p-3">
+                      <div className="font-medium flex items-center gap-2">
+                        {employee.name}
+                        {trialInfo?.isWarning && (
+                          <span title="Fim de Experiência Próximo" className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                            90 Dias!
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{String(employee.email_corporate ?? employee.email_personal ?? "")}</div>
+                    </td>
+                    <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
+                    <td className="p-3"><div>{String(employee.role ?? "-")}</div><div className="text-xs text-muted-foreground">{employee.departments?.name ?? String(employee.unit ?? employee.workplace ?? "-")}</div></td>
+                    <td className="p-3">{String(employee.status ?? "-")}</td>
+                    <td className="p-3 text-right"><Button size="sm" variant="outline" onClick={() => startEdit(employee)}><Edit3 className="mr-2 h-3.5 w-3.5" />Visualizar</Button></td>
+                  </tr>
+                )})}
+              </tbody>
+            </table>
+          </div>
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
-        <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button></div>
-      </div>
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
+            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button></div>
+          </div>
+        </>
+      )}
+
+      {activeTab === "experiencia" && (
+        <div className="rounded-lg border bg-card p-6">
+          <h2 className="mb-4 text-lg font-semibold flex items-center gap-2"><AlertCircle className="h-5 w-5 text-primary" /> Fim de Experiência (90 dias)</h2>
+          <p className="mb-6 text-sm text-muted-foreground">Colaboradores que ainda estão dentro do período de 90 dias de experiência. O sistema destaca em vermelho aqueles que têm 7 dias ou menos para o encerramento do contrato.</p>
+          
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {employeesInTrial.length === 0 ? (
+              <p className="text-sm text-muted-foreground sm:col-span-2 lg:col-span-3">Não há colaboradores em período de experiência no momento.</p>
+            ) : employeesInTrial.map(e => {
+              const info = getTrialInfo(e.admission_date as string | null)!;
+              return (
+                <div key={e.id} className={`rounded-md border p-4 shadow-sm ${info.isWarning ? 'border-red-200 bg-red-50/50' : 'bg-background'}`}>
+                  <div className="font-semibold">{e.name}</div>
+                  <div className="text-sm text-muted-foreground mb-3">{String(e.role ?? "-")}</div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Faltam {info.daysRemaining} dias</span>
+                    {info.isWarning && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">Atenção</span>}
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <Button size="sm" variant="outline" onClick={() => startEdit(e)}>Ver Ficha</Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "aniversarios" && (
+        <div className="rounded-lg border bg-card p-6">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+            <div>
+              <h2 className="text-lg font-semibold flex items-center gap-2"><Cake className="h-5 w-5 text-primary" /> Aniversariantes do Mês</h2>
+              <p className="text-sm text-muted-foreground">Celebre as datas especiais da sua equipe.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-nowrap">Mês:</Label>
+              <select 
+                value={selectedMonth} 
+                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                className="h-9 w-40 rounded-md border bg-background px-3 text-sm"
+              >
+                {MONTHS.map((m, idx) => (
+                  <option key={m} value={idx}>{m}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid gap-8 lg:grid-cols-2">
+            <div>
+              <h3 className="mb-4 text-base font-semibold flex items-center gap-2"><Cake className="h-4 w-4 text-pink-500" /> Aniversário de Vida</h3>
+              <div className="space-y-3">
+                {birthdaysThisMonth.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum aniversariante neste mês.</p>
+                ) : birthdaysThisMonth.map(e => {
+                  const info = getBirthdayInfo(e.birthday as string | null)!;
+                  const age = differenceInYears(new Date(), info.date);
+                  return (
+                    <div key={e.id} className="flex items-center justify-between rounded-md border bg-background p-3 shadow-sm">
+                      <div>
+                        <div className="font-medium">{e.name}</div>
+                        <div className="text-xs text-muted-foreground">Dia {info.day.toString().padStart(2, '0')}</div>
+                      </div>
+                      <div className="rounded-full bg-pink-100 px-2.5 py-1 text-xs font-semibold text-pink-700">
+                        {age} anos
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="mb-4 text-base font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-blue-500" /> Tempo de Casa</h3>
+              <div className="space-y-3">
+                {workAnniversariesThisMonth.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum aniversário de casa neste mês.</p>
+                ) : workAnniversariesThisMonth.map(e => {
+                  const info = getBirthdayInfo(e.admission_date as string | null)!;
+                  const years = differenceInYears(new Date(), info.date);
+                  return (
+                    <div key={e.id} className="flex items-center justify-between rounded-md border bg-background p-3 shadow-sm">
+                      <div>
+                        <div className="font-medium">{e.name}</div>
+                        <div className="text-xs text-muted-foreground">Dia {info.day.toString().padStart(2, '0')}</div>
+                      </div>
+                      <div className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                        {years} {years === 1 ? 'ano' : 'anos'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
