@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { AlertCircle, Cake, CalendarDays, Edit3, Plus, Search, Trash2, Users, X } from "lucide-react";
+import { AlertCircle, Cake, CalendarDays, Edit3, Plus, Search, Trash2, Users, X, Activity, Filter } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
+import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 
 type Department = { id: string; name: string };
 type Employee = Record<string, string | null | Department> & { id: string; name: string; departments: Department | null };
@@ -40,6 +41,19 @@ export default function ColaboradoresPage() {
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState({
+    gender: "",
+    marital_status: "",
+    department_id: "",
+    role: "",
+    unit: "",
+    status: "",
+    admission_start: "",
+    admission_end: "",
+  });
   
   const [activeTab, setActiveTab] = useState<"todos" | "aniversarios" | "experiencia">("todos");
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
@@ -65,13 +79,25 @@ export default function ColaboradoresPage() {
       let request = supabase
         .from("employees")
         .select(`${fields}, departments(name)`, { count: "exact" })
-        .neq("status", "Desligado")
-        .neq("status", "Arquivo Morto")
         .order("name")
         .range(page * pageSize, page * pageSize + pageSize - 1);
       
+      if (advancedFilters.status) {
+        request = request.eq("status", advancedFilters.status);
+      } else {
+        request = request.neq("status", "Desligado").neq("status", "Arquivo Morto");
+      }
+      
       const term = query.trim().replace(/[,%()]/g, " ");
       if (term) request = request.or(`name.ilike.%${term}%,cpf.ilike.%${term}%,rg.ilike.%${term}%,role.ilike.%${term}%`);
+      
+      if (advancedFilters.gender) request = request.eq("gender", advancedFilters.gender);
+      if (advancedFilters.marital_status) request = request.eq("marital_status", advancedFilters.marital_status);
+      if (advancedFilters.department_id) request = request.eq("department_id", advancedFilters.department_id);
+      if (advancedFilters.role) request = request.ilike("role", `%${advancedFilters.role}%`);
+      if (advancedFilters.unit) request = request.ilike("unit", `%${advancedFilters.unit}%`);
+      if (advancedFilters.admission_start) request = request.gte("admission_date", advancedFilters.admission_start);
+      if (advancedFilters.admission_end) request = request.lte("admission_date", advancedFilters.admission_end);
       
       const { data, error: loadError, count } = await request;
       setLoading(false);
@@ -83,7 +109,7 @@ export default function ColaboradoresPage() {
       setTotal(count ?? 0);
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [page, query, refresh]);
+  }, [page, query, refresh, advancedFilters]);
 
   const update = (field: keyof EmployeeForm, value: string) => setForm((current) => ({ ...current, [field]: value }));
 
@@ -258,9 +284,14 @@ export default function ColaboradoresPage() {
       {/* TABS CONTENT */}
       {activeTab === "todos" && (
         <>
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nome, CPF, RG ou cargo" className="pl-9" />
+          <div className="relative max-w-md flex items-center gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nome, CPF, RG ou cargo" className="pl-9" />
+            </div>
+            <Button variant="outline" size="icon" onClick={() => setShowFilterModal(true)} title="Filtros avançados">
+              <Filter className="h-4 w-4" />
+            </Button>
           </div>
 
           <div className="overflow-x-auto rounded-lg border bg-card">
@@ -285,7 +316,16 @@ export default function ColaboradoresPage() {
                     <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
                     <td className="p-3"><div>{String(employee.role ?? "-")}</div><div className="text-xs text-muted-foreground">{employee.departments?.name ?? String(employee.unit ?? employee.workplace ?? "-")}</div></td>
                     <td className="p-3">{String(employee.status ?? "-")}</td>
-                    <td className="p-3 text-right"><Button size="sm" variant="outline" onClick={() => startEdit(employee)}><Edit3 className="mr-2 h-3.5 w-3.5" />Visualizar</Button></td>
+                    <td className="p-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setSelectedEmployeeId(employee.id)} title="Perfil Big Five">
+                          <Activity className="h-3.5 w-3.5 text-primary" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => startEdit(employee)}>
+                          <Edit3 className="mr-2 h-3.5 w-3.5" />Visualizar
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 )})}
               </tbody>
@@ -404,6 +444,92 @@ export default function ColaboradoresPage() {
             ))}
           </div>
         </div>
+      )}
+
+      {showFilterModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card w-full max-w-2xl rounded-lg shadow-lg border flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="font-semibold text-lg">Filtros Avançados</h2>
+              <Button variant="ghost" size="icon" onClick={() => setShowFilterModal(false)}><X className="h-4 w-4" /></Button>
+            </div>
+            <div className="p-4 overflow-y-auto space-y-4 flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>Departamento</Label>
+                  <select value={advancedFilters.department_id} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, department_id: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Todos</option>
+                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Situação</Label>
+                  <select value={advancedFilters.status} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Todos (Exceto Desligados)</option>
+                    <option value="Ativo">Ativo</option>
+                    <option value="Férias">Férias</option>
+                    <option value="Afastado">Afastado</option>
+                    <option value="Inativo">Inativo</option>
+                    <option value="Desligado">Desligado</option>
+                    <option value="Arquivo Morto">Arquivo Morto</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Gênero</Label>
+                  <select value={advancedFilters.gender} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, gender: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Todos</option>
+                    <option value="Masculino">Masculino</option>
+                    <option value="Feminino">Feminino</option>
+                    <option value="Outro">Outro</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Estado Civil</Label>
+                  <select value={advancedFilters.marital_status} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, marital_status: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Todos</option>
+                    <option value="Solteiro(a)">Solteiro(a)</option>
+                    <option value="Casado(a)">Casado(a)</option>
+                    <option value="Divorciado(a)">Divorciado(a)</option>
+                    <option value="Viúvo(a)">Viúvo(a)</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Cargo (Contém)</Label>
+                  <Input value={advancedFilters.role} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, role: e.target.value }))} placeholder="Ex: Engenheiro" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Unidade / Obra (Contém)</Label>
+                  <Input value={advancedFilters.unit} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, unit: e.target.value }))} placeholder="Ex: Matriz" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Data de Admissão (Início)</Label>
+                  <Input type="date" value={advancedFilters.admission_start} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, admission_start: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Data de Admissão (Fim)</Label>
+                  <Input type="date" value={advancedFilters.admission_end} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, admission_end: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t flex justify-between bg-muted/30">
+              <Button variant="ghost" onClick={() => {
+                setAdvancedFilters({ gender: "", marital_status: "", department_id: "", role: "", unit: "", status: "", admission_start: "", admission_end: "" });
+                setPage(0);
+              }}>Limpar Filtros</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowFilterModal(false)}>Cancelar</Button>
+                <Button onClick={() => { setPage(0); setShowFilterModal(false); }}>Aplicar Filtros</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedEmployeeId && (
+        <CandidateProfileModal 
+          employeeId={selectedEmployeeId} 
+          onClose={() => setSelectedEmployeeId(null)} 
+        />
       )}
     </div>
   );
