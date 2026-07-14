@@ -41,7 +41,7 @@ export default function ColaboradoresPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<"todos" | "experiencia" | "aniversarios">("todos");
+  const [activeTab, setActiveTab] = useState<"todos" | "aniversarios" | "experiencia">("todos");
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
 
   const [query, setQuery] = useState("");
@@ -133,17 +133,14 @@ export default function ColaboradoresPage() {
     const daysRemaining = 90 - daysElapsed;
     
     if (daysRemaining < 0) return null;
-    return { daysRemaining, isWarning: daysRemaining <= 7 };
+    return { daysRemaining, isWarning: daysRemaining <= 7, admission };
   };
 
-  const employeesInTrial = employees.filter(e => {
-    const info = getTrialInfo(e.admission_date as string | null);
-    return info !== null;
-  }).sort((a, b) => {
-    const infoA = getTrialInfo(a.admission_date as string | null)!;
-    const infoB = getTrialInfo(b.admission_date as string | null)!;
-    return infoA.daysRemaining - infoB.daysRemaining; // Sort by closest to end
-  });
+  const inProbation = employees
+    .filter(e => e.status === "Ativo")
+    .map(e => ({ employee: e, trialInfo: getTrialInfo(e.admission_date as string | null) }))
+    .filter(item => item.trialInfo !== null)
+    .sort((a, b) => a.trialInfo!.daysRemaining - b.trialInfo!.daysRemaining);
 
   const getBirthdayInfo = (dateStr: string | null) => {
     if (!dateStr) return null;
@@ -183,19 +180,21 @@ export default function ColaboradoresPage() {
         >
           <Users className="mr-2 h-4 w-4" /> Todos
         </Button>
-        <Button
-          variant={activeTab === "experiencia" ? "default" : "ghost"}
-          className="flex-1 sm:flex-none"
-          onClick={() => setActiveTab("experiencia")}
-        >
-          <AlertCircle className="mr-2 h-4 w-4" /> Fim de Experiência
-        </Button>
+
         <Button
           variant={activeTab === "aniversarios" ? "default" : "ghost"}
           className="flex-1 sm:flex-none"
           onClick={() => setActiveTab("aniversarios")}
         >
           <Cake className="mr-2 h-4 w-4" /> Aniversariantes
+        </Button>
+
+        <Button
+          variant={activeTab === "experiencia" ? "default" : "ghost"}
+          className="flex-1 sm:flex-none"
+          onClick={() => setActiveTab("experiencia")}
+        >
+          <CalendarDays className="mr-2 h-4 w-4" /> Fim de Experiência (90d)
         </Button>
       </div>
 
@@ -299,33 +298,7 @@ export default function ColaboradoresPage() {
         </>
       )}
 
-      {activeTab === "experiencia" && (
-        <div className="rounded-lg border bg-card p-6">
-          <h2 className="mb-4 text-lg font-semibold flex items-center gap-2"><AlertCircle className="h-5 w-5 text-primary" /> Fim de Experiência (90 dias)</h2>
-          <p className="mb-6 text-sm text-muted-foreground">Colaboradores que ainda estão dentro do período de 90 dias de experiência. O sistema destaca em vermelho aqueles que têm 7 dias ou menos para o encerramento do contrato.</p>
-          
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {employeesInTrial.length === 0 ? (
-              <p className="text-sm text-muted-foreground sm:col-span-2 lg:col-span-3">Não há colaboradores em período de experiência no momento.</p>
-            ) : employeesInTrial.map(e => {
-              const info = getTrialInfo(e.admission_date as string | null)!;
-              return (
-                <div key={e.id} className={`rounded-md border p-4 shadow-sm ${info.isWarning ? 'border-red-200 bg-red-50/50' : 'bg-background'}`}>
-                  <div className="font-semibold">{e.name}</div>
-                  <div className="text-sm text-muted-foreground mb-3">{String(e.role ?? "-")}</div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">Faltam {info.daysRemaining} dias</span>
-                    {info.isWarning && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">Atenção</span>}
-                  </div>
-                  <div className="mt-3 flex justify-end">
-                    <Button size="sm" variant="outline" onClick={() => startEdit(e)}>Ver Ficha</Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+
 
       {activeTab === "aniversarios" && (
         <div className="rounded-lg border bg-card p-6">
@@ -394,6 +367,40 @@ export default function ColaboradoresPage() {
                 })}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "experiencia" && (
+        <div className="rounded-lg border bg-card p-6">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+            <div>
+              <h2 className="text-lg font-semibold flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /> Fim de Experiência</h2>
+              <p className="text-sm text-muted-foreground">Colaboradores dentro dos 90 dias iniciais, ordenados por proximidade do término.</p>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium text-primary">{inProbation.length}</span> em experiência
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {inProbation.length === 0 ? (
+              <p className="text-sm text-muted-foreground col-span-full">Nenhum colaborador em período de experiência.</p>
+            ) : inProbation.map(({ employee: e, trialInfo }) => (
+              <div key={e.id} className={`flex flex-col justify-between rounded-md border p-4 shadow-sm ${trialInfo!.isWarning ? "bg-red-50/50 border-red-200" : "bg-background"}`}>
+                <div className="mb-3">
+                  <div className="font-semibold text-base">{e.name}</div>
+                  <div className="text-xs text-muted-foreground">Admissão: {trialInfo!.admission.toLocaleDateString("pt-BR")}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{String(e.role ?? "-")}</div>
+                </div>
+                <div className="flex items-center justify-between pt-3 border-t">
+                  <div className="text-xs font-medium text-muted-foreground">Tempo restante:</div>
+                  <div className={`rounded-full px-2.5 py-1 text-xs font-bold ${trialInfo!.isWarning ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                    {trialInfo!.daysRemaining} {trialInfo!.daysRemaining === 1 ? 'dia' : 'dias'}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
