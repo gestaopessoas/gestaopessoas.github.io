@@ -140,37 +140,78 @@ export default function ArquivoMortoPage() {
 
 function ArchiveRow({ employee, onSave, onReactivate }: { employee: Employee; onSave: (employee: Employee, box: string) => void; onReactivate: (employee: Employee) => void }) {
   const [box, setBox] = useState(employee.archive_box ?? "");
+  const [expanded, setExpanded] = useState(false);
   return (
-    <tr className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
-      <td className="p-4 pl-6">
-        <div className="font-semibold text-foreground">{employee.name}</div>
-        <div className="text-xs text-muted-foreground font-medium mt-0.5">{employee.role ?? "-"} · {employee.unit ?? "-"}</div>
-      </td>
-      <td className="p-4">
-        <div className="text-foreground">CPF: {employee.cpf ?? "-"}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">RG: {employee.rg ?? "-"}</div>
-      </td>
-      <td className="p-4 text-foreground">
-        {employee.dismissed_at ? new Date(`${employee.dismissed_at}T00:00:00`).toLocaleDateString("pt-BR") : "-"}
-      </td>
-      <td className="p-4">
-        <div className="flex min-w-56 gap-2 items-center">
-          <Input 
-            value={box} 
-            onChange={(e) => setBox(e.target.value)} 
-            placeholder="Caixa / localização" 
-            className="h-9 bg-background focus-visible:ring-primary"
-          />
-          <Button size="sm" variant="secondary" onClick={() => onSave(employee, box)} className="h-9 font-semibold hover:bg-primary hover:text-primary-foreground border-border">
-            Salvar
+    <>
+      <tr className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <td className="p-4 pl-6">
+          <div className="font-semibold text-foreground flex items-center gap-2">
+            {employee.name}
+            {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </div>
+          <div className="text-xs text-muted-foreground font-medium mt-0.5">{employee.role ?? "-"} · {employee.unit ?? "-"}</div>
+        </td>
+        <td className="p-4">
+          <div className="text-foreground">CPF: {employee.cpf ?? "-"}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">RG: {employee.rg ?? "-"}</div>
+        </td>
+        <td className="p-4 text-foreground">
+          {employee.dismissed_at ? new Date(`${employee.dismissed_at}T00:00:00`).toLocaleDateString("pt-BR") : "-"}
+        </td>
+        <td className="p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="flex min-w-56 gap-2 items-center">
+            <Input 
+              value={box} 
+              onChange={(e) => setBox(e.target.value)} 
+              placeholder="Caixa / localização" 
+              className="h-9 bg-background focus-visible:ring-primary"
+            />
+            <Button size="sm" variant="secondary" onClick={() => onSave(employee, box)} className="h-9 font-semibold hover:bg-primary hover:text-primary-foreground border-border">
+              Salvar
+            </Button>
+          </div>
+        </td>
+        <td className="p-4 pr-6 text-right" onClick={(e) => e.stopPropagation()}>
+          <Button size="sm" variant="outline" onClick={() => setExpanded(!expanded)} className="mr-2 h-9 font-semibold text-foreground hover:bg-muted transition-colors">
+            Visualizar
           </Button>
-        </div>
-      </td>
-      <td className="p-4 pr-6 text-right">
-        <Button size="sm" variant="outline" onClick={() => onReactivate(employee)} className="h-9 font-semibold text-foreground hover:bg-foreground hover:text-background transition-colors">
-          <RotateCcw className="mr-2 h-4 w-4" />Reativar
-        </Button>
-      </td>
-    </tr>
+          <Button size="sm" variant="outline" onClick={() => onReactivate(employee)} className="h-9 font-semibold text-foreground hover:bg-foreground hover:text-background transition-colors">
+            <RotateCcw className="mr-2 h-4 w-4" />Reativar
+          </Button>
+        </td>
+      </tr>
+      {expanded && (
+        <tr className="bg-muted/20 border-b border-border/50">
+          <td colSpan={5} className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-muted-foreground">Nome Completo</h4>
+                <p className="font-medium text-foreground">{employee.name}</p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-muted-foreground">Documentos</h4>
+                <p className="font-medium text-foreground">CPF: {employee.cpf ?? "Não informado"} | RG: {employee.rg ?? "Não informado"}</p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-muted-foreground">Cargo Anterior</h4>
+                <p className="font-medium text-foreground">{employee.role ?? "Não informado"}</p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-muted-foreground">Unidade / Lotação</h4>
+                <p className="font-medium text-foreground">{employee.unit ?? "Não informado"}</p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-muted-foreground">Data de Desligamento</h4>
+                <p className="font-medium text-foreground">{employee.dismissed_at ? new Date(`${employee.dismissed_at}T00:00:00`).toLocaleDateString("pt-BR") : "Não informada"}</p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-muted-foreground">Localização no Arquivo Morto</h4>
+                <p className="font-medium text-foreground">{employee.archive_box ?? "Não guardado em caixa"}</p>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }

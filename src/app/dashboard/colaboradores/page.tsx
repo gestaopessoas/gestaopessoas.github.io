@@ -193,7 +193,7 @@ export default function ColaboradoresPage() {
                 <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
                 <td className="p-3"><div>{String(employee.role ?? "-")}</div><div className="text-xs text-muted-foreground">{employee.departments?.name ?? String(employee.unit ?? employee.workplace ?? "-")}</div></td>
                 <td className="p-3">{String(employee.status ?? "-")}</td>
-                <td className="p-3 text-right"><Button size="sm" variant="outline" onClick={() => startEdit(employee)}><Edit3 className="mr-2 h-3.5 w-3.5" />Abrir registro</Button></td>
+                <td className="p-3 text-right"><Button size="sm" variant="outline" onClick={() => startEdit(employee)}><Edit3 className="mr-2 h-3.5 w-3.5" />Visualizar</Button></td>
               </tr>
             ))}
           </tbody>
