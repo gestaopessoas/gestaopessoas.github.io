@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
-import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight } from "lucide-react"
+import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award } from "lucide-react"
 import { usePermissions } from "@/hooks/usePermissions"
 import { createClient } from "@/utils/supabase/client"
 
@@ -18,6 +18,17 @@ const sidebarItems = [
   { name: "Mesas & Ilhas", href: "/dashboard/mesas", icon: Armchair, module: "ilhas" },
   { name: "Controle RGS", href: "/dashboard/rgs", icon: ClipboardList, module: "rgs" },
   { name: "Admissão", href: "/dashboard/admissao", icon: FileText, module: "admissao" },
+  { name: "Treinamentos", href: "/dashboard/treinamentos", icon: GraduationCap, module: "treinamentos" },
+  { name: "Férias", href: "/dashboard/ferias", icon: CalendarDays, module: "ferias" },
+  { name: "Benefícios", href: "/dashboard/beneficios", icon: Gift, module: "beneficios" },
+  { name: "Ponto", href: "/dashboard/ponto", icon: Clock, module: "ponto" },
+  { name: "Holerites", href: "/dashboard/holerites", icon: Receipt, module: "holerites" },
+  { name: "Avaliações", href: "/dashboard/avaliacoes", icon: Star, module: "avaliacoes" },
+  { name: "Clima", href: "/dashboard/clima", icon: Smile, module: "clima" },
+  { name: "Metas", href: "/dashboard/metas", icon: Target, module: "metas" },
+  { name: "PDI", href: "/dashboard/pdi", icon: TrendingUp, module: "pdi" },
+  { name: "Competências", href: "/dashboard/competencias", icon: Award, module: "competencias" },
+  { name: "Turnover", href: "/dashboard/turnover", icon: RefreshCcw, module: "turnover" },
   { name: "Centros de Custo", href: "/dashboard/centros-de-custo", icon: Briefcase },
   { name: "Empresas", href: "/dashboard/empresas", icon: LayoutDashboard },
   { name: "Obras", href: "/dashboard/obras", icon: LayoutDashboard },
