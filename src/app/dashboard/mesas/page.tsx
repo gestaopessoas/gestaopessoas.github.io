@@ -181,45 +181,46 @@ export default function MesasPage() {
                 </div>
               ) : (
                 <div 
-                  className="grid gap-[2px] rounded-sm bg-[#b39575] p-[2px] shadow-lg"
+                  className="grid gap-1 rounded-sm bg-[#a88b6c] p-1 shadow-lg"
                   style={{ 
-                    gridTemplateColumns: `repeat(${sector.cols}, minmax(0, 1fr))`,
-                    gridTemplateRows: `repeat(${sector.rows}, minmax(0, 1fr))` 
+                    gridTemplateColumns: `repeat(${sector.cols}, minmax(100px, 1fr))`,
+                    gridTemplateRows: `repeat(${sector.rows}, minmax(80px, 1fr))` 
                   }}
                 >
-                  {Array.from({ length: sector.total }).map((_, i) => (
-                    <div key={i} className="relative">
-                       {/* Desk Rendering specifically for Islands */}
-                       {(() => {
-                          const index = i + 1;
-                          const pos = positions.find(p => p.sector === sector.name && p.position_index === index);
-                          const isOccupied = !!pos?.employee_id;
-                          const employeeName = pos?.employees?.name?.split(" ")?.slice(0, 2)?.join(" ") || "Livre";
-                          
-                          // Determine if it's top row or bottom row for chair placement
-                          // For a 2-row island, row 1 chairs are on top, row 2 chairs are on bottom
-                          const isTopRow = i < sector.cols;
-                          const isBottomRow = i >= sector.total - sector.cols;
-                          
-                          return (
-                            <button onClick={() => open(sector.name, index, pos)} className="group relative flex h-24 w-32 flex-col items-center justify-center bg-[#dcbca0] transition-colors hover:bg-[#cda683]">
-                              {isTopRow && (
-                                <div className={`absolute -top-4 left-1/2 h-8 w-8 -translate-x-1/2 rounded-full border-2 border-zinc-300 shadow-sm transition-transform group-hover:scale-110 ${isOccupied ? 'bg-primary' : 'bg-white'}`}></div>
-                              )}
-                              
-                              <div className="h-1 w-14 rounded-sm bg-zinc-700/40 shadow-sm mt-2"></div>
-                              <div className="mt-3 rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight shadow-sm max-w-[90%] truncate text-center">
-                                {employeeName}
-                              </div>
+                  {Array.from({ length: sector.rows * sector.cols }).map((_, i) => {
+                    const isMissing = i >= sector.total;
+                    if (isMissing) return <div key={i} className="bg-transparent" />;
 
-                              {isBottomRow && (
-                                <div className={`absolute -bottom-4 left-1/2 h-8 w-8 -translate-x-1/2 rounded-full border-2 border-zinc-300 shadow-sm transition-transform group-hover:scale-110 ${isOccupied ? 'bg-primary' : 'bg-white'}`}></div>
-                              )}
-                            </button>
-                          );
-                       })()}
-                    </div>
-                  ))}
+                    const index = i + 1;
+                    const pos = positions.find(p => p.sector === sector.name && p.position_index === index);
+                    const isOccupied = !!pos?.employee_id;
+                    const employeeName = pos?.employees?.name?.split(" ")?.slice(0, 2)?.join(" ") || "Livre";
+                    
+                    const isTopRow = i < sector.cols;
+                    const isBottomRow = i >= (sector.rows - 1) * sector.cols;
+                    
+                    return (
+                      <div key={i} className="relative h-full w-full">
+                        <button 
+                          onClick={() => open(sector.name, index, pos)} 
+                          className="group relative flex h-full w-full min-h-[90px] flex-col items-center justify-center bg-[#dcbca0] transition-colors hover:bg-[#cda683]"
+                        >
+                          {isTopRow && (
+                            <div className={`absolute -top-3 left-1/2 h-7 w-7 -translate-x-1/2 rounded-full border-2 border-zinc-300 shadow-sm transition-transform group-hover:scale-110 ${isOccupied ? 'bg-primary' : 'bg-white'}`}></div>
+                          )}
+                          
+                          <div className="h-1 w-12 rounded-sm bg-zinc-700/40 shadow-sm mt-1"></div>
+                          <div className="mt-2 rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight shadow-sm max-w-[85%] truncate text-center">
+                            {employeeName}
+                          </div>
+
+                          {isBottomRow && (
+                            <div className={`absolute -bottom-3 left-1/2 h-7 w-7 -translate-x-1/2 rounded-full border-2 border-zinc-300 shadow-sm transition-transform group-hover:scale-110 ${isOccupied ? 'bg-primary' : 'bg-white'}`}></div>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
