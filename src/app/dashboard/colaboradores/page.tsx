@@ -17,14 +17,14 @@ const fields = [
   "id", "name", "department_id", "birthday", "status", "dismissed_at", "role", "phone",
   "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "gender",
   "unit", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cost_center", "cbo",
-  "aso_date", "observation", "archive_box", "workplace",
+  "aso_date", "observation", "workplace",
 ].join(", ");
 
 const emptyForm = {
   name: "", department_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "",
   gender: "", unit: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
-  cost_center: "", cbo: "", aso_date: "", observation: "", archive_box: "", workplace: "",
+  cost_center: "", cbo: "", aso_date: "", observation: "", workplace: "",
 };
 
 type EmployeeForm = typeof emptyForm;
@@ -115,7 +115,7 @@ export default function ColaboradoresPage() {
       : await supabase.from("employees").insert(payload);
     setSaving(false);
     if (result.error) {
-      setError(`Não foi possível salvar: ${result.error.message}`);
+      setError(`Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
       return;
     }
     setShowForm(false);
@@ -223,7 +223,7 @@ export default function ColaboradoresPage() {
           </Section>
 
           <Section title="Vínculo e lotação">
-            <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "Férias", "Afastado", "Inativo", "Desligado", "Arquivo Morto"]} /></Field>
+            <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "Férias", "Afastado", "Inativo", "Desligado"]} /></Field>
             <Field label="Cargo"><Input value={form.role} onChange={(e) => update("role", e.target.value)} /></Field>
             <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></Field>
             <Field label="Tipo de contrato"><Input value={form.contract_type} onChange={(e) => update("contract_type", e.target.value)} /></Field>
@@ -241,7 +241,7 @@ export default function ColaboradoresPage() {
             <Field label="Série CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
             <Field label="PIS"><Input value={form.pis} onChange={(e) => update("pis", e.target.value)} /></Field>
             <Field label="Data do ASO"><Input type="date" value={form.aso_date} onChange={(e) => update("aso_date", e.target.value)} /></Field>
-            <Field label="Caixa do arquivo morto"><Input value={form.archive_box} onChange={(e) => update("archive_box", e.target.value)} /></Field>
+
             <Field label="Observações" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
           </Section>
 

@@ -113,7 +113,7 @@ export default function ObrasPage() {
 
     setSaving(false);
     if (result.error) {
-      setError("Não foi possível salvar a unidade.");
+      setError(`Não foi possível salvar a unidade: ${result.error.message || JSON.stringify(result.error)}`);
       return;
     }
 

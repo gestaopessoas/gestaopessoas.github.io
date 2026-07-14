@@ -84,7 +84,7 @@ export default function EmpresasPage() {
 
     setSaving(false);
     if (result.error) {
-      setError("Não foi possível salvar a empresa.");
+      setError(`Não foi possível salvar a empresa: ${result.error.message || JSON.stringify(result.error)}`);
       return;
     }
 

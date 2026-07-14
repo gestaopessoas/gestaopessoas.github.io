@@ -84,7 +84,7 @@ export default function CentrosDeCustoPage() {
 
     setSaving(false);
     if (result.error) {
-      setError("Não foi possível salvar o centro de custo.");
+      setError(`Não foi possível salvar o centro de custo: ${result.error.message || JSON.stringify(result.error)}`);
       return;
     }
 
