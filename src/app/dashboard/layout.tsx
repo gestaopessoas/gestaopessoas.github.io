@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/layout/Sidebar";
-import { Bell, Search, User } from "lucide-react";
+import { NotificationBell } from "@/components/layout/NotificationBell";
+import { Search, User } from "lucide-react";
 
 export default function DashboardLayout({
   children,
@@ -27,9 +28,7 @@ export default function DashboardLayout({
             <button className="text-muted-foreground hover:text-primary">
               <Search className="h-5 w-5" />
             </button>
-            <button className="text-muted-foreground hover:text-primary">
-              <Bell className="h-5 w-5" />
-            </button>
+            <NotificationBell />
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
               <User className="h-5 w-5 text-muted-foreground" />
             </div>

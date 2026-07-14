@@ -6,7 +6,18 @@ import { createClient } from "@/utils/supabase/client";
 import { Archive, RotateCcw, Search, Package, ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type Employee = { id: string; name: string; cpf: string | null; rg: string | null; role: string | null; unit: string | null; dismissed_at: string | null; archive_box: string | null };
+type EmployeeArchive = { physical_boxes: { code: string } | null };
+type Employee = { 
+  id: string; 
+  name: string; 
+  cpf: string | null; 
+  rg: string | null; 
+  role: string | null; 
+  unit: string | null; 
+  dismissed_at: string | null; 
+  employee_archives: EmployeeArchive[];
+};
+
 const pageSize = 100;
 
 export default function ArquivoMortoPage() {
@@ -23,24 +34,66 @@ export default function ArquivoMortoPage() {
     const timer = window.setTimeout(async () => {
       setLoading(true);
       const term = query.trim().replace(/[,%()]/g, " ");
-      let request = createClient().from("employees").select("id, name, cpf, rg, role, unit, dismissed_at, archive_box", { count: "exact" }).eq("status", "Arquivo Morto").order("name").range(page * pageSize, page * pageSize + pageSize - 1);
+      let request = createClient()
+        .from("employees")
+        .select(`
+          id, name, cpf, rg, role, unit, dismissed_at,
+          employee_archives ( physical_boxes ( code ) )
+        `, { count: "exact" })
+        .eq("status", "Desligado")
+        .order("name")
+        .range(page * pageSize, page * pageSize + pageSize - 1);
+        
       if (term) request = request.or(`name.ilike.%${term}%,cpf.ilike.%${term}%,rg.ilike.%${term}%`);
       const { data, error: loadError, count } = await request;
+      
       setLoading(false);
       if (loadError) { setError(loadError.message); return; }
-      setRows((data ?? []) as Employee[]); setTotal(count ?? 0); setError("");
+      
+      // Fix potential typings from Supabase join
+      const typedData = (data ?? []).map(item => ({
+        ...item,
+        employee_archives: Array.isArray(item.employee_archives) ? item.employee_archives : []
+      })) as Employee[];
+      
+      setRows(typedData); 
+      setTotal(count ?? 0); 
+      setError("");
     }, 250);
     return () => window.clearTimeout(timer);
   }, [page, query, refresh]);
 
   const saveBox = async (employee: Employee, archiveBox: string) => {
-    const { error: saveError } = await createClient().from("employees").update({ archive_box: archiveBox.trim() || null }).eq("id", employee.id);
+    const boxCode = archiveBox.trim();
+    const sb = createClient();
+    
+    if (!boxCode) {
+      const { error: delError } = await sb.from("employee_archives").delete().eq("employee_id", employee.id);
+      if (delError) setError(delError.message); else setRefresh((value) => value + 1);
+      return;
+    }
+
+    // Upsert box and get ID
+    let { data: box } = await sb.from("physical_boxes").select("id").eq("code", boxCode).single();
+    if (!box) {
+      const { data: newBox, error: newBoxError } = await sb.from("physical_boxes").insert({ code: boxCode, description: `Caixa ${boxCode}` }).select("id").single();
+      if (newBoxError) { setError(newBoxError.message); return; }
+      box = newBox;
+    }
+    
+    // Clear old box link and insert new one
+    await sb.from("employee_archives").delete().eq("employee_id", employee.id);
+    const { error: saveError } = await sb.from("employee_archives").insert({ employee_id: employee.id, box_id: box!.id });
+    
     if (saveError) setError(saveError.message); else setRefresh((value) => value + 1);
   };
 
   const reactivate = async (employee: Employee) => {
     if (!window.confirm(`Reativar ${employee.name}?`)) return;
-    const { error: saveError } = await createClient().from("employees").update({ status: "Ativo", dismissed_at: null, archive_box: null }).eq("id", employee.id);
+    const sb = createClient();
+    const { error: saveError } = await sb.from("employees").update({ status: "Ativo", dismissed_at: null }).eq("id", employee.id);
+    await sb.from("employee_archives").delete().eq("employee_id", employee.id);
+    
     if (saveError) setError(saveError.message); else setRefresh((value) => value + 1);
   };
 
@@ -49,7 +102,15 @@ export default function ArquivoMortoPage() {
   };
 
   const groupedEmployees = rows.reduce((acc, emp) => {
-    const box = emp.archive_box?.trim() || "Sem Caixa";
+    // Pegar o primeiro arquivo se houver (considerando 1 caixa por funcionário no view básico)
+    let box = "Sem Caixa";
+    if (emp.employee_archives && emp.employee_archives.length > 0) {
+      const firstArchive = emp.employee_archives[0];
+      if (firstArchive.physical_boxes && firstArchive.physical_boxes.code) {
+        box = firstArchive.physical_boxes.code;
+      }
+    }
+    
     if (!acc[box]) acc[box] = [];
     acc[box].push(emp);
     return acc;
@@ -67,7 +128,7 @@ export default function ArquivoMortoPage() {
       <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
         <Archive className="h-6 w-6 text-primary" />Arquivo Morto
       </h1>
-      <p className="text-sm text-muted-foreground mt-1">{total.toLocaleString("pt-BR")} colaboradores arquivados e localização das caixas físicas.</p>
+      <p className="text-sm text-muted-foreground mt-1">{total.toLocaleString("pt-BR")} colaboradores desligados e localização das caixas físicas.</p>
     </header>
     
     {error && <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
@@ -139,8 +200,17 @@ export default function ArquivoMortoPage() {
 }
 
 function ArchiveRow({ employee, onSave, onReactivate }: { employee: Employee; onSave: (employee: Employee, box: string) => void; onReactivate: (employee: Employee) => void }) {
-  const [box, setBox] = useState(employee.archive_box ?? "");
+  let initialBox = "";
+  if (employee.employee_archives && employee.employee_archives.length > 0) {
+    const firstArchive = employee.employee_archives[0];
+    if (firstArchive.physical_boxes && firstArchive.physical_boxes.code) {
+      initialBox = firstArchive.physical_boxes.code;
+    }
+  }
+
+  const [box, setBox] = useState(initialBox);
   const [expanded, setExpanded] = useState(false);
+  
   return (
     <>
       <tr className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setExpanded(!expanded)}>
@@ -206,7 +276,7 @@ function ArchiveRow({ employee, onSave, onReactivate }: { employee: Employee; on
               </div>
               <div className="space-y-1">
                 <h4 className="text-sm font-semibold text-muted-foreground">Localização no Arquivo Morto</h4>
-                <p className="font-medium text-foreground">{employee.archive_box ?? "Não guardado em caixa"}</p>
+                <p className="font-medium text-foreground">{initialBox || "Não guardado em caixa"}</p>
               </div>
             </div>
           </td>

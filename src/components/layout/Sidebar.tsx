@@ -1,31 +1,43 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
 import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight } from "lucide-react"
+import { usePermissions } from "@/hooks/usePermissions"
+import { createClient } from "@/utils/supabase/client"
 
 const sidebarItems = [
   { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Vagas", href: "/dashboard/vagas", icon: Briefcase },
-  { name: "Talentos", href: "/dashboard/talentos", icon: Users },
-  { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users },
-  { name: "Arquivo Morto", href: "/dashboard/arquivo-morto", icon: Archive },
-  { name: "Armários", href: "/dashboard/armarios", icon: LockKeyhole },
-  { name: "Mesas & Ilhas", href: "/dashboard/mesas", icon: Armchair },
-  { name: "Controle RGS", href: "/dashboard/rgs", icon: ClipboardList },
-  { name: "Admissão", href: "/dashboard/admissao", icon: FileText },
+  { name: "Vagas", href: "/dashboard/vagas", icon: Briefcase, module: "vagas" },
+  { name: "Talentos", href: "/dashboard/talentos", icon: Users, module: "talentos" },
+  { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users, module: "colaboradores" },
+  { name: "Arquivo Morto", href: "/dashboard/arquivo-morto", icon: Archive, module: "arquivo_morto" },
+  { name: "Armários", href: "/dashboard/armarios", icon: LockKeyhole, module: "armarios" },
+  { name: "Mesas & Ilhas", href: "/dashboard/mesas", icon: Armchair, module: "ilhas" },
+  { name: "Controle RGS", href: "/dashboard/rgs", icon: ClipboardList, module: "rgs" },
+  { name: "Admissão", href: "/dashboard/admissao", icon: FileText, module: "admissao" },
   { name: "Centros de Custo", href: "/dashboard/centros-de-custo", icon: Briefcase },
   { name: "Empresas", href: "/dashboard/empresas", icon: LayoutDashboard },
   { name: "Obras", href: "/dashboard/obras", icon: LayoutDashboard },
-  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-  { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
+  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, module: "analytics" },
+  { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings, module: "configuracoes" },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const { loading, can } = usePermissions()
+
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/login")
+  }
+
+  const visibleItems = sidebarItems.filter((item) => loading || !item.module || can(item.module, "view"))
 
   return (
     <aside 
@@ -44,7 +56,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 scrollbar-hide">
-        {sidebarItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
           return (
             <div key={item.name} className="relative group/nav-item">
@@ -90,7 +102,8 @@ export function Sidebar() {
         </button>
 
         <div className="relative group/nav-item">
-          <button 
+          <button
+            onClick={handleSignOut}
             className={cn(
               "flex w-full items-center px-3 py-2 text-sm font-medium text-muted-foreground rounded-lg transition-all duration-200 hover:bg-muted/50 hover:text-destructive",
               isCollapsed ? "justify-center" : ""

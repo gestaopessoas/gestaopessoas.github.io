@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/utils/supabase/client";
+import { countBy } from "@/lib/metrics";
 import { BarChart3, Briefcase, Clock, TrendingUp, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -116,13 +117,6 @@ export default function AnalyticsPage() {
       </div>
     </div>
   );
-}
-
-function countBy(values: string[]) {
-  return values.reduce<Record<string, number>>((acc, value) => {
-    acc[value] = (acc[value] ?? 0) + 1;
-    return acc;
-  }, {});
 }
 
 function Metric({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: number | string }) {

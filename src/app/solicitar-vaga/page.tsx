@@ -23,17 +23,11 @@ type JobProfile = {
 type Department = { id: string; name: string };
 
 const behavioralTags = [
-  "Liderança", "Comunicação clara", "Organização", "Disciplina", "Proatividade", "Mão na massa",
-  "Analítico", "Atenção a detalhes", "Senso de urgência", "Resiliência", "Trabalho sob pressão",
-  "Autonomia", "Colaborativo", "Negociação", "Empatia", "Foco em resultado", "Aprendizado rápido",
-  "Postura profissional", "Planejamento", "Resolução de problemas", "Agilidade", "Controle emocional",
-  "Flexibilidade", "Tomada de decisão", "Perfil técnico", "Perfil operacional", "Perfil cuidadoso",
-  "Perfil executor", "Perfil influente", "Perfil estável", "Perfil conforme", "Boa escuta",
-  "Comunicação com obra", "Liderança operacional", "Ritmo constante", "Senso de dono",
-  "Cumpre combinado", "Busca melhoria", "Aceita feedback", "Ensina colegas", "Aprende na prática",
-  "Foco em segurança", "Capricho", "Concentração", "Discrição", "Relacionamento com cliente",
-  "Facilidade com rotina", "Facilidade com mudança", "Perfil conciliador", "Perfil fiscalizador",
-  "Perfil independente", "Perfil orientado por processo", "Perfil orientado por pessoas",
+  "Abertura a Experiências (Alta)", "Abertura a Experiências (Média)", "Abertura a Experiências (Baixa)",
+  "Conscienciosidade (Alta)", "Conscienciosidade (Média)", "Conscienciosidade (Baixa)",
+  "Extroversão (Alta)", "Extroversão (Média)", "Extroversão (Baixa)",
+  "Amabilidade (Alta)", "Amabilidade (Média)", "Amabilidade (Baixa)",
+  "Neuroticismo (Alto - instabilidade)", "Neuroticismo (Médio)", "Neuroticismo (Baixo - estabilidade)",
 ];
 
 const searchTags = [
@@ -347,8 +341,8 @@ export default function SolicitarVagaPage() {
         </section>
 
         <section className="rounded-lg border bg-card p-5">
-          <h2 className="text-lg font-semibold">Tags comportamentais</h2>
-          <p className="mb-3 mt-1 text-sm text-muted-foreground">Marque tudo que combina com a pessoa ideal.</p>
+          <h2 className="text-lg font-semibold">Perfil Big Five Desejado</h2>
+          <p className="mb-3 mt-1 text-sm text-muted-foreground">Marque os níveis ideais para os 5 grandes fatores de personalidade.</p>
           {tagBox("behavioral_tags", behavioralTags)}
         </section>
 

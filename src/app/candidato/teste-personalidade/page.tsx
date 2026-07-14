@@ -1,0 +1,232 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { createClient } from "@/utils/supabase/client";
+import { CheckCircle2, ChevronRight, ChevronLeft } from "lucide-react";
+import { useEffect, useState } from "react";
+
+type Question = {
+  id: string;
+  item_number: number;
+  item_text: string;
+};
+
+export default function BigFiveTestPage() {
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const [error, setError] = useState("");
+  
+  // Paginating 20 questions per page to not overwhelm the user
+  const [currentPage, setCurrentPage] = useState(0);
+  const questionsPerPage = 20;
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("big_five_questions")
+        .select("id, item_number, item_text")
+        .order("item_number", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching questions:", error);
+        // Fallback for demonstration if DB is empty
+        setQuestions(
+          Array.from({ length: 44 }, (_, i) => ({
+            id: `q-${i + 1}`,
+            item_number: i + 1,
+            item_text: `Pergunta de exemplo número ${i + 1} para o mapeamento de personalidade.`,
+          }))
+        );
+      } else if (data.length === 0) {
+        // Fallback for demonstration if DB is empty
+        setQuestions(
+          Array.from({ length: 44 }, (_, i) => ({
+            id: `q-${i + 1}`,
+            item_number: i + 1,
+            item_text: `Pergunta de exemplo número ${i + 1} para o mapeamento de personalidade.`,
+          }))
+        );
+      } else {
+        setQuestions(data);
+      }
+      setLoading(false);
+    };
+
+    fetchQuestions();
+  }, []);
+
+  const handleAnswer = (questionId: string, score: number) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: score }));
+  };
+
+  const submit = async () => {
+    // Check if all questions are answered
+    if (Object.keys(answers).length < questions.length) {
+      setError("Por favor, responda todas as perguntas antes de finalizar.");
+      return;
+    }
+    
+    setError("");
+    setSaving(true);
+    
+    const supabase = createClient();
+    // Assuming user is authenticated as candidate, or we pass a token. For now, just a direct insert.
+    const { error: insertError } = await supabase
+      .from("candidate_big_five_results")
+      .insert([
+        {
+          raw_answers: answers,
+          // the DB trigger or edge function should calculate the actual scores based on the raw answers
+        }
+      ]);
+      
+    setSaving(false);
+    
+    if (insertError) {
+      console.error(insertError);
+      setError("Houve um erro ao salvar suas respostas. Tente novamente.");
+    } else {
+      setCompleted(true);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30">
+        <p className="text-muted-foreground">Carregando questionário...</p>
+      </div>
+    );
+  }
+
+  if (completed) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-muted/30 p-6">
+        <section className="w-full max-w-lg rounded-lg border bg-card p-8 text-center shadow-sm">
+          <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-emerald-500" />
+          <h1 className="text-2xl font-semibold">Mapeamento Concluído</h1>
+          <p className="mt-3 text-muted-foreground">
+            Obrigado por dedicar seu tempo. Suas respostas foram registradas e ajudarão a entender melhor o seu perfil profissional.
+          </p>
+          <Button className="mt-6" onClick={() => window.location.href = '/'}>
+            Voltar ao Início
+          </Button>
+        </section>
+      </main>
+    );
+  }
+
+  const totalPages = Math.ceil(questions.length / questionsPerPage);
+  const currentQuestions = questions.slice(currentPage * questionsPerPage, (currentPage + 1) * questionsPerPage);
+  
+  const allAnsweredOnCurrentPage = currentQuestions.every(q => answers[q.id] !== undefined);
+
+  return (
+    <main className="min-h-screen bg-muted/30 px-4 py-8">
+      <div className="mx-auto max-w-4xl">
+        <header className="mb-8 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight">Mapeamento de Perfil Profissional</h1>
+          <p className="mt-2 text-muted-foreground">
+            Este questionário nos ajuda a entender melhor seu estilo de trabalho. Não há respostas certas ou erradas.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <span>Progresso: {Object.keys(answers).length} de {questions.length} respondidas</span>
+          </div>
+          <div className="mx-auto mt-2 h-2 w-full max-w-md overflow-hidden rounded-full bg-secondary">
+            <div 
+              className="h-full bg-primary transition-all duration-300" 
+              style={{ width: `${(Object.keys(answers).length / questions.length) * 100}%` }}
+            />
+          </div>
+        </header>
+
+        {error && (
+          <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-center text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-6">
+          {currentQuestions.map((q, idx) => (
+            <div key={q.id} className="rounded-lg border bg-card p-6 shadow-sm">
+              <p className="mb-4 font-medium text-card-foreground">
+                <span className="mr-2 text-muted-foreground">{q.item_number}.</span>
+                {q.item_text}
+              </p>
+              
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="hidden text-xs text-muted-foreground sm:inline-block">Discordo Totalmente</span>
+                <div className="flex w-full justify-between gap-2 sm:w-auto sm:justify-center">
+                  {[1, 2, 3, 4, 5].map((score) => (
+                    <label 
+                      key={score} 
+                      className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border transition-colors hover:bg-muted ${answers[q.id] === score ? 'border-primary bg-primary text-primary-foreground hover:bg-primary' : 'border-input bg-background'}`}
+                    >
+                      <input 
+                        type="radio" 
+                        name={`question-${q.id}`} 
+                        value={score} 
+                        className="sr-only"
+                        checked={answers[q.id] === score}
+                        onChange={() => handleAnswer(q.id, score)}
+                      />
+                      <span className={answers[q.id] === score ? 'font-bold' : ''}>{score}</span>
+                    </label>
+                  ))}
+                </div>
+                <span className="hidden text-xs text-muted-foreground sm:inline-block">Concordo Totalmente</span>
+              </div>
+              <div className="mt-2 flex justify-between text-xs text-muted-foreground sm:hidden">
+                <span>Discordo</span>
+                <span>Concordo</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-8 flex items-center justify-between rounded-lg border bg-card p-4">
+          <Button 
+            variant="outline" 
+            onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+            disabled={currentPage === 0}
+          >
+            <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+          </Button>
+          
+          <span className="text-sm font-medium">
+            Página {currentPage + 1} de {totalPages}
+          </span>
+          
+          {currentPage < totalPages - 1 ? (
+            <Button 
+              onClick={() => {
+                if (!allAnsweredOnCurrentPage) {
+                  setError("Por favor, responda todas as perguntas desta página antes de avançar.");
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  return;
+                }
+                setError("");
+                setCurrentPage(p => p + 1);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            >
+              Próxima <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
+            <Button 
+              onClick={submit} 
+              disabled={saving}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {saving ? "Enviando..." : "Finalizar Teste"}
+            </Button>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
