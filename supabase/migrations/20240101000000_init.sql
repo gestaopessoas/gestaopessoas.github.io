@@ -2,13 +2,13 @@
 
 -- 1. CriaÃ§Ã£o das Tabelas
 
-CREATE TABLE public.departments (
+CREATE TABLE IF NOT EXISTS public.departments (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   name text NOT NULL,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-CREATE TABLE public.employees (
+CREATE TABLE IF NOT EXISTS public.employees (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   name text NOT NULL,
   department_id uuid REFERENCES public.departments(id) ON DELETE SET NULL,
@@ -16,14 +16,14 @@ CREATE TABLE public.employees (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-CREATE TABLE public.lockers (
+CREATE TABLE IF NOT EXISTS public.lockers (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   number text NOT NULL,
   employee_id uuid REFERENCES public.employees(id) ON DELETE SET NULL,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-CREATE TABLE public.uniforms (
+CREATE TABLE IF NOT EXISTS public.uniforms (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   employee_id uuid REFERENCES public.employees(id) ON DELETE CASCADE NOT NULL,
   size text,
@@ -32,7 +32,7 @@ CREATE TABLE public.uniforms (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-CREATE TABLE public.islands (
+CREATE TABLE IF NOT EXISTS public.islands (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   name text NOT NULL,
   employee_id uuid REFERENCES public.employees(id) ON DELETE SET NULL,
@@ -63,7 +63,7 @@ INSERT INTO public.departments (name) VALUES ('Recursos Humanos'), ('Engenharia'
 -- 1. CriaÃ§Ã£o das Tabelas
 
 -- Contatos (Banco de Talentos / SÃ³lides)
-CREATE TABLE public.contacts (
+CREATE TABLE IF NOT EXISTS public.contacts (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   name text NOT NULL,
   email text,
@@ -74,7 +74,7 @@ CREATE TABLE public.contacts (
 );
 
 -- Vagas Abertas e Perfil de CompetÃªncia
-CREATE TABLE public.jobs (
+CREATE TABLE IF NOT EXISTS public.jobs (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   title text NOT NULL,
   department_id uuid REFERENCES public.departments(id) ON DELETE SET NULL,
@@ -85,7 +85,7 @@ CREATE TABLE public.jobs (
 );
 
 -- SolicitaÃ§Ãµes de Vagas (Para a GestÃ£o de Pessoas)
-CREATE TABLE public.job_requests (
+CREATE TABLE IF NOT EXISTS public.job_requests (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   department_id uuid REFERENCES public.departments(id) ON DELETE SET NULL,
   requested_role text NOT NULL,
@@ -95,7 +95,7 @@ CREATE TABLE public.job_requests (
 );
 
 -- Entrevistas (Conectado com o Planner)
-CREATE TABLE public.interviews (
+CREATE TABLE IF NOT EXISTS public.interviews (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   contact_id uuid REFERENCES public.contacts(id) ON DELETE CASCADE NOT NULL,
   job_id uuid REFERENCES public.jobs(id) ON DELETE CASCADE,
@@ -107,7 +107,7 @@ CREATE TABLE public.interviews (
 );
 
 -- ContrataÃ§Ãµes (AdmissÃ£o)
-CREATE TABLE public.hires (
+CREATE TABLE IF NOT EXISTS public.hires (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   contact_id uuid REFERENCES public.contacts(id) ON DELETE CASCADE NOT NULL,
   start_date date,
@@ -116,7 +116,7 @@ CREATE TABLE public.hires (
 );
 
 -- Registros de Treinamentos Realizados
-CREATE TABLE public.training_sessions (
+CREATE TABLE IF NOT EXISTS public.training_sessions (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   theme text NOT NULL,
   training_date date NOT NULL,
@@ -127,7 +127,7 @@ CREATE TABLE public.training_sessions (
 );
 
 -- CorrelaÃ§Ã£o Colaboradores x Treinamentos (Lista de PresenÃ§a Manual)
-CREATE TABLE public.training_participants (
+CREATE TABLE IF NOT EXISTS public.training_participants (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   training_id uuid REFERENCES public.training_sessions(id) ON DELETE CASCADE NOT NULL,
   employee_id uuid REFERENCES public.employees(id) ON DELETE CASCADE NOT NULL,
