@@ -53,8 +53,8 @@ export default function ArquivoMortoPage() {
       // Fix potential typings from Supabase join
       const typedData = (data ?? []).map(item => ({
         ...item,
-        employee_archives: Array.isArray(item.employee_archives) ? item.employee_archives : []
-      })) as Employee[];
+        employee_archives: Array.isArray(item.employee_archives) ? item.employee_archives : item.employee_archives ? [item.employee_archives] : []
+      })) as unknown as Employee[];
       
       setRows(typedData); 
       setTotal(count ?? 0); 

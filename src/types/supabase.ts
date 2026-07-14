@@ -1,1 +1,24 @@
-﻿{"_tag":"Error","error":{"code":"PlatformError","message":"NotFound: ChildProcess.spawn (podman container inspect supabase_db_gestaopessoas.github.io)"}}
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export interface Database {
+  public: {
+    Tables: {
+      [key: string]: any
+    }
+    Views: {
+      [key: string]: any
+    }
+    Functions: {
+      [key: string]: any
+    }
+    Enums: {
+      [key: string]: any
+    }
+  }
+}

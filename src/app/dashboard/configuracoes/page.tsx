@@ -32,16 +32,28 @@ export default function ConfiguracoesPage() {
 
   async function handleSave() {
     setSaving(true)
-    const { error } = await supabase.from('system_settings').upsert([
-      { setting_key: 'modules', setting_value: modules },
-      { setting_key: 'permissions', setting_value: permissions }
-    ], { onConflict: 'setting_key' })
-    setSaving(false)
-    
-    if (error) {
-      alert("Erro ao salvar: " + error.message)
-    } else {
-      alert("Configurações salvas no banco de dados.")
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modules,
+          permissions,
+          user_name: 'Administrador' // TODO: Pegar do contexto do usuário logado
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro desconhecido');
+      }
+      
+      alert("Configurações salvas e logadas com sucesso no banco de dados.");
+    } catch (error: any) {
+      alert("Erro ao salvar: " + error.message);
+    } finally {
+      setSaving(false);
     }
   }
 

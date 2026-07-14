@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
 import { Briefcase, MapPin, Search, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 
 type Candidate = {
   id: string;
@@ -27,6 +28,7 @@ export default function BancoDeTalentosPage() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -114,7 +116,11 @@ export default function BancoDeTalentosPage() {
         {filtered.map((candidate) => {
           const tags = [...(candidate.behavioral_tags ?? []), ...(candidate.search_tags ?? [])];
           return (
-            <Card key={candidate.id} className="hover:shadow-md transition-shadow relative overflow-hidden group">
+            <Card 
+              key={candidate.id} 
+              className="hover:shadow-md transition-shadow relative overflow-hidden group cursor-pointer"
+              onClick={() => setSelectedCandidateId(candidate.id)}
+            >
               <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary transition-colors" />
               <CardHeader className="pb-3 flex flex-row items-start justify-between">
                 <div>
@@ -142,6 +148,13 @@ export default function BancoDeTalentosPage() {
           );
         })}
       </div>
+      
+      {selectedCandidateId && (
+        <CandidateProfileModal 
+          candidateId={selectedCandidateId} 
+          onClose={() => setSelectedCandidateId(null)} 
+        />
+      )}
     </div>
   );
 }
