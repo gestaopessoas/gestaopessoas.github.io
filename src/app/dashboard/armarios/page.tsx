@@ -205,7 +205,7 @@ export default function ArmariosPage() {
             </div>
 
             <div className="mt-6 flex justify-between border-t pt-4">
-              <Button variant="destructive" variant="outline" onClick={() => { setEmployeeId(""); setHasKey(false); setQuery(""); }} className="text-red-600 hover:bg-red-50 hover:text-red-700">
+              <Button variant="outline" onClick={() => { setEmployeeId(""); setHasKey(false); setQuery(""); }} className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200">
                 Esvaziar Armário
               </Button>
               <div className="flex gap-2">

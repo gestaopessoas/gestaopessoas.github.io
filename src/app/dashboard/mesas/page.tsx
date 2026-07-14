@@ -263,7 +263,7 @@ export default function MesasPage() {
             </div>
 
             <div className="mt-6 flex justify-between border-t pt-4">
-              <Button variant="destructive" variant="outline" onClick={() => { setEmployeeId(""); setQuery(""); }} className="text-red-600 hover:bg-red-50 hover:text-red-700">
+              <Button variant="outline" onClick={() => { setEmployeeId(""); setQuery(""); }} className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200">
                 Desocupar Mesa
               </Button>
               <div className="flex gap-2">
