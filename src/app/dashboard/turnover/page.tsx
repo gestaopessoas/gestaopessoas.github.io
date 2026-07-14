@@ -14,12 +14,25 @@ export default function TurnoverPage() {
   useEffect(() => {
     async function fetchData() {
       // We look at employees with INACTIVE status vs ACTIVE status
-      const { data: emps } = await supabase.from('employees').select('id, name, status, termination_date, termination_reason');
+      const { data: emps } = await supabase.from('employees').select('id, name, status, dismissed_at, observation');
       
+      const ativos = emps?.filter(e => e.status !== 'Desligado' && e.status !== 'Inativo') || [];
+      const desligados = emps?.filter(e => e.status === 'Desligado' || e.dismissed_at) || [];
+      
+      const monthStart = startOfMonth(new Date());
+      const monthEnd = endOfMonth(new Date());
+      
+      const ativosNoMes = ativos;
+      const desligadosNoMes = desligados.filter(e => {
+        if (!e.dismissed_at) return false;
+        const d = new Date(e.dismissed_at);
+        return d >= monthStart && d <= monthEnd;
+      });
+
       const total = emps?.length || 0;
-      const desligados = emps?.filter(e => e.status === 'INACTIVE' || e.termination_date) || [];
-      
-      const turnoverRate = total > 0 ? ((desligados.length / total) * 100).toFixed(1) : 0;
+      const turnoverRate = (ativosNoMes.length + desligadosNoMes.length) > 0 
+        ? ((desligadosNoMes.length / ((ativosNoMes.length + desligadosNoMes.length + ativosNoMes.length) / 2)) * 100).toFixed(1) 
+        : 0;
 
       setMetrics({ total, desligados: desligados.length, turnover: Number(turnoverRate), history: desligados });
       setLoading(false);
@@ -89,8 +102,8 @@ export default function TurnoverPage() {
                   {metrics.history.map((h: any) => (
                     <tr key={h.id} className="hover:bg-muted/50">
                       <td className="px-4 py-3 font-medium">{h.name}</td>
-                      <td className="px-4 py-3 tabular-nums">{h.termination_date ? format(new Date(h.termination_date), 'dd/MM/yyyy') : 'N/D'}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{h.termination_reason || 'Não informado'}</td>
+                      <td className="px-4 py-3 tabular-nums">{h.dismissed_at ? format(new Date(h.dismissed_at), 'dd/MM/yyyy') : 'N/D'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{h.observation || 'Sem observação'}</td>
                     </tr>
                   ))}
                   {metrics.history.length === 0 && (

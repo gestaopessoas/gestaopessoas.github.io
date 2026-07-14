@@ -33,23 +33,22 @@ export default function ConfiguracoesPage() {
   async function handleSave() {
     setSaving(true)
     try {
-      const response = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          modules,
-          permissions,
-          user_name: 'Administrador' // TODO: Pegar do contexto do usuário logado
-        })
-      });
+      const { error: settingsError } = await supabase.from('system_settings').upsert([
+        { setting_key: 'modules', setting_value: modules },
+        { setting_key: 'permissions', setting_value: permissions }
+      ], { onConflict: 'setting_key' });
+      
+      if (settingsError) throw new Error(settingsError.message);
 
-      const data = await response.json();
+      await supabase.from('system_audit_logs').insert({
+        action_type: 'UPDATE_SETTINGS',
+        entity_name: 'system_settings',
+        user_identifier: 'Administrador',
+        ip_address: 'browser',
+        details: { modules, permissions }
+      });
       
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro desconhecido');
-      }
-      
-      alert("Configurações salvas e logadas com sucesso no banco de dados.");
+      alert("Configurações salvas com sucesso!");
     } catch (error: any) {
       alert("Erro ao salvar: " + error.message);
     } finally {
