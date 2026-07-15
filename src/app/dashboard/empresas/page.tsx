@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { Building2, Edit3, Plus, Search, X } from "lucide-react";
+import { Building2, Edit3, Plus, Search, X, Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type Company = {
@@ -93,6 +93,24 @@ export default function EmpresasPage() {
     startNew();
   };
 
+  const exportToCsv = () => {
+    if (filtered.length === 0) return;
+    const headers = ["Razão social", "Nome fantasia", "CNPJ"];
+    const exportRows = filtered.map(c => [
+      `"${c.name}"`,
+      `"${c.trading_name || ''}"`,
+      `"${c.cnpj}"`
+    ].join(","));
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...exportRows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "empresas.csv");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex-1 p-8 space-y-6 max-w-7xl mx-auto w-full">
@@ -101,10 +119,16 @@ export default function EmpresasPage() {
             <h1 className="text-2xl font-semibold tracking-tight">Empresas</h1>
             <p className="text-sm text-muted-foreground mt-1">CNPJs e vínculos jurídicos usados no Core HR.</p>
           </div>
-          <Button size="sm" className="h-9" onClick={startNew}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova empresa
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-9" onClick={exportToCsv} disabled={filtered.length === 0}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar
+            </Button>
+            <Button size="sm" className="h-9" onClick={startNew}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova empresa
+            </Button>
+          </div>
         </header>
 
         {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}

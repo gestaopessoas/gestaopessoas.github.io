@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Landmark, Plus, Search, X } from "lucide-react";
+import { Edit3, Landmark, Plus, Search, X, Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type CostCenter = {
@@ -93,6 +93,24 @@ export default function CentrosDeCustoPage() {
     startNew();
   };
 
+  const exportToCsv = () => {
+    if (filtered.length === 0) return;
+    const headers = ["Código", "Centro de Custo", "Descrição"];
+    const exportRows = filtered.map(c => [
+      `"${c.code}"`,
+      `"${c.name}"`,
+      `"${c.description || ''}"`
+    ].join(","));
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...exportRows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "centros_de_custo.csv");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex-1 p-8 space-y-6 max-w-7xl mx-auto w-full">
@@ -101,10 +119,16 @@ export default function CentrosDeCustoPage() {
             <h1 className="text-2xl font-semibold tracking-tight">Centros de Custo</h1>
             <p className="text-sm text-muted-foreground mt-1">Departamentos e alocações financeiras usados no Core HR.</p>
           </div>
-          <Button size="sm" className="h-9" onClick={startNew}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo centro
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-9" onClick={exportToCsv} disabled={filtered.length === 0}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar
+            </Button>
+            <Button size="sm" className="h-9" onClick={startNew}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo centro
+            </Button>
+          </div>
         </header>
 
         {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
