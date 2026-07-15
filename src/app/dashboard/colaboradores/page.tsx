@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { AlertCircle, Cake, CalendarDays, Edit3, Plus, Search, Trash2, Users, X, Activity, Filter, TrendingUp } from "lucide-react";
+import { AlertCircle, Cake, CalendarDays, Download, Edit3, Plus, Search, Trash2, Users, X, Activity, Filter, TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
@@ -216,6 +216,31 @@ export default function ColaboradoresPage() {
     return years > 0; // At least 1 year
   }).sort((a, b) => getBirthdayInfo(a.admission_date as string | null)!.day - getBirthdayInfo(b.admission_date as string | null)!.day);
 
+  const exportBirthdaysCsv = () => {
+    if (birthdaysThisMonth.length === 0) return;
+    const headers = ["Colaborador", "Cargo", "Departamento", "Dia do Aniversário", "Idade Atual", "Data de Nascimento"];
+    const rows = birthdaysThisMonth.map(e => {
+      const info = getBirthdayInfo(e.birthday as string | null)!;
+      const age = differenceInYears(new Date(), info.date);
+      return [
+        `"${e.name}"`, 
+        `"${e.role || ''}"`, 
+        `"${e.departments?.name || e.unit || e.workplace || ''}"`, 
+        `"${info.day.toString().padStart(2, '0')}"`, 
+        `"${age}"`,
+        `"${info.date.toLocaleDateString('pt-BR', {timeZone: 'UTC'})}"`
+      ].join(",");
+    });
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `aniversariantes_${MONTHS[selectedMonth]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -364,7 +389,11 @@ export default function ColaboradoresPage() {
               <p className="text-sm text-muted-foreground">Celebre as datas especiais da sua equipe.</p>
             </div>
             <div className="flex items-center gap-2">
-              <Label className="text-nowrap">Mês:</Label>
+              <Button variant="outline" onClick={exportBirthdaysCsv} disabled={birthdaysThisMonth.length === 0}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar
+              </Button>
+              <Label className="text-nowrap ml-2">Mês:</Label>
               <select 
                 value={selectedMonth} 
                 onChange={(e) => setSelectedMonth(Number(e.target.value))}

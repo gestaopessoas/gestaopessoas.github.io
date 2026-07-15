@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { ClipboardList, Plus, Search, X, ExternalLink } from "lucide-react";
+import { ClipboardList, Plus, Search, X, ExternalLink, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -32,6 +32,7 @@ export default function RgsPage() {
   const [query, setQuery] = useState("");
   const [type, setType] = useState("Todos");
   const [status, setStatus] = useState("Todos");
+  const [selectedMonth, setSelectedMonth] = useState(""); // YYYY-MM
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // desc = mais recentes primeiro
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,11 +65,36 @@ export default function RgsPage() {
   };
 
   const types = useMemo(() => Array.from(new Set(rows.map((row) => row.process_type).filter(Boolean))).sort(), [rows]);
+  
   const filtered = rows.filter((row) =>
     (type === "Todos" || row.process_type === type) &&
     (status === "Todos" || row.status === status) &&
+    (!selectedMonth || (row.process_date && row.process_date.startsWith(selectedMonth))) &&
     (row.employee_name ?? "").toLowerCase().includes(query.toLowerCase())
   );
+
+  const exportToCsv = () => {
+    if (filtered.length === 0) return;
+    const headers = ["Data", "Processo", "Colaborador", "Cargo", "Local", "Setor", "Vigência", "Status"];
+    const exportRows = filtered.map(r => [
+      `"${r.process_date ? new Date(`${r.process_date}T00:00:00`).toLocaleDateString('pt-BR') : ''}"`, 
+      `"${r.process_type || ''}"`, 
+      `"${r.employee_name || ''}"`, 
+      `"${r.role || ''}"`, 
+      `"${r.location || ''}"`, 
+      `"${r.sector || ''}"`, 
+      `"${r.effective_date ? new Date(`${r.effective_date}T00:00:00`).toLocaleDateString('pt-BR') : ''}"`, 
+      `"${r.status || ''}"`
+    ].join(","));
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...exportRows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `rgs_${selectedMonth || 'todos'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
   const update = (field: keyof typeof emptyForm, value: string) => setForm((current) => ({ ...current, [field]: value }));
   
@@ -93,7 +119,13 @@ export default function RgsPage() {
           <h1 className="flex items-center gap-2 text-2xl font-semibold"><ClipboardList className="h-6 w-6" />Controle RGS</h1>
           <p className="text-sm text-muted-foreground">Processos de contratação, alteração, desligamento e saúde ocupacional.</p>
         </div>
-        <Button onClick={() => setShowForm(true)}><Plus className="mr-2 h-4 w-4" />Novo processo</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={exportToCsv} disabled={filtered.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar Planilha
+          </Button>
+          <Button onClick={() => setShowForm(true)}><Plus className="mr-2 h-4 w-4" />Novo processo</Button>
+        </div>
       </header>
 
       {error && <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
@@ -139,7 +171,21 @@ export default function RgsPage() {
         </div>
         <Filter value={type} onChange={setType} options={["Todos", ...types]} />
         <Filter value={status} onChange={setStatus} options={["Todos", "Pendente", "Concluído"]} />
-        <Button variant="outline" className="h-10 text-muted-foreground" onClick={toggleSortOrder}>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground ml-2">Mês:</span>
+          <Input 
+            type="month" 
+            value={selectedMonth} 
+            onChange={(e) => setSelectedMonth(e.target.value)} 
+            className="h-10 w-44"
+          />
+          {selectedMonth && (
+            <Button variant="ghost" size="sm" onClick={() => setSelectedMonth("")} className="text-xs text-muted-foreground">
+              Limpar
+            </Button>
+          )}
+        </div>
+        <Button variant="outline" className="h-10 text-muted-foreground ml-auto" onClick={toggleSortOrder}>
           {sortOrder === "desc" ? "Recentes primeiro ↓" : "Antigos primeiro ↑"}
         </Button>
       </div>
