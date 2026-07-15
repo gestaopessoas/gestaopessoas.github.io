@@ -18,10 +18,17 @@ type Employee = {
   employee_archives: EmployeeArchive[];
 };
 
+type BoxData = {
+  id: string;
+  code: string;
+  count: number;
+};
+
 const pageSize = 100;
 
 export default function ArquivoMortoPage() {
-  const [rows, setRows] = useState<Employee[]>([]);
+  const [boxes, setBoxes] = useState<BoxData[]>([]);
+  const [rows, setRows] = useState<Employee[]>([]); // For search results
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
@@ -34,31 +41,58 @@ export default function ArquivoMortoPage() {
     const timer = window.setTimeout(async () => {
       setLoading(true);
       const term = query.trim().replace(/[,%()]/g, " ");
-      let request = createClient()
-        .from("employees")
-        .select(`
-          id, name, cpf, rg, role, unit, dismissed_at,
-          employee_archives ( physical_boxes ( code ) )
-        `, { count: "exact" })
-        .eq("status", "Desligado")
-        .order("name")
-        .range(page * pageSize, page * pageSize + pageSize - 1);
+      const sb = createClient();
+      
+      if (!term) {
+        // Fetch paginated boxes
+        const { data, error: loadError, count } = await sb
+          .from("physical_boxes")
+          .select("id, code, employee_archives(count)", { count: "exact" })
+          .order("code")
+          .range(page * pageSize, page * pageSize + pageSize - 1);
+          
+        setLoading(false);
+        if (loadError) { setError(loadError.message); return; }
         
-      if (term) request = request.or(`name.ilike.%${term}%,cpf.ilike.%${term}%,rg.ilike.%${term}%`);
-      const { data, error: loadError, count } = await request;
-      
-      setLoading(false);
-      if (loadError) { setError(loadError.message); return; }
-      
-      // Fix potential typings from Supabase join
-      const typedData = (data ?? []).map(item => ({
-        ...item,
-        employee_archives: Array.isArray(item.employee_archives) ? item.employee_archives : item.employee_archives ? [item.employee_archives] : []
-      })) as unknown as Employee[];
-      
-      setRows(typedData); 
-      setTotal(count ?? 0); 
-      setError("");
+        const mappedBoxes = (data || []).map(b => ({
+           id: b.id,
+           code: b.code,
+           count: Array.isArray(b.employee_archives) 
+                  ? b.employee_archives[0]?.count || 0 
+                  : (b.employee_archives as any)?.count || 0
+        }));
+        setBoxes(mappedBoxes);
+        setRows([]);
+        setTotal(count ?? 0);
+        setError("");
+      } else {
+        // Fetch employees for search
+        let request = sb
+          .from("employees")
+          .select(`
+            id, name, cpf, rg, role, unit, dismissed_at,
+            employee_archives ( physical_boxes ( code ) )
+          `, { count: "exact" })
+          .eq("status", "Desligado")
+          .order("name")
+          .range(page * pageSize, page * pageSize + pageSize - 1)
+          .or(`name.ilike.%${term}%,cpf.ilike.%${term}%,rg.ilike.%${term}%`);
+
+        const { data, error: loadError, count } = await request;
+        
+        setLoading(false);
+        if (loadError) { setError(loadError.message); return; }
+        
+        const typedData = (data ?? []).map(item => ({
+          ...item,
+          employee_archives: Array.isArray(item.employee_archives) ? item.employee_archives : item.employee_archives ? [item.employee_archives] : []
+        })) as unknown as Employee[];
+        
+        setRows(typedData); 
+        setBoxes([]);
+        setTotal(count ?? 0); 
+        setError("");
+      }
     }, 250);
     return () => window.clearTimeout(timer);
   }, [page, query, refresh]);
@@ -101,8 +135,7 @@ export default function ArquivoMortoPage() {
     setExpandedBoxes(prev => prev.includes(box) ? prev.filter(b => b !== box) : [...prev, box]);
   };
 
-  const groupedEmployees = rows.reduce((acc, emp) => {
-    // Pegar o primeiro arquivo se houver (considerando 1 caixa por funcionário no view básico)
+  const groupedSearchEmployees = rows.reduce((acc, emp) => {
     let box = "Sem Caixa";
     if (emp.employee_archives && emp.employee_archives.length > 0) {
       const firstArchive = emp.employee_archives[0];
@@ -110,16 +143,14 @@ export default function ArquivoMortoPage() {
         box = firstArchive.physical_boxes.code;
       }
     }
-    
     if (!acc[box]) acc[box] = [];
     acc[box].push(emp);
     return acc;
   }, {} as Record<string, Employee[]>);
 
-  // Auto-expand if there's only one box or searching
   useEffect(() => {
-    if (query && Object.keys(groupedEmployees).length > 0) {
-      setExpandedBoxes(Object.keys(groupedEmployees));
+    if (query && Object.keys(groupedSearchEmployees).length > 0) {
+      setExpandedBoxes(Object.keys(groupedSearchEmployees));
     }
   }, [query, rows]);
 
@@ -128,7 +159,7 @@ export default function ArquivoMortoPage() {
       <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
         <Archive className="h-6 w-6 text-primary" />Arquivo Morto
       </h1>
-      <p className="text-sm text-muted-foreground mt-1">{total.toLocaleString("pt-BR")} colaboradores desligados e localização das caixas físicas.</p>
+      <p className="text-sm text-muted-foreground mt-1">{!query ? "Caixas físicas do arquivo morto." : "Resultados da busca em colaboradores desligados."}</p>
     </header>
     
     {error && <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
@@ -140,11 +171,21 @@ export default function ArquivoMortoPage() {
 
     {loading ? (
       <div className="p-8 text-center text-muted-foreground border rounded-lg bg-card">Carregando...</div>
+    ) : !query ? (
+      boxes.length === 0 ? (
+        <div className="p-8 text-center text-muted-foreground border rounded-lg bg-card">Nenhuma caixa encontrada.</div>
+      ) : (
+        <div className="space-y-4">
+          {boxes.map(box => (
+            <LazyBoxRow key={box.id} box={box} onSave={saveBox} onReactivate={reactivate} />
+          ))}
+        </div>
+      )
     ) : rows.length === 0 ? (
       <div className="p-8 text-center text-muted-foreground border rounded-lg bg-card">Nenhum registro encontrado.</div>
     ) : (
       <div className="space-y-4">
-        {Object.entries(groupedEmployees).sort(([a], [b]) => a.localeCompare(b)).map(([boxName, emps]) => (
+        {Object.entries(groupedSearchEmployees).sort(([a], [b]) => a.localeCompare(b)).map(([boxName, emps]) => (
           <div key={boxName} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm transition-all hover:shadow-md">
             <button 
               onClick={() => toggleBox(boxName)} 
@@ -156,7 +197,7 @@ export default function ArquivoMortoPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg text-foreground">{boxName}</h3>
-                  <p className="text-sm text-muted-foreground font-medium">{emps.length} colaborador(es)</p>
+                  <p className="text-sm text-muted-foreground font-medium">{emps.length} colaborador(es) encontrado(s)</p>
                 </div>
               </div>
               <div className="p-2 rounded-full hover:bg-border/50 transition-colors">
@@ -197,6 +238,87 @@ export default function ArquivoMortoPage() {
       </div>
     </div>
   </div>;
+}
+
+function LazyBoxRow({ box, onSave, onReactivate }: { box: BoxData, onSave: any, onReactivate: any }) {
+  const [expanded, setExpanded] = useState(false);
+  const [employees, setEmployees] = useState<Employee[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (expanded && employees === null) {
+      setLoading(true);
+      const sb = createClient();
+      sb.from("employee_archives")
+        .select(`employees(id, name, cpf, rg, role, unit, dismissed_at)`)
+        .eq("box_id", box.id)
+        .then(({ data, error }) => {
+           setLoading(false);
+           if (!error && data) {
+             const emps = data.map(d => ({
+                ...(d.employees as any),
+                employee_archives: [{ physical_boxes: { code: box.code } }]
+             })) as Employee[];
+             emps.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+             setEmployees(emps);
+           }
+        });
+    }
+  }, [expanded, box.id, box.code, employees]);
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm transition-all hover:shadow-md">
+      <button 
+        onClick={() => setExpanded(!expanded)} 
+        className="w-full flex items-center justify-between p-5 hover:bg-muted/50 transition-colors text-left"
+      >
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-primary/10 text-primary rounded-lg">
+            <Package className="h-6 w-6 stroke-[1.5px]" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg text-foreground">{box.code}</h3>
+            <p className="text-sm text-muted-foreground font-medium">{box.count} colaborador(es)</p>
+          </div>
+        </div>
+        <div className="p-2 rounded-full hover:bg-border/50 transition-colors">
+          {expanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+        </div>
+      </button>
+      
+      {expanded && (
+        <div className="border-t border-border overflow-x-auto bg-background/30">
+          {loading ? (
+             <div className="p-6 text-center text-sm text-muted-foreground">Carregando registros...</div>
+          ) : employees?.length === 0 ? (
+             <div className="p-6 text-center text-sm text-muted-foreground">Nenhum registro nesta caixa.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40 text-left">
+                <tr>
+                  <th className="p-4 pl-6 text-muted-foreground font-semibold">Colaborador</th>
+                  <th className="p-4 text-muted-foreground font-semibold">Documentos</th>
+                  <th className="p-4 text-muted-foreground font-semibold">Desligamento</th>
+                  <th className="p-4 text-muted-foreground font-semibold">Caixa física</th>
+                  <th className="p-4 pr-6 text-right text-muted-foreground font-semibold">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees?.map((emp) => (
+                  <ArchiveRow 
+                    key={emp.id} 
+                    employee={emp} 
+                    onSave={(e, b) => { onSave(e, b); setEmployees(null); }} 
+                    onReactivate={(e) => { onReactivate(e); setEmployees(null); }} 
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ArchiveRow({ employee, onSave, onReactivate }: { employee: Employee; onSave: (employee: Employee, box: string) => void; onReactivate: (employee: Employee) => void }) {

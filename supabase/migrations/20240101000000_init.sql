@@ -49,10 +49,19 @@ ALTER TABLE public.lockers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.uniforms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.islands ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.departments;
 CREATE POLICY "Allow all actions for anon" ON public.departments FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.employees;
 CREATE POLICY "Allow all actions for anon" ON public.employees FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.lockers;
 CREATE POLICY "Allow all actions for anon" ON public.lockers FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.uniforms;
 CREATE POLICY "Allow all actions for anon" ON public.uniforms FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.islands;
 CREATE POLICY "Allow all actions for anon" ON public.islands FOR ALL USING (true) WITH CHECK (true);
 
 -- 3. InserÃ§Ã£o de Dados Iniciais (Opcional - Apenas para testes)
@@ -146,12 +155,25 @@ ALTER TABLE public.hires ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.training_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.training_participants ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.contacts;
 CREATE POLICY "Allow all actions for anon" ON public.contacts FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.jobs;
 CREATE POLICY "Allow all actions for anon" ON public.jobs FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.job_requests;
 CREATE POLICY "Allow all actions for anon" ON public.job_requests FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.interviews;
 CREATE POLICY "Allow all actions for anon" ON public.interviews FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.hires;
 CREATE POLICY "Allow all actions for anon" ON public.hires FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.training_sessions;
 CREATE POLICY "Allow all actions for anon" ON public.training_sessions FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.training_participants;
 CREATE POLICY "Allow all actions for anon" ON public.training_participants FOR ALL USING (true) WITH CHECK (true);
 -- Adiciona colunas de status e data de demissÃ£o na tabela employees
 ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS status text DEFAULT 'Ativo';
@@ -387,7 +409,10 @@ CREATE TABLE IF NOT EXISTS public.job_openings (
 ALTER TABLE public.job_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.job_openings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.job_profiles;
 CREATE POLICY "Allow all actions for anon" ON public.job_profiles FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.job_openings;
 CREATE POLICY "Allow all actions for anon" ON public.job_openings FOR ALL USING (true) WITH CHECK (true);
 -- Adicionar colunas de setor e posiÃ§Ã£o para o mapa visual
 ALTER TABLE public.islands ADD COLUMN IF NOT EXISTS sector text;
@@ -404,6 +429,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- 2. SeguranÃ§a de NÃ­vel de Linha (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.profiles;
 CREATE POLICY "Allow all actions for anon" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
 
 -- 3. Trigger para criar profile automaticamente quando usuÃ¡rio for criado no Auth
@@ -684,4 +710,5 @@ create table if not exists public.rgs_processes (
 
 -- Habilitar RLS e criar polÃ­tica de anon
 alter table public.rgs_processes enable row level security;
+drop policy if exists "Allow all operations for anon on rgs" on public.rgs_processes;
 create policy "Allow all operations for anon on rgs" on public.rgs_processes for all using (true) with check (true);
