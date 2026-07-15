@@ -21,7 +21,8 @@ export default function ArmariosPage() {
   const [employeeId, setEmployeeId] = useState("");
   const [hasKey, setHasKey] = useState(false);
   const [location, setLocation] = useState("Lado Oeste");
-  const [lockerNumber, setLockerNumber] = useState("");
+  const [lockerGroup, setLockerGroup] = useState("");
+  const [lockerNumberStr, setLockerNumberStr] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -41,11 +42,17 @@ export default function ArmariosPage() {
   }, [query, selected]);
 
   const grouped = useMemo(() => {
-    const groups: Record<string, Locker[]> = { "Lado Oeste": [], "Lado Leste": [], "Corredor": [], "Outros": [] };
+    const groups: Record<string, Locker[]> = {};
     lockers.forEach(locker => {
-      const loc = locker.location || "Lado Oeste";
-      if (groups[loc]) groups[loc].push(locker);
-      else groups["Outros"].push(locker);
+      let group = "Outros";
+      if (locker.number.includes(" - ")) {
+        group = locker.number.split(" - ")[0].trim();
+      } else {
+        group = locker.location || "Outros";
+      }
+      
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(locker);
     });
     return groups;
   }, [lockers]);
@@ -57,20 +64,32 @@ export default function ArmariosPage() {
     setEmployeeId(locker.employee_id ?? ""); 
     setHasKey(locker.has_key ?? false);
     setLocation(locker.location ?? "Lado Oeste");
-    setLockerNumber(locker.number);
+    
+    if (locker.number.includes(" - ")) {
+      const parts = locker.number.split(" - ");
+      setLockerGroup(parts[0].trim());
+      setLockerNumberStr(parts[1].trim());
+    } else {
+      setLockerGroup("");
+      setLockerNumberStr(locker.number);
+    }
+    
     setQuery(""); 
     setMatches([]); 
   };
 
   const save = async () => {
     if (!selected) return;
+    
+    const fullNumber = lockerGroup ? `${lockerGroup} - ${lockerNumberStr}` : lockerNumberStr;
+    
     const { error: saveError } = await createClient()
       .from("lockers")
       .update({ 
         employee_id: employeeId || null, 
         has_key: hasKey,
         location: location,
-        number: lockerNumber
+        number: fullNumber
       })
       .eq("id", selected.id);
     
@@ -106,7 +125,7 @@ export default function ArmariosPage() {
                 {/* Top Section: Number & Key Status */}
                 <div className="flex w-full items-start justify-between p-2">
                   <div className="rounded bg-zinc-400/30 px-1.5 py-0.5 text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
-                    Nº {locker.number.replace(/vertical|horizontal/gi, "").trim()}
+                    Nº {locker.number.includes(" - ") ? locker.number.split(" - ")[1].trim() : locker.number}
                   </div>
                   {locker.employee_id && (
                     <div title={locker.has_key ? "Chave com o funcionário" : "Chave na administração"} className={`flex h-5 w-5 items-center justify-center rounded-full shadow-inner ${locker.has_key ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
@@ -147,10 +166,14 @@ export default function ArmariosPage() {
             </div>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <Label>Número do Armário</Label>
-                  <Input value={lockerNumber} onChange={(e) => setLockerNumber(e.target.value)} />
+                  <Label>Grupo</Label>
+                  <Input value={lockerGroup} onChange={(e) => setLockerGroup(e.target.value)} placeholder="Ex: Horizontal ADM" />
+                </div>
+                <div className="space-y-1">
+                  <Label>Número</Label>
+                  <Input value={lockerNumberStr} onChange={(e) => setLockerNumberStr(e.target.value)} />
                 </div>
                 <div className="space-y-1">
                   <Label>Localização</Label>
@@ -243,7 +266,9 @@ export default function ArmariosPage() {
                 {lockers.sort((a,b) => parseInt(a.number) - parseInt(b.number)).map(locker => (
                   <div key={locker.id} className="flex items-center justify-between rounded-lg border p-3 shadow-sm transition-colors hover:bg-muted/50">
                     <div>
-                      <div className="font-medium text-sm">Armário {locker.number.replace(/vertical|horizontal/gi, "").trim()}</div>
+                      <div className="font-medium text-sm">
+                        {locker.number.includes(" - ") ? locker.number : `Armário ${locker.number}`}
+                      </div>
                       <div className="text-xs text-muted-foreground">{locker.location}</div>
                     </div>
                     <div className="flex items-center gap-3">
