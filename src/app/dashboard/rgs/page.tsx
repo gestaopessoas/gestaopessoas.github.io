@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { ClipboardList, Plus, Search, X, ExternalLink } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Process = {
@@ -25,6 +25,7 @@ const emptyForm = {
 };
 
 export default function RgsPage() {
+  const router = useRouter();
   const [rows, setRows] = useState<Process[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -40,7 +41,8 @@ export default function RgsPage() {
     const { data, error: loadError } = await createClient()
       .from("rgs_processes")
       .select("*")
-      .order("process_date", { ascending: false })
+      .order("process_date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false, nullsFirst: false })
       .limit(1000);
     setLoading(false);
     if (loadError) setError(loadError.message); else { setRows((data ?? []) as Process[]); setError(""); }
@@ -147,13 +149,13 @@ export default function RgsPage() {
                   <div className="flex items-center gap-2">
                     {row.employee_name ?? "-"}
                     {row.employee_name && (
-                      <Link 
-                        href={`/dashboard/colaboradores?query=${encodeURIComponent(row.employee_name)}`}
+                      <button 
+                        onClick={() => router.push(`/dashboard/colaboradores?query=${encodeURIComponent(row.employee_name!)}`)}
                         title="Ver no cadastro"
-                        className="text-primary hover:text-primary/80 transition-colors"
+                        className="text-primary hover:text-primary/80 transition-colors cursor-pointer bg-transparent border-0 p-0"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
-                      </Link>
+                      </button>
                     )}
                   </div>
                 </td>
