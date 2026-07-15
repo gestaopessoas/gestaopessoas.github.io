@@ -20,6 +20,7 @@ type ProfileRow = { id: string; name: string | null; level: number; permissions:
 export default function ConfiguracoesPage() {
   const [modules, setModules] = useState({ ats: true, admissao: true, pdi: true, gestor: true })
   const [permissions, setPermissions] = useState({ "2fa": true, salaries: false, ai_notifications: true })
+  const [jobRequestCode, setJobRequestCode] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
@@ -67,6 +68,9 @@ export default function ConfiguracoesPage() {
           if (row.setting_key === 'permissions') setPermissions(row.setting_value)
         })
       }
+      const { data: publicForm } = await supabase.from('public_form_settings').select('value').eq('key', 'job_request_code').single()
+      if (publicForm) setJobRequestCode(publicForm.value)
+      
       setLoading(false)
     }
     load()
@@ -81,6 +85,12 @@ export default function ConfiguracoesPage() {
       ], { onConflict: 'setting_key' });
       
       if (settingsError) throw new Error(settingsError.message);
+
+      const { error: publicFormError } = await supabase.from('public_form_settings').upsert(
+        { key: 'job_request_code', value: jobRequestCode },
+        { onConflict: 'key' }
+      );
+      if (publicFormError) throw new Error(publicFormError.message);
 
       await supabase.from('system_audit_logs').insert({
         action_type: 'UPDATE_SETTINGS',
@@ -189,6 +199,18 @@ export default function ConfiguracoesPage() {
                     <p className="text-sm text-muted-foreground">A IA pode enviar emails de reprovação/aprovação automaticamente.</p>
                   </div>
                   <Switch checked={permissions.ai_notifications} onCheckedChange={(c) => setPermissions({...permissions, ai_notifications: c})} />
+                </div>
+                <div className="flex items-center justify-between border-t border-border/40 pt-4">
+                  <div className="space-y-1">
+                    <Label className="text-base font-medium">Código do Formulário Público de Vagas</Label>
+                    <p className="text-sm text-muted-foreground">Senha que os gestores usarão para solicitar abertura de novas vagas.</p>
+                  </div>
+                  <Input 
+                    value={jobRequestCode} 
+                    onChange={(e) => setJobRequestCode(e.target.value)} 
+                    className="w-48"
+                    placeholder="Ex: ACPO-VAGAS" 
+                  />
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/20 border-t border-border/40 pt-4 flex justify-end">
