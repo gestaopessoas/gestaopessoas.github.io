@@ -4,10 +4,18 @@ import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Save, Loader2 } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
+import { usePermissions } from "@/hooks/usePermissions"
+
+const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "talentos", "recrutamento", "armarios", "uniformes", "ponto", "rgs", "ilhas", "configuracoes"] as const
+const ACTIONS = ["view", "create", "edit", "delete"] as const
+
+type UserPerms = Record<string, Record<string, boolean>>
+type ProfileRow = { id: string; name: string | null; level: number; permissions: UserPerms | null }
 
 export default function ConfiguracoesPage() {
   const [modules, setModules] = useState({ ats: true, admissao: true, pdi: true, gestor: true })
@@ -15,6 +23,40 @@ export default function ConfiguracoesPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
+  const { loading: permLoading, can } = usePermissions()
+
+  const [profiles, setProfiles] = useState<ProfileRow[]>([])
+  const [profilesLoading, setProfilesLoading] = useState(true)
+  const [savingProfileId, setSavingProfileId] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function loadProfiles() {
+      const { data } = await supabase.from('profiles').select('id, name, level, permissions')
+      setProfiles((data as ProfileRow[]) ?? [])
+      setProfilesLoading(false)
+    }
+    loadProfiles()
+  }, [supabase])
+
+  function updateProfileField(id: string, field: 'level' | 'permissions', value: number | UserPerms) {
+    setProfiles(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
+  }
+
+  function toggleModuleAction(profile: ProfileRow, mod: string, action: string, checked: boolean) {
+    const perms: UserPerms = { ...(profile.permissions ?? {}) }
+    perms[mod] = { ...(perms[mod] ?? {}), [action]: checked }
+    updateProfileField(profile.id, 'permissions', perms)
+  }
+
+  async function saveProfile(profile: ProfileRow) {
+    setSavingProfileId(profile.id)
+    const { error } = await supabase.from('profiles').update({
+      level: profile.level,
+      permissions: profile.permissions ?? {},
+    }).eq('id', profile.id)
+    setSavingProfileId(null)
+    if (error) alert("Erro ao salvar usuário: " + error.message)
+  }
 
   useEffect(() => {
     async function load() {
@@ -67,9 +109,12 @@ export default function ConfiguracoesPage() {
         </header>
 
         <Tabs defaultValue="modulos" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md h-10 p-1 bg-muted/50">
+          <TabsList className={`grid w-full ${can('configuracoes', 'edit') ? 'grid-cols-3 max-w-2xl' : 'grid-cols-2 max-w-md'} h-10 p-1 bg-muted/50`}>
             <TabsTrigger value="modulos" className="text-sm rounded-md data-[state=active]:shadow-sm">Módulos do Sistema</TabsTrigger>
             <TabsTrigger value="permissoes" className="text-sm rounded-md data-[state=active]:shadow-sm">Permissões Globais</TabsTrigger>
+            {can('configuracoes', 'edit') && (
+              <TabsTrigger value="usuarios" className="text-sm rounded-md data-[state=active]:shadow-sm">Usuários & Permissões</TabsTrigger>
+            )}
           </TabsList>
           
           <TabsContent value="modulos" className="mt-6 space-y-6">
@@ -154,6 +199,75 @@ export default function ConfiguracoesPage() {
               </CardFooter>
             </Card>
           </TabsContent>
+
+          {can('configuracoes', 'edit') && (
+            <TabsContent value="usuarios" className="mt-6 space-y-6">
+              {(permLoading || profilesLoading) ? (
+                <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
+              ) : (
+                profiles.map(profile => (
+                  <Card key={profile.id} className="border-border/60 shadow-sm">
+                    <CardHeader className="pb-4 border-b border-border/40 mb-4">
+                      <CardTitle className="text-lg">{profile.name ?? profile.id}</CardTitle>
+                      <CardDescription>
+                        Nível de acesso (0-100). <strong>Nível ≥ 50 concede acesso total (admin)</strong> e ignora a grade abaixo.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="flex items-center gap-3 max-w-xs">
+                        <Label className="text-sm font-medium whitespace-nowrap">Level</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={profile.level}
+                          onChange={(e) => updateProfileField(profile.id, 'level', Number(e.target.value))}
+                        />
+                      </div>
+
+                      {profile.level >= 50 ? (
+                        <p className="text-sm text-muted-foreground">Este usuário é admin (level ≥ 50) e já tem acesso total a todos os módulos.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm border-collapse">
+                            <thead>
+                              <tr className="border-b border-border/40">
+                                <th className="text-left py-2 pr-4 font-medium">Módulo</th>
+                                {ACTIONS.map(action => (
+                                  <th key={action} className="text-center py-2 px-2 font-medium capitalize">{action}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {MODULES.map(mod => (
+                                <tr key={mod} className="border-b border-border/20">
+                                  <td className="py-2 pr-4">{mod}</td>
+                                  {ACTIONS.map(action => (
+                                    <td key={action} className="text-center py-2 px-2">
+                                      <Switch
+                                        checked={profile.permissions?.[mod]?.[action] === true}
+                                        onCheckedChange={(c) => toggleModuleAction(profile, mod, action, c)}
+                                      />
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardContent>
+                    <CardFooter className="bg-muted/20 border-t border-border/40 pt-4 flex justify-end">
+                      <Button size="sm" onClick={() => saveProfile(profile)} disabled={savingProfileId === profile.id}>
+                        {savingProfileId === profile.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                        Salvar Usuário
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>

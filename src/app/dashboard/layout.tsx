@@ -1,12 +1,45 @@
+"use client"
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
-import { Search, User } from "lucide-react";
+import { Search, User, Loader2 } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  // ponytail: client-side guard only (UX/defense-in-depth). Static export has no
+  // middleware in production, so the real barrier is Supabase RLS on the tables.
+  useEffect(() => {
+    const supabase = createClient();
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) router.replace("/login");
+      else setChecking(false);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) router.replace("/login");
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, [router]);
+
+  if (checking) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar - fixed on desktop */}
