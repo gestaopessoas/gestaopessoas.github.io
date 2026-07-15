@@ -126,7 +126,7 @@ export default function CentrosDeCustoPage() {
             <Field label="Descrição"><Input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
           </div>
           <div className="mt-4 flex justify-end">
-            <Button disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
           </div>
         </form>
 

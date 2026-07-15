@@ -211,7 +211,7 @@ export default function CarreirasPage() {
                 <Field label="UF"><Input disabled={!selectedJob} value={candidate.state} onChange={(event) => setCandidate({ ...candidate, state: event.target.value })} /></Field>
               </div>
               <Field label="LinkedIn"><Input disabled={!selectedJob} value={candidate.linkedin_url} onChange={(event) => setCandidate({ ...candidate, linkedin_url: event.target.value })} /></Field>
-              <Button className="w-full" disabled={!selectedJob || saving}>
+              <Button type="submit" className="w-full" disabled={!selectedJob || saving}>
                 <Send className="mr-2 h-4 w-4" />
                 {saving ? "Enviando..." : "Enviar candidatura"}
               </Button>

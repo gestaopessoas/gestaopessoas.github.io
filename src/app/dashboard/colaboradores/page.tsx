@@ -276,7 +276,7 @@ export default function ColaboradoresPage() {
 
           <div className="mt-5 flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button disabled={saving}>{saving ? "Salvando..." : "Salvar registro"}</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar registro"}</Button>
           </div>
         </form>
       )}
