@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Bell } from "lucide-react";
+import { Bell, UserX, AlertTriangle, Briefcase, ChevronRight } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { differenceInDays, isValid, parseISO } from "date-fns";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type TrialNotification = {
   id: string;
@@ -13,49 +14,85 @@ type TrialNotification = {
   isWarning: boolean;
 };
 
+type RgsNotification = {
+  id: string;
+  name: string;
+  type: string;
+  daysPending: number;
+};
+
 export function NotificationBell() {
-  const [notifications, setNotifications] = useState<TrialNotification[]>([]);
+  const [trialNotifications, setTrialNotifications] = useState<TrialNotification[]>([]);
+  const [rgsNotifications, setRgsNotifications] = useState<RgsNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchNotifications = async () => {
       const supabase = createClient();
-      const { data, error } = await supabase
+      
+      // 1. Fetch Trial Notifications
+      const { data: empData, error: empError } = await supabase
         .from("employees")
         .select("id, name, admission_date, contract_type")
         .neq("status", "Arquivo Morto")
         .neq("status", "Desligado")
         .neq("status", "Inativo");
 
-      if (error || !data) return;
-
       const today = new Date();
       const trialList: TrialNotification[] = [];
 
-      for (const emp of data) {
-        if (!emp.admission_date) continue;
-        // Se já tivermos o tipo de contrato e não for CLT, não tem período de experiência
-        if (emp.contract_type && emp.contract_type !== "CLT") continue;
-        const admission = parseISO(emp.admission_date);
-        if (!isValid(admission)) continue;
-        
-        const daysElapsed = differenceInDays(today, admission);
-        const daysRemaining = 90 - daysElapsed;
-        
-        // Mostramos no sininho aqueles que estão a 15 dias ou menos de acabar a experiência
-        if (daysRemaining >= 0 && daysRemaining <= 15) {
-          trialList.push({
-            id: emp.id,
-            name: emp.name,
-            daysRemaining,
-            isWarning: daysRemaining <= 7,
-          });
+      if (!empError && empData) {
+        for (const emp of empData) {
+          if (!emp.admission_date) continue;
+          if (emp.contract_type && emp.contract_type !== "CLT") continue;
+          const admission = parseISO(emp.admission_date);
+          if (!isValid(admission)) continue;
+          
+          const daysElapsed = differenceInDays(today, admission);
+          const daysRemaining = 90 - daysElapsed;
+          
+          if (daysRemaining >= 0 && daysRemaining <= 15) {
+            trialList.push({
+              id: emp.id,
+              name: emp.name,
+              daysRemaining,
+              isWarning: daysRemaining <= 7,
+            });
+          }
         }
+        trialList.sort((a, b) => a.daysRemaining - b.daysRemaining);
+        setTrialNotifications(trialList);
       }
 
-      trialList.sort((a, b) => a.daysRemaining - b.daysRemaining);
-      setNotifications(trialList);
+      // 2. Fetch RGS Notifications
+      const { data: rgsData, error: rgsError } = await supabase
+        .from("rgs_processes")
+        .select("id, employee_name, process_type, created_at, status")
+        .eq("status", "Pendente");
+
+      if (!rgsError && rgsData) {
+        const rgsList: RgsNotification[] = [];
+        for (const rgs of rgsData) {
+          if (!rgs.created_at) continue;
+          const createdAt = parseISO(rgs.created_at);
+          if (!isValid(createdAt)) continue;
+          
+          const daysPending = differenceInDays(today, createdAt);
+          
+          if (daysPending >= 3) {
+            rgsList.push({
+              id: rgs.id,
+              name: rgs.employee_name || "Desconhecido",
+              type: rgs.process_type || "Processo",
+              daysPending,
+            });
+          }
+        }
+        rgsList.sort((a, b) => b.daysPending - a.daysPending);
+        setRgsNotifications(rgsList);
+      }
     };
 
     fetchNotifications();
@@ -71,6 +108,8 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const totalCount = trialNotifications.length + rgsNotifications.length;
+
   return (
     <div className="relative flex items-center" ref={dropdownRef}>
       <button 
@@ -79,33 +118,80 @@ export function NotificationBell() {
         aria-label="Notificações"
       >
         <Bell className="h-5 w-5" />
-        {notifications.length > 0 && (
+        {totalCount > 0 && (
           <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-background">
-            {notifications.length}
+            {totalCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-3 w-80 rounded-xl border bg-card p-2 shadow-xl animate-in fade-in slide-in-from-top-2">
-          <div className="mb-2 px-2 pb-2 pt-1 border-b">
-            <h3 className="text-sm font-semibold text-foreground">Fim de Experiência</h3>
-            <p className="text-xs text-muted-foreground">Colaboradores nos últimos 15 dias de contrato.</p>
-          </div>
-          
-          {notifications.length === 0 ? (
-            <div className="px-2 py-6 text-center text-sm text-muted-foreground">Nenhum aviso no momento.</div>
+        <div className="absolute right-0 top-full mt-3 w-80 rounded-xl border bg-card p-0 shadow-xl animate-in fade-in slide-in-from-top-2 max-h-[85vh] overflow-y-auto">
+          {totalCount === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma notificação no momento.</div>
           ) : (
-            <div className="flex max-h-80 flex-col gap-1 overflow-y-auto pr-1">
-              {notifications.map(n => (
-                <div key={n.id} className={`flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted ${n.isWarning ? "bg-red-50/50 dark:bg-red-950/20" : ""}`}>
-                  <span className="font-medium text-foreground">{n.name}</span>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Faltam {n.daysRemaining} dias</span>
-                    {n.isWarning && <span className="text-red-600 font-semibold bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 rounded-sm">Atenção</span>}
+            <div className="flex flex-col">
+              
+              {/* RGS Pendentes */}
+              {rgsNotifications.length > 0 && (
+                <div className="border-b last:border-b-0 pb-2">
+                  <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> RGS Pendentes
+                    </h3>
+                    <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{rgsNotifications.length}</span>
+                  </div>
+                  <div className="px-2 pt-2 flex flex-col gap-1">
+                    {rgsNotifications.map(n => (
+                      <button 
+                        key={n.id} 
+                        onClick={() => { setIsOpen(false); router.push("/dashboard/rgs"); }}
+                        className="flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted text-left w-full group"
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-medium text-foreground">{n.name}</span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <div className="flex items-center justify-between text-xs mt-0.5">
+                          <span className="text-muted-foreground">{n.type}</span>
+                          <span className="text-amber-600 font-medium">Há {n.daysPending} dias</span>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* Fim de Experiência */}
+              {trialNotifications.length > 0 && (
+                <div className="pb-2">
+                  <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Briefcase className="h-3.5 w-3.5 text-blue-500" /> Fim de Experiência
+                    </h3>
+                    <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{trialNotifications.length}</span>
+                  </div>
+                  <div className="px-2 pt-2 flex flex-col gap-1">
+                    {trialNotifications.map(n => (
+                      <button 
+                        key={n.id} 
+                        onClick={() => { setIsOpen(false); router.push("/dashboard/colaboradores"); }}
+                        className={`flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted text-left w-full group ${n.isWarning ? "bg-red-50/50 dark:bg-red-950/20" : ""}`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-medium text-foreground">{n.name}</span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <div className="flex items-center justify-between text-xs mt-0.5">
+                          <span className="text-muted-foreground">Faltam {n.daysRemaining} dias</span>
+                          {n.isWarning && <span className="text-red-600 font-semibold bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 rounded-sm">Atenção</span>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
             </div>
           )}
         </div>

@@ -10,7 +10,7 @@ import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 
 type Department = { id: string; name: string };
-type Employee = Record<string, string | null | Department> & { id: string; name: string; departments: Department | null };
+type Employee = Record<string, string | null | Department> & { id: string; name: string; departments: Department | null; level?: string | null };
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
 const pageSize = 1000; // Increased to load all for client-side filtering on special tabs
@@ -22,7 +22,7 @@ const fields = [
 ].join(", ");
 
 const emptyForm = {
-  name: "", department_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", phone: "",
+  name: "", department_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "",
   gender: "", unit: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
   cost_center: "", cbo: "", aso_date: "", observation: "", workplace: "",
@@ -38,6 +38,7 @@ const MONTHS = [
 export default function ColaboradoresPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [roles, setRoles] = useState<string[]>([]);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -69,6 +70,12 @@ export default function ColaboradoresPage() {
   useEffect(() => {
     const supabase = createClient();
     supabase.from("departments").select("id, name").order("name").then(({ data }) => setDepartments((data ?? []) as Department[]));
+    supabase.from("job_profiles").select("title").then(({ data }) => {
+      if (data) setRoles(Array.from(new Set(data.map((d: any) => d.title))).sort() as string[]);
+    });
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("query");
+    if (q) setQuery(q);
   }, []);
 
   useEffect(() => {
@@ -139,9 +146,28 @@ export default function ColaboradoresPage() {
     payload.name = form.name.trim();
     payload.status = form.status;
     const supabase = createClient();
+    
+    const isNew = !editingId;
+    const original = editingId ? employees.find((e) => e.id === editingId) : null;
+    const isDismissed = form.status === "Desligado" && original?.status !== "Desligado";
+    const isPromoted = !isNew && !isDismissed && (form.role !== original?.role || form.level !== original?.level || form.department_id !== original?.department_id || form.workplace !== original?.workplace);
+
     const result = editingId
       ? await supabase.from("employees").update(payload).eq("id", editingId)
       : await supabase.from("employees").insert(payload);
+      
+    if (!result.error && (isNew || isDismissed || isPromoted)) {
+      const rgsType = isNew ? "Contratação" : isDismissed ? "Desligamento" : "Alteração de cargo/local";
+      await supabase.from("rgs_processes").insert({
+        process_type: rgsType,
+        process_date: new Date().toISOString().split("T")[0],
+        employee_name: payload.name,
+        role: payload.role,
+        location: payload.workplace,
+        status: "Pendente",
+      });
+    }
+
     setSaving(false);
     if (result.error) {
       setError(`Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
@@ -253,7 +279,8 @@ export default function ColaboradoresPage() {
 
           <Section title="Vínculo e lotação">
             <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "Férias", "Afastado", "Inativo", "Desligado"]} /></Field>
-            <Field label="Cargo"><Input value={form.role} onChange={(e) => update("role", e.target.value)} /></Field>
+            <Field label="Cargo"><Input list="roles-list" value={form.role} onChange={(e) => update("role", e.target.value)} /><datalist id="roles-list">{roles.map(r => <option key={r} value={r} />)}</datalist></Field>
+            <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Diretoria"]} /></Field>
             <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></Field>
             <Field label="Tipo de contrato"><Input value={form.contract_type} onChange={(e) => update("contract_type", e.target.value)} /></Field>
             <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
