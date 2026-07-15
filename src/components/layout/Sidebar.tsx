@@ -11,6 +11,7 @@ import { createClient } from "@/utils/supabase/client"
 const sidebarItems = [
   { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
   { name: "Vagas", href: "/dashboard/vagas", icon: Briefcase, module: "vagas" },
+  { name: "Entrevistas", href: "/dashboard/entrevistas", icon: Users, module: "entrevistas" },
   { name: "Talentos", href: "/dashboard/talentos", icon: Users, module: "talentos" },
   { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users, module: "colaboradores" },
   { name: "Arquivo Morto", href: "/dashboard/arquivo-morto", icon: Archive, module: "arquivo_morto" },

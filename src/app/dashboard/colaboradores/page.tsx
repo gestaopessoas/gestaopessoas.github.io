@@ -3,8 +3,9 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { AlertCircle, Cake, CalendarDays, Edit3, Plus, Search, Trash2, Users, X, Activity, Filter } from "lucide-react";
+import { AlertCircle, Cake, CalendarDays, Edit3, Plus, Search, Trash2, Users, X, Activity, Filter, TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
@@ -13,12 +14,12 @@ type Department = { id: string; name: string };
 type Employee = Record<string, string | null | Department> & { id: string; name: string; departments: Department | null; level?: string | null };
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
-const pageSize = 1000; // Increased to load all for client-side filtering on special tabs
+const pageSize = 1000;
 const fields = [
   "id", "name", "department_id", "birthday", "status", "dismissed_at", "role", "phone",
   "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "gender",
   "unit", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cost_center", "cbo",
-  "aso_date", "observation", "workplace",
+  "aso_date", "observation", "workplace", "level"
 ].join(", ");
 
 const emptyForm = {
@@ -41,7 +42,9 @@ export default function ColaboradoresPage() {
   const [roles, setRoles] = useState<string[]>([]);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  
+  // Modals state
+  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -123,7 +126,7 @@ export default function ColaboradoresPage() {
   const startNew = () => {
     setEditingId(null);
     setForm(emptyForm);
-    setShowForm(true);
+    setIsEmployeeModalOpen(true);
   };
 
   const startEdit = (employee: Employee) => {
@@ -131,10 +134,7 @@ export default function ColaboradoresPage() {
     for (const key of Object.keys(next) as (keyof EmployeeForm)[]) next[key] = String(employee[key] ?? "");
     setEditingId(employee.id);
     setForm(next);
-    setShowForm(true);
-    // ponytail: the dashboard scrolls <main>, not the window, so window.scrollTo was a no-op
-    // and the form opened off-screen. Query it rather than thread a ref through the layout.
-    document.querySelector("main")?.scrollTo({ top: 0, behavior: "smooth" });
+    setIsEmployeeModalOpen(true);
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -173,7 +173,7 @@ export default function ColaboradoresPage() {
       setError(`Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
       return;
     }
-    setShowForm(false);
+    setIsEmployeeModalOpen(false);
     setEditingId(null);
     setForm(emptyForm);
     setRefresh((value) => value + 1);
@@ -228,87 +228,72 @@ export default function ColaboradoresPage() {
 
       {/* Tabs */}
       <div className="flex w-full flex-wrap gap-2 rounded-md bg-muted p-1 sm:w-fit">
-        <Button
-          variant={activeTab === "todos" ? "default" : "ghost"}
-          className="flex-1 sm:flex-none"
-          onClick={() => setActiveTab("todos")}
-        >
+        <Button variant={activeTab === "todos" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("todos")}>
           <Users className="mr-2 h-4 w-4" /> Todos
         </Button>
-
-        <Button
-          variant={activeTab === "aniversarios" ? "default" : "ghost"}
-          className="flex-1 sm:flex-none"
-          onClick={() => setActiveTab("aniversarios")}
-        >
+        <Button variant={activeTab === "aniversarios" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("aniversarios")}>
           <Cake className="mr-2 h-4 w-4" /> Aniversariantes
         </Button>
-
-        <Button
-          variant={activeTab === "experiencia" ? "default" : "ghost"}
-          className="flex-1 sm:flex-none"
-          onClick={() => setActiveTab("experiencia")}
-        >
+        <Button variant={activeTab === "experiencia" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("experiencia")}>
           <CalendarDays className="mr-2 h-4 w-4" /> Fim de Experiência (90d)
         </Button>
       </div>
 
       {error && <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-      {showForm && (
-        <form onSubmit={save} className="rounded-lg border bg-card p-5">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold">{editingId ? "Registro completo do colaborador" : "Novo colaborador"}</h2>
-              <p className="text-sm text-muted-foreground">Dados pessoais, contratuais, documentos e saúde ocupacional.</p>
-            </div>
-            <Button type="button" variant="ghost" size="icon" onClick={() => setShowForm(false)} aria-label="Fechar"><X className="h-4 w-4" /></Button>
-          </div>
+      {/* Colaborador Edit/Create Modal */}
+      <Dialog open={isEmployeeModalOpen} onOpenChange={setIsEmployeeModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Registro completo do colaborador" : "Novo colaborador"}</DialogTitle>
+            <DialogDescription>Dados pessoais, contratuais, documentos, saúde ocupacional e histórico.</DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={save} className="mt-4">
+            <Section title="Identificação">
+              <Field label="Nome completo *" span><Input required value={form.name} onChange={(e) => update("name", e.target.value)} /></Field>
+              <Field label="CPF"><Input value={form.cpf} onChange={(e) => update("cpf", e.target.value)} /></Field>
+              <Field label="RG"><Input value={form.rg} onChange={(e) => update("rg", e.target.value)} /></Field>
+              <Field label="Nascimento"><Input type="date" value={form.birthday} onChange={(e) => update("birthday", e.target.value)} /></Field>
+              <Field label="Gênero"><Input value={form.gender} onChange={(e) => update("gender", e.target.value)} /></Field>
+              <Field label="Estado civil"><Input value={form.marital_status} onChange={(e) => update("marital_status", e.target.value)} /></Field>
+              <Field label="Telefone"><Input value={form.phone} onChange={(e) => update("phone", e.target.value)} /></Field>
+              <Field label="E-mail pessoal"><Input type="email" value={form.email_personal} onChange={(e) => update("email_personal", e.target.value)} /></Field>
+              <Field label="E-mail corporativo"><Input type="email" value={form.email_corporate} onChange={(e) => update("email_corporate", e.target.value)} /></Field>
+            </Section>
 
-          <Section title="Identificação">
-            <Field label="Nome completo *" span><Input required value={form.name} onChange={(e) => update("name", e.target.value)} /></Field>
-            <Field label="CPF"><Input value={form.cpf} onChange={(e) => update("cpf", e.target.value)} /></Field>
-            <Field label="RG"><Input value={form.rg} onChange={(e) => update("rg", e.target.value)} /></Field>
-            <Field label="Nascimento"><Input type="date" value={form.birthday} onChange={(e) => update("birthday", e.target.value)} /></Field>
-            <Field label="Gênero"><Input value={form.gender} onChange={(e) => update("gender", e.target.value)} /></Field>
-            <Field label="Estado civil"><Input value={form.marital_status} onChange={(e) => update("marital_status", e.target.value)} /></Field>
-            <Field label="Telefone"><Input value={form.phone} onChange={(e) => update("phone", e.target.value)} /></Field>
-            <Field label="E-mail pessoal"><Input type="email" value={form.email_personal} onChange={(e) => update("email_personal", e.target.value)} /></Field>
-            <Field label="E-mail corporativo"><Input type="email" value={form.email_corporate} onChange={(e) => update("email_corporate", e.target.value)} /></Field>
-          </Section>
+            <Section title="Vínculo e lotação">
+              <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "Férias", "Afastado", "Inativo", "Desligado"]} /></Field>
+              <Field label="Cargo"><Input list="roles-list" value={form.role} onChange={(e) => update("role", e.target.value)} /><datalist id="roles-list">{roles.map(r => <option key={r} value={r} />)}</datalist></Field>
+              <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Diretoria"]} /></Field>
+              <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></Field>
+              <Field label="Tipo de contrato"><Input value={form.contract_type} onChange={(e) => update("contract_type", e.target.value)} /></Field>
+              <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
+              <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
+              <Field label="Unidade / obra"><Input value={form.unit} onChange={(e) => update("unit", e.target.value)} /></Field>
+              <Field label="Local de trabalho"><Input value={form.workplace} onChange={(e) => update("workplace", e.target.value)} /></Field>
+              <Field label="Centro de custo"><Input value={form.cost_center} onChange={(e) => update("cost_center", e.target.value)} /></Field>
+              <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} /></Field>
+              <Field label="Tamanho da camisa"><Input value={form.shirt_size} onChange={(e) => update("shirt_size", e.target.value)} /></Field>
+            </Section>
 
-          <Section title="Vínculo e lotação">
-            <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "Férias", "Afastado", "Inativo", "Desligado"]} /></Field>
-            <Field label="Cargo"><Input list="roles-list" value={form.role} onChange={(e) => update("role", e.target.value)} /><datalist id="roles-list">{roles.map(r => <option key={r} value={r} />)}</datalist></Field>
-            <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Diretoria"]} /></Field>
-            <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></Field>
-            <Field label="Tipo de contrato"><Input value={form.contract_type} onChange={(e) => update("contract_type", e.target.value)} /></Field>
-            <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
-            <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
-            <Field label="Unidade / obra"><Input value={form.unit} onChange={(e) => update("unit", e.target.value)} /></Field>
-            <Field label="Local de trabalho"><Input value={form.workplace} onChange={(e) => update("workplace", e.target.value)} /></Field>
-            <Field label="Centro de custo"><Input value={form.cost_center} onChange={(e) => update("cost_center", e.target.value)} /></Field>
-            <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} /></Field>
-            <Field label="Tamanho da camisa"><Input value={form.shirt_size} onChange={(e) => update("shirt_size", e.target.value)} /></Field>
-          </Section>
+            <Section title="Documentos e arquivo">
+              <Field label="CTPS"><Input value={form.ctps} onChange={(e) => update("ctps", e.target.value)} /></Field>
+              <Field label="Série CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
+              <Field label="PIS"><Input value={form.pis} onChange={(e) => update("pis", e.target.value)} /></Field>
+              <Field label="Data do ASO"><Input type="date" value={form.aso_date} onChange={(e) => update("aso_date", e.target.value)} /></Field>
+              <Field label="Observações" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
+            </Section>
 
-          <Section title="Documentos e arquivo">
-            <Field label="CTPS"><Input value={form.ctps} onChange={(e) => update("ctps", e.target.value)} /></Field>
-            <Field label="Série CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
-            <Field label="PIS"><Input value={form.pis} onChange={(e) => update("pis", e.target.value)} /></Field>
-            <Field label="Data do ASO"><Input type="date" value={form.aso_date} onChange={(e) => update("aso_date", e.target.value)} /></Field>
+            {editingId && <RelatedRecords employeeId={editingId} />}
 
-            <Field label="Observações" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
-          </Section>
-
-          {editingId && <RelatedRecords employeeId={editingId} />}
-
-          <div className="mt-5 flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar registro"}</Button>
-          </div>
-        </form>
-      )}
+            <DialogFooter className="mt-8 border-t pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsEmployeeModalOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar registro"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* TABS CONTENT */}
       {activeTab === "todos" && (
@@ -330,7 +315,7 @@ export default function ColaboradoresPage() {
                 {loading ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : employees.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum colaborador encontrado.</td></tr> : employees.map((employee) => {
                   const trialInfo = getTrialInfo(employee.admission_date as string | null);
                   return (
-                  <tr key={employee.id} className="border-b last:border-0">
+                  <tr key={employee.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => startEdit(employee)}>
                     <td className="p-3">
                       <div className="font-medium flex items-center gap-2">
                         {employee.name}
@@ -343,15 +328,18 @@ export default function ColaboradoresPage() {
                       <div className="text-xs text-muted-foreground">{String(employee.email_corporate ?? employee.email_personal ?? "")}</div>
                     </td>
                     <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
-                    <td className="p-3"><div>{String(employee.role ?? "-")}</div><div className="text-xs text-muted-foreground">{employee.departments?.name ?? String(employee.unit ?? employee.workplace ?? "-")}</div></td>
+                    <td className="p-3">
+                      <div>{String(employee.role ?? "-")} {employee.level && <span className="text-[10px] bg-muted px-1.5 rounded-full ml-1">{employee.level}</span>}</div>
+                      <div className="text-xs text-muted-foreground">{employee.departments?.name ?? String(employee.unit ?? employee.workplace ?? "-")}</div>
+                    </td>
                     <td className="p-3">{String(employee.status ?? "-")}</td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
                         <Button size="sm" variant="outline" onClick={() => setSelectedEmployeeId(employee.id)} title="Perfil Big Five">
                           <Activity className="h-3.5 w-3.5 text-primary" />
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => startEdit(employee)}>
-                          <Edit3 className="mr-2 h-3.5 w-3.5" />Visualizar
+                          <Edit3 className="mr-2 h-3.5 w-3.5" />Abrir
                         </Button>
                       </div>
                     </td>
@@ -367,8 +355,6 @@ export default function ColaboradoresPage() {
           </div>
         </>
       )}
-
-
 
       {activeTab === "aniversarios" && (
         <div className="rounded-lg border bg-card p-6">
@@ -565,51 +551,92 @@ export default function ColaboradoresPage() {
 }
 
 function RelatedRecords({ employeeId }: { employeeId: string }) {
+  const [companyBenefits, setCompanyBenefits] = useState<{id: string, name: string}[]>([]);
   const [benefits, setBenefits] = useState<RelatedRow[]>([]);
   const [epis, setEpis] = useState<RelatedRow[]>([]);
   const [vacations, setVacations] = useState<RelatedRow[]>([]);
   const [exams, setExams] = useState<RelatedRow[]>([]);
-  const [benefit, setBenefit] = useState("");
+  const [promotions, setPromotions] = useState<RelatedRow[]>([]);
+  
   const [epi, setEpi] = useState({ epi_name: "", ca_number: "", received_date: "" });
   const [vacation, setVacation] = useState({ start_date: "", end_date: "" });
   const [exam, setExam] = useState({ exam_type: "Admissional", exam_name: "", exam_date: "" });
+  const [promotion, setPromotion] = useState({ previous_role: "", new_role: "", previous_level: "", new_level: "", promotion_date: new Date().toISOString().split('T')[0] });
 
   const load = useCallback(async () => {
     const supabase = createClient();
-    const [b, e, v, x] = await Promise.all([
+    const [cb, b, e, v, x, p] = await Promise.all([
+      supabase.from("company_benefits").select("*").order("name"),
       supabase.from("employee_benefits").select("*").eq("employee_id", employeeId).order("created_at"),
       supabase.from("employee_epis").select("*").eq("employee_id", employeeId).order("created_at"),
       supabase.from("vacations").select("*").eq("employee_id", employeeId).order("start_date", { ascending: false }),
       supabase.from("occupational_exams").select("*").eq("employee_id", employeeId).order("exam_date", { ascending: false }),
+      supabase.from("employee_promotions").select("*").eq("employee_id", employeeId).order("promotion_date", { ascending: false }),
     ]);
-    setBenefits((b.data ?? []) as RelatedRow[]); setEpis((e.data ?? []) as RelatedRow[]); setVacations((v.data ?? []) as RelatedRow[]); setExams((x.data ?? []) as RelatedRow[]);
+    setCompanyBenefits((cb.data ?? []) as any[]);
+    setBenefits((b.data ?? []) as RelatedRow[]); 
+    setEpis((e.data ?? []) as RelatedRow[]); 
+    setVacations((v.data ?? []) as RelatedRow[]); 
+    setExams((x.data ?? []) as RelatedRow[]);
+    setPromotions((p.data ?? []) as RelatedRow[]);
   }, [employeeId]);
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
-  const add = async (table: "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams", payload: Record<string, string | null>) => {
+  const add = async (table: "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams" | "employee_promotions", payload: Record<string, string | null>) => {
     const { error } = await createClient().from(table).insert({ employee_id: employeeId, ...payload });
     if (!error) void load();
   };
-  const remove = async (table: "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams", id: string) => {
+  const remove = async (table: "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams" | "employee_promotions", id: string) => {
     if (!window.confirm("Excluir este registro?")) return;
     const { error } = await createClient().from(table).delete().eq("id", id);
     if (!error) void load();
   };
 
   return (
-    <div className="mt-6 space-y-3 border-t pt-5">
-      <h3 className="font-medium">Histórico vinculado</h3>
-      <Related title="Benefícios" rows={benefits} render={(row) => `${row.benefit_name}${row.value ? ` · R$ ${row.value}` : ""}`} onRemove={(id) => remove("employee_benefits", id)}>
-        <Input value={benefit} onChange={(e) => setBenefit(e.target.value)} placeholder="Nome do benefício" />
-        <Button type="button" variant="outline" onClick={() => { if (benefit.trim()) { void add("employee_benefits", { benefit_name: benefit.trim() }); setBenefit(""); } }}>Adicionar</Button>
+    <div className="mt-8 space-y-4 border-t pt-6">
+      <h3 className="font-semibold text-lg text-foreground mb-4">Registros Vinculados</h3>
+      
+      <details className="rounded-md border p-3" open>
+        <summary className="cursor-pointer font-medium select-none">Benefícios ({benefits.length})</summary>
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+          {companyBenefits.map(b => {
+            const hasBenefit = benefits.find(eb => eb.benefit_name === b.name);
+            return (
+              <Label key={b.id} className="flex items-center gap-2 cursor-pointer rounded border p-2 hover:bg-muted/50 transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={!!hasBenefit} 
+                  onChange={(e) => {
+                    if (e.target.checked) add("employee_benefits", { benefit_name: b.name });
+                    else if (hasBenefit) remove("employee_benefits", hasBenefit.id);
+                  }}
+                  className="w-4 h-4 text-primary"
+                /> 
+                {b.name}
+              </Label>
+            );
+          })}
+        </div>
+      </details>
+      
+      <Related title="Histórico de Promoções" icon={TrendingUp} rows={promotions} render={(row) => `${new Date(row.promotion_date + "T12:00:00").toLocaleDateString('pt-BR')}: ${row.previous_role || '-'} (${row.previous_level || '-'}) ➔ ${row.new_role || '-'} (${row.new_level || '-'})`} onRemove={(id) => remove("employee_promotions", id)}>
+        <Input value={promotion.previous_role} onChange={(e) => setPromotion({ ...promotion, previous_role: e.target.value })} placeholder="Cargo anterior" />
+        <Input value={promotion.new_role} onChange={(e) => setPromotion({ ...promotion, new_role: e.target.value })} placeholder="Novo cargo" />
+        <Input value={promotion.previous_level} onChange={(e) => setPromotion({ ...promotion, previous_level: e.target.value })} placeholder="Nível anterior" />
+        <Input value={promotion.new_level} onChange={(e) => setPromotion({ ...promotion, new_level: e.target.value })} placeholder="Novo nível" />
+        <Input type="date" value={promotion.promotion_date} onChange={(e) => setPromotion({ ...promotion, promotion_date: e.target.value })} />
+        <Button type="button" variant="outline" onClick={() => { if (promotion.new_role && promotion.promotion_date) { void add("employee_promotions", promotion); setPromotion({ previous_role: "", new_role: "", previous_level: "", new_level: "", promotion_date: new Date().toISOString().split('T')[0] }); } }}>Adicionar</Button>
       </Related>
+
       <Related title="EPIs" rows={epis} render={(row) => `${row.epi_name} · CA ${row.ca_number || "-"} · ${row.received_date || "sem data"}`} onRemove={(id) => remove("employee_epis", id)}>
         <Input value={epi.epi_name} onChange={(e) => setEpi({ ...epi, epi_name: e.target.value })} placeholder="EPI" /><Input value={epi.ca_number} onChange={(e) => setEpi({ ...epi, ca_number: e.target.value })} placeholder="Número CA" /><Input type="date" value={epi.received_date} onChange={(e) => setEpi({ ...epi, received_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (epi.epi_name) { void add("employee_epis", { ...epi, received_date: epi.received_date || null, status: "Ativo" }); setEpi({ epi_name: "", ca_number: "", received_date: "" }); } }}>Adicionar</Button>
       </Related>
+      
       <Related title="Férias" rows={vacations} render={(row) => `${row.start_date} até ${row.end_date} · ${row.status || "Programada"}`} onRemove={(id) => remove("vacations", id)}>
         <Input type="date" value={vacation.start_date} onChange={(e) => setVacation({ ...vacation, start_date: e.target.value })} /><Input type="date" value={vacation.end_date} onChange={(e) => setVacation({ ...vacation, end_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (vacation.start_date && vacation.end_date) { void add("vacations", { ...vacation, status: "Programada" }); setVacation({ start_date: "", end_date: "" }); } }}>Adicionar</Button>
       </Related>
+      
       <Related title="Exames ocupacionais" rows={exams} render={(row) => `${row.exam_type} · ${row.exam_name} · ${row.exam_date}`} onRemove={(id) => remove("occupational_exams", id)}>
         <Select value={exam.exam_type} onChange={(value) => setExam({ ...exam, exam_type: value })} options={["Admissional", "Periódico", "Retorno", "Mudança de risco", "Demissional"]} /><Input value={exam.exam_name} onChange={(e) => setExam({ ...exam, exam_name: e.target.value })} placeholder="Exame" /><Input type="date" value={exam.exam_date} onChange={(e) => setExam({ ...exam, exam_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (exam.exam_name && exam.exam_date) { void add("occupational_exams", { ...exam, status: "Realizado", result: "Pendente" }); setExam({ exam_type: "Admissional", exam_name: "", exam_date: "" }); } }}>Adicionar</Button>
       </Related>
@@ -620,4 +647,4 @@ function RelatedRecords({ employeeId }: { employeeId: string }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) { return <section className="mb-6"><h3 className="mb-3 text-sm font-semibold text-muted-foreground">{title}</h3><div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">{children}</div></section>; }
 function Field({ label, span, children }: { label: string; span?: boolean; children: React.ReactNode }) { return <div className={span ? "space-y-1.5 md:col-span-2" : "space-y-1.5"}><Label>{label}</Label>{children}</div>; }
 function Select({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) { return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
-function Related({ title, rows, render, onRemove, children }: { title: string; rows: RelatedRow[]; render: (row: RelatedRow) => string; onRemove: (id: string) => void; children: React.ReactNode }) { return <details className="rounded-md border p-3"><summary className="cursor-pointer font-medium">{title} ({rows.length})</summary><div className="mt-3 space-y-2">{rows.map((row) => <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm"><span>{render(row)}</span><Button type="button" size="icon" variant="ghost" onClick={() => onRemove(row.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button></div>)}<div className="grid gap-2 md:grid-cols-4">{children}</div></div></details>; }
+function Related({ title, icon: Icon, rows, render, onRemove, children }: { title: string; icon?: React.ElementType; rows: RelatedRow[]; render: (row: RelatedRow) => string; onRemove: (id: string) => void; children: React.ReactNode }) { return <details className="rounded-md border p-3"><summary className="cursor-pointer font-medium flex items-center gap-2">{Icon && <Icon className="w-4 h-4 text-muted-foreground" />} {title} ({rows.length})</summary><div className="mt-3 space-y-2">{rows.map((row) => <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm"><span>{render(row)}</span><Button type="button" size="icon" variant="ghost" onClick={() => onRemove(row.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button></div>)}<div className="grid gap-2 md:flex md:flex-wrap">{children}</div></div></details>; }

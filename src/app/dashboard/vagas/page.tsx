@@ -2,8 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, CheckCircle2, Clock, ExternalLink, MessageCircle, Plus, Search } from "lucide-react";
+import { Briefcase, CheckCircle2, Clock, ExternalLink, MessageCircle, Plus, Search, Edit3, Archive, ListTodo, ArchiveRestore } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -31,15 +33,22 @@ const statusStyle: Record<string, string> = {
   "Em análise": "bg-blue-500/10 text-blue-700 dark:text-blue-300",
   Aprovada: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   Recusada: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-300",
+  Arquivada: "bg-zinc-800/10 text-zinc-500 dark:text-zinc-400",
 };
 
-const nextStatus = ["Nova", "Em análise", "Aprovada", "Recusada"];
+const nextStatus = ["Nova", "Em análise", "Aprovada", "Recusada", "Arquivada"];
 
 export default function VagasAdminPage() {
   const [requests, setRequests] = useState<JobRequest[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  
+  const [activeTab, setActiveTab] = useState<"ativas" | "historico">("ativas");
+  
+  // Edit Modal State
+  const [editingJob, setEditingJob] = useState<JobRequest | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -69,8 +78,17 @@ export default function VagasAdminPage() {
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return requests;
-    return requests.filter((request) => [
+    let result = requests;
+    
+    if (activeTab === "ativas") {
+      result = result.filter(r => !["Aprovada", "Recusada", "Arquivada"].includes(r.status || ""));
+    } else {
+      result = result.filter(r => ["Aprovada", "Recusada", "Arquivada"].includes(r.status || ""));
+    }
+    
+    if (!term) return result;
+    
+    return result.filter((request) => [
       request.position_title,
       request.requester_name,
       request.requester_area,
@@ -78,7 +96,7 @@ export default function VagasAdminPage() {
       request.urgency,
       request.status,
     ].some((value) => value?.toLowerCase().includes(term)));
-  }, [query, requests]);
+  }, [query, requests, activeTab]);
 
   const updateStatus = async (request: JobRequest, status: string) => {
     const supabase = createClient();
@@ -89,9 +107,36 @@ export default function VagasAdminPage() {
     }
     setRequests((prev) => prev.map((item) => item.id === request.id ? { ...item, status } : item));
   };
+  
+  const handleSaveEdit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingJob) return;
+    setIsSaving(true);
+    
+    const supabase = createClient();
+    const { error } = await supabase.from("job_requests").update({
+      position_title: editingJob.position_title,
+      quantity: editingJob.quantity,
+      unit: editingJob.unit,
+      contract_type: editingJob.contract_type,
+      required_requirements: editingJob.required_requirements,
+      desired_requirements: editingJob.desired_requirements,
+      manager_expectations: editingJob.manager_expectations,
+    }).eq("id", editingJob.id);
+    
+    setIsSaving(false);
+    
+    if (error) {
+      alert("Erro ao salvar vaga: " + error.message);
+      return;
+    }
+    
+    setRequests(prev => prev.map(item => item.id === editingJob.id ? editingJob : item));
+    setEditingJob(null);
+  };
 
-  const abertas = requests.filter((request) => !["Aprovada", "Recusada"].includes(request.status ?? "")).length;
-  const urgentes = requests.filter((request) => ["Alta", "Crítica"].includes(request.urgency ?? "")).length;
+  const abertas = requests.filter((request) => !["Aprovada", "Recusada", "Arquivada"].includes(request.status ?? "")).length;
+  const urgentes = requests.filter((request) => ["Alta", "Crítica"].includes(request.urgency ?? "") && !["Aprovada", "Recusada", "Arquivada"].includes(request.status ?? "")).length;
   const aprovadas = requests.filter((request) => request.status === "Aprovada").length;
 
   return (
@@ -123,10 +168,28 @@ export default function VagasAdminPage() {
         {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Metric icon={Briefcase} label="Solicitações" value={requests.length} />
-          <Metric icon={Clock} label="Em aberto" value={abertas} />
+          <Metric icon={Briefcase} label="Total de Solicitações" value={requests.length} />
+          <Metric icon={Clock} label="Em aberto (Ativas)" value={abertas} />
           <Metric icon={CheckCircle2} label="Aprovadas" value={aprovadas} />
-          <Metric icon={Clock} label="Urgentes" value={urgentes} />
+          <Metric icon={Clock} label="Urgentes (Em aberto)" value={urgentes} />
+        </div>
+        
+        <div className="flex w-full flex-wrap gap-2 rounded-md bg-muted p-1 sm:w-fit">
+          <Button
+            variant={activeTab === "ativas" ? "default" : "ghost"}
+            className="flex-1 sm:flex-none h-9"
+            onClick={() => setActiveTab("ativas")}
+          >
+            <ListTodo className="mr-2 h-4 w-4" /> Em Andamento
+          </Button>
+
+          <Button
+            variant={activeTab === "historico" ? "default" : "ghost"}
+            className="flex-1 sm:flex-none h-9"
+            onClick={() => setActiveTab("historico")}
+          >
+            <Archive className="mr-2 h-4 w-4" /> Histórico
+          </Button>
         </div>
 
         <div className="relative w-full max-w-sm">
@@ -150,7 +213,7 @@ export default function VagasAdminPage() {
                   <th className="px-4 py-3">Tags</th>
                   <th className="px-4 py-3">Requisitos</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Data</th>
+                  <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
@@ -158,7 +221,7 @@ export default function VagasAdminPage() {
                   <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>Carregando solicitações...</td></tr>
                 )}
                 {!loading && filtered.length === 0 && (
-                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>Nenhuma solicitação encontrada.</td></tr>
+                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>Nenhuma solicitação encontrada na aba {activeTab}.</td></tr>
                 )}
                 {!loading && filtered.map((request) => (
                   <tr key={request.id} className="hover:bg-muted/30 transition-colors">
@@ -167,6 +230,7 @@ export default function VagasAdminPage() {
                       <div className="mt-1 text-xs text-muted-foreground">
                         {request.quantity ?? 1} vaga(s) · {request.contract_type || "Contrato não informado"} · {request.unit || "Unidade não informada"}
                       </div>
+                      <div className="text-xs text-muted-foreground mt-1">Data: {new Date(request.created_at).toLocaleDateString("pt-BR")}</div>
                       {request.manager_expectations && <p className="mt-2 max-w-md text-xs leading-5 text-muted-foreground">{request.manager_expectations}</p>}
                     </td>
                     <td className="px-4 py-3 min-w-44 text-muted-foreground">
@@ -189,13 +253,26 @@ export default function VagasAdminPage() {
                       <select
                         value={request.status || "Nova"}
                         onChange={(event) => updateStatus(request, event.target.value)}
-                        className={`h-9 rounded-md border bg-background px-2 text-xs font-medium ${statusStyle[request.status || "Nova"] ?? ""}`}
+                        className={`h-9 w-full rounded-md border bg-background px-2 text-xs font-medium ${statusStyle[request.status || "Nova"] ?? ""}`}
                       >
                         {nextStatus.map((status) => <option key={status}>{status}</option>)}
                       </select>
                     </td>
-                    <td className="px-4 py-3 text-right text-xs tabular-nums text-muted-foreground">
-                      {new Date(request.created_at).toLocaleDateString("pt-BR")}
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button size="sm" variant="outline" title="Editar Solicitação" onClick={() => setEditingJob({...request})}>
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </Button>
+                        {request.status !== "Arquivada" ? (
+                          <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-zinc-900 dark:hover:text-zinc-100" title="Arquivar" onClick={() => updateStatus(request, "Arquivada")}>
+                            <Archive className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-zinc-900 dark:hover:text-zinc-100" title="Desarquivar" onClick={() => updateStatus(request, "Nova")}>
+                            <ArchiveRestore className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -204,6 +281,53 @@ export default function VagasAdminPage() {
           </div>
         </div>
       </div>
+      
+      <Dialog open={!!editingJob} onOpenChange={(o) => !o && setEditingJob(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Vaga</DialogTitle>
+            <DialogDescription>Altere as informações da solicitação da vaga.</DialogDescription>
+          </DialogHeader>
+          {editingJob && (
+            <form onSubmit={handleSaveEdit} className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2 col-span-2">
+                  <Label>Título da Vaga</Label>
+                  <Input value={editingJob.position_title || ""} onChange={(e) => setEditingJob({...editingJob, position_title: e.target.value})} required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Quantidade</Label>
+                  <Input type="number" min="1" value={editingJob.quantity || 1} onChange={(e) => setEditingJob({...editingJob, quantity: parseInt(e.target.value)})} required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Unidade / Obra</Label>
+                  <Input value={editingJob.unit || ""} onChange={(e) => setEditingJob({...editingJob, unit: e.target.value})} />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Tipo de Contrato</Label>
+                  <Input value={editingJob.contract_type || ""} onChange={(e) => setEditingJob({...editingJob, contract_type: e.target.value})} />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Requisitos Mínimos</Label>
+                  <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={editingJob.required_requirements || ""} onChange={(e) => setEditingJob({...editingJob, required_requirements: e.target.value})} />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Requisitos Desejáveis</Label>
+                  <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={editingJob.desired_requirements || ""} onChange={(e) => setEditingJob({...editingJob, desired_requirements: e.target.value})} />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Expectativas do Gestor</Label>
+                  <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={editingJob.manager_expectations || ""} onChange={(e) => setEditingJob({...editingJob, manager_expectations: e.target.value})} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditingJob(null)}>Cancelar</Button>
+                <Button type="submit" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar Alterações"}</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
