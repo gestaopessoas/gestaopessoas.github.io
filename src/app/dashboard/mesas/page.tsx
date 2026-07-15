@@ -166,7 +166,7 @@ export default function MesasPage() {
 
       {error && <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-      <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="flex flex-col gap-12 max-w-5xl mx-auto">
         {SECTORS_LAYOUT.map((sector) => (
           <section key={sector.name} className="flex flex-col items-center rounded-2xl border bg-[#f8f9fa] p-6 shadow-sm">
             <h2 className="mb-8 text-lg font-semibold uppercase tracking-widest text-zinc-600">

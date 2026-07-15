@@ -32,23 +32,36 @@ export default function RgsPage() {
   const [query, setQuery] = useState("");
   const [type, setType] = useState("Todos");
   const [status, setStatus] = useState("Todos");
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // desc = mais recentes primeiro
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Load sort preference
+  useEffect(() => {
+    const saved = localStorage.getItem("rgs_sort_order");
+    if (saved === "asc" || saved === "desc") setSortOrder(saved);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error: loadError } = await createClient()
       .from("rgs_processes")
       .select("*")
-      .order("process_date", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false, nullsFirst: false })
+      .order("process_date", { ascending: sortOrder === "asc", nullsFirst: false })
+      .order("created_at", { ascending: sortOrder === "asc", nullsFirst: false })
       .limit(1000);
     setLoading(false);
     if (loadError) setError(loadError.message); else { setRows((data ?? []) as Process[]); setError(""); }
-  }, []);
+  }, [sortOrder]);
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+
+  const toggleSortOrder = () => {
+    const next = sortOrder === "desc" ? "asc" : "desc";
+    setSortOrder(next);
+    localStorage.setItem("rgs_sort_order", next);
+  };
 
   const types = useMemo(() => Array.from(new Set(rows.map((row) => row.process_type).filter(Boolean))).sort(), [rows]);
   const filtered = rows.filter((row) =>
@@ -119,13 +132,16 @@ export default function RgsPage() {
         </form>
       )}
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 items-center">
         <div className="relative min-w-64 flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar colaborador" className="pl-9" />
         </div>
         <Filter value={type} onChange={setType} options={["Todos", ...types]} />
         <Filter value={status} onChange={setStatus} options={["Todos", "Pendente", "Concluído"]} />
+        <Button variant="outline" className="h-10 text-muted-foreground" onClick={toggleSortOrder}>
+          {sortOrder === "desc" ? "Recentes primeiro ↓" : "Antigos primeiro ↑"}
+        </Button>
       </div>
 
       <div className="overflow-x-auto rounded-lg border bg-card">
