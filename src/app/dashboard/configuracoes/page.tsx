@@ -61,11 +61,11 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('system_settings').select('*').in('setting_key', ['modules', 'permissions'])
+      const { data } = await supabase.from('system_settings').select('*').in('key', ['modules', 'permissions'])
       if (data) {
         data.forEach(row => {
-          if (row.setting_key === 'modules') setModules(row.setting_value)
-          if (row.setting_key === 'permissions') setPermissions(row.setting_value)
+          if (row.key === 'modules') setModules(row.value)
+          if (row.key === 'permissions') setPermissions(row.value)
         })
       }
       const { data: publicForm } = await supabase.from('public_form_settings').select('value').eq('key', 'job_request_code').single()
@@ -80,9 +80,9 @@ export default function ConfiguracoesPage() {
     setSaving(true)
     try {
       const { error: settingsError } = await supabase.from('system_settings').upsert([
-        { setting_key: 'modules', setting_value: modules },
-        { setting_key: 'permissions', setting_value: permissions }
-      ], { onConflict: 'setting_key' });
+        { key: 'modules', value: modules },
+        { key: 'permissions', value: permissions }
+      ], { onConflict: 'key' });
       
       if (settingsError) throw new Error(settingsError.message);
 
