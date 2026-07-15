@@ -11,22 +11,20 @@ import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 
 type Department = { id: string; name: string };
-type Employee = Record<string, string | null | Department> & { id: string; name: string; departments: Department | null; level?: string | null };
+type Entity = { id: string; name: string };
+type Employee = Record<string, string | null | any> & { id: string; name: string; departments?: Entity | null; level?: string | null; companies?: Entity | null; cost_centers?: Entity | null; workplaces?: Entity | null; };
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
 const pageSize = 1000;
 const fields = [
-  "id", "name", "department_id", "birthday", "status", "dismissed_at", "role", "phone",
-  "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "gender",
-  "unit", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cost_center", "cbo",
-  "aso_date", "observation", "workplace", "level"
+  "id", "name", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id"
 ].join(", ");
 
 const emptyForm = {
   name: "", department_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "",
-  gender: "", unit: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
-  cost_center: "", cbo: "", aso_date: "", observation: "", workplace: "",
+  gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
+  cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: ""
 };
 
 type EmployeeForm = typeof emptyForm;
@@ -38,7 +36,10 @@ const MONTHS = [
 
 export default function ColaboradoresPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departments, setDepartments] = useState<Entity[]>([]);
+  const [companies, setCompanies] = useState<Entity[]>([]);
+  const [costCenters, setCostCenters] = useState<Entity[]>([]);
+  const [workplaces, setWorkplaces] = useState<Entity[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -72,7 +73,10 @@ export default function ColaboradoresPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.from("departments").select("id, name").order("name").then(({ data }) => setDepartments((data ?? []) as Department[]));
+    supabase.from("departments").select("id, name").order("name").then(({ data }) => setDepartments((data ?? []) as Entity[]));
+    supabase.from("companies").select("id, name").order("name").then(({ data }) => setCompanies((data ?? []) as Entity[]));
+    supabase.from("cost_centers").select("id, name").order("name").then(({ data }) => setCostCenters((data ?? []) as Entity[]));
+    supabase.from("workplaces").select("id, name").order("name").then(({ data }) => setWorkplaces((data ?? []) as Entity[]));
     supabase.from("job_profiles").select("title").then(({ data }) => {
       if (data) setRoles(Array.from(new Set(data.map((d: any) => d.title))).sort() as string[]);
     });
@@ -88,7 +92,7 @@ export default function ColaboradoresPage() {
       const supabase = createClient();
       let request = supabase
         .from("employees")
-        .select(`${fields}, departments(name)`, { count: "exact" })
+        .select(`${fields}, departments(name), companies(name), cost_centers(name), workplaces(name)`, { count: "exact" })
         .order("name")
         .range(page * pageSize, page * pageSize + pageSize - 1);
       
@@ -142,7 +146,8 @@ export default function ColaboradoresPage() {
     setSaving(true);
     setError("");
     const nullableDates = new Set(["birthday", "dismissed_at", "admission_date", "aso_date"]);
-    const payload = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || key === "department_id" ? value || null : value.trim() || null]));
+    const nullableUuids = new Set(["department_id", "company_id", "cost_center_id", "workplace_id"]);
+    const payload = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || nullableUuids.has(key) ? value || null : (value as string).trim() || null]));
     payload.name = form.name.trim();
     payload.status = form.status;
     const supabase = createClient();
@@ -150,7 +155,7 @@ export default function ColaboradoresPage() {
     const isNew = !editingId;
     const original = editingId ? employees.find((e) => e.id === editingId) : null;
     const isDismissed = form.status === "Desligado" && original?.status !== "Desligado";
-    const isPromoted = !isNew && !isDismissed && (form.role !== original?.role || form.level !== original?.level || form.department_id !== original?.department_id || form.workplace !== original?.workplace);
+    const isPromoted = !isNew && !isDismissed && (form.role !== original?.role || form.level !== original?.level || form.department_id !== original?.department_id || form.workplace_id !== original?.workplace_id);
 
     const result = editingId
       ? await supabase.from("employees").update(payload).eq("id", editingId)
@@ -163,7 +168,7 @@ export default function ColaboradoresPage() {
         process_date: new Date().toISOString().split("T")[0],
         employee_name: payload.name,
         role: payload.role,
-        location: payload.workplace,
+        location: payload.workplace_id ? workplaces.find(w => w.id === payload.workplace_id)?.name || null : null,
         status: "Pendente",
       });
     }
@@ -291,13 +296,13 @@ export default function ColaboradoresPage() {
               <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "Férias", "Afastado", "Inativo", "Desligado"]} /></Field>
               <Field label="Cargo"><Input list="roles-list" value={form.role} onChange={(e) => update("role", e.target.value)} /><datalist id="roles-list">{roles.map(r => <option key={r} value={r} />)}</datalist></Field>
               <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Diretoria"]} /></Field>
-              <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></Field>
+              <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+              <Field label="Centro de Custo *"><select value={form.cost_center_id} onChange={(e) => update("cost_center_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{costCenters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+              <Field label="Obra/Unidade"><select value={form.workplace_id} onChange={(e) => update("workplace_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{workplaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
+              <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
               <Field label="Tipo de contrato"><Input value={form.contract_type} onChange={(e) => update("contract_type", e.target.value)} /></Field>
               <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
               <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
-              <Field label="Unidade / obra"><Input value={form.unit} onChange={(e) => update("unit", e.target.value)} /></Field>
-              <Field label="Local de trabalho"><Input value={form.workplace} onChange={(e) => update("workplace", e.target.value)} /></Field>
-              <Field label="Centro de custo"><Input value={form.cost_center} onChange={(e) => update("cost_center", e.target.value)} /></Field>
               <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} /></Field>
               <Field label="Tamanho da camisa"><Input value={form.shirt_size} onChange={(e) => update("shirt_size", e.target.value)} /></Field>
             </Section>
@@ -355,7 +360,12 @@ export default function ColaboradoresPage() {
                     <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
                     <td className="p-3">
                       <div>{String(employee.role ?? "-")} {employee.level && <span className="text-[10px] bg-muted px-1.5 rounded-full ml-1">{employee.level}</span>}</div>
-                      <div className="text-xs text-muted-foreground">{employee.departments?.name ?? String(employee.unit ?? employee.workplace ?? "-")}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {employee.companies?.name ? `${employee.companies.name}` : ""}
+                        {employee.workplaces?.name ? ` · ${employee.workplaces.name}` : ""}
+                        {employee.departments?.name ? ` · ${employee.departments.name}` : ""}
+                        {(!employee.companies?.name && !employee.workplaces?.name && !employee.departments?.name) && "-"}
+                      </div>
                     </td>
                     <td className="p-3">{String(employee.status ?? "-")}</td>
                     <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
