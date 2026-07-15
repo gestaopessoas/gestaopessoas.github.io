@@ -283,9 +283,9 @@ export default function VagasAdminPage() {
       </div>
       
       <Dialog open={!!editingJob} onOpenChange={(o) => !o && setEditingJob(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Vaga</DialogTitle>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-6 md:p-8">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-2xl">Editar Vaga</DialogTitle>
             <DialogDescription>Altere as informações da solicitação da vaga.</DialogDescription>
           </DialogHeader>
           {editingJob && (

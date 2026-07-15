@@ -243,9 +243,9 @@ export default function ColaboradoresPage() {
 
       {/* Colaborador Edit/Create Modal */}
       <Dialog open={isEmployeeModalOpen} onOpenChange={setIsEmployeeModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingId ? "Registro completo do colaborador" : "Novo colaborador"}</DialogTitle>
+        <DialogContent className="max-w-[95vw] lg:max-w-6xl max-h-[95vh] overflow-y-auto p-6 md:p-8">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-2xl">{editingId ? "Registro completo do colaborador" : "Novo colaborador"}</DialogTitle>
             <DialogDescription>Dados pessoais, contratuais, documentos, saúde ocupacional e histórico.</DialogDescription>
           </DialogHeader>
           
@@ -644,7 +644,7 @@ function RelatedRecords({ employeeId }: { employeeId: string }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) { return <section className="mb-6"><h3 className="mb-3 text-sm font-semibold text-muted-foreground">{title}</h3><div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">{children}</div></section>; }
+function Section({ title, children }: { title: string; children: React.ReactNode }) { return <section className="mb-8 rounded-xl border bg-muted/10 p-6 shadow-sm"><h3 className="mb-5 text-base font-semibold text-foreground border-b pb-2 flex items-center gap-2">{title}</h3><div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">{children}</div></section>; }
 function Field({ label, span, children }: { label: string; span?: boolean; children: React.ReactNode }) { return <div className={span ? "space-y-1.5 md:col-span-2" : "space-y-1.5"}><Label>{label}</Label>{children}</div>; }
 function Select({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) { return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
 function Related({ title, icon: Icon, rows, render, onRemove, children }: { title: string; icon?: React.ElementType; rows: RelatedRow[]; render: (row: RelatedRow) => string; onRemove: (id: string) => void; children: React.ReactNode }) { return <details className="rounded-md border p-3"><summary className="cursor-pointer font-medium flex items-center gap-2">{Icon && <Icon className="w-4 h-4 text-muted-foreground" />} {title} ({rows.length})</summary><div className="mt-3 space-y-2">{rows.map((row) => <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm"><span>{render(row)}</span><Button type="button" size="icon" variant="ghost" onClick={() => onRemove(row.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button></div>)}<div className="grid gap-2 md:flex md:flex-wrap">{children}</div></div></details>; }
