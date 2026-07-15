@@ -125,7 +125,9 @@ export default function ColaboradoresPage() {
     setEditingId(employee.id);
     setForm(next);
     setShowForm(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // ponytail: the dashboard scrolls <main>, not the window, so window.scrollTo was a no-op
+    // and the form opened off-screen. Query it rather than thread a ref through the layout.
+    document.querySelector("main")?.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
