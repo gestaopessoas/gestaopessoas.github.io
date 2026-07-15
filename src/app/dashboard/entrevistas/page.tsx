@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, Calendar, CheckCircle2, Clock, Search, User, XCircle } from "lucide-react";
+import { Briefcase, Calendar, CheckCircle2, Clock, Download, Search, User, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type Interview = {
@@ -36,6 +36,7 @@ const resultStyle: Record<string, string> = {
 export default function EntrevistasPage() {
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [query, setQuery] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(""); // YYYY-MM
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -66,20 +67,52 @@ export default function EntrevistasPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return interviews;
-    return interviews.filter((interview) => [
-      interview.candidate_name,
-      interview.role,
-      interview.status,
-      interview.result,
-      interview.email,
-    ].some((value) => value?.toLowerCase().includes(term)));
-  }, [query, interviews]);
+    let result = interviews;
 
-  const confirmados = interviews.filter((i) => i.status === "Confirmado").length;
-  const compareceram = interviews.filter((i) => i.status === "Compareceu" || i.result === "Aprovado" || i.result === "Reprovado").length;
-  const aprovados = interviews.filter((i) => i.result === "Aprovado").length;
+    if (selectedMonth) {
+      result = result.filter(i => i.interview_date && i.interview_date.startsWith(selectedMonth));
+    }
+
+    const term = query.trim().toLowerCase();
+    if (term) {
+      result = result.filter((interview) => [
+        interview.candidate_name,
+        interview.role,
+        interview.status,
+        interview.result,
+        interview.email,
+      ].some((value) => value?.toLowerCase().includes(term)));
+    }
+
+    return result;
+  }, [query, selectedMonth, interviews]);
+
+  const confirmados = filtered.filter((i) => i.status === "Confirmado").length;
+  const compareceram = filtered.filter((i) => i.status === "Compareceu" || i.result === "Aprovado" || i.result === "Reprovado").length;
+  const aprovados = filtered.filter((i) => i.result === "Aprovado").length;
+
+  const exportToCsv = () => {
+    if (filtered.length === 0) return;
+    const headers = ["Candidato", "Telefone", "Email", "Cargo Alvo", "Data", "Hora", "Status", "Resultado"];
+    const rows = filtered.map(i => [
+      `"${i.candidate_name || ''}"`, 
+      `"${i.phone || ''}"`, 
+      `"${i.email || ''}"`, 
+      `"${i.role || ''}"`, 
+      `"${i.interview_date ? new Date(i.interview_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : ''}"`, 
+      `"${i.interview_time || ''}"`, 
+      `"${i.status || ''}"`, 
+      `"${i.result || ''}"`
+    ].join(","));
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `entrevistas_${selectedMonth || 'todas'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -91,26 +124,48 @@ export default function EntrevistasPage() {
               Gerenciamento de candidatos, datas e resultados de entrevistas.
             </p>
           </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={exportToCsv} disabled={filtered.length === 0}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar Planilha
+            </Button>
+          </div>
         </header>
 
         {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Metric icon={User} label="Total Registros" value={interviews.length} />
+          <Metric icon={User} label="Total Registros" value={filtered.length} />
           <Metric icon={Calendar} label="Confirmados" value={confirmados} />
           <Metric icon={CheckCircle2} label="Compareceram" value={compareceram} />
           <Metric icon={CheckCircle2} label="Aprovados" value={aprovados} />
         </div>
 
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar candidato, cargo, status..."
-            className="pl-9 bg-muted/30 border-border/50 h-9 text-sm rounded-md"
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar candidato, cargo, status..."
+              className="pl-9 bg-muted/30 border-border/50 h-10 text-sm rounded-md"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Mês:</span>
+            <Input 
+              type="month" 
+              value={selectedMonth} 
+              onChange={(e) => setSelectedMonth(e.target.value)} 
+              className="h-10 w-44 bg-muted/30 border-border/50"
+            />
+            {selectedMonth && (
+              <Button variant="ghost" size="sm" onClick={() => setSelectedMonth("")} className="text-xs text-muted-foreground">
+                Limpar
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
