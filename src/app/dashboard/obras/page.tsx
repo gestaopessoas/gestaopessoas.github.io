@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, HardHat, MapPin, Plus, Search, X, Download } from "lucide-react";
+import { Edit3, HardHat, MapPin, Plus, Search, X, Download, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type Company = {
@@ -230,7 +230,10 @@ export default function ObrasPage() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{companyName(workplace) || "-"}</td>
                     <td className="px-4 py-3 text-right">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(workplace)}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 mr-1" onClick={() => window.open(`/dashboard/obras/termo-uniforme?id=${workplace.id}`, '_blank')} title="Imprimir Lista de Uniformes">
+                        <Printer className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(workplace)} title="Editar">
                         <Edit3 className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     </td>
