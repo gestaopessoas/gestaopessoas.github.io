@@ -12,9 +12,10 @@ type Company = {
   cnpj: string;
   name: string;
   trading_name: string | null;
+  dominio_code: string | null;
 };
 
-const emptyForm = { cnpj: "", name: "", trading_name: "" };
+const emptyForm = { cnpj: "", name: "", trading_name: "", dominio_code: "" };
 
 export default function EmpresasPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -30,7 +31,7 @@ export default function EmpresasPage() {
 
     const loadCompanies = async () => {
       const supabase = createClient();
-      const { data, error } = await supabase.from("companies").select("id, cnpj, name, trading_name").order("name");
+      const { data, error } = await supabase.from("companies").select("id, cnpj, name, trading_name, dominio_code").order("name");
 
       if (!active) return;
       setLoading(false);
@@ -62,7 +63,7 @@ export default function EmpresasPage() {
 
   const startEdit = (company: Company) => {
     setEditingId(company.id);
-    setForm({ cnpj: company.cnpj, name: company.name, trading_name: company.trading_name ?? "" });
+    setForm({ cnpj: company.cnpj, name: company.name, trading_name: company.trading_name ?? "", dominio_code: company.dominio_code ?? "" });
     setError("");
   };
 
@@ -75,6 +76,7 @@ export default function EmpresasPage() {
       cnpj: form.cnpj.replace(/\D/g, ""),
       name: form.name.trim(),
       trading_name: form.trading_name.trim() || null,
+      dominio_code: form.dominio_code.trim() || null,
     };
 
     const supabase = createClient();
@@ -95,11 +97,12 @@ export default function EmpresasPage() {
 
   const exportToCsv = () => {
     if (filtered.length === 0) return;
-    const headers = ["Razão social", "Nome fantasia", "CNPJ"];
+    const headers = ["Razão social", "Nome fantasia", "CNPJ", "Cód. Domínio"];
     const exportRows = filtered.map(c => [
       `"${c.name}"`,
       `"${c.trading_name || ''}"`,
-      `"${c.cnpj}"`
+      `"${c.cnpj}"`,
+      `"${c.dominio_code || ''}"`
     ].join(","));
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...exportRows].join("\n");
     const encodedUri = encodeURI(csvContent);
@@ -144,10 +147,11 @@ export default function EmpresasPage() {
             <h2 className="font-semibold">{editingId ? "Editar empresa" : "Adicionar empresa"}</h2>
             {editingId && <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={startNew}><X className="h-4 w-4" /></Button>}
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-4">
             <Field label="CNPJ *"><Input required value={form.cnpj} onChange={(event) => setForm({ ...form, cnpj: event.target.value })} /></Field>
             <Field label="Razão social *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
             <Field label="Nome fantasia"><Input value={form.trading_name} onChange={(event) => setForm({ ...form, trading_name: event.target.value })} /></Field>
+            <Field label="Cód. Domínio"><Input value={form.dominio_code} onChange={(event) => setForm({ ...form, dominio_code: event.target.value })} /></Field>
           </div>
           <div className="mt-4 flex justify-end">
             <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
@@ -167,6 +171,7 @@ export default function EmpresasPage() {
                   <th className="px-4 py-3">Razão social</th>
                   <th className="px-4 py-3">Nome fantasia</th>
                   <th className="px-4 py-3">CNPJ</th>
+                  <th className="px-4 py-3">Cód. Domínio</th>
                   <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
@@ -178,6 +183,7 @@ export default function EmpresasPage() {
                     <td className="px-4 py-3 font-medium text-foreground">{company.name}</td>
                     <td className="px-4 py-3 text-muted-foreground">{company.trading_name || "-"}</td>
                     <td className="px-4 py-3 text-muted-foreground font-mono text-xs tabular-nums">{company.cnpj}</td>
+                    <td className="px-4 py-3 text-muted-foreground font-mono text-xs tabular-nums">{company.dominio_code || "-"}</td>
                     <td className="px-4 py-3 text-right">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(company)}>
                         <Edit3 className="h-4 w-4 text-muted-foreground" />
