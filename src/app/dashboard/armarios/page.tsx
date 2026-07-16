@@ -107,33 +107,27 @@ export default function ArmariosPage() {
     const data = lockers.sort((a,b) => parseInt(a.number) - parseInt(b.number)).map(locker => {
       const spareCount = locker.spare_keys || 0;
       
-      let mainKeyStatus = "Na Empresa";
-      let mainKeyExists = true;
+      let mainKeyStatus = "-";
       
       if (locker.employee_id) {
         if (locker.has_key) {
           mainKeyStatus = "Com Colaborador";
         } else {
-          mainKeyStatus = "Na Empresa (Não entregue)";
+          mainKeyStatus = "Não entregue / Perdida";
         }
       } else {
-        if (locker.has_key) {
-          mainKeyStatus = "Sumiu / Não devolvida";
-          mainKeyExists = false;
-        } else {
-          mainKeyStatus = "Na Empresa (Livre)";
-        }
+        mainKeyStatus = "Livre (Apenas reservas)";
       }
 
-      const totalKeys = (mainKeyExists ? 1 : 0) + spareCount; 
+      const totalKeys = (locker.employee_id && locker.has_key ? 1 : 0) + spareCount; 
       
       let alertMsg = "OK";
       if (totalKeys === 0) {
-        alertMsg = "🚨 SEM NENHUMA CHAVE (CADEADO PERDIDO)";
-      } else if (!mainKeyExists && spareCount > 0) {
-        alertMsg = "⚠️ USANDO RESERVA COMO PRINCIPAL";
+        alertMsg = "🚨 SEM NENHUMA CHAVE (PERDIDO)";
+      } else if (locker.employee_id && !locker.has_key) {
+        alertMsg = "⚠️ OCUPADO MAS SEM CHAVE";
       } else if (spareCount === 0) {
-        alertMsg = "⚠️ SEM CHAVE RESERVA";
+        alertMsg = "⚠️ SEM CHAVE NA EMPRESA";
       }
 
       return {
@@ -299,19 +293,28 @@ export default function ArmariosPage() {
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${hasKey ? 'bg-emerald-100 text-emerald-600' : 'bg-zinc-200 text-zinc-500'}`}>
                     <KeyRound className="h-5 w-5" />
                   </div>
-                  <div className="flex-1">
-                    <Label className="text-sm">Chave Principal</Label>
-                    <p className="text-xs text-muted-foreground mt-0.5">{employeeId ? "Com colaborador?" : "A chave sumiu / foi perdida?"}</p>
-                  </div>
-                  <Button 
-                    type="button"
-                    size="sm"
-                    variant={hasKey ? (employeeId ? "default" : "destructive") : "outline"}
-                    className={hasKey ? (employeeId ? "bg-emerald-600 hover:bg-emerald-700 h-8" : "h-8") : "h-8"}
-                    onClick={() => setHasKey(!hasKey)}
-                  >
-                    {hasKey ? "Sim" : "Não"}
-                  </Button>
+                  {employeeId ? (
+                    <>
+                      <div className="flex-1">
+                        <Label className="text-sm">Chave Principal</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">Foi entregue ao colaborador?</p>
+                      </div>
+                      <Button 
+                        type="button"
+                        size="sm"
+                        variant={hasKey ? "default" : "outline"}
+                        className={hasKey ? "bg-emerald-600 hover:bg-emerald-700 h-8" : "h-8"}
+                        onClick={() => setHasKey(!hasKey)}
+                      >
+                        {hasKey ? "Sim" : "Não"}
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="flex-1 opacity-70">
+                      <Label className="text-sm">Armário Livre</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">Chaves ficam nas reservas</p>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
@@ -332,7 +335,14 @@ export default function ArmariosPage() {
             </div>
 
             <div className="mt-6 flex justify-between border-t pt-4">
-              <Button variant="outline" onClick={() => { setEmployeeId(""); setHasKey(false); setQuery(""); }} className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200">
+              <Button variant="outline" onClick={() => { 
+                if (employeeId && hasKey) {
+                  setSpareKeys(prev => prev + 1);
+                }
+                setEmployeeId(""); 
+                setHasKey(false); 
+                setQuery(""); 
+              }} className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200">
                 Esvaziar Armário
               </Button>
               <div className="flex gap-2">
