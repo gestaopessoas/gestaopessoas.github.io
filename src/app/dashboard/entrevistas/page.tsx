@@ -3,8 +3,9 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, Calendar, CheckCircle2, Clock, Download, Search, User, XCircle } from "lucide-react";
+import { Briefcase, Calendar, CheckCircle2, Clock, Download, Search, User, XCircle, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Label } from "@/components/ui/label";
 
 type Interview = {
   id: string;
@@ -39,31 +40,32 @@ export default function EntrevistasPage() {
   const [selectedMonth, setSelectedMonth] = useState(""); // YYYY-MM
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C"
+  });
+
+  const loadInterviews = async () => {
+    setLoading(true);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("interviews")
+      .select("*")
+      .order("interview_date", { ascending: false, nullsFirst: false });
+
+    setLoading(false);
+    if (error) {
+      setError("Não foi possível carregar as entrevistas.");
+      return;
+    }
+    setInterviews((data ?? []) as Interview[]);
+  };
 
   useEffect(() => {
-    let active = true;
-
-    const loadInterviews = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("interviews")
-        .select("*")
-        .order("interview_date", { ascending: false, nullsFirst: false });
-
-      if (!active) return;
-      setLoading(false);
-      if (error) {
-        setError("Não foi possível carregar as entrevistas.");
-        return;
-      }
-      setInterviews((data ?? []) as Interview[]);
-    };
-
     loadInterviews();
-
-    return () => {
-      active = false;
-    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -113,6 +115,33 @@ export default function EntrevistasPage() {
     link.click();
     link.remove();
   };
+  
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    const supabase = createClient();
+    
+    const payload = Object.fromEntries(
+      Object.entries(form).map(([key, value]) => [key, value.trim() || null])
+    );
+    
+    const { error: saveError } = await supabase.from("interviews").insert(payload);
+    setSaving(false);
+    
+    if (saveError) {
+      setError("Erro ao salvar entrevista: " + saveError.message);
+      return;
+    }
+    
+    setIsModalOpen(false);
+    loadInterviews();
+  };
+
+  const openNewModal = () => {
+    setForm({ candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C" });
+    setIsModalOpen(true);
+  };
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -127,7 +156,11 @@ export default function EntrevistasPage() {
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={exportToCsv} disabled={filtered.length === 0}>
               <Download className="mr-2 h-4 w-4" />
-              Exportar Planilha
+              Exportar
+            </Button>
+            <Button onClick={openNewModal} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nova Entrevista
             </Button>
           </div>
         </header>
@@ -228,6 +261,119 @@ export default function EntrevistasPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal Nova Entrevista */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-background w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h2 className="text-lg font-semibold">Registrar Nova Entrevista</h2>
+                <p className="text-sm text-muted-foreground">Preencha os dados do candidato e da entrevista.</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1 col-span-2">
+                  <Label>Nome do Candidato <span className="text-red-500">*</span></Label>
+                  <Input 
+                    required 
+                    value={form.candidate_name} 
+                    onChange={e => setForm({...form, candidate_name: e.target.value})} 
+                    placeholder="Ex: João da Silva" 
+                  />
+                </div>
+                
+                <div className="space-y-1 col-span-2 md:col-span-1">
+                  <Label>Cargo Alvo</Label>
+                  <Input 
+                    value={form.role} 
+                    onChange={e => setForm({...form, role: e.target.value})} 
+                    placeholder="Ex: Pedreiro" 
+                  />
+                </div>
+
+                <div className="space-y-1 col-span-2 md:col-span-1">
+                  <Label>Telefone</Label>
+                  <Input 
+                    value={form.phone} 
+                    onChange={e => setForm({...form, phone: e.target.value})} 
+                    placeholder="(XX) XXXXX-XXXX" 
+                  />
+                </div>
+
+                <div className="space-y-1 col-span-2">
+                  <Label>E-mail</Label>
+                  <Input 
+                    type="email"
+                    value={form.email} 
+                    onChange={e => setForm({...form, email: e.target.value})} 
+                    placeholder="joao@email.com" 
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Data da Entrevista <span className="text-red-500">*</span></Label>
+                  <Input 
+                    type="date"
+                    required
+                    value={form.interview_date} 
+                    onChange={e => setForm({...form, interview_date: e.target.value})} 
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Horário</Label>
+                  <Input 
+                    type="time"
+                    value={form.interview_time} 
+                    onChange={e => setForm({...form, interview_time: e.target.value})} 
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Status</Label>
+                  <select 
+                    value={form.status} 
+                    onChange={e => setForm({...form, status: e.target.value})}
+                    className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="Aguardando">Aguardando</option>
+                    <option value="Confirmado">Confirmado</option>
+                    <option value="Compareceu">Compareceu</option>
+                    <option value="Desistente">Desistente</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Resultado</Label>
+                  <select 
+                    value={form.result} 
+                    onChange={e => setForm({...form, result: e.target.value})}
+                    className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="N/C">N/C (Não Concluído)</option>
+                    <option value="Aprovado">Aprovado</option>
+                    <option value="Reprovado">Reprovado</option>
+                    <option value="Desistente">Desistente</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Salvando..." : "Salvar Entrevista"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
