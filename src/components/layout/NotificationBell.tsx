@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Bell, UserX, AlertTriangle, Briefcase, ChevronRight } from "lucide-react";
+import { Bell, UserX, AlertTriangle, Briefcase, ChevronRight, HeartPulse } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { differenceInDays, isValid, parseISO } from "date-fns";
 import Link from "next/link";
@@ -21,9 +21,16 @@ type RgsNotification = {
   daysPending: number;
 };
 
+type BenefitNotification = {
+  id: string;
+  name: string;
+  type: "INCLUSAO" | "CORTE";
+};
+
 export function NotificationBell() {
   const [trialNotifications, setTrialNotifications] = useState<TrialNotification[]>([]);
   const [rgsNotifications, setRgsNotifications] = useState<RgsNotification[]>([]);
+  const [benefitNotifications, setBenefitNotifications] = useState<BenefitNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -31,22 +38,22 @@ export function NotificationBell() {
   useEffect(() => {
     const fetchNotifications = async () => {
       const supabase = createClient();
+      const today = new Date();
       
-      // 1. Fetch Trial Notifications
+      // 1. Fetch Employees for both Trial and Benefits
       const { data: empData, error: empError } = await supabase
         .from("employees")
-        .select("id, name, admission_date, contract_type")
-        .neq("status", "Arquivo Morto")
-        .neq("status", "Desligado")
-        .neq("status", "Inativo");
+        .select("id, name, admission_date, contract_type, status")
+        .neq("status", "Arquivo Morto");
 
-      const today = new Date();
       const trialList: TrialNotification[] = [];
-
+      
       if (!empError && empData) {
         for (const emp of empData) {
+          if (["Inativo", "Desligado"].includes(emp.status)) continue;
           if (!emp.admission_date) continue;
           if (emp.contract_type && emp.contract_type !== "CLT") continue;
+          
           const admission = parseISO(emp.admission_date);
           if (!isValid(admission)) continue;
           
@@ -93,6 +100,50 @@ export function NotificationBell() {
         rgsList.sort((a, b) => b.daysPending - a.daysPending);
         setRgsNotifications(rgsList);
       }
+      
+      // 3. Fetch Benefits Notifications
+      if (!empError && empData) {
+        const { data: bens } = await supabase.from("employee_benefits").select("employee_id, benefit_name");
+        const { data: igs } = await supabase.from("benefit_ignores").select("employee_id");
+        
+        const benefits = bens || [];
+        const ignores = (igs || []).map(i => i.employee_id);
+        const benefitList: BenefitNotification[] = [];
+        
+        for (const emp of empData) {
+          // Pendentes de Corte (Desligados com benefício)
+          if (emp.status === "Desligado") {
+            const hasBenefits = benefits.some(b => b.employee_id === emp.id);
+            if (hasBenefits) {
+              benefitList.push({ id: emp.id, name: emp.name, type: "CORTE" });
+            }
+            continue;
+          }
+          
+          // Elegíveis (Inclusão pendente)
+          if (["Ativo", "Férias", "Afastado"].includes(emp.status)) {
+            if (ignores.includes(emp.id)) continue;
+            if (!emp.admission_date) continue;
+            
+            const admission = parseISO(emp.admission_date);
+            if (!isValid(admission)) continue;
+            
+            const days = differenceInDays(today, admission);
+            if (days <= 90) continue;
+            
+            const hasSaude = benefits.some(b => b.employee_id === emp.id && (b.benefit_name?.toLowerCase().includes('saúde') || b.benefit_name?.toLowerCase().includes('saude')));
+            const hasOdonto = benefits.some(b => b.employee_id === emp.id && b.benefit_name?.toLowerCase().includes('odonto'));
+            const hasFarmacia = benefits.some(b => b.employee_id === emp.id && (b.benefit_name?.toLowerCase().includes('farmácia') || b.benefit_name?.toLowerCase().includes('farmacia')));
+            
+            if (!hasSaude || !hasOdonto || !hasFarmacia) {
+              benefitList.push({ id: emp.id, name: emp.name, type: "INCLUSAO" });
+            }
+          }
+        }
+        
+        setBenefitNotifications(benefitList);
+      }
+
     };
 
     fetchNotifications();
@@ -108,7 +159,10 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const totalCount = trialNotifications.length + rgsNotifications.length;
+  const totalCount = trialNotifications.length + rgsNotifications.length + benefitNotifications.length;
+  
+  const cutsCount = benefitNotifications.filter(b => b.type === "CORTE").length;
+  const inclusionsCount = benefitNotifications.filter(b => b.type === "INCLUSAO").length;
 
   return (
     <div className="relative flex items-center" ref={dropdownRef}>
@@ -120,7 +174,7 @@ export function NotificationBell() {
         <Bell className="h-5 w-5" />
         {totalCount > 0 && (
           <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-background">
-            {totalCount}
+            {totalCount > 99 ? '99+' : totalCount}
           </span>
         )}
       </button>
@@ -132,6 +186,51 @@ export function NotificationBell() {
           ) : (
             <div className="flex flex-col">
               
+              {/* Benefícios */}
+              {benefitNotifications.length > 0 && (
+                <div className="border-b last:border-b-0 pb-2">
+                  <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <HeartPulse className="h-3.5 w-3.5 text-pink-500" /> Benefícios
+                    </h3>
+                    <span className="bg-pink-100 text-pink-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{benefitNotifications.length}</span>
+                  </div>
+                  <div className="px-2 pt-2 flex flex-col gap-1">
+                    {inclusionsCount > 0 && (
+                      <button 
+                        onClick={() => { setIsOpen(false); router.push("/dashboard/beneficios?tab=planos"); }}
+                        className="flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted text-left w-full group"
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-medium text-foreground">Inclusões Pendentes</span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <div className="text-xs mt-0.5 text-pink-600 font-medium">
+                          {inclusionsCount} {inclusionsCount === 1 ? 'colaborador elegível' : 'colaboradores elegíveis'} sem plano
+                        </div>
+                      </button>
+                    )}
+                    
+                    {cutsCount > 0 && (
+                      <button 
+                        onClick={() => { setIsOpen(false); router.push("/dashboard/beneficios?tab=cortes"); }}
+                        className="flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted text-left w-full group bg-red-50/50 dark:bg-red-950/20"
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-medium text-foreground">Cortes de Benefícios</span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <div className="flex items-center justify-between text-xs mt-0.5">
+                          <span className="text-red-600 font-medium">
+                            {cutsCount} ex-colaborador{cutsCount === 1 ? '' : 'es'} ainda com benefício!
+                          </span>
+                        </div>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* RGS Pendentes */}
               {rgsNotifications.length > 0 && (
                 <div className="border-b last:border-b-0 pb-2">

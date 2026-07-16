@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { KeyRound, Search, X } from "lucide-react";
+import { KeyRound, Search, X, AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Locker = { id: string; number: string; employee_id: string | null; location: string | null; has_key: boolean; spare_keys: number; employees: { name: string } | null };
@@ -23,6 +23,7 @@ export default function ArmariosPage() {
   const [location, setLocation] = useState("Lado Oeste");
   const [lockerGroup, setLockerGroup] = useState("");
   const [lockerNumberStr, setLockerNumberStr] = useState("");
+  const [spareKeys, setSpareKeys] = useState(0);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -73,6 +74,7 @@ export default function ArmariosPage() {
       setLockerGroup("");
       setLockerNumberStr(locker.number);
     }
+    setSpareKeys(locker.spare_keys || 0);
     
     setQuery(""); 
     setMatches([]); 
@@ -89,7 +91,8 @@ export default function ArmariosPage() {
         employee_id: employeeId || null, 
         has_key: hasKey,
         location: location,
-        number: fullNumber
+        number: fullNumber,
+        spare_keys: spareKeys
       })
       .eq("id", selected.id);
     
@@ -127,11 +130,18 @@ export default function ArmariosPage() {
                   <div className="rounded bg-zinc-400/30 px-1.5 py-0.5 text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
                     Nº {locker.number.includes(" - ") ? locker.number.split(" - ")[1].trim() : locker.number}
                   </div>
-                  {locker.employee_id && (
-                    <div title={locker.has_key ? "Chave com o funcionário" : "Chave na administração"} className={`flex h-5 w-5 items-center justify-center rounded-full shadow-inner ${locker.has_key ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                      <KeyRound className="h-3 w-3" />
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {locker.has_key && (locker.spare_keys || 0) === 0 && (
+                      <div title="Sem chave na empresa!" className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-red-600 shadow-inner animate-pulse">
+                        <AlertTriangle className="h-3 w-3" />
+                      </div>
+                    )}
+                    {locker.employee_id && (
+                      <div title={locker.has_key ? "Chave com o funcionário" : "Chave na administração"} className={`flex h-5 w-5 items-center justify-center rounded-full shadow-inner ${locker.has_key ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                        <KeyRound className="h-3 w-3" />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Vents Design */}
@@ -208,22 +218,40 @@ export default function ArmariosPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${hasKey ? 'bg-emerald-100 text-emerald-600' : 'bg-zinc-200 text-zinc-500'}`}>
-                  <KeyRound className="h-5 w-5" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${hasKey ? 'bg-emerald-100 text-emerald-600' : 'bg-zinc-200 text-zinc-500'}`}>
+                    <KeyRound className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <Label className="text-sm">Chave Principal</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">Com colaborador?</p>
+                  </div>
+                  <Button 
+                    type="button"
+                    size="sm"
+                    variant={hasKey ? "default" : "outline"}
+                    className={hasKey ? "bg-emerald-600 hover:bg-emerald-700 h-8" : "h-8"}
+                    onClick={() => setHasKey(!hasKey)}
+                  >
+                    {hasKey ? "Sim" : "Não"}
+                  </Button>
                 </div>
-                <div className="flex-1">
-                  <Label className="text-base">Controle de Chave</Label>
-                  <p className="text-xs text-muted-foreground">A chave está com o colaborador?</p>
+                
+                <div className="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                    <KeyRound className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <Label className="text-sm">Chave Reserva</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">Na administração</p>
+                  </div>
+                  <div className="flex items-center gap-1 bg-background rounded-md border p-1 shadow-sm">
+                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSpareKeys(Math.max(0, spareKeys - 1))}>-</Button>
+                    <span className="w-6 text-center text-sm font-semibold">{spareKeys}</span>
+                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSpareKeys(spareKeys + 1)}>+</Button>
+                  </div>
                 </div>
-                <Button 
-                  type="button"
-                  variant={hasKey ? "default" : "outline"}
-                  className={hasKey ? "bg-emerald-600 hover:bg-emerald-700" : ""}
-                  onClick={() => setHasKey(!hasKey)}
-                >
-                  {hasKey ? "Sim, com colaborador" : "Não, na empresa"}
-                </Button>
               </div>
             </div>
 

@@ -595,7 +595,7 @@ export default function ColaboradoresPage() {
 }
 
 function RelatedRecords({ employeeId }: { employeeId: string }) {
-  const [companyBenefits, setCompanyBenefits] = useState<{id: string, name: string}[]>([]);
+  const [companyBenefits, setCompanyBenefits] = useState<{id: string, name: string, level_values?: Record<string, number> | null}[]>([]);
   const [benefits, setBenefits] = useState<RelatedRow[]>([]);
   const [epis, setEpis] = useState<RelatedRow[]>([]);
   const [vacations, setVacations] = useState<RelatedRow[]>([]);
@@ -606,6 +606,10 @@ function RelatedRecords({ employeeId }: { employeeId: string }) {
   const [vacation, setVacation] = useState({ start_date: "", end_date: "" });
   const [exam, setExam] = useState({ exam_type: "Admissional", exam_name: "", exam_date: "" });
   const [promotion, setPromotion] = useState({ previous_role: "", new_role: "", previous_level: "", new_level: "", promotion_date: new Date().toISOString().split('T')[0] });
+
+  // For benefit levels selection
+  const [levelSelectBenefit, setLevelSelectBenefit] = useState<{ id: string, name: string, level_values: Record<string, number> } | null>(null);
+  const [selectedLevelForBenefit, setSelectedLevelForBenefit] = useState<string>("");
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -641,24 +645,75 @@ function RelatedRecords({ employeeId }: { employeeId: string }) {
     <div className="mt-8 space-y-4 border-t pt-6">
       <h3 className="font-semibold text-lg text-foreground mb-4">Registros Vinculados</h3>
       
+      {levelSelectBenefit && (
+        <Dialog open={!!levelSelectBenefit} onOpenChange={(open) => { if (!open) setLevelSelectBenefit(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Selecionar Nível - {levelSelectBenefit.name}</DialogTitle>
+              <DialogDescription>Escolha o nível para vincular o valor correto ao colaborador.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-3">
+              <Label>Nível do Benefício</Label>
+              <select 
+                value={selectedLevelForBenefit} 
+                onChange={(e) => setSelectedLevelForBenefit(e.target.value)} 
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="">Selecione...</option>
+                {Object.keys(levelSelectBenefit.level_values).map(lvl => (
+                  <option key={lvl} value={lvl}>Nível {lvl} - R$ {Number(levelSelectBenefit.level_values[lvl]).toFixed(2).replace('.', ',')}</option>
+                ))}
+              </select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setLevelSelectBenefit(null)}>Cancelar</Button>
+              <Button type="button" disabled={!selectedLevelForBenefit} onClick={() => {
+                if (selectedLevelForBenefit && levelSelectBenefit) {
+                  const val = levelSelectBenefit.level_values[selectedLevelForBenefit];
+                  add("employee_benefits", { 
+                    benefit_name: `${levelSelectBenefit.name} - Nível ${selectedLevelForBenefit}`,
+                    value: String(val)
+                  });
+                  setLevelSelectBenefit(null);
+                }
+              }}>Confirmar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      
       <details className="rounded-md border p-3" open>
         <summary className="cursor-pointer font-medium select-none">Benefícios ({benefits.length})</summary>
         <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
           {companyBenefits.map(b => {
-            const hasBenefit = benefits.find(eb => eb.benefit_name === b.name);
+            const hasBenefit = benefits.find(eb => String(eb.benefit_name) === b.name || String(eb.benefit_name).startsWith(b.name + " - Nível"));
             return (
-              <Label key={b.id} className="flex items-center gap-2 cursor-pointer rounded border p-2 hover:bg-muted/50 transition-colors">
-                <input 
-                  type="checkbox" 
-                  checked={!!hasBenefit} 
-                  onChange={(e) => {
-                    if (e.target.checked) add("employee_benefits", { benefit_name: b.name });
-                    else if (hasBenefit) remove("employee_benefits", hasBenefit.id);
-                  }}
-                  className="w-4 h-4 text-primary"
-                /> 
-                {b.name}
-              </Label>
+              <div key={b.id} className="flex flex-col gap-1">
+                <Label className="flex items-center gap-2 cursor-pointer rounded border p-2 hover:bg-muted/50 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    checked={!!hasBenefit} 
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        if (b.level_values && Object.keys(b.level_values).length > 0) {
+                          setSelectedLevelForBenefit("");
+                          setLevelSelectBenefit({ id: b.id, name: b.name, level_values: b.level_values });
+                        } else {
+                          add("employee_benefits", { benefit_name: b.name });
+                        }
+                      }
+                      else if (hasBenefit) remove("employee_benefits", hasBenefit.id);
+                    }}
+                    className="w-4 h-4 text-primary"
+                  /> 
+                  {b.name}
+                </Label>
+                {hasBenefit && String(hasBenefit.benefit_name).includes(" - Nível") && (
+                  <span className="text-[10px] text-muted-foreground ml-7 bg-muted px-2 py-0.5 rounded-full w-fit">
+                    {String(hasBenefit.benefit_name).replace(b.name + " - ", "")}
+                  </span>
+                )}
+              </div>
             );
           })}
         </div>

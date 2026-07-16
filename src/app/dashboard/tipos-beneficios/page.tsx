@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { createClient } from "@/utils/supabase/client";
 import { Edit3, Gift, Plus, Search, X, Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -11,9 +12,12 @@ type Benefit = {
   id: string;
   name: string;
   default_value: number | null;
+  level_values?: Record<string, number> | null;
 };
 
-const emptyForm = { name: "", default_value: "" };
+const LEVELS = ['Inicial', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+
+const emptyForm = { name: "", default_value: "", has_levels: false, level_values: {} as Record<string, string> };
 
 export default function TiposBeneficiosPage() {
   const [benefits, setBenefits] = useState<Benefit[]>([]);
@@ -61,7 +65,21 @@ export default function TiposBeneficiosPage() {
 
   const startEdit = (b: Benefit) => {
     setEditingId(b.id);
-    setForm({ name: b.name, default_value: b.default_value ? String(b.default_value) : "" });
+    
+    const hasLevels = b.level_values && Object.keys(b.level_values).length > 0;
+    const strLevels: Record<string, string> = {};
+    if (hasLevels) {
+      Object.entries(b.level_values!).forEach(([k, v]) => {
+        strLevels[k] = v.toString();
+      });
+    }
+
+    setForm({ 
+      name: b.name, 
+      default_value: b.default_value ? String(b.default_value) : "",
+      has_levels: !!hasLevels,
+      level_values: strLevels
+    });
     setError("");
   };
 
@@ -70,9 +88,19 @@ export default function TiposBeneficiosPage() {
     setSaving(true);
     setError("");
 
+    const parsedLevels: Record<string, number> = {};
+    if (form.has_levels) {
+      Object.entries(form.level_values).forEach(([k, v]) => {
+        if (v && v.trim() !== '') {
+          parsedLevels[k] = parseFloat(v.replace(',', '.'));
+        }
+      });
+    }
+
     const payload = {
       name: form.name.trim(),
-      default_value: form.default_value ? parseFloat(form.default_value.replace(',', '.')) : null
+      default_value: form.default_value && !form.has_levels ? parseFloat(form.default_value.replace(',', '.')) : null,
+      level_values: form.has_levels ? parsedLevels : null
     };
 
     const supabase = createClient();
@@ -139,11 +167,41 @@ export default function TiposBeneficiosPage() {
             <h2 className="font-semibold">{editingId ? "Editar benefício" : "Adicionar benefício"}</h2>
             {editingId && <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={startNew}><X className="h-4 w-4" /></Button>}
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <Field label="Nome do Benefício *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ex: Vale Refeição" /></Field>
-            <Field label="Valor Padrão (R$)"><Input type="number" step="0.01" value={form.default_value} onChange={(event) => setForm({ ...form, default_value: event.target.value })} placeholder="Opcional" /></Field>
+            
+            {!form.has_levels && (
+              <Field label="Valor Padrão Único (R$)"><Input type="number" step="0.01" value={form.default_value} onChange={(event) => setForm({ ...form, default_value: event.target.value })} placeholder="Opcional" /></Field>
+            )}
+            
+            <div className="flex items-center space-x-2 md:col-span-2 bg-muted/50 p-3 rounded-lg border border-border/50">
+              <Switch id="has_levels" checked={form.has_levels} onCheckedChange={(c) => setForm({...form, has_levels: c, default_value: ''})} />
+              <Label htmlFor="has_levels" className="font-medium">Benefício com Valores Variáveis por Nível</Label>
+            </div>
+            
+            {form.has_levels && (
+              <div className="md:col-span-2 mt-2">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 block">Valores por Nível (R$)</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 bg-muted/20 p-4 rounded-md border border-border/40">
+                  {LEVELS.map(lvl => (
+                    <div key={lvl} className="space-y-1">
+                      <Label className="text-xs">Nível {lvl}</Label>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        className="h-8 text-sm" 
+                        placeholder="R$ 0,00"
+                        value={form.level_values[lvl] || ""}
+                        onChange={(e) => setForm({...form, level_values: {...form.level_values, [lvl]: e.target.value}})}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
           </div>
-          <div className="mt-4 flex justify-end">
+          <div className="mt-6 flex justify-end">
             <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
           </div>
         </form>
@@ -159,7 +217,7 @@ export default function TiposBeneficiosPage() {
               <thead className="bg-muted/50 border-b border-border">
                 <tr className="text-muted-foreground font-medium">
                   <th className="px-4 py-3">Benefício</th>
-                  <th className="px-4 py-3">Valor Padrão</th>
+                  <th className="px-4 py-3">Valor / Configuração</th>
                   <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
@@ -169,7 +227,13 @@ export default function TiposBeneficiosPage() {
                 {!loading && filtered.map((b) => (
                   <tr key={b.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 font-medium text-foreground">{b.name}</td>
-                    <td className="px-4 py-3 tabular-nums">{b.default_value ? `R$ ${Number(b.default_value).toFixed(2).replace('.', ',')}` : '-'}</td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {b.level_values && Object.keys(b.level_values).length > 0 ? (
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">Configurado por Níveis</span>
+                      ) : (
+                        b.default_value ? `R$ ${Number(b.default_value).toFixed(2).replace('.', ',')}` : '-'
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(b)}>
                         <Edit3 className="h-4 w-4 text-muted-foreground" />
