@@ -33,6 +33,8 @@ const sidebarItems = [
   { name: "Turnover", href: "/dashboard/turnover", icon: RefreshCcw, module: "turnover" },
   { name: "Uniformes & EPIs", href: "/dashboard/uniformes", icon: Package },
   { name: "Centros de Custo", href: "/dashboard/centros-de-custo", icon: Briefcase },
+  { name: "Departamentos", href: "/dashboard/departamentos", icon: Briefcase },
+  { name: "Cargos", href: "/dashboard/cargos", icon: Briefcase },
   { name: "Empresas", href: "/dashboard/empresas", icon: LayoutDashboard },
   { name: "Obras", href: "/dashboard/obras", icon: LayoutDashboard },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, module: "analytics" },
