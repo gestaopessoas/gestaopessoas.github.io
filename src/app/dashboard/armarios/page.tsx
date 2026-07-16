@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { KeyRound, Search, X, AlertTriangle } from "lucide-react";
+import { KeyRound, Search, X, AlertTriangle, Download } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 
 type Locker = { id: string; number: string; employee_id: string | null; location: string | null; has_key: boolean; spare_keys: number; employees: { name: string } | null };
 type Employee = { id: string; name: string };
@@ -100,11 +101,64 @@ export default function ArmariosPage() {
     else { setSelected(null); void load(); }
   };
 
+  const exportExcel = () => {
+    if (lockers.length === 0) return;
+
+    const data = lockers.sort((a,b) => parseInt(a.number) - parseInt(b.number)).map(locker => {
+      const spareCount = locker.spare_keys || 0;
+      
+      // Regra de chaves
+      // Se não tem chave na empresa (has_key = true) e não tem com o colaborador (se livre), então sumiu? 
+      // Mas o padrão do sistema: 1 chave principal + N reservas.
+      const totalKeys = 1 + spareCount; 
+      let mainKeyStatus = "Na Empresa";
+      
+      if (locker.employee_id && locker.has_key) {
+        mainKeyStatus = "Com Colaborador";
+      } else if (!locker.employee_id && locker.has_key) {
+        mainKeyStatus = "Sumiu / Não devolvida";
+      }
+
+      return {
+        "Armário / Grupo": locker.number,
+        "Localização": locker.location || "Não informada",
+        "Ocupante": locker.employee_id ? locker.employees?.name : "Livre",
+        "Chave Principal": mainKeyStatus,
+        "Qtd Reservas": spareCount,
+        "Total Existente": totalKeys,
+        "Alerta": (locker.has_key && spareCount === 0) ? "SEM CHAVE NA EMPRESA" : "OK"
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    
+    // Ajustar largura das colunas
+    worksheet['!cols'] = [
+      { wch: 15 }, // Armário / Grupo
+      { wch: 20 }, // Localização
+      { wch: 40 }, // Ocupante
+      { wch: 25 }, // Chave Principal
+      { wch: 15 }, // Qtd Reservas
+      { wch: 15 }, // Total Existente
+      { wch: 25 }, // Alerta
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Armários e Chaves");
+    XLSX.writeFile(workbook, "Relatorio_Armarios_Chaves.xlsx");
+  };
+
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold">Armários e Vestiários</h1>
-        <p className="text-sm text-muted-foreground">{occupied} armários ocupados de {lockers.length}. Clique no armário para gerenciar a posse e a chave.</p>
+      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">Armários e Vestiários</h1>
+          <p className="text-sm text-muted-foreground">{occupied} armários ocupados de {lockers.length}. Clique no armário para gerenciar a posse e a chave.</p>
+        </div>
+        <Button onClick={exportExcel} variant="outline" className="gap-2">
+          <Download className="h-4 w-4" /> 
+          Exportar Relatório Excel
+        </Button>
       </header>
       
       {error && <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
