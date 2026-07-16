@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Plus, Search, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, CheckCircle2, XCircle, TrendingUp, Package, Activity, Download, AlertCircle, X } from "lucide-react";
+import { Edit3, Plus, Search, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, CheckCircle2, XCircle, TrendingUp, Package, Activity, Download, AlertCircle, X, Printer } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
@@ -748,8 +748,19 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
 
   return (
     <details className="rounded-md border p-3">
-      <summary className="cursor-pointer font-medium flex items-center gap-2">
-        <Package className="w-4 h-4 text-muted-foreground" /> Uniformes Entregues ({deliveries.length})
+      <summary className="cursor-pointer font-medium flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Package className="w-4 h-4 text-muted-foreground" /> Uniformes Entregues ({deliveries.length})
+        </div>
+        <Button 
+          type="button" 
+          size="sm" 
+          variant="outline" 
+          className="h-7 text-xs" 
+          onClick={(e) => { e.preventDefault(); window.open(`/dashboard/colaboradores/termo-uniforme?id=${employeeId}`, '_blank'); }}
+        >
+          <Printer className="w-3 h-3 mr-1" /> Imprimir Termo
+        </Button>
       </summary>
       <div className="mt-3 space-y-2">
         {deliveries.map((row) => (

@@ -27,6 +27,7 @@ const typeStyle: Record<string, string> = {
   OBRA: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
   SEDE: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
   FILIAL: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
+  "PLANTÃO DE VENDAS": "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
 };
 
 export default function ObrasPage() {
@@ -178,7 +179,7 @@ export default function ObrasPage() {
             <Field label="Nome *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
             <Field label="Tipo">
               <select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                {["OBRA", "SEDE", "FILIAL"].map((type) => <option key={type}>{type}</option>)}
+                {["OBRA", "SEDE", "FILIAL", "PLANTÃO DE VENDAS"].map((type) => <option key={type}>{type}</option>)}
               </select>
             </Field>
             <Field label="Empresa vinculada">
