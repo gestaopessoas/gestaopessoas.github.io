@@ -573,7 +573,7 @@ Resultado Final: ${form.result || "N/C"}
                     <Label className="text-base font-medium">Pontos Fortes</Label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {PREDEFINED_STRENGTHS.map(item => {
-                        const checked = assessmentForm.strengths.includes(item);
+                        const checked = (assessmentForm.strengths || "").includes(item);
                         return (
                           <div key={item} className="flex items-center space-x-2">
                             <Checkbox 
@@ -592,7 +592,7 @@ Resultado Final: ${form.result || "N/C"}
                     <Label className="text-base font-medium">Pontos a Desenvolver</Label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {PREDEFINED_WEAKNESSES.map(item => {
-                        const checked = assessmentForm.weaknesses.includes(item);
+                        const checked = (assessmentForm.weaknesses || "").includes(item);
                         return (
                           <div key={item} className="flex items-center space-x-2">
                             <Checkbox 
