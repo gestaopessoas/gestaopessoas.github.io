@@ -11,7 +11,7 @@ import { Save, Loader2 } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { usePermissions } from "@/hooks/usePermissions"
 
-const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "talentos", "recrutamento", "armarios", "uniformes", "ponto", "rgs", "ilhas", "configuracoes"] as const
+const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "talentos", "recrutamento", "armarios", "uniformes", "ponto", "rgs", "ilhas", "admissao", "onboarding", "centros_de_custo", "departamentos", "cargos", "empresas", "obras", "beneficios", "treinamentos", "ferias", "holerites", "avaliacoes", "clima", "metas", "pdi", "competencias", "turnover", "analytics", "salarios", "configuracoes"] as const
 const ACTIONS = ["view", "create", "edit", "delete"] as const
 
 type UserPerms = Record<string, Record<string, boolean>>
@@ -19,7 +19,7 @@ type ProfileRow = { id: string; name: string | null; level: number; permissions:
 
 export default function ConfiguracoesPage() {
   const [modules, setModules] = useState({ ats: true, admissao: true, pdi: true, gestor: true })
-  const [permissions, setPermissions] = useState({ "2fa": true, salaries: false, ai_notifications: true })
+  const [permissions, setPermissions] = useState({ "2fa": true, ai_notifications: true })
   const [jobRequestCode, setJobRequestCode] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -186,13 +186,7 @@ export default function ConfiguracoesPage() {
                   </div>
                   <Switch checked={permissions["2fa"]} onCheckedChange={(c) => setPermissions({...permissions, "2fa": c})} />
                 </div>
-                <div className="flex items-center justify-between border-b border-border/40 pb-4">
-                  <div className="space-y-0.5">
-                    <Label className="text-base font-medium">Visibilidade de Salários</Label>
-                    <p className="text-sm text-muted-foreground">Permitir que gestores visualizem a remuneração de seus times.</p>
-                  </div>
-                  <Switch checked={permissions.salaries} onCheckedChange={(c) => setPermissions({...permissions, salaries: c})} />
-                </div>
+
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-base font-medium">Notificações Automáticas via IA</Label>
