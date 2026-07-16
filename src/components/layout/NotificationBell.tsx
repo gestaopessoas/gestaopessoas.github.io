@@ -38,6 +38,7 @@ export function NotificationBell() {
   const [rgsNotifications, setRgsNotifications] = useState<RgsNotification[]>([]);
   const [benefitNotifications, setBenefitNotifications] = useState<BenefitNotification[]>([]);
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfileNotification[]>([]);
+  const [preferences, setPreferences] = useState({ trial: true, rgs: true, benefits: true, profile: true });
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -47,6 +48,17 @@ export function NotificationBell() {
       const supabase = createClient();
       const today = new Date();
       
+      const { data: authData } = await supabase.auth.getUser();
+      let userPrefs = { trial: true, rgs: true, benefits: true, profile: true };
+      
+      if (authData.user?.id) {
+        const { data: prof } = await supabase.from('profiles').select('permissions').eq('id', authData.user.id).single();
+        if (prof?.permissions?._preferences) {
+          userPrefs = { ...userPrefs, ...prof.permissions._preferences };
+          setPreferences(userPrefs);
+        }
+      }
+
       // 1. Fetch Employees for both Trial and Benefits
       const { data: empData, error: empError } = await supabase
         .from("employees")
@@ -70,7 +82,7 @@ export function NotificationBell() {
           } else if (["Inativo", "Desligado"].includes(emp.status)) {
             if (!emp.dismissed_at) missing.push("Desligamento");
           }
-          if (missing.length > 0) {
+          if (missing.length > 0 && userPrefs.profile) {
             pendingProfileList.push({ id: emp.id, name: emp.name, missingFields: missing });
           }
 
@@ -84,7 +96,7 @@ export function NotificationBell() {
           const daysElapsed = differenceInDays(today, admission);
           const daysRemaining = 90 - daysElapsed;
           
-          if (daysRemaining >= 0 && daysRemaining <= 15) {
+          if (daysRemaining >= 0 && daysRemaining <= 15 && userPrefs.trial) {
             trialList.push({
               id: emp.id,
               name: emp.name,
@@ -113,7 +125,7 @@ export function NotificationBell() {
           
           const daysPending = differenceInDays(today, createdAt);
           
-          if (daysPending >= 3) {
+          if (daysPending >= 3 && userPrefs.rgs) {
             rgsList.push({
               id: rgs.id,
               name: rgs.employee_name || "Desconhecido",
@@ -139,7 +151,7 @@ export function NotificationBell() {
           // Pendentes de Corte (Desligados com benefício)
           if (emp.status === "Desligado") {
             const hasBenefits = benefits.some(b => b.employee_id === emp.id);
-            if (hasBenefits) {
+            if (hasBenefits && userPrefs.benefits) {
               benefitList.push({ id: emp.id, name: emp.name, type: "CORTE" });
             }
             continue;
@@ -161,7 +173,9 @@ export function NotificationBell() {
             const hasFarmacia = benefits.some(b => b.employee_id === emp.id && (b.benefit_name?.toLowerCase().includes('farmácia') || b.benefit_name?.toLowerCase().includes('farmacia')));
             
             if (!hasSaude || !hasOdonto || !hasFarmacia) {
-              benefitList.push({ id: emp.id, name: emp.name, type: "INCLUSAO" });
+              if (userPrefs.benefits) {
+                benefitList.push({ id: emp.id, name: emp.name, type: "INCLUSAO" });
+              }
             }
           }
         }
