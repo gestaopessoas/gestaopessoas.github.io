@@ -238,7 +238,7 @@ export function NotificationBell() {
                     {pendingProfiles.map(n => (
                       <button 
                         key={n.id} 
-                        onClick={() => { setIsOpen(false); router.push(`/dashboard/colaboradores`); }}
+                        onClick={() => { setIsOpen(false); router.push(`/dashboard/colaboradores?edit=${n.id}`); }}
                         className="flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted text-left w-full group"
                       >
                         <div className="flex justify-between items-start">
@@ -344,7 +344,7 @@ export function NotificationBell() {
                     {trialNotifications.map(n => (
                       <button 
                         key={n.id} 
-                        onClick={() => { setIsOpen(false); router.push("/dashboard/colaboradores"); }}
+                        onClick={() => { setIsOpen(false); router.push(`/dashboard/colaboradores?edit=${n.id}`); }}
                         className={`flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted text-left w-full group ${n.isWarning ? "bg-red-50/50 dark:bg-red-950/20" : ""}`}
                       >
                         <div className="flex justify-between items-start">

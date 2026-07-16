@@ -41,6 +41,7 @@ export default function ColaboradoresPage() {
   const [costCenters, setCostCenters] = useState<Entity[]>([]);
   const [workplaces, setWorkplaces] = useState<Entity[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
+  const [employeeBenefits, setEmployeeBenefits] = useState<{employee_id: string, benefit_name: string}[]>([]);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   
@@ -80,9 +81,28 @@ export default function ColaboradoresPage() {
     supabase.from("job_profiles").select("title").then(({ data }) => {
       if (data) setRoles(Array.from(new Set(data.map((d: any) => d.title))).sort() as string[]);
     });
+    supabase.from("employee_benefits").select("employee_id, benefit_name").then(({ data }) => {
+      setEmployeeBenefits((data || []) as any);
+    });
+
     const params = new URLSearchParams(window.location.search);
     const q = params.get("query");
     if (q) setQuery(q);
+
+    const editId = params.get("edit");
+    if (editId) {
+      supabase.from("employees").select("*").eq("id", editId).single().then(({ data }) => {
+        if (data) {
+          const emp = data as Employee;
+          const next = { ...emptyForm };
+          for (const key of Object.keys(next) as (keyof EmployeeForm)[]) next[key] = String(emp[key] ?? "");
+          setEditingId(emp.id);
+          setForm(next);
+          setIsEmployeeModalOpen(true);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -351,11 +371,26 @@ export default function ColaboradoresPage() {
                     <td className="p-3">
                       <div className="font-medium flex items-center gap-2">
                         {employee.name}
-                        {trialInfo?.isWarning && (
-                          <span title="Fim de Experiência Próximo" className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
-                            90 Dias!
-                          </span>
-                        )}
+                        {(() => {
+                          const isActive = ["Ativo", "Férias", "Afastado"].includes(employee.status);
+                          const isRed = (isActive && (!employee.admission_date || !employee.registration_number || !employee.birthday || !employee.cost_center_id || !employee.company_id || !employee.workplace_id)) || 
+                                        (["Inativo", "Desligado"].includes(employee.status) && !employee.dismissed_at);
+                                        
+                          const isEligible = isActive && employee.admission_date && differenceInDays(new Date(), parseISO(employee.admission_date)) > 90;
+                          const empBens = employeeBenefits.filter(b => b.employee_id === employee.id);
+                          const hasSaude = empBens.some(b => b.benefit_name?.toLowerCase().includes('saúde') || b.benefit_name?.toLowerCase().includes('saude'));
+                          const hasOdonto = empBens.some(b => b.benefit_name?.toLowerCase().includes('odonto'));
+                          const hasFarmacia = empBens.some(b => b.benefit_name?.toLowerCase().includes('farmácia') || b.benefit_name?.toLowerCase().includes('farmacia'));
+                          const isPurple = isEligible && (!hasSaude || !hasOdonto || !hasFarmacia);
+                          
+                          return (
+                            <div className="flex gap-1.5 ml-1">
+                              {isRed && <span title="Cadastro Incompleto (Admissão, Matrícula, Nascimento, Centro de Custo, Empresa, Obra ou Desligamento)" className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-sm" />}
+                              {isPurple && <span title="Benefícios Pendentes (Saúde, Odonto ou Farmácia)" className="h-2.5 w-2.5 rounded-full bg-purple-500 shadow-sm" />}
+                              {trialInfo?.isWarning && <span title="Fim de Experiência Próximo (90 Dias)" className="h-2.5 w-2.5 rounded-full bg-yellow-400 shadow-sm" />}
+                            </div>
+                          );
+                        })()}
                       </div>
                       {employee.registration_number && (
                         <div className="text-xs text-muted-foreground mt-0.5">Matrícula: {employee.registration_number}</div>

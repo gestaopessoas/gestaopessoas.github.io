@@ -16,8 +16,8 @@ export function UserProfile() {
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [userId, setUserId] = useState("");
   const [permissions, setPermissions] = useState<any>({});
   const [preferences, setPreferences] = useState({ trial: true, rgs: true, benefits: true, profile: true });
@@ -31,8 +31,9 @@ export function UserProfile() {
         setEmail(data.user.email);
         setUserId(data.user.id);
         
-        const { data: prof } = await supabase.from('profiles').select('permissions').eq('id', data.user.id).single();
+        const { data: prof } = await supabase.from('profiles').select('name, permissions').eq('id', data.user.id).single();
         if (prof) {
+          setName(prof.name || "");
           setPermissions(prof.permissions || {});
           setPreferences(prof.permissions?._preferences || { trial: true, rgs: true, benefits: true, profile: true });
         }
@@ -58,39 +59,60 @@ export function UserProfile() {
     }
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!oldPassword || !newPassword) return;
-
     setLoading(true);
     setError("");
     setSuccess("");
 
     const supabase = createClient();
     
-    // First verify old password by attempting to sign in
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    // Update Auth
+    const { error: authError } = await supabase.auth.updateUser({
       email,
-      password: oldPassword,
+      data: { name }
     });
 
-    if (signInError) {
-      setLoading(false);
-      setError("Senha atual incorreta.");
-      return;
+    if (userId) {
+      await supabase.from('profiles').update({ name }).eq('id', userId);
     }
 
-    // Now change to new password
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword
-    });
+    // Update password if fields are filled
+    if (newPassword) {
+      if (!oldPassword) {
+        setLoading(false);
+        setError("Informe a senha atual para alterar a senha.");
+        return;
+      }
+      
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: oldPassword,
+      });
+
+      if (signInError) {
+        setLoading(false);
+        setError("Senha atual incorreta.");
+        return;
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (updateError) {
+        setError("Erro ao atualizar senha: " + updateError.message);
+        setLoading(false);
+        return;
+      }
+    }
 
     setLoading(false);
 
-    if (updateError) {
-      setError("Erro ao atualizar senha: " + updateError.message);
+    if (authError) {
+      setError("Erro ao atualizar perfil: " + authError.message);
     } else {
-      setSuccess("Senha atualizada com sucesso!");
+      setSuccess("Perfil atualizado com sucesso!");
       setOldPassword("");
       setNewPassword("");
       setTimeout(() => setOpen(false), 2000);
@@ -121,27 +143,52 @@ export function UserProfile() {
           </TabsList>
 
           <TabsContent value="security">
-            <form onSubmit={handleChangePassword} className="space-y-4">
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="old_password">Senha Atual</Label>
+                <Label htmlFor="profile_name">Nome Completo</Label>
                 <Input
-                  id="old_password"
-                  type="password"
-                  value={oldPassword}
-                  onChange={(e) => setOldPassword(e.target.value)}
+                  id="profile_name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   required
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="new_password">Nova Senha</Label>
+                <Label htmlFor="profile_email">E-mail</Label>
                 <Input
-                  id="new_password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  id="profile_email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
+              </div>
+
+              <div className="pt-2 border-t mt-4">
+                <p className="text-xs text-muted-foreground mb-4">Preencha os campos abaixo apenas se desejar alterar sua senha.</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="old_password">Senha Atual</Label>
+                    <Input
+                      id="old_password"
+                      type="password"
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="new_password">Nova Senha</Label>
+                    <Input
+                      id="new_password"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
 
               {error && <div className="text-sm text-destructive font-medium">{error}</div>}
@@ -149,7 +196,7 @@ export function UserProfile() {
 
               <div className="flex justify-end gap-2 pt-4 border-t mt-4">
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={loading}>{loading ? "Alterando..." : "Alterar Senha"}</Button>
+                <Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Salvar Perfil"}</Button>
               </div>
             </form>
           </TabsContent>
