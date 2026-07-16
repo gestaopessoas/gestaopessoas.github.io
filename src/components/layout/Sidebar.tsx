@@ -23,6 +23,7 @@ const sidebarItems = [
   { name: "Treinamentos", href: "/dashboard/treinamentos", icon: GraduationCap, module: "treinamentos" },
   { name: "Férias", href: "/dashboard/ferias", icon: CalendarDays, module: "ferias" },
   { name: "Benefícios", href: "/dashboard/beneficios", icon: Gift, module: "beneficios" },
+  { name: "Tipos de Benefício", href: "/dashboard/tipos-beneficios", icon: Gift, module: "beneficios" },
   { name: "Ponto", href: "/dashboard/ponto", icon: Clock, module: "ponto" },
   { name: "Holerites", href: "/dashboard/holerites", icon: Receipt, module: "holerites" },
   { name: "Avaliações", href: "/dashboard/avaliacoes", icon: Star, module: "avaliacoes" },

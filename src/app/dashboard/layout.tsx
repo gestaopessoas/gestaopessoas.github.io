@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
-import { Search, User, Loader2 } from "lucide-react";
+import { UserProfile } from "@/components/layout/UserProfile";
+import { Search, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 export default function DashboardLayout({
@@ -62,9 +63,7 @@ export default function DashboardLayout({
               <Search className="h-5 w-5" />
             </button>
             <NotificationBell />
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-              <User className="h-5 w-5 text-muted-foreground" />
-            </div>
+            <UserProfile />
           </div>
         </header>
 
