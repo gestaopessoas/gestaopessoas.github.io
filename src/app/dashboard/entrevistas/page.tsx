@@ -3,9 +3,20 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, Calendar, CheckCircle2, Clock, Download, Search, User, XCircle, Plus, X } from "lucide-react";
+import { Briefcase, Calendar, CheckCircle2, Clock, Download, Search, User, Plus, X, FileText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+type Assessment = {
+  psychological_test: string;
+  technical: string;
+  communication: string;
+  cultural_fit: string;
+  strengths: string;
+  weaknesses: string;
+  observations: string;
+};
 
 type Interview = {
   id: string;
@@ -17,6 +28,7 @@ type Interview = {
   interview_date: string | null;
   interview_time: string | null;
   result: string | null;
+  assessment: Assessment | null;
   created_at: string;
 };
 
@@ -34,6 +46,16 @@ const resultStyle: Record<string, string> = {
   "N/C": "text-zinc-500",
 };
 
+const defaultAssessment: Assessment = {
+  psychological_test: "Não",
+  technical: "",
+  communication: "",
+  cultural_fit: "",
+  strengths: "",
+  weaknesses: "",
+  observations: "",
+};
+
 export default function EntrevistasPage() {
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [query, setQuery] = useState("");
@@ -43,10 +65,13 @@ export default function EntrevistasPage() {
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"dados" | "avaliacao">("dados");
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C"
   });
+  const [assessmentForm, setAssessmentForm] = useState<Assessment>(defaultAssessment);
 
   const loadInterviews = async () => {
     setLoading(true);
@@ -70,11 +95,9 @@ export default function EntrevistasPage() {
 
   const filtered = useMemo(() => {
     let result = interviews;
-
     if (selectedMonth) {
       result = result.filter(i => i.interview_date && i.interview_date.startsWith(selectedMonth));
     }
-
     const term = query.trim().toLowerCase();
     if (term) {
       result = result.filter((interview) => [
@@ -85,7 +108,6 @@ export default function EntrevistasPage() {
         interview.email,
       ].some((value) => value?.toLowerCase().includes(term)));
     }
-
     return result;
   }, [query, selectedMonth, interviews]);
 
@@ -116,30 +138,92 @@ export default function EntrevistasPage() {
     link.remove();
   };
   
+  const exportParecer = () => {
+    const text = `PARECER DE ENTREVISTA
+=============================
+Candidato: ${form.candidate_name || "N/I"}
+Cargo Alvo: ${form.role || "N/I"}
+Data: ${form.interview_date ? new Date(form.interview_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/I'}
+
+AVALIAÇÃO
+=============================
+Teste Psicológico Realizado? ${assessmentForm.psychological_test}
+Avaliação Técnica: ${assessmentForm.technical || '-'}
+Comunicação: ${assessmentForm.communication || '-'}
+Fit Cultural: ${assessmentForm.cultural_fit || '-'}
+
+PONTOS FORTES
+-----------------------------
+${assessmentForm.strengths || 'Nenhum registrado'}
+
+PONTOS A DESENVOLVER
+-----------------------------
+${assessmentForm.weaknesses || 'Nenhum registrado'}
+
+PARECER FINAL / OBSERVAÇÕES
+-----------------------------
+${assessmentForm.observations || 'Nenhum registrado'}
+
+Resultado Final: ${form.result || "N/C"}
+`.trim();
+
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Parecer_${form.candidate_name?.replace(/\s+/g, '_') || 'candidato'}.txt`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError("");
     const supabase = createClient();
     
-    const payload = Object.fromEntries(
-      Object.entries(form).map(([key, value]) => [key, value.trim() || null])
-    );
+    const payload = {
+      ...Object.fromEntries(
+        Object.entries(form).map(([key, value]) => [key, value.trim() || null])
+      ),
+      assessment: assessmentForm
+    };
     
-    const { error: saveError } = await supabase.from("interviews").insert(payload);
-    setSaving(false);
-    
-    if (saveError) {
-      setError("Erro ao salvar entrevista: " + saveError.message);
-      return;
+    if (editingId) {
+      const { error: saveError } = await supabase.from("interviews").update(payload).eq("id", editingId);
+      if (saveError) setError("Erro ao atualizar entrevista: " + saveError.message);
+      else { setIsModalOpen(false); loadInterviews(); }
+    } else {
+      const { error: saveError } = await supabase.from("interviews").insert(payload);
+      if (saveError) setError("Erro ao salvar entrevista: " + saveError.message);
+      else { setIsModalOpen(false); loadInterviews(); }
     }
-    
-    setIsModalOpen(false);
-    loadInterviews();
+    setSaving(false);
   };
 
   const openNewModal = () => {
+    setEditingId(null);
     setForm({ candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C" });
+    setAssessmentForm(defaultAssessment);
+    setActiveTab("dados");
+    setIsModalOpen(true);
+  };
+  
+  const openEditModal = (interview: Interview) => {
+    setEditingId(interview.id);
+    setForm({
+      candidate_name: interview.candidate_name || "",
+      role: interview.role || "",
+      phone: interview.phone || "",
+      email: interview.email || "",
+      interview_date: interview.interview_date || "",
+      interview_time: interview.interview_time || "",
+      status: interview.status || "Aguardando",
+      result: interview.result || "N/C",
+    });
+    setAssessmentForm(interview.assessment || defaultAssessment);
+    setActiveTab("dados");
     setIsModalOpen(true);
   };
 
@@ -150,13 +234,13 @@ export default function EntrevistasPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Registro de Entrevistas</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Gerenciamento de candidatos, datas e resultados de entrevistas.
+              Gerenciamento de candidatos, avaliações e pareceres.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={exportToCsv} disabled={filtered.length === 0}>
               <Download className="mr-2 h-4 w-4" />
-              Exportar
+              Exportar Excel
             </Button>
             <Button onClick={openNewModal} className="gap-2">
               <Plus className="h-4 w-4" />
@@ -221,7 +305,7 @@ export default function EntrevistasPage() {
                   <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={5}>Nenhum registro encontrado.</td></tr>
                 )}
                 {!loading && filtered.map((interview) => (
-                  <tr key={interview.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={interview.id} onClick={() => openEditModal(interview)} className="hover:bg-muted/30 cursor-pointer transition-colors">
                     <td className="px-4 py-3 min-w-64">
                       <div className="font-medium text-foreground">{interview.candidate_name || "Sem nome"}</div>
                       <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
@@ -262,113 +346,219 @@ export default function EntrevistasPage() {
         </div>
       </div>
 
-      {/* Modal Nova Entrevista */}
+      {/* Modal Entrevista */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-background w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between p-4 border-b">
+          <div className="bg-background w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-4 border-b shrink-0">
               <div>
-                <h2 className="text-lg font-semibold">Registrar Nova Entrevista</h2>
-                <p className="text-sm text-muted-foreground">Preencha os dados do candidato e da entrevista.</p>
+                <h2 className="text-lg font-semibold">{editingId ? "Editar Entrevista & Avaliação" : "Registrar Nova Entrevista"}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {editingId ? "Altere dados do candidato ou adicione o parecer da entrevista." : "Preencha os dados do candidato e da entrevista."}
+                </p>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
                 <X className="h-5 w-5" />
               </Button>
             </div>
             
-            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1 col-span-2">
-                  <Label>Nome do Candidato <span className="text-red-500">*</span></Label>
-                  <Input 
-                    required 
-                    value={form.candidate_name} 
-                    onChange={e => setForm({...form, candidate_name: e.target.value})} 
-                    placeholder="Ex: João da Silva" 
-                  />
-                </div>
-                
-                <div className="space-y-1 col-span-2 md:col-span-1">
-                  <Label>Cargo Alvo</Label>
-                  <Input 
-                    value={form.role} 
-                    onChange={e => setForm({...form, role: e.target.value})} 
-                    placeholder="Ex: Pedreiro" 
-                  />
-                </div>
+            <div className="border-b px-6 flex gap-6 shrink-0">
+              <button 
+                onClick={() => setActiveTab("dados")}
+                className={`py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${activeTab === "dados" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                Dados Básicos
+              </button>
+              <button 
+                onClick={() => setActiveTab("avaliacao")}
+                className={`py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${activeTab === "avaliacao" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                Parecer / Avaliação
+              </button>
+            </div>
 
-                <div className="space-y-1 col-span-2 md:col-span-1">
-                  <Label>Telefone</Label>
-                  <Input 
-                    value={form.phone} 
-                    onChange={e => setForm({...form, phone: e.target.value})} 
-                    placeholder="(XX) XXXXX-XXXX" 
-                  />
-                </div>
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col">
+              {activeTab === "dados" && (
+                <div className="grid grid-cols-2 gap-4 flex-1">
+                  <div className="space-y-1 col-span-2">
+                    <Label>Nome do Candidato <span className="text-red-500">*</span></Label>
+                    <Input 
+                      required 
+                      value={form.candidate_name} 
+                      onChange={e => setForm({...form, candidate_name: e.target.value})} 
+                      placeholder="Ex: João da Silva" 
+                    />
+                  </div>
+                  
+                  <div className="space-y-1 col-span-2 md:col-span-1">
+                    <Label>Cargo Alvo</Label>
+                    <Input 
+                      value={form.role} 
+                      onChange={e => setForm({...form, role: e.target.value})} 
+                      placeholder="Ex: Pedreiro" 
+                    />
+                  </div>
 
-                <div className="space-y-1 col-span-2">
-                  <Label>E-mail</Label>
-                  <Input 
-                    type="email"
-                    value={form.email} 
-                    onChange={e => setForm({...form, email: e.target.value})} 
-                    placeholder="joao@email.com" 
-                  />
-                </div>
+                  <div className="space-y-1 col-span-2 md:col-span-1">
+                    <Label>Telefone</Label>
+                    <Input 
+                      value={form.phone} 
+                      onChange={e => setForm({...form, phone: e.target.value})} 
+                      placeholder="(XX) XXXXX-XXXX" 
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <Label>Data da Entrevista <span className="text-red-500">*</span></Label>
-                  <Input 
-                    type="date"
-                    required
-                    value={form.interview_date} 
-                    onChange={e => setForm({...form, interview_date: e.target.value})} 
-                  />
-                </div>
+                  <div className="space-y-1 col-span-2">
+                    <Label>E-mail</Label>
+                    <Input 
+                      type="email"
+                      value={form.email} 
+                      onChange={e => setForm({...form, email: e.target.value})} 
+                      placeholder="joao@email.com" 
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <Label>Horário</Label>
-                  <Input 
-                    type="time"
-                    value={form.interview_time} 
-                    onChange={e => setForm({...form, interview_time: e.target.value})} 
-                  />
-                </div>
+                  <div className="space-y-1">
+                    <Label>Data da Entrevista <span className="text-red-500">*</span></Label>
+                    <Input 
+                      type="date"
+                      required
+                      value={form.interview_date} 
+                      onChange={e => setForm({...form, interview_date: e.target.value})} 
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <Label>Status</Label>
-                  <select 
-                    value={form.status} 
-                    onChange={e => setForm({...form, status: e.target.value})}
-                    className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="Aguardando">Aguardando</option>
-                    <option value="Confirmado">Confirmado</option>
-                    <option value="Compareceu">Compareceu</option>
-                    <option value="Desistente">Desistente</option>
-                  </select>
-                </div>
+                  <div className="space-y-1">
+                    <Label>Horário</Label>
+                    <Input 
+                      type="time"
+                      value={form.interview_time} 
+                      onChange={e => setForm({...form, interview_time: e.target.value})} 
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <Label>Resultado</Label>
-                  <select 
-                    value={form.result} 
-                    onChange={e => setForm({...form, result: e.target.value})}
-                    className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="N/C">N/C (Não Concluído)</option>
-                    <option value="Aprovado">Aprovado</option>
-                    <option value="Reprovado">Reprovado</option>
-                    <option value="Desistente">Desistente</option>
-                  </select>
-                </div>
-              </div>
+                  <div className="space-y-1">
+                    <Label>Status</Label>
+                    <select 
+                      value={form.status} 
+                      onChange={e => setForm({...form, status: e.target.value})}
+                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="Aguardando">Aguardando</option>
+                      <option value="Confirmado">Confirmado</option>
+                      <option value="Compareceu">Compareceu</option>
+                      <option value="Desistente">Desistente</option>
+                    </select>
+                  </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={saving}>
-                  {saving ? "Salvando..." : "Salvar Entrevista"}
-                </Button>
+                  <div className="space-y-1">
+                    <Label>Resultado Final</Label>
+                    <select 
+                      value={form.result} 
+                      onChange={e => setForm({...form, result: e.target.value})}
+                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="N/C">N/C (Não Concluído)</option>
+                      <option value="Aprovado">Aprovado</option>
+                      <option value="Reprovado">Reprovado</option>
+                      <option value="Desistente">Desistente</option>
+                      <option value="Banco de Talentos">Banco de Talentos</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "avaliacao" && (
+                <div className="space-y-5 flex-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label>Teste Psicológico Realizado?</Label>
+                      <select 
+                        value={assessmentForm.psychological_test} 
+                        onChange={e => setAssessmentForm({...assessmentForm, psychological_test: e.target.value})}
+                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="Não">Não</option>
+                        <option value="Sim">Sim</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label>Avaliação Técnica</Label>
+                      <Input 
+                        value={assessmentForm.technical} 
+                        onChange={e => setAssessmentForm({...assessmentForm, technical: e.target.value})} 
+                        placeholder="Ex: Excelente, Necessita treino, etc" 
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label>Comunicação</Label>
+                      <Input 
+                        value={assessmentForm.communication} 
+                        onChange={e => setAssessmentForm({...assessmentForm, communication: e.target.value})} 
+                        placeholder="Ex: Articulado, Tímido, etc" 
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label>Fit Cultural (Aderência)</Label>
+                      <Input 
+                        value={assessmentForm.cultural_fit} 
+                        onChange={e => setAssessmentForm({...assessmentForm, cultural_fit: e.target.value})} 
+                        placeholder="Ex: Alta, Média, Baixa" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>Pontos Fortes</Label>
+                    <Textarea 
+                      value={assessmentForm.strengths} 
+                      onChange={e => setAssessmentForm({...assessmentForm, strengths: e.target.value})}
+                      placeholder="Principais destaques positivos do candidato..."
+                      className="resize-none"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>Pontos a Desenvolver</Label>
+                    <Textarea 
+                      value={assessmentForm.weaknesses} 
+                      onChange={e => setAssessmentForm({...assessmentForm, weaknesses: e.target.value})}
+                      placeholder="Pontos onde o candidato apresentou dificuldade ou falta de experiência..."
+                      className="resize-none"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>Parecer Final / Observações</Label>
+                    <Textarea 
+                      value={assessmentForm.observations} 
+                      onChange={e => setAssessmentForm({...assessmentForm, observations: e.target.value})}
+                      placeholder="Anotações gerais e recomendação final de contratação..."
+                      className="resize-none"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center gap-2 pt-4 border-t mt-auto shrink-0">
+                {editingId && activeTab === "avaliacao" ? (
+                  <Button type="button" variant="secondary" onClick={exportParecer} className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    Exportar Parecer
+                  </Button>
+                ) : <div />}
+                <div className="flex gap-2">
+                  <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+                  <Button type="submit" disabled={saving}>
+                    {saving ? "Salvando..." : "Salvar Entrevista"}
+                  </Button>
+                </div>
               </div>
             </form>
           </div>
