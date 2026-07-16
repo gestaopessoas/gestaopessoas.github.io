@@ -11,7 +11,7 @@ import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 
 type Department = { id: string; name: string };
-type Entity = { id: string; name: string };
+type Entity = { id: string; name: string; trading_name?: string | null };
 type Employee = Record<string, string | null | any> & { id: string; name: string; departments?: Entity | null; level?: string | null; companies?: Entity | null; cost_centers?: Entity | null; workplaces?: Entity | null; };
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
@@ -74,7 +74,7 @@ export default function ColaboradoresPage() {
   useEffect(() => {
     const supabase = createClient();
     supabase.from("departments").select("id, name").order("name").then(({ data }) => setDepartments((data ?? []) as Entity[]));
-    supabase.from("companies").select("id, name").order("name").then(({ data }) => setCompanies((data ?? []) as Entity[]));
+    supabase.from("companies").select("id, name, trading_name").order("name").then(({ data }) => setCompanies((data ?? []) as Entity[]));
     supabase.from("cost_centers").select("id, name").order("name").then(({ data }) => setCostCenters((data ?? []) as Entity[]));
     supabase.from("workplaces").select("id, name").order("name").then(({ data }) => setWorkplaces((data ?? []) as Entity[]));
     supabase.from("job_profiles").select("title").then(({ data }) => {
@@ -92,7 +92,7 @@ export default function ColaboradoresPage() {
       const supabase = createClient();
       let request = supabase
         .from("employees")
-        .select(`${fields}, departments(name), companies(name), cost_centers(name), workplaces(name)`, { count: "exact" })
+        .select(`${fields}, departments(name), companies(name, trading_name), cost_centers(name), workplaces(name)`, { count: "exact" })
         .order("name")
         .range(page * pageSize, page * pageSize + pageSize - 1);
       
@@ -297,7 +297,7 @@ export default function ColaboradoresPage() {
               <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "Férias", "Afastado", "Inativo", "Desligado"]} /></Field>
               <Field label="Cargo"><Input list="roles-list" value={form.role} onChange={(e) => update("role", e.target.value)} /><datalist id="roles-list">{roles.map(r => <option key={r} value={r} />)}</datalist></Field>
               <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Diretoria"]} /></Field>
-              <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+              <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.trading_name || c.name}</option>)}</select></Field>
               <Field label="Centro de Custo *"><select value={form.cost_center_id} onChange={(e) => update("cost_center_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{costCenters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
               <Field label="Obra/Unidade"><select value={form.workplace_id} onChange={(e) => update("workplace_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{workplaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
               <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
@@ -365,10 +365,10 @@ export default function ColaboradoresPage() {
                     <td className="p-3">
                       <div>{String(employee.role ?? "-")} {employee.level && <span className="text-[10px] bg-muted px-1.5 rounded-full ml-1">{employee.level}</span>}</div>
                       <div className="text-xs text-muted-foreground">
-                        {employee.companies?.name ? `${employee.companies.name}` : ""}
+                        {employee.companies?.trading_name || employee.companies?.name ? `${employee.companies.trading_name || employee.companies.name}` : ""}
                         {employee.workplaces?.name ? ` · ${employee.workplaces.name}` : ""}
                         {employee.departments?.name ? ` · ${employee.departments.name}` : ""}
-                        {(!employee.companies?.name && !employee.workplaces?.name && !employee.departments?.name) && "-"}
+                        {(!employee.companies?.trading_name && !employee.companies?.name && !employee.workplaces?.name && !employee.departments?.name) && "-"}
                       </div>
                     </td>
                     <td className="p-3">{String(employee.status ?? "-")}</td>
