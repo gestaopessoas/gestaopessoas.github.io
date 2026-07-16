@@ -27,10 +27,17 @@ type BenefitNotification = {
   type: "INCLUSAO" | "CORTE";
 };
 
+type PendingProfileNotification = {
+  id: string;
+  name: string;
+  missingFields: string[];
+};
+
 export function NotificationBell() {
   const [trialNotifications, setTrialNotifications] = useState<TrialNotification[]>([]);
   const [rgsNotifications, setRgsNotifications] = useState<RgsNotification[]>([]);
   const [benefitNotifications, setBenefitNotifications] = useState<BenefitNotification[]>([]);
+  const [pendingProfiles, setPendingProfiles] = useState<PendingProfileNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -43,13 +50,30 @@ export function NotificationBell() {
       // 1. Fetch Employees for both Trial and Benefits
       const { data: empData, error: empError } = await supabase
         .from("employees")
-        .select("id, name, admission_date, contract_type, status")
+        .select("id, name, admission_date, contract_type, status, registration_number, birthday, cost_center_id, company_id, workplace_id, dismissed_at")
         .neq("status", "Arquivo Morto");
 
       const trialList: TrialNotification[] = [];
+      const pendingProfileList: PendingProfileNotification[] = [];
       
       if (!empError && empData) {
         for (const emp of empData) {
+          // Pendências de Perfil
+          const missing: string[] = [];
+          if (["Ativo", "Férias", "Afastado"].includes(emp.status)) {
+            if (!emp.admission_date) missing.push("Admissão");
+            if (!emp.registration_number) missing.push("Matrícula");
+            if (!emp.birthday) missing.push("Nascimento");
+            if (!emp.cost_center_id) missing.push("Centro de Custo");
+            if (!emp.company_id) missing.push("Empresa");
+            if (!emp.workplace_id) missing.push("Obra");
+          } else if (["Inativo", "Desligado"].includes(emp.status)) {
+            if (!emp.dismissed_at) missing.push("Desligamento");
+          }
+          if (missing.length > 0) {
+            pendingProfileList.push({ id: emp.id, name: emp.name, missingFields: missing });
+          }
+
           if (["Inativo", "Desligado"].includes(emp.status)) continue;
           if (!emp.admission_date) continue;
           if (emp.contract_type && emp.contract_type !== "CLT") continue;
@@ -71,6 +95,7 @@ export function NotificationBell() {
         }
         trialList.sort((a, b) => a.daysRemaining - b.daysRemaining);
         setTrialNotifications(trialList);
+        setPendingProfiles(pendingProfileList);
       }
 
       // 2. Fetch RGS Notifications
@@ -159,7 +184,7 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const totalCount = trialNotifications.length + rgsNotifications.length + benefitNotifications.length;
+  const totalCount = trialNotifications.length + rgsNotifications.length + benefitNotifications.length + pendingProfiles.length;
   
   const cutsCount = benefitNotifications.filter(b => b.type === "CORTE").length;
   const inclusionsCount = benefitNotifications.filter(b => b.type === "INCLUSAO").length;
@@ -186,6 +211,37 @@ export function NotificationBell() {
           ) : (
             <div className="flex flex-col">
               
+              {/* Pendências de Cadastro */}
+              {pendingProfiles.length > 0 && (
+                <div className="border-b last:border-b-0 pb-2">
+                  <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <UserX className="h-3.5 w-3.5 text-purple-500" /> Cadastro Incompleto
+                    </h3>
+                    <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pendingProfiles.length}</span>
+                  </div>
+                  <div className="px-2 pt-2 flex flex-col gap-1 max-h-[160px] overflow-y-auto">
+                    {pendingProfiles.map(n => (
+                      <button 
+                        key={n.id} 
+                        onClick={() => { setIsOpen(false); router.push(`/dashboard/colaboradores`); }}
+                        className="flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted text-left w-full group"
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-medium text-foreground">{n.name}</span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {n.missingFields.map(f => (
+                            <span key={f} className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">{f}</span>
+                          ))}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Benefícios */}
               {benefitNotifications.length > 0 && (
                 <div className="border-b last:border-b-0 pb-2">
