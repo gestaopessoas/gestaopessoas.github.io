@@ -7,6 +7,7 @@ import { Briefcase, Calendar, CheckCircle2, Clock, Download, Search, User, Plus,
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Assessment = {
   psychological_test: string;
@@ -225,6 +226,46 @@ Resultado Final: ${form.result || "N/C"}
     setAssessmentForm(interview.assessment || defaultAssessment);
     setActiveTab("dados");
     setIsModalOpen(true);
+  };
+
+  const PREDEFINED_STRENGTHS = ["Proatividade", "Boa Comunicação", "Experiência", "Trabalho em Equipe", "Organização", "Liderança", "Foco em Resultados", "Empatia", "Resiliência"];
+  const PREDEFINED_WEAKNESSES = ["Timidez", "Falta de Experiência Técnica", "Insegurança", "Dificuldade com Ferramentas", "Postura", "Conhecimento Básico", "Nervosismo", "Falta de Clareza"];
+
+  const toggleListItem = (list: string, item: string) => {
+    const arr = list ? list.split(',').map(s => s.trim()).filter(Boolean) : [];
+    if (arr.includes(item)) {
+      return arr.filter(i => i !== item).join(', ');
+    } else {
+      return [...arr, item].join(', ');
+    }
+  };
+
+  const generateParecerText = () => {
+    const parts: string[] = [];
+    if (assessmentForm.technical) parts.push(`Apresentou uma avaliação técnica ${assessmentForm.technical.toLowerCase()}.`);
+    if (assessmentForm.communication) parts.push(`Sua comunicação foi avaliada como ${assessmentForm.communication.toLowerCase()}.`);
+    if (assessmentForm.cultural_fit) parts.push(`Demonstrou aderência cultural ${assessmentForm.cultural_fit.toLowerCase()} com os valores da empresa.`);
+    
+    const fortes = assessmentForm.strengths ? assessmentForm.strengths.split(',').map(s => s.trim().toLowerCase()) : [];
+    if (fortes.length > 0) {
+      parts.push(`Como pontos fortes, destacou-se por apresentar ${fortes.join(', ')}.`);
+    }
+
+    const fracos = assessmentForm.weaknesses ? assessmentForm.weaknesses.split(',').map(s => s.trim().toLowerCase()) : [];
+    if (fracos.length > 0) {
+      parts.push(`Como pontos de atenção e desenvolvimento, notou-se: ${fracos.join(', ')}.`);
+    }
+
+    if (parts.length === 0) {
+      parts.push("Nenhuma avaliação técnica ou comportamental preenchida.");
+    } else {
+      parts.push("Candidato(a) " + (form.result === "Aprovado" ? "recomendado(a) para a vaga." : form.result === "Reprovado" ? "não recomendado(a) para a vaga neste momento." : "aguardando definição final."));
+    }
+
+    setAssessmentForm(prev => ({
+      ...prev,
+      observations: parts.join(' ')
+    }));
   };
 
   return (
@@ -485,62 +526,99 @@ Resultado Final: ${form.result || "N/C"}
 
                     <div className="space-y-1">
                       <Label>Avaliação Técnica</Label>
-                      <Input 
+                      <select 
                         value={assessmentForm.technical} 
-                        onChange={e => setAssessmentForm({...assessmentForm, technical: e.target.value})} 
-                        placeholder="Ex: Excelente, Necessita treino, etc" 
-                      />
+                        onChange={e => setAssessmentForm({...assessmentForm, technical: e.target.value})}
+                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="Excelente">Excelente (Domina o assunto)</option>
+                        <option value="Boa">Boa (Tem conhecimento sólido)</option>
+                        <option value="Básica">Básica (Precisa de treinamento)</option>
+                        <option value="Insuficiente">Insuficiente (Não atende aos requisitos)</option>
+                      </select>
                     </div>
 
                     <div className="space-y-1">
                       <Label>Comunicação</Label>
-                      <Input 
+                      <select 
                         value={assessmentForm.communication} 
-                        onChange={e => setAssessmentForm({...assessmentForm, communication: e.target.value})} 
-                        placeholder="Ex: Articulado, Tímido, etc" 
-                      />
+                        onChange={e => setAssessmentForm({...assessmentForm, communication: e.target.value})}
+                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="Excelente">Excelente (Articulado e claro)</option>
+                        <option value="Boa">Boa (Comunica-se bem)</option>
+                        <option value="Razoável">Razoável (Um pouco retraído)</option>
+                        <option value="Ruim">Ruim (Dificuldade de expressão)</option>
+                      </select>
                     </div>
 
                     <div className="space-y-1">
                       <Label>Fit Cultural (Aderência)</Label>
-                      <Input 
+                      <select 
                         value={assessmentForm.cultural_fit} 
-                        onChange={e => setAssessmentForm({...assessmentForm, cultural_fit: e.target.value})} 
-                        placeholder="Ex: Alta, Média, Baixa" 
-                      />
+                        onChange={e => setAssessmentForm({...assessmentForm, cultural_fit: e.target.value})}
+                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="Alta">Alta (Total aderência aos valores)</option>
+                        <option value="Média">Média (Aderência parcial)</option>
+                        <option value="Baixa">Baixa (Pouca aderência aos valores)</option>
+                      </select>
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label>Pontos Fortes</Label>
-                    <Textarea 
-                      value={assessmentForm.strengths} 
-                      onChange={e => setAssessmentForm({...assessmentForm, strengths: e.target.value})}
-                      placeholder="Principais destaques positivos do candidato..."
-                      className="resize-none"
-                      rows={2}
-                    />
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Pontos Fortes</Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {PREDEFINED_STRENGTHS.map(item => {
+                        const checked = assessmentForm.strengths.includes(item);
+                        return (
+                          <div key={item} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`strength-${item}`} 
+                              checked={checked}
+                              onCheckedChange={() => setAssessmentForm(prev => ({...prev, strengths: toggleListItem(prev.strengths, item)}))}
+                            />
+                            <Label htmlFor={`strength-${item}`} className="text-sm font-normal cursor-pointer leading-tight">{item}</Label>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label>Pontos a Desenvolver</Label>
-                    <Textarea 
-                      value={assessmentForm.weaknesses} 
-                      onChange={e => setAssessmentForm({...assessmentForm, weaknesses: e.target.value})}
-                      placeholder="Pontos onde o candidato apresentou dificuldade ou falta de experiência..."
-                      className="resize-none"
-                      rows={2}
-                    />
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Pontos a Desenvolver</Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {PREDEFINED_WEAKNESSES.map(item => {
+                        const checked = assessmentForm.weaknesses.includes(item);
+                        return (
+                          <div key={item} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`weakness-${item}`} 
+                              checked={checked}
+                              onCheckedChange={() => setAssessmentForm(prev => ({...prev, weaknesses: toggleListItem(prev.weaknesses, item)}))}
+                            />
+                            <Label htmlFor={`weakness-${item}`} className="text-sm font-normal cursor-pointer leading-tight">{item}</Label>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label>Parecer Final / Observações</Label>
+                  <div className="space-y-2 border-t pt-4 mt-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-medium">Parecer Final / Observações</Label>
+                      <Button type="button" size="sm" variant="outline" onClick={generateParecerText} className="gap-2 text-primary border-primary/50 hover:bg-primary/10">
+                        <span className="text-lg leading-none">🪄</span> Gerar Parecer
+                      </Button>
+                    </div>
                     <Textarea 
                       value={assessmentForm.observations} 
                       onChange={e => setAssessmentForm({...assessmentForm, observations: e.target.value})}
-                      placeholder="Anotações gerais e recomendação final de contratação..."
-                      className="resize-none"
-                      rows={3}
+                      placeholder="O texto gerado aparecerá aqui. Você também pode digitar manualmente..."
+                      className="resize-none min-h-[100px]"
                     />
                   </div>
                 </div>

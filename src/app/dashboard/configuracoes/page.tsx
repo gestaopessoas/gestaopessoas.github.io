@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Save, Loader2 } from "lucide-react"
+import { Save, Loader2, DownloadCloud } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { usePermissions } from "@/hooks/usePermissions"
 
@@ -108,6 +108,38 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  const [backingUp, setBackingUp] = useState(false);
+
+  async function handleBackup() {
+    setBackingUp(true);
+    try {
+      const tables = ["employees", "lockers", "interviews", "rgs_processes", "profiles", "system_settings"];
+      const backupData: Record<string, any> = {};
+      
+      for (const table of tables) {
+        const { data, error } = await supabase.from(table).select("*");
+        if (!error && data) {
+          backupData[table] = data;
+        }
+      }
+      
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `backup_gestaopessoas_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      alert("Backup gerado com sucesso!");
+    } catch (error: any) {
+      alert("Erro ao gerar backup: " + error.message);
+    } finally {
+      setBackingUp(false);
+    }
+  }
+
   if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="w-6 h-6 animate-spin" /></div>
 
   return (
@@ -119,9 +151,10 @@ export default function ConfiguracoesPage() {
         </header>
 
         <Tabs defaultValue="modulos" className="w-full">
-          <TabsList className={`grid w-full ${can('configuracoes', 'edit') ? 'grid-cols-3 max-w-2xl' : 'grid-cols-2 max-w-md'} h-10 p-1 bg-muted/50`}>
-            <TabsTrigger value="modulos" className="text-sm rounded-md data-[state=active]:shadow-sm">Módulos do Sistema</TabsTrigger>
+          <TabsList className={`grid w-full ${can('configuracoes', 'edit') ? 'grid-cols-4 max-w-3xl' : 'grid-cols-3 max-w-xl'} h-10 p-1 bg-muted/50`}>
+            <TabsTrigger value="modulos" className="text-sm rounded-md data-[state=active]:shadow-sm">Módulos</TabsTrigger>
             <TabsTrigger value="permissoes" className="text-sm rounded-md data-[state=active]:shadow-sm">Permissões Globais</TabsTrigger>
+            <TabsTrigger value="backup" className="text-sm rounded-md data-[state=active]:shadow-sm">Backup</TabsTrigger>
             {can('configuracoes', 'edit') && (
               <TabsTrigger value="usuarios" className="text-sm rounded-md data-[state=active]:shadow-sm">Usuários & Permissões</TabsTrigger>
             )}
@@ -155,6 +188,11 @@ export default function ConfiguracoesPage() {
                   </div>
                   <Switch checked={modules.pdi} onCheckedChange={(c) => setModules({...modules, pdi: c})} />
                 </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-medium">Portal do Gestor</Label>
+                    <p className="text-sm text-muted-foreground">Área restrita para gestores aprovarem candidatos e metas.</p>
+                  </div>
                   <Switch checked={modules.gestor} onCheckedChange={(c) => setModules({...modules, gestor: c})} />
                 </div>
                 <div className="flex items-center justify-between border-t border-border/40 pt-4">
@@ -286,6 +324,27 @@ export default function ConfiguracoesPage() {
               )}
             </TabsContent>
           )}
+
+          <TabsContent value="backup" className="mt-6 space-y-6">
+            <Card className="border-border/60 shadow-sm">
+              <CardHeader className="pb-4 border-b border-border/40 mb-4">
+                <CardTitle className="text-lg">Backup do Sistema</CardTitle>
+                <CardDescription>Exporte todos os dados do banco de dados em formato JSON para fins de segurança e arquivo.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-medium">Exportar Banco de Dados</Label>
+                    <p className="text-sm text-muted-foreground">O arquivo JSON gerado conterá Colaboradores, Armários, Entrevistas e Configurações.</p>
+                  </div>
+                  <Button onClick={handleBackup} disabled={backingUp} variant="outline" className="gap-2 border-primary/50 text-primary hover:bg-primary/10">
+                    {backingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <DownloadCloud className="w-4 h-4" />}
+                    Fazer Backup (JSON)
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </div>
