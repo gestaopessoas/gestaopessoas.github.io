@@ -182,15 +182,20 @@ export default function ColaboradoresPage() {
       : await supabase.from("employees").insert(payload);
       
     if (!result.error && (isNew || isDismissed || isPromoted)) {
-      const rgsType = isNew ? "Contratação" : isDismissed ? "Desligamento" : "Alteração de cargo/local";
-      await supabase.from("rgs_processes").insert({
-        process_type: rgsType,
-        process_date: new Date().toISOString().split("T")[0],
-        employee_name: payload.name,
-        role: payload.role,
-        location: payload.workplace_id ? workplaces.find(w => w.id === payload.workplace_id)?.name || null : null,
-        status: "Pendente",
-      });
+      const { data: settingsData } = await supabase.from("system_settings").select("value").eq("key", "modules").single();
+      const rgsTrackingEnabled = settingsData?.value?.rgs_tracking ?? true;
+      
+      if (rgsTrackingEnabled) {
+        const rgsType = isNew ? "Contratação" : isDismissed ? "Desligamento" : "Alteração de cargo/local";
+        await supabase.from("rgs_processes").insert({
+          process_type: rgsType,
+          process_date: new Date().toISOString().split("T")[0],
+          employee_name: payload.name,
+          role: payload.role,
+          location: payload.workplace_id ? workplaces.find(w => w.id === payload.workplace_id)?.name || null : null,
+          status: "Pendente",
+        });
+      }
     }
 
     setSaving(false);

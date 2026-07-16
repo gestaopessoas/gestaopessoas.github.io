@@ -18,7 +18,7 @@ type UserPerms = Record<string, Record<string, boolean>>
 type ProfileRow = { id: string; name: string | null; level: number; permissions: UserPerms | null }
 
 export default function ConfiguracoesPage() {
-  const [modules, setModules] = useState({ ats: true, admissao: true, pdi: true, gestor: true })
+  const [modules, setModules] = useState({ ats: true, admissao: true, pdi: true, gestor: true, rgs_tracking: true })
   const [permissions, setPermissions] = useState({ "2fa": true, ai_notifications: true })
   const [jobRequestCode, setJobRequestCode] = useState("")
   const [loading, setLoading] = useState(true)
@@ -155,12 +155,14 @@ export default function ConfiguracoesPage() {
                   </div>
                   <Switch checked={modules.pdi} onCheckedChange={(c) => setModules({...modules, pdi: c})} />
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base font-medium">Portal do Gestor</Label>
-                    <p className="text-sm text-muted-foreground">Área restrita para gestores aprovarem candidatos e metas.</p>
-                  </div>
                   <Switch checked={modules.gestor} onCheckedChange={(c) => setModules({...modules, gestor: c})} />
+                </div>
+                <div className="flex items-center justify-between border-t border-border/40 pt-4">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-medium">Registro Automático de RGS</Label>
+                    <p className="text-sm text-muted-foreground">Criar registros automaticamente no RGS ao alterar colaboradores (Admissão, Demissão, Alterações).</p>
+                  </div>
+                  <Switch checked={modules.rgs_tracking ?? true} onCheckedChange={(c) => setModules({...modules, rgs_tracking: c})} />
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/20 border-t border-border/40 pt-4 flex justify-end">
