@@ -17,11 +17,11 @@ type RelatedRow = Record<string, string | number | boolean | null> & { id: strin
 
 const pageSize = 1000;
 const fields = [
-  "id", "name", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id"
+  "id", "name", "registration_number", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id"
 ].join(", ");
 
 const emptyForm = {
-  name: "", department_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", level: "", phone: "",
+  name: "", registration_number: "", department_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: ""
