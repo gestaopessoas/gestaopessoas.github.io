@@ -113,7 +113,18 @@ export default function ConfiguracoesPage() {
   async function handleBackup() {
     setBackingUp(true);
     try {
-      const tables = ["employees", "lockers", "interviews", "rgs_processes", "profiles", "system_settings"];
+      const tables = [
+        "applications", "benefit_ignores", "big_five_questions", "candidate_big_five_results", 
+        "candidates", "climate_survey_responses", "climate_surveys", "companies", 
+        "company_benefits", "competencies", "cost_centers", "departments", 
+        "employee_archives", "employee_benefits", "employee_epis", "employee_promotions", 
+        "employee_uniforms", "employees", "evaluation_cycles", "goals", "interviews", 
+        "islands", "job_applications", "job_openings", "job_profiles", "job_requests", 
+        "lockers", "lunch_lists", "occupational_exams", "payslips", "physical_boxes", 
+        "profiles", "public_form_settings", "rgs_processes", "system_audit_logs", 
+        "system_settings", "tests", "time_logs", "training_sessions", "uniform_items", 
+        "vacations", "workplaces"
+      ];
       const backupData: Record<string, any> = {};
       
       for (const table of tables) {
