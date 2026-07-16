@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { AlertCircle, Cake, CalendarDays, Download, Edit3, Plus, Search, Trash2, Users, X, Activity, Filter, TrendingUp } from "lucide-react";
+import { Edit3, Plus, Search, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, CheckCircle2, XCircle, TrendingUp, Package } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
@@ -676,6 +676,8 @@ function RelatedRecords({ employeeId }: { employeeId: string }) {
         <Input value={epi.epi_name} onChange={(e) => setEpi({ ...epi, epi_name: e.target.value })} placeholder="EPI" /><Input value={epi.ca_number} onChange={(e) => setEpi({ ...epi, ca_number: e.target.value })} placeholder="Número CA" /><Input type="date" value={epi.received_date} onChange={(e) => setEpi({ ...epi, received_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (epi.epi_name) { void add("employee_epis", { ...epi, received_date: epi.received_date || null, status: "Ativo" }); setEpi({ epi_name: "", ca_number: "", received_date: "" }); } }}>Adicionar</Button>
       </Related>
       
+      <EmployeeUniforms employeeId={employeeId} />
+      
       <Related title="Férias" rows={vacations} render={(row) => `${row.start_date} até ${row.end_date} · ${row.status || "Programada"}`} onRemove={(id) => remove("vacations", id)}>
         <Input type="date" value={vacation.start_date} onChange={(e) => setVacation({ ...vacation, start_date: e.target.value })} /><Input type="date" value={vacation.end_date} onChange={(e) => setVacation({ ...vacation, end_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (vacation.start_date && vacation.end_date) { void add("vacations", { ...vacation, status: "Programada" }); setVacation({ start_date: "", end_date: "" }); } }}>Adicionar</Button>
       </Related>
@@ -691,3 +693,81 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, span, children }: { label: string; span?: boolean; children: React.ReactNode }) { return <div className={span ? "space-y-1.5 md:col-span-2" : "space-y-1.5"}><Label>{label}</Label>{children}</div>; }
 function Select({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) { return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
 function Related({ title, icon: Icon, rows, render, onRemove, children }: { title: string; icon?: React.ElementType; rows: RelatedRow[]; render: (row: RelatedRow) => string; onRemove: (id: string) => void; children: React.ReactNode }) { return <details className="rounded-md border p-3"><summary className="cursor-pointer font-medium flex items-center gap-2">{Icon && <Icon className="w-4 h-4 text-muted-foreground" />} {title} ({rows.length})</summary><div className="mt-3 space-y-2">{rows.map((row) => <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm"><span>{render(row)}</span><Button type="button" size="icon" variant="ghost" onClick={() => onRemove(row.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button></div>)}<div className="grid gap-2 md:flex md:flex-wrap">{children}</div></div></details>; }
+
+function EmployeeUniforms({ employeeId }: { employeeId: string }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [uniformId, setUniformId] = useState("");
+  const [qty, setQty] = useState(1);
+  const [notes, setNotes] = useState("");
+
+  const load = useCallback(async () => {
+    const supabase = createClient();
+    const [i, d] = await Promise.all([
+      supabase.from("uniform_items").select("*").order("name"),
+      supabase.from("employee_uniforms").select("*, uniform_items(name, size)").eq("employee_id", employeeId).order("delivered_at", { ascending: false }),
+    ]);
+    setItems((i.data ?? []));
+    setDeliveries((d.data ?? []));
+  }, [employeeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const add = async () => {
+    if (!uniformId || qty < 1) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("employee_uniforms").insert({
+      employee_id: employeeId,
+      uniform_item_id: uniformId,
+      quantity_delivered: qty,
+      notes: notes || null,
+    });
+    
+    if (!error) {
+       const item = items.find(i => i.id === uniformId);
+       if (item) {
+         await supabase.from("uniform_items").update({ quantity_in_stock: item.quantity_in_stock - qty }).eq("id", uniformId);
+       }
+       setUniformId(""); setQty(1); setNotes("");
+       load();
+    }
+  };
+
+  const remove = async (id: string, uniformItemId: string, qtyDelivered: number) => {
+    if (!window.confirm("Excluir este registro e devolver ao estoque?")) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("employee_uniforms").delete().eq("id", id);
+    if (!error) {
+       const item = items.find(i => i.id === uniformItemId);
+       if (item) {
+         await supabase.from("uniform_items").update({ quantity_in_stock: item.quantity_in_stock + qtyDelivered }).eq("id", uniformItemId);
+       }
+       load();
+    }
+  };
+
+  return (
+    <details className="rounded-md border p-3">
+      <summary className="cursor-pointer font-medium flex items-center gap-2">
+        <Package className="w-4 h-4 text-muted-foreground" /> Uniformes Entregues ({deliveries.length})
+      </summary>
+      <div className="mt-3 space-y-2">
+        {deliveries.map((row) => (
+          <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm">
+            <span>{row.quantity_delivered}x {row.uniform_items?.name} ({row.uniform_items?.size}) &middot; {new Date(row.delivered_at).toLocaleDateString()} {row.notes ? '- ' + row.notes : ''}</span>
+            <Button type="button" size="icon" variant="ghost" onClick={() => remove(row.id, row.uniform_item_id, row.quantity_delivered)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button>
+          </div>
+        ))}
+        <div className="grid gap-2 md:flex md:flex-wrap">
+          <select value={uniformId} onChange={(e) => setUniformId(e.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm flex-1">
+            <option value="">Selecione a peça...</option>
+            {items.map(i => <option key={i.id} value={i.id}>{i.name} (Tam: {i.size}) - Estq: {i.quantity_in_stock}</option>)}
+          </select>
+          <Input type="number" min="1" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="Qtd" className="w-20" />
+          <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anotações" className="flex-1" />
+          <Button type="button" variant="outline" onClick={add}>Adicionar</Button>
+        </div>
+      </div>
+    </details>
+  );
+}
