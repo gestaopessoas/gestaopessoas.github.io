@@ -107,16 +107,33 @@ export default function ArmariosPage() {
     const data = lockers.sort((a,b) => parseInt(a.number) - parseInt(b.number)).map(locker => {
       const spareCount = locker.spare_keys || 0;
       
-      // Regra de chaves
-      // Se não tem chave na empresa (has_key = true) e não tem com o colaborador (se livre), então sumiu? 
-      // Mas o padrão do sistema: 1 chave principal + N reservas.
-      const totalKeys = 1 + spareCount; 
       let mainKeyStatus = "Na Empresa";
+      let mainKeyExists = true;
       
-      if (locker.employee_id && locker.has_key) {
-        mainKeyStatus = "Com Colaborador";
-      } else if (!locker.employee_id && locker.has_key) {
-        mainKeyStatus = "Sumiu / Não devolvida";
+      if (locker.employee_id) {
+        if (locker.has_key) {
+          mainKeyStatus = "Com Colaborador";
+        } else {
+          mainKeyStatus = "Na Empresa (Não entregue)";
+        }
+      } else {
+        if (locker.has_key) {
+          mainKeyStatus = "Sumiu / Não devolvida";
+          mainKeyExists = false;
+        } else {
+          mainKeyStatus = "Na Empresa (Livre)";
+        }
+      }
+
+      const totalKeys = (mainKeyExists ? 1 : 0) + spareCount; 
+      
+      let alertMsg = "OK";
+      if (totalKeys === 0) {
+        alertMsg = "🚨 SEM NENHUMA CHAVE (CADEADO PERDIDO)";
+      } else if (!mainKeyExists && spareCount > 0) {
+        alertMsg = "⚠️ USANDO RESERVA COMO PRINCIPAL";
+      } else if (spareCount === 0) {
+        alertMsg = "⚠️ SEM CHAVE RESERVA";
       }
 
       return {
@@ -126,7 +143,7 @@ export default function ArmariosPage() {
         "Chave Principal": mainKeyStatus,
         "Qtd Reservas": spareCount,
         "Total Existente": totalKeys,
-        "Alerta": (locker.has_key && spareCount === 0) ? "SEM CHAVE NA EMPRESA" : "OK"
+        "Alerta": alertMsg
       };
     });
 
@@ -185,8 +202,13 @@ export default function ArmariosPage() {
                     Nº {locker.number.includes(" - ") ? locker.number.split(" - ")[1].trim() : locker.number}
                   </div>
                   <div className="flex items-center gap-1">
-                    {locker.has_key && (locker.spare_keys || 0) === 0 && (
-                      <div title="Sem chave na empresa!" className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-red-600 shadow-inner animate-pulse">
+                    {locker.has_key && !locker.employee_id && (
+                      <div title="Chave principal perdida!" className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-red-600 shadow-inner animate-pulse">
+                        <AlertTriangle className="h-3 w-3" />
+                      </div>
+                    )}
+                    {locker.has_key && locker.employee_id && (locker.spare_keys || 0) === 0 && (
+                      <div title="Sem chave na empresa!" className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-600 shadow-inner animate-pulse">
                         <AlertTriangle className="h-3 w-3" />
                       </div>
                     )}
@@ -279,13 +301,13 @@ export default function ArmariosPage() {
                   </div>
                   <div className="flex-1">
                     <Label className="text-sm">Chave Principal</Label>
-                    <p className="text-xs text-muted-foreground mt-0.5">Com colaborador?</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{employeeId ? "Com colaborador?" : "A chave sumiu / foi perdida?"}</p>
                   </div>
                   <Button 
                     type="button"
                     size="sm"
-                    variant={hasKey ? "default" : "outline"}
-                    className={hasKey ? "bg-emerald-600 hover:bg-emerald-700 h-8" : "h-8"}
+                    variant={hasKey ? (employeeId ? "default" : "destructive") : "outline"}
+                    className={hasKey ? (employeeId ? "bg-emerald-600 hover:bg-emerald-700 h-8" : "h-8") : "h-8"}
                     onClick={() => setHasKey(!hasKey)}
                   >
                     {hasKey ? "Sim" : "Não"}
