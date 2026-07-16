@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Plus, Search, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, CheckCircle2, XCircle, TrendingUp, Package } from "lucide-react";
+import { Edit3, Plus, Search, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, CheckCircle2, XCircle, TrendingUp, Package, Activity, Download, AlertCircle, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";

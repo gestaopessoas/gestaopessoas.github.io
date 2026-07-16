@@ -77,7 +77,7 @@ export default function OnboardingPage() {
     const admission = new Date(e.admission_date);
     const diffDays = Math.floor((today.getTime() - admission.getTime()) / (1000 * 60 * 60 * 24));
     
-    const status = e.onboarding_status || {};
+    const status = (e.onboarding_status || {}) as Record<OnboardingTask, boolean>;
     const isCompleted = TASKS.every(t => status[t.id]);
     
     return diffDays <= 60 || !isCompleted;
