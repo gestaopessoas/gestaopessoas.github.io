@@ -282,6 +282,7 @@ export default function ColaboradoresPage() {
           <form onSubmit={save} className="mt-4">
             <Section title="Identificação">
               <Field label="Nome completo *" span><Input required value={form.name} onChange={(e) => update("name", e.target.value)} /></Field>
+              <Field label="Matrícula"><Input value={form.registration_number} onChange={(e) => update("registration_number", e.target.value)} /></Field>
               <Field label="CPF"><Input value={form.cpf} onChange={(e) => update("cpf", e.target.value)} /></Field>
               <Field label="RG"><Input value={form.rg} onChange={(e) => update("rg", e.target.value)} /></Field>
               <Field label="Nascimento"><Input type="date" value={form.birthday} onChange={(e) => update("birthday", e.target.value)} /></Field>
@@ -355,6 +356,9 @@ export default function ColaboradoresPage() {
                           </span>
                         )}
                       </div>
+                      {employee.registration_number && (
+                        <div className="text-xs text-muted-foreground mt-0.5">Matrícula: {employee.registration_number}</div>
+                      )}
                       <div className="text-xs text-muted-foreground">{String(employee.email_corporate ?? employee.email_personal ?? "")}</div>
                     </td>
                     <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
