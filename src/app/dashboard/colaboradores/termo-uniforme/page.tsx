@@ -88,7 +88,7 @@ function TermoUniformeContent() {
         </div>
 
         <div className="mt-16 flex flex-col items-center">
-          <p className="mb-8 text-center">Pelotas, ____ de __________________ de ______</p>
+          <p className="mb-8 text-center">Pelotas, {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
           <div className="w-96 border-t border-black mb-2"></div>
           <p className="font-semibold text-center">{data.employee.name}</p>
           <p className="text-sm text-center">Assinatura do Colaborador</p>

@@ -41,14 +41,14 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-background print:h-auto print:block print:bg-transparent">
       {/* Sidebar - fixed on desktop */}
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible print:block">
         {/* Sticky Header */}
-        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-6 backdrop-blur">
+        <header className="print:hidden sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-6 backdrop-blur">
           {/* Breadcrumbs Placeholder */}
           <div className="flex items-center">
             <span className="text-sm font-medium text-muted-foreground">
@@ -69,7 +69,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto bg-muted/10 p-6">
+        <main className="flex-1 overflow-auto bg-muted/10 p-6 print:overflow-visible print:bg-transparent print:p-0">
           <div className="mx-auto max-w-7xl">
             {children}
           </div>
