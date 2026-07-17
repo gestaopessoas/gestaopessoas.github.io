@@ -277,16 +277,15 @@ Resultado Final: ${form.result || "N/C"}
   </div>
 </div>
 <button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
-<script>setTimeout(() => window.print(), 600);<\/script>
 </body>
 </html>`;
 
     const win = window.open('', '_blank');
-    if (win) { win.document.write(html); win.document.close(); }
-  };
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      win.onload = () => win.print();
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
