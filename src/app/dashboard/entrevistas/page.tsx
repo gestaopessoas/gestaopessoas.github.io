@@ -173,6 +173,117 @@ Resultado Final: ${form.result || "N/C"}
     const link = document.createElement("a");
     link.setAttribute("href", url);
     link.setAttribute("download", `Parecer_${form.candidate_name?.replace(/\s+/g, '_') || 'candidato'}.txt`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const printParecer = () => {
+    const candidate = form.candidate_name || 'N/I';
+    const role = form.role || 'N/I';
+    const date = form.interview_date ? new Date(form.interview_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/I';
+    const result = form.result || 'N/C';
+    const resultColor = result === 'Aprovado' ? '#16a34a' : result === 'Reprovado' ? '#dc2626' : '#d97706';
+
+    const fortes = (assessmentForm.strengths || '').split(',').map(s => s.trim()).filter(Boolean);
+    const fracos = (assessmentForm.weaknesses || '').split(',').map(s => s.trim()).filter(Boolean);
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Parecer de Entrevista - ${candidate}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #f8fafc; color: #1e293b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { max-width: 800px; margin: 0 auto; background: #fff; }
+    @media print { body { background: #fff; } .page { max-width: 100%; box-shadow: none; } .no-print { display: none !important; } }
+    @media screen { .page { margin: 32px auto; padding: 0; box-shadow: 0 4px 24px rgba(0,0,0,.10); border-radius: 16px; overflow: hidden; } }
+    .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #fff; padding: 40px 48px 32px; }
+    .header-logo { font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; opacity: .6; margin-bottom: 16px; }
+    .header h1 { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+    .header-sub { font-size: 14px; opacity: .7; }
+    .result-badge { display: inline-block; margin-top: 20px; padding: 6px 18px; border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: .5px; background: ${resultColor}22; color: ${resultColor}; border: 2px solid ${resultColor}55; }
+    .body { padding: 40px 48px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    .info-item label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 4px; }
+    .info-item span { font-size: 15px; font-weight: 500; color: #1e293b; }
+    .section { margin-bottom: 28px; }
+    .section-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #6366f1; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; }
+    .eval-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .eval-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
+    .eval-card label { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 6px; }
+    .eval-card span { font-size: 14px; font-weight: 600; color: #1e293b; }
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tag { padding: 5px 14px; border-radius: 999px; font-size: 13px; font-weight: 500; }
+    .tag-green { background: #dcfce7; color: #15803d; }
+    .tag-orange { background: #ffedd5; color: #c2410c; }
+    .observations { background: #f8fafc; border-left: 4px solid #6366f1; border-radius: 0 8px 8px 0; padding: 18px 20px; font-size: 14px; line-height: 1.8; color: #334155; white-space: pre-wrap; }
+    .footer { background: #f1f5f9; padding: 20px 48px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #94a3b8; }
+    .print-btn { position: fixed; bottom: 32px; right: 32px; background: #6366f1; color: #fff; border: none; border-radius: 12px; padding: 14px 28px; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 16px rgba(99,102,241,.4); display: flex; align-items: center; gap: 8px; }
+    .print-btn:hover { background: #4f46e5; }
+    .psy { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; background: ${assessmentForm.psychological_test === 'Sim' ? '#dcfce7' : '#fee2e2'}; color: ${assessmentForm.psychological_test === 'Sim' ? '#15803d' : '#dc2626'}; }
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="header-logo">Gestão de Pessoas — RH</div>
+    <h1>${candidate}</h1>
+    <div class="header-sub">Parecer de Entrevista · ${role}</div>
+    <div class="result-badge">Resultado: ${result}</div>
+  </div>
+  <div class="body">
+    <div class="info-grid">
+      <div class="info-item"><label>Data da Entrevista</label><span>${date}</span></div>
+      <div class="info-item"><label>Cargo</label><span>${role}</span></div>
+      <div class="info-item"><label>Telefone</label><span>${form.phone || '—'}</span></div>
+      <div class="info-item"><label>E-mail</label><span>${form.email || '—'}</span></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Avaliação</div>
+      <div class="eval-grid">
+        <div class="eval-card"><label>Avaliação Técnica</label><span>${assessmentForm.technical || '—'}</span></div>
+        <div class="eval-card"><label>Comunicação</label><span>${assessmentForm.communication || '—'}</span></div>
+        <div class="eval-card"><label>Fit Cultural</label><span>${assessmentForm.cultural_fit || '—'}</span></div>
+      </div>
+      <div style="margin-top:12px"><label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:6px">Teste Psicológico Realizado</label><span class="psy">${assessmentForm.psychological_test || 'Não Informado'}</span></div>
+    </div>
+
+    ${fortes.length > 0 ? `
+    <div class="section">
+      <div class="section-title">Pontos Fortes</div>
+      <div class="tags">${fortes.map(f => `<span class="tag tag-green">${f}</span>`).join('')}</div>
+    </div>` : ''}
+
+    ${fracos.length > 0 ? `
+    <div class="section">
+      <div class="section-title">Pontos a Desenvolver</div>
+      <div class="tags">${fracos.map(f => `<span class="tag tag-orange">${f}</span>`).join('')}</div>
+    </div>` : ''}
+
+    ${assessmentForm.observations ? `
+    <div class="section">
+      <div class="section-title">Parecer Final</div>
+      <div class="observations">${assessmentForm.observations}</div>
+    </div>` : ''}
+  </div>
+  <div class="footer">
+    <span>Gerado em ${new Date().toLocaleString('pt-BR')}</span>
+    <span>RH · Gestão de Pessoas</span>
+  </div>
+</div>
+<button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+<script>setTimeout(() => window.print(), 600);<\/script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
+  };
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -626,10 +737,15 @@ Resultado Final: ${form.result || "N/C"}
 
               <div className="flex justify-between items-center gap-2 pt-4 border-t mt-auto shrink-0">
                 {editingId && activeTab === "avaliacao" ? (
-                  <Button type="button" variant="secondary" onClick={exportParecer} className="gap-2">
-                    <FileText className="h-4 w-4" />
-                    Exportar Parecer
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="secondary" onClick={exportParecer} className="gap-2">
+                      <FileText className="h-4 w-4" />
+                      Exportar .txt
+                    </Button>
+                    <Button type="button" variant="outline" onClick={printParecer} className="gap-2 text-primary border-primary/50 hover:bg-primary/10">
+                      🖨️ Imprimir / PDF
+                    </Button>
+                  </div>
                 ) : <div />}
                 <div className="flex gap-2">
                   <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
