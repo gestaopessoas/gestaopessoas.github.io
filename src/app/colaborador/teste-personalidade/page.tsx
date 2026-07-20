@@ -50,12 +50,12 @@ function TestContent() {
       const supabase = createClient();
       
       // Check session
-      const { data: sessionData, error: sessErr } = await supabase
-        .from("candidate_big_five_results")
-        .select("*")
-        .eq("id", sessionId)
+      const { data: sessData, error: sessErr } = await supabase
+        .rpc("get_bfi_session", { session_id: sessionId })
         .single();
         
+      const sessionData = sessData as any;
+         
       if (sessErr || !sessionData) {
         setSessionError("Sessão não encontrada ou link inválido.");
         setLoading(false);
@@ -101,19 +101,26 @@ function TestContent() {
     setSaving(true);
     
     const supabase = createClient();
-    const { data: updatedData, error: updateError } = await supabase
+    const { error: updateError } = await supabase
       .from("candidate_big_five_results")
       .update({ raw_answers: answers })
-      .eq("id", sessionId)
-      .select()
-      .single();
+      .eq("id", sessionId);
       
-    setSaving(false);
-    
     if (updateError) {
+      setSaving(false);
       setError("Houve um erro ao salvar suas respostas. Tente novamente.");
     } else {
-      setResults(updatedData);
+      // Fetch the updated scores via the secure RPC function
+      const { data: updatedData, error: fetchError } = await supabase
+        .rpc("get_bfi_session", { session_id: sessionId })
+        .single();
+        
+      setSaving(false);
+      if (fetchError || !updatedData) {
+        setError("Erro ao carregar os resultados calculados.");
+      } else {
+        setResults(updatedData);
+      }
       setCompleted(true);
     }
   };
