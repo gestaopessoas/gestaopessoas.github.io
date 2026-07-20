@@ -808,6 +808,7 @@ function BfiBar({ label, score }: { label: string, score: number }) {
 function EmployeePersonality({ employeeId }: { employeeId: string }) {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedReport, setSelectedReport] = useState<any>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -860,12 +861,17 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
                 </span>
               </div>
               {isCompleted ? (
-                <div className="space-y-2">
-                  <BfiBar label="Abertura (O)" score={row.openness_score} />
-                  <BfiBar label="Conscienciosidade (C)" score={row.conscientiousness_score} />
-                  <BfiBar label="Extroversão (E)" score={row.extraversion_score} />
-                  <BfiBar label="Amabilidade (A)" score={row.agreeableness_score} />
-                  <BfiBar label="Neuroticismo (N)" score={row.neuroticism_score} />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <BfiBar label="Abertura (O)" score={row.openness_score} />
+                    <BfiBar label="Conscienciosidade (C)" score={row.conscientiousness_score} />
+                    <BfiBar label="Extroversão (E)" score={row.extraversion_score} />
+                    <BfiBar label="Amabilidade (A)" score={row.agreeableness_score} />
+                    <BfiBar label="Neuroticismo (N)" score={row.neuroticism_score} />
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => setSelectedReport(row)}>
+                    Visualizar Relatório Detalhado
+                  </Button>
                 </div>
               ) : (
                 <div className="text-xs text-muted-foreground flex items-center gap-2">
@@ -881,6 +887,59 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
           );
         })}
       </div>
+      
+      {selectedReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg bg-background p-6 shadow-xl border">
+            <div className="flex justify-between items-center border-b pb-4 mb-6">
+              <h2 className="text-xl font-bold">Relatório Analítico de Perfil (Big Five)</h2>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedReport(null)}>Fechar</Button>
+            </div>
+            
+            <div className="mb-6 bg-muted/20 p-4 rounded-md">
+              <p className="text-sm text-muted-foreground mb-4">Teste realizado em: <strong>{new Date(selectedReport.created_at).toLocaleDateString('pt-BR')}</strong></p>
+              <p className="text-sm leading-relaxed mb-4">Este relatório apresenta o mapeamento da personalidade do colaborador com base no modelo dos Cinco Grandes Fatores (Big Five). Os resultados refletem tendências comportamentais no ambiente de trabalho e não devem ser vistos como determinantes absolutos, mas como ferramentas de desenvolvimento e autoconhecimento.</p>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <div className="flex justify-between items-end mb-1"><span className="font-semibold">Abertura à Experiência (O)</span><span className="font-bold text-primary">{selectedReport.openness_score?.toFixed(1)} / 5.0</span></div>
+                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-2"><div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, ((selectedReport.openness_score - 1) / 4) * 100))}%` }}></div></div>
+                <p className="text-sm text-muted-foreground leading-relaxed">Indica o grau de curiosidade, imaginação e preferência por novidades. Pessoas com pontuação alta costumam ser mais criativas e abertas a novas ideias. Pontuações baixas indicam preferência pela rotina e pelo que é familiar e tradicional.</p>
+              </div>
+              
+              <div>
+                <div className="flex justify-between items-end mb-1"><span className="font-semibold">Conscienciosidade (C)</span><span className="font-bold text-primary">{selectedReport.conscientiousness_score?.toFixed(1)} / 5.0</span></div>
+                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-2"><div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, ((selectedReport.conscientiousness_score - 1) / 4) * 100))}%` }}></div></div>
+                <p className="text-sm text-muted-foreground leading-relaxed">Mede a organização, disciplina e foco em metas. Pontuações altas sugerem alguém metódico, confiável e orientado a resultados. Pontuações baixas indicam maior flexibilidade, espontaneidade e, às vezes, menor foco no planejamento.</p>
+              </div>
+              
+              <div>
+                <div className="flex justify-between items-end mb-1"><span className="font-semibold">Extroversão (E)</span><span className="font-bold text-primary">{selectedReport.extraversion_score?.toFixed(1)} / 5.0</span></div>
+                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-2"><div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, ((selectedReport.extraversion_score - 1) / 4) * 100))}%` }}></div></div>
+                <p className="text-sm text-muted-foreground leading-relaxed">Reflete a energia, sociabilidade e busca por estímulos sociais. Quem pontua alto costuma ser comunicativo e ganha energia interagindo com outros. Quem pontua baixo (introvertidos) tende a ser mais reservado e foca em análises aprofundadas.</p>
+              </div>
+              
+              <div>
+                <div className="flex justify-between items-end mb-1"><span className="font-semibold">Amabilidade (A)</span><span className="font-bold text-primary">{selectedReport.agreeableness_score?.toFixed(1)} / 5.0</span></div>
+                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-2"><div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, ((selectedReport.agreeableness_score - 1) / 4) * 100))}%` }}></div></div>
+                <p className="text-sm text-muted-foreground leading-relaxed">Avalia a tendência à cooperação, empatia e compaixão. Pontuações altas indicam pessoas amigáveis, colaborativas e que evitam conflitos. Pontuações baixas apontam para pessoas mais competitivas, críticas e questionadoras.</p>
+              </div>
+              
+              <div>
+                <div className="flex justify-between items-end mb-1"><span className="font-semibold">Neuroticismo (N)</span><span className="font-bold text-primary">{selectedReport.neuroticism_score?.toFixed(1)} / 5.0</span></div>
+                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-2"><div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, ((selectedReport.neuroticism_score - 1) / 4) * 100))}%` }}></div></div>
+                <p className="text-sm text-muted-foreground leading-relaxed">Indica a sensibilidade ao estresse e a estabilidade emocional. Pontuações altas sugerem maior reatividade emocional, preocupação e ansiedade. Pontuações baixas indicam pessoas calmas, resilientes e emocionalmente estáveis sob pressão.</p>
+              </div>
+            </div>
+            
+            <div className="mt-8 flex justify-end gap-3 print:hidden">
+              <Button variant="outline" onClick={() => setSelectedReport(null)}>Fechar</Button>
+              <Button onClick={() => window.print()}>Imprimir Relatório</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </details>
   );
 }

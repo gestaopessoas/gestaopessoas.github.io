@@ -19,6 +19,7 @@ export default function BigFiveTestPage() {
   const [saving, setSaving] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState("");
+  const [isStarted, setIsStarted] = useState(false);
   
   // Paginating 20 questions per page to not overwhelm the user
   const [currentPage, setCurrentPage] = useState(0);
@@ -116,6 +117,29 @@ export default function BigFiveTestPage() {
             Voltar ao Início
           </Button>
         </section>
+      </main>
+    );
+  }
+
+  if (!isStarted) {
+    return (
+      <main className="min-h-screen bg-muted/30 px-4 py-12 flex items-center justify-center">
+        <div className="w-full max-w-3xl rounded-xl border bg-card p-8 shadow-sm">
+          <h1 className="text-3xl font-bold tracking-tight mb-6 text-center">Instruções para o Mapeamento</h1>
+          <div className="space-y-4 text-muted-foreground mb-8 text-lg leading-relaxed">
+             <p>Bem-vindo(a) ao nosso Mapeamento de Perfil Profissional (metodologia Big Five).</p>
+             <p>Este questionário é composto por 44 afirmações curtas. Para cada afirmação, você deverá indicar o quanto concorda ou discorda que ela descreve você.</p>
+             <ul className="list-disc pl-6 space-y-2">
+               <li><strong>Não existem respostas certas ou erradas.</strong> O objetivo é conhecer o seu estilo natural de ser e trabalhar.</li>
+               <li><strong>Seja o mais sincero(a) possível.</strong> Responda pensando em como você é na maior parte do tempo, e não como gostaria de ser ou como acha que esperam que você seja.</li>
+               <li><strong>Evite pensar demais.</strong> Geralmente, a primeira resposta que vem à mente é a mais autêntica e precisa.</li>
+               <li>O questionário leva em média de 5 a 10 minutos para ser concluído.</li>
+             </ul>
+          </div>
+          <div className="flex justify-center border-t pt-6">
+            <Button size="lg" className="text-lg px-8 py-6 h-auto" onClick={() => setIsStarted(true)}>Compreendi, Iniciar Teste</Button>
+          </div>
+        </div>
       </main>
     );
   }
