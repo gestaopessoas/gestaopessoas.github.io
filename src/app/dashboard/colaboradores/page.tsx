@@ -889,7 +889,7 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
       </div>
       
       <Dialog open={!!selectedReport} onOpenChange={(open) => !open && setSelectedReport(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto print-report-modal">
           <DialogHeader>
             <DialogTitle>Relatório Analítico de Perfil (Big Five)</DialogTitle>
           </DialogHeader>
