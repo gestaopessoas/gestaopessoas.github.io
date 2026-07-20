@@ -950,6 +950,7 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
   const [uniformId, setUniformId] = useState("");
   const [qty, setQty] = useState(1);
   const [notes, setNotes] = useState("");
+  const [deductFromStock, setDeductFromStock] = useState(true);
 
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [selectedDeliveries, setSelectedDeliveries] = useState<Set<string>>(new Set());
@@ -1023,23 +1024,27 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
     });
     
     if (!error) {
-       const item = items.find(i => i.id === uniformId);
-       if (item) {
-         await supabase.from("uniform_items").update({ quantity_in_stock: item.quantity_in_stock - qty }).eq("id", uniformId);
+       if (deductFromStock) {
+         const item = items.find(i => i.id === uniformId);
+         if (item) {
+           await supabase.from("uniform_items").update({ quantity_in_stock: item.quantity_in_stock - qty }).eq("id", uniformId);
+         }
        }
-       setUniformId(""); setQty(1); setNotes("");
+       setUniformId(""); setQty(1); setNotes(""); setDeductFromStock(true);
        load();
     }
   };
 
   const remove = async (id: string, uniformItemId: string, qtyDelivered: number) => {
-    if (!window.confirm("Excluir este registro e devolver ao estoque?")) return;
+    const returnToStock = window.confirm("Excluir este registro. Deseja DEVOLVER esta quantidade ao estoque?");
     const supabase = createClient();
     const { error } = await supabase.from("employee_uniforms").delete().eq("id", id);
     if (!error) {
-       const item = items.find(i => i.id === uniformItemId);
-       if (item) {
-         await supabase.from("uniform_items").update({ quantity_in_stock: item.quantity_in_stock + qtyDelivered }).eq("id", uniformItemId);
+       if (returnToStock) {
+         const item = items.find(i => i.id === uniformItemId);
+         if (item) {
+           await supabase.from("uniform_items").update({ quantity_in_stock: item.quantity_in_stock + qtyDelivered }).eq("id", uniformItemId);
+         }
        }
        load();
     }
@@ -1078,13 +1083,27 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
             <Button type="button" size="icon" variant="ghost" onClick={() => remove(row.id, row.uniform_item_id, row.quantity_delivered)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button>
           </div>
         ))}
-        <div className="grid gap-2 md:flex md:flex-wrap">
+        <div className="grid gap-2 md:flex md:flex-wrap items-center">
           <select value={uniformId} onChange={(e) => setUniformId(e.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm flex-1">
             <option value="">Selecione a peça...</option>
             {items.map(i => <option key={i.id} value={i.id}>{i.name} (Tam: {i.size}) - Estq: {i.quantity_in_stock}</option>)}
           </select>
           <Input type="number" min="1" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="Qtd" className="w-20" />
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anotações" className="flex-1" />
+          
+          <div className="flex items-center gap-2 px-2">
+            <input 
+              type="checkbox" 
+              id="deductStock" 
+              checked={deductFromStock} 
+              onChange={(e) => setDeductFromStock(e.target.checked)} 
+              className="h-4 w-4 rounded border-gray-300" 
+            />
+            <Label htmlFor="deductStock" className="text-xs font-normal cursor-pointer whitespace-nowrap">
+              Abater do estoque
+            </Label>
+          </div>
+
           <Button type="button" variant="outline" onClick={add}>Adicionar</Button>
         </div>
       </div>
