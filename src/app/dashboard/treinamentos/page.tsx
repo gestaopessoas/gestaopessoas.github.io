@@ -9,7 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Users, GraduationCap, CalendarDays, Clock, Pencil } from "lucide-react";
+import { Users, GraduationCap, CalendarDays, Clock, Pencil, Star, Download } from "lucide-react";
+import { generateTrainingReport } from "./report";
+
+type SatisfactionMetrics = {
+  respondents: number;
+  average_score: number;
+  expectations: Record<string, number>;
+  feedback_likes: string[];
+  feedback_improvements: string[];
+};
 
 type TrainingSession = {
   id: string;
@@ -17,6 +26,7 @@ type TrainingSession = {
   training_date: string;
   training_time: string | null;
   participant_count: number | null;
+  satisfaction_metrics: SatisfactionMetrics | null;
 };
 
 const MONTH_LABELS: Record<string, string> = {
@@ -36,7 +46,7 @@ export default function TreinamentosPage() {
   const fetchSessions = async () => {
     const { data } = await supabase
       .from("training_sessions")
-      .select("id, theme, training_date, training_time, participant_count")
+      .select("id, theme, training_date, training_time, participant_count, satisfaction_metrics")
       .order("training_date", { ascending: true });
     setSessions((data as TrainingSession[]) ?? []);
     setLoading(false);
@@ -89,14 +99,27 @@ export default function TreinamentosPage() {
         Object.entries(grouped).map(([monthKey, items]) => (
           <Card key={monthKey}>
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <GraduationCap className="w-4 h-4 text-primary" />
-                {MONTH_LABELS[monthKey] ?? monthKey}
-              </CardTitle>
-              <CardDescription>
-                {items.length} treinamento{items.length > 1 ? "s" : ""} ·{" "}
-                {items.reduce((s, i) => s + (i.participant_count ?? 0), 0)} participações
-              </CardDescription>
+              <div className="flex items-start justify-between w-full">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <GraduationCap className="w-4 h-4 text-primary" />
+                    {MONTH_LABELS[monthKey] ?? monthKey}
+                  </CardTitle>
+                  <CardDescription>
+                    {items.length} treinamento{items.length > 1 ? "s" : ""} ·{" "}
+                    {items.reduce((s, i) => s + (i.participant_count ?? 0), 0)} participações
+                  </CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2"
+                  onClick={() => generateTrainingReport(MONTH_LABELS[monthKey] ?? monthKey, items)}
+                >
+                  <Download className="w-4 h-4" />
+                  Gerar PDF
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -107,13 +130,21 @@ export default function TreinamentosPage() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="font-semibold leading-tight text-sm">{session.theme}</h3>
-                      <button
-                        onClick={() => setEditing({ ...session })}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground shrink-0"
-                        title="Editar"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {session.satisfaction_metrics && (
+                          <div className="flex items-center gap-1 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500 px-1.5 py-0.5 rounded text-xs font-medium">
+                            <Star className="w-3 h-3 fill-current" />
+                            {session.satisfaction_metrics.average_score.toFixed(1)}
+                          </div>
+                        )}
+                        <button
+                          onClick={() => setEditing({ ...session })}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground shrink-0"
+                          title="Editar"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-1 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">
