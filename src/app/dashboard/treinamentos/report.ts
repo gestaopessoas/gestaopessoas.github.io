@@ -1,5 +1,5 @@
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 
 export const generateTrainingReport = (monthLabel: string, sessions: any[]) => {
   const doc = new jsPDF("landscape");
@@ -40,7 +40,7 @@ export const generateTrainingReport = (monthLabel: string, sessions: any[]) => {
     ];
   });
   
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: 55,
     head: [["Tema", "Data", "Duração", "Participantes", "Nota (0-10)", "Avaliações"]],
     body: tableData,
