@@ -3,8 +3,8 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { useState } from "react"
-import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award, Package, CheckSquare } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award, Package, CheckSquare } from "lucide-react"
 import { usePermissions } from "@/hooks/usePermissions"
 import { createClient } from "@/utils/supabase/client"
 
@@ -77,7 +77,22 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {}
+    try {
+      return JSON.parse(localStorage.getItem("sidebar-collapsed-groups") ?? "{}") as Record<string, boolean>
+    } catch {
+      return {}
+    }
+  })
   const { loading, can } = usePermissions()
+
+  useEffect(() => {
+    localStorage.setItem("sidebar-collapsed-groups", JSON.stringify(collapsedGroups))
+  }, [collapsedGroups])
+
+  const toggleGroup = (name: string) =>
+    setCollapsedGroups((prev) => ({ ...prev, [name]: !prev[name] }))
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -107,16 +122,27 @@ export function Sidebar() {
           
           if (groupVisibleItems.length === 0) return null;
 
+          const isGroupCollapsed = !isCollapsed && !!collapsedGroups[group.name]
+
           return (
             <div key={group.name} className="space-y-1">
               {!isCollapsed && (
-                <div className="px-3 mb-2">
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.name}</h3>
-                </div>
+                <button
+                  onClick={() => toggleGroup(group.name)}
+                  className="w-full flex items-center justify-between px-3 mb-1 group/group-header"
+                >
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider group-hover/group-header:text-foreground transition-colors">{group.name}</h3>
+                  <ChevronDown
+                    className={cn(
+                      "h-3 w-3 text-muted-foreground group-hover/group-header:text-foreground transition-all duration-200",
+                      isGroupCollapsed ? "-rotate-90" : "rotate-0"
+                    )}
+                  />
+                </button>
               )}
               {isCollapsed && groupIdx > 0 && <div className="h-px bg-border/50 mx-4 my-4" />}
               
-              {groupVisibleItems.map((item) => {
+              {!isGroupCollapsed && groupVisibleItems.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
                 return (
                   <div key={item.name} className="relative group/nav-item">
