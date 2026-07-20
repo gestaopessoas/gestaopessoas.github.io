@@ -85,8 +85,6 @@ export function Sidebar() {
     router.push("/login")
   }
 
-  const visibleItems = sidebarItems.filter((item) => loading || !item.module || can(item.module, "view"))
-
   return (
     <aside 
       className={cn(
