@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Users, GraduationCap, CalendarDays, Clock, Pencil, Star, Download } from "lucide-react";
+import { Users, GraduationCap, CalendarDays, Clock, Pencil, Star, Download, Upload } from "lucide-react";
 import { generateTrainingReport } from "./report";
+import { parseSatisfactionExcel } from "./excelParser";
 
 type SatisfactionMetrics = {
   respondents: number;
@@ -64,11 +65,27 @@ export default function TreinamentosPage() {
         training_date: editing.training_date,
         training_time: editing.training_time || null,
         participant_count: editing.participant_count ?? null,
+        satisfaction_metrics: editing.satisfaction_metrics,
       })
       .eq("id", editing.id);
     setSaving(false);
     setEditing(null);
     fetchSessions();
+  };
+
+  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editing) return;
+    
+    try {
+      const metrics = await parseSatisfactionExcel(file);
+      setEditing({ ...editing, satisfaction_metrics: metrics });
+      alert("Planilha importada com sucesso! Salve para confirmar.");
+    } catch (err: any) {
+      alert("Erro ao ler planilha: " + err.message);
+    }
+    // reset input
+    e.target.value = '';
   };
 
   const grouped = sessions.reduce<Record<string, TrainingSession[]>>((acc, s) => {
@@ -216,6 +233,26 @@ export default function TreinamentosPage() {
                   value={editing.participant_count ?? ""}
                   onChange={(e) => setEditing({ ...editing, participant_count: e.target.value ? Number(e.target.value) : null })}
                 />
+              </div>
+
+              <div className="space-y-1.5 pt-4 border-t">
+                <Label>Avaliações do Forms (Opcional)</Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    type="file" 
+                    accept=".xlsx" 
+                    className="flex-1"
+                    onChange={handleExcelImport}
+                  />
+                </div>
+                {editing.satisfaction_metrics && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    ✓ {editing.satisfaction_metrics.respondents} respostas lidas (Média: {editing.satisfaction_metrics.average_score.toFixed(1)})
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Exporte o Excel no Microsoft Forms e anexe aqui para importar notas e feedbacks.
+                </p>
               </div>
             </div>
           )}
