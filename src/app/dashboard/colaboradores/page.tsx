@@ -774,6 +774,7 @@ function RelatedRecords({ employeeId }: { employeeId: string }) {
       </Related>
       
       <EmployeeUniforms employeeId={employeeId} />
+      <EmployeePersonality employeeId={employeeId} />
       
       <Related title="Férias" rows={vacations} render={(row) => `${row.start_date} até ${row.end_date} · ${row.status || "Programada"}`} onRemove={(id) => remove("vacations", id)}>
         <Input type="date" value={vacation.start_date} onChange={(e) => setVacation({ ...vacation, start_date: e.target.value })} /><Input type="date" value={vacation.end_date} onChange={(e) => setVacation({ ...vacation, end_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (vacation.start_date && vacation.end_date) { void add("vacations", { ...vacation, status: "Programada" }); setVacation({ start_date: "", end_date: "" }); } }}>Adicionar</Button>
@@ -791,12 +792,148 @@ function Field({ label, span, children }: { label: string; span?: boolean; child
 function Select({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) { return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
 function Related({ title, icon: Icon, rows, render, onRemove, children }: { title: string; icon?: React.ElementType; rows: RelatedRow[]; render: (row: RelatedRow) => string; onRemove: (id: string) => void; children: React.ReactNode }) { return <details className="rounded-md border p-3"><summary className="cursor-pointer font-medium flex items-center gap-2">{Icon && <Icon className="w-4 h-4 text-muted-foreground" />} {title} ({rows.length})</summary><div className="mt-3 space-y-2">{rows.map((row) => <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm"><span>{render(row)}</span><Button type="button" size="icon" variant="ghost" onClick={() => onRemove(row.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button></div>)}<div className="grid gap-2 md:flex md:flex-wrap">{children}</div></div></details>; }
 
+function BfiBar({ label, score }: { label: string, score: number }) {
+  const percent = ((score - 1) / 4) * 100;
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-40 truncate text-xs sm:text-sm">{label}</span>
+      <div className="flex-1 h-2 sm:h-3 bg-secondary rounded-full overflow-hidden">
+        <div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}></div>
+      </div>
+      <span className="w-8 text-right font-medium text-xs sm:text-sm">{score?.toFixed(1) || '-'}</span>
+    </div>
+  );
+}
+
+function EmployeePersonality({ employeeId }: { employeeId: string }) {
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const supabase = createClient();
+    const { data } = await supabase.from("candidate_big_five_results").select("*").eq("employee_id", employeeId).order("created_at", { ascending: false });
+    setHistory(data || []);
+    setLoading(false);
+  }, [employeeId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const generateLink = async () => {
+    const supabase = createClient();
+    const { data, error } = await supabase.from("candidate_big_five_results").insert({ employee_id: employeeId }).select("id").single();
+    if (error) {
+      alert("Erro ao gerar link: " + error.message);
+      return;
+    }
+    const link = `${window.location.origin}/colaborador/teste-personalidade?session=${data.id}`;
+    navigator.clipboard.writeText(link);
+    alert("Link copiado para a área de transferência!\n\nEnvie este link para o colaborador preencher o teste de personalidade (BFI). O link é de uso único.");
+    load();
+  };
+
+  return (
+    <details className="rounded-md border p-3">
+      <summary className="cursor-pointer font-medium flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Activity className="w-4 h-4 text-muted-foreground" /> Teste de Personalidade (BFI) ({history.length})
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
+          onClick={(e) => { e.preventDefault(); generateLink(); }}
+        >
+          <Plus className="w-3 h-3 mr-1" /> Gerar Novo Link
+        </Button>
+      </summary>
+      <div className="mt-3 space-y-4">
+        {loading ? <div className="text-sm text-muted-foreground">Carregando...</div> : history.length === 0 ? <div className="text-sm italic text-muted-foreground">Nenhum teste registrado para este colaborador.</div> : history.map((row) => {
+          const isCompleted = row.raw_answers && Object.keys(row.raw_answers).length > 0;
+          return (
+            <div key={row.id} className="rounded border bg-muted/20 p-4 text-sm">
+              <div className="flex justify-between items-center mb-3">
+                <span className="font-semibold">{new Date(row.created_at).toLocaleDateString('pt-BR')}</span>
+                <span className={`px-2 py-1 text-xs rounded-full ${isCompleted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                  {isCompleted ? 'Concluído' : 'Pendente'}
+                </span>
+              </div>
+              {isCompleted ? (
+                <div className="space-y-2">
+                  <BfiBar label="Abertura (O)" score={row.openness_score} />
+                  <BfiBar label="Conscienciosidade (C)" score={row.conscientiousness_score} />
+                  <BfiBar label="Extroversão (E)" score={row.extraversion_score} />
+                  <BfiBar label="Amabilidade (A)" score={row.agreeableness_score} />
+                  <BfiBar label="Neuroticismo (N)" score={row.neuroticism_score} />
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  <span>O colaborador ainda não respondeu este teste.</span>
+                  <Button type="button" variant="link" className="h-auto p-0 text-xs" onClick={() => {
+                    const link = `${window.location.origin}/colaborador/teste-personalidade?session=${row.id}`;
+                    navigator.clipboard.writeText(link);
+                    alert("Link copiado!");
+                  }}>Copiar link novamente</Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
 function EmployeeUniforms({ employeeId }: { employeeId: string }) {
   const [items, setItems] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [uniformId, setUniformId] = useState("");
   const [qty, setQty] = useState(1);
   const [notes, setNotes] = useState("");
+
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [selectedDeliveries, setSelectedDeliveries] = useState<Set<string>>(new Set());
+  const [isFirstPiece, setIsFirstPiece] = useState(true);
+  const [applyCredit, setApplyCredit] = useState(false);
+  const [installments, setInstallments] = useState(1);
+
+  const getPrice = (name: string) => {
+    const lower = name.toLowerCase();
+    if (lower.includes("camisa social")) return 144;
+    if (lower.includes("blusão") || lower.includes("blusao")) return 208;
+    if (lower.includes("jaqueta")) return 226;
+    if (lower.includes("polo")) return 76;
+    return 0;
+  };
+
+  const calculateTotal = () => {
+    let total = 0;
+    let nonJacketTotal = 0;
+    
+    deliveries.filter(d => selectedDeliveries.has(d.id)).forEach(d => {
+      const price = getPrice(d.uniform_items?.name || "");
+      const itemTotal = price * d.quantity_delivered;
+      total += itemTotal;
+      if (!(d.uniform_items?.name || "").toLowerCase().includes("jaqueta")) {
+        nonJacketTotal += itemTotal;
+      }
+    });
+
+    if (applyCredit && nonJacketTotal > 0) {
+      const discount = Math.min(150, nonJacketTotal);
+      total -= discount;
+    }
+    
+    return Math.max(0, total);
+  };
+
+  const toggleDelivery = (id: string) => {
+    const next = new Set(selectedDeliveries);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedDeliveries(next);
+  };
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -806,6 +943,12 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
     ]);
     setItems((i.data ?? []));
     setDeliveries((d.data ?? []));
+    if (d.data) {
+       setSelectedDeliveries(prev => {
+          if (prev.size === 0 && d.data.length > 0) return new Set(d.data.map(x => x.id));
+          return prev;
+       });
+    }
   }, [employeeId]);
 
   useEffect(() => { load(); }, [load]);
@@ -849,12 +992,19 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
         <div className="flex items-center gap-2">
           <Package className="w-4 h-4 text-muted-foreground" /> Uniformes Entregues ({deliveries.length})
         </div>
-        <Button 
-          type="button" 
-          size="sm" 
-          variant="outline" 
-          className="h-7 text-xs" 
-          onClick={(e) => { e.preventDefault(); window.open(`/dashboard/colaboradores/termo-uniforme?id=${employeeId}`, '_blank'); }}
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
+          onClick={(e) => { 
+            e.preventDefault(); 
+            if (selectedDeliveries.size === 0) {
+              alert("Selecione pelo menos um item para imprimir.");
+              return;
+            }
+            setIsPrintModalOpen(true); 
+          }}
         >
           <Printer className="w-3 h-3 mr-1" /> Imprimir Termo
         </Button>
@@ -862,7 +1012,10 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
       <div className="mt-3 space-y-2">
         {deliveries.map((row) => (
           <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm">
-            <span>{row.quantity_delivered}x {row.uniform_items?.name} ({row.uniform_items?.size}) &middot; {new Date(row.delivered_at).toLocaleDateString()} {row.notes ? '- ' + row.notes : ''}</span>
+            <div className="flex items-center gap-3">
+              <input type="checkbox" checked={selectedDeliveries.has(row.id)} onChange={() => toggleDelivery(row.id)} className="h-4 w-4 rounded border-gray-300" title="Incluir no termo" />
+              <span>{row.quantity_delivered}x {row.uniform_items?.name} ({row.uniform_items?.size}) &middot; {new Date(row.delivered_at).toLocaleDateString()} {row.notes ? '- ' + row.notes : ''}</span>
+            </div>
             <Button type="button" size="icon" variant="ghost" onClick={() => remove(row.id, row.uniform_item_id, row.quantity_delivered)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button>
           </div>
         ))}
@@ -876,6 +1029,50 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
           <Button type="button" variant="outline" onClick={add}>Adicionar</Button>
         </div>
       </div>
+      <Dialog open={isPrintModalOpen} onOpenChange={setIsPrintModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configurar Termo de Uniforme</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center space-x-2">
+              <input type="checkbox" id="firstPiece" checked={isFirstPiece} onChange={(e) => setIsFirstPiece(e.target.checked)} className="h-4 w-4" />
+              <Label htmlFor="firstPiece">Primeira Peça / Entrega Gratuita (Termo Padrão)</Label>
+            </div>
+
+            {!isFirstPiece && (
+              <div className="pl-6 space-y-4 border-l-2 border-muted mt-2">
+                <div className="text-sm text-muted-foreground mb-2">Configure os valores para o termo de compra. Peças sem valor mapeado não serão cobradas.</div>
+                <div className="flex items-center space-x-2">
+                  <input type="checkbox" id="applyCredit" checked={applyCredit} onChange={(e) => setApplyCredit(e.target.checked)} className="h-4 w-4" />
+                  <Label htmlFor="applyCredit">Aplicar crédito de R$ 150,00 (Não aplicável à Jaqueta)</Label>
+                </div>
+                <div>
+                  <Label>Parcelas para desconto em folha:</Label>
+                  <select value={installments} onChange={(e) => setInstallments(Number(e.target.value))} className="h-9 w-full rounded-md border mt-1 px-3 text-sm">
+                    <option value={1}>1x</option>
+                    <option value={2}>2x</option>
+                    <option value={3}>3x</option>
+                  </select>
+                </div>
+                <div className="p-3 bg-muted rounded-md text-sm">
+                  <strong>Valor Total a Descontar: </strong> R$ {calculateTotal().toFixed(2).replace('.', ',')}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPrintModalOpen(false)}>Cancelar</Button>
+            <Button onClick={() => {
+              const itemsParam = Array.from(selectedDeliveries).join(',');
+              const type = isFirstPiece ? 'padrao' : 'compra';
+              const price = calculateTotal();
+              window.open(`/dashboard/colaboradores/termo-uniforme?id=${employeeId}&items=${itemsParam}&type=${type}&price=${price}&installments=${installments}`, '_blank');
+              setIsPrintModalOpen(false);
+            }}>Gerar Termo</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </details>
   );
 }

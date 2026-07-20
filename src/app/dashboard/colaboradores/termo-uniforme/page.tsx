@@ -7,6 +7,10 @@ import { useSearchParams } from "next/navigation";
 function TermoUniformeContent() {
   const searchParams = useSearchParams();
   const employeeId = searchParams.get("id");
+  const itemsParam = searchParams.get("items");
+  const typeParam = searchParams.get("type");
+  const priceParam = searchParams.get("price");
+  const installmentsParam = searchParams.get("installments");
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
@@ -17,7 +21,12 @@ function TermoUniformeContent() {
         supabase.from("employees").select("*").eq("id", employeeId).single(),
         supabase.from("employee_uniforms").select("*, uniform_items(name, size)").eq("employee_id", employeeId).order("delivered_at", { ascending: false }),
       ]);
-      setData({ employee: emp.data, uniforms: unis.data });
+      let filteredUnis = unis.data || [];
+      if (itemsParam && itemsParam.trim() !== "") {
+        const itemIds = itemsParam.split(',');
+        filteredUnis = filteredUnis.filter(u => itemIds.includes(u.id));
+      }
+      setData({ employee: emp.data, uniforms: filteredUnis });
     };
     load();
   }, [employeeId]);
@@ -25,6 +34,9 @@ function TermoUniformeContent() {
   if (!employeeId) return <div className="p-8 text-center text-red-500">ID não fornecido.</div>;
   if (!data) return <div className="p-8 text-center">Carregando termo...</div>;
   if (!data.employee) return <div className="p-8 text-center text-red-500">Colaborador não encontrado.</div>;
+
+  const isPurchase = typeParam === "compra";
+  const titleText = isPurchase ? "Termo de Recebimento de Uniforme e Autorização de Desconto" : "Termo de Recebimento de Uniformes e EPIs";
 
   return (
     <div className="bg-white text-black min-h-screen p-8 font-sans max-w-4xl mx-auto">
@@ -36,14 +48,17 @@ function TermoUniformeContent() {
 
       <div className="border-2 border-black p-8">
         <div className="text-center mb-8 border-b-2 border-black pb-4">
-          <h1 className="text-2xl font-bold uppercase tracking-wider">Termo de Recebimento de Uniformes e EPIs</h1>
+          <h1 className="text-2xl font-bold uppercase tracking-wider">{titleText}</h1>
         </div>
 
-        <div className="mb-6 leading-relaxed">
+        <div className="mb-6 leading-relaxed text-justify">
           <p>
             Eu, <strong>{data.employee.name}</strong>, portador(a) do cargo <strong>{data.employee.role || "_________________________"}</strong>,
-            declaro ter recebido da empresa os equipamentos e uniformes abaixo relacionados,
-            em perfeito estado de conservação e funcionamento, para meu uso exclusivo no desempenho de minhas funções.
+            {isPurchase ? (
+              <> declaro ter recebido da empresa as peças adicionais abaixo relacionadas, e <strong>autorizo o desconto em minha folha de pagamento</strong> do valor total de <strong>R$ {Number(priceParam || 0).toFixed(2).replace('.', ',')}</strong>, dividido em <strong>{installmentsParam || 1} parcela(s)</strong>, referente à aquisição destes itens para meu uso exclusivo no desempenho de minhas funções.</>
+            ) : (
+              <> declaro ter recebido da empresa os equipamentos e uniformes abaixo relacionados, em perfeito estado de conservação e funcionamento, para meu uso exclusivo no desempenho de minhas funções.</>
+            )}
           </p>
         </div>
 
