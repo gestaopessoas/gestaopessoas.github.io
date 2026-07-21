@@ -129,8 +129,8 @@
 }
 
 @media print {
-  /* Hide all top-level elements by default */
-  body > * {
+  /* Hide all top-level elements by default ONLY if the print modal is on the screen */
+  body:has(.print-report-modal) > * {
     display: none !important;
   }
   
