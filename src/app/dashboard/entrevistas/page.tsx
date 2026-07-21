@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 type Assessment = {
   psychological_test: string;
+  tests_details?: string;
   technical: string;
   communication: string;
   cultural_fit: string;
@@ -49,6 +50,7 @@ const resultStyle: Record<string, string> = {
 
 const defaultAssessment: Assessment = {
   psychological_test: "Não",
+  tests_details: "",
   technical: "",
   communication: "",
   cultural_fit: "",
@@ -199,13 +201,13 @@ Resultado Final: ${form.result || "N/C"}
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', sans-serif; background: #f8fafc; color: #1e293b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .page { max-width: 800px; margin: 0 auto; background: #fff; }
-    @media print { body { background: #fff; } .page { max-width: 100%; box-shadow: none; } .no-print { display: none !important; } }
+    @media print { body { background: #fff; } .page { max-width: 100%; box-shadow: none; border: none; margin: 0; padding: 0; } .no-print { display: none !important; } }
     @media screen { .page { margin: 32px auto; padding: 0; box-shadow: 0 4px 24px rgba(0,0,0,.10); border-radius: 16px; overflow: hidden; } }
-    .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #fff; padding: 40px 48px 32px; }
-    .header-logo { font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; opacity: .6; margin-bottom: 16px; }
-    .header h1 { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
-    .header-sub { font-size: 14px; opacity: .7; }
-    .result-badge { display: inline-block; margin-top: 20px; padding: 6px 18px; border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: .5px; background: ${resultColor}22; color: ${resultColor}; border: 2px solid ${resultColor}55; }
+    .header { padding: 40px 48px 32px; display: flex; flex-direction: column; align-items: center; text-align: center; border-bottom: 2px solid #e2e8f0; }
+    .header img { max-width: 140px; margin-bottom: 20px; }
+    .header h1 { font-size: 26px; font-weight: 700; margin-bottom: 4px; color: #0f172a; }
+    .header-sub { font-size: 14px; color: #64748b; font-weight: 500; }
+    .result-badge { display: inline-block; margin-top: 20px; padding: 6px 18px; border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: .5px; background: ${resultColor}15; color: ${resultColor}; border: 1.5px solid ${resultColor}40; }
     .body { padding: 40px 48px; }
     .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
     .info-item label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 4px; }
@@ -230,7 +232,7 @@ Resultado Final: ${form.result || "N/C"}
 <body>
 <div class="page">
   <div class="header">
-    <div class="header-logo">Gestão de Pessoas — RH</div>
+    <img src="/logos/SEDE.png" alt="ACPO" />
     <h1>${candidate}</h1>
     <div class="header-sub">Parecer de Entrevista · ${role}</div>
     <div class="result-badge">Resultado: ${result}</div>
@@ -251,6 +253,11 @@ Resultado Final: ${form.result || "N/C"}
         <div class="eval-card"><label>Fit Cultural</label><span>${assessmentForm.cultural_fit || '—'}</span></div>
       </div>
       <div style="margin-top:12px"><label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:6px">Teste Psicológico Realizado</label><span class="psy">${assessmentForm.psychological_test || 'Não Informado'}</span></div>
+      ${assessmentForm.psychological_test === 'Sim' && assessmentForm.tests_details ? `
+      <div style="margin-top:16px">
+        <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:6px">Testes Aplicados e Resultados</label>
+        <div style="font-size: 14px; line-height: 1.6; color: #334155; white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">${assessmentForm.tests_details}</div>
+      </div>` : ''}
     </div>
 
     ${fortes.length > 0 ? `
@@ -633,6 +640,18 @@ Resultado Final: ${form.result || "N/C"}
                         <option value="Sim">Sim</option>
                       </select>
                     </div>
+
+                    {assessmentForm.psychological_test === "Sim" && (
+                      <div className="space-y-1 md:col-span-2">
+                        <Label>Testes Aplicados e Resultados</Label>
+                        <Textarea 
+                          placeholder="Ex: G-36: Percentil 80 (Superior). AC: Percentil 50 (Médio)."
+                          value={assessmentForm.tests_details || ''}
+                          onChange={(e) => setAssessmentForm({ ...assessmentForm, tests_details: e.target.value })}
+                          className="min-h-[80px]"
+                        />
+                      </div>
+                    )}
 
                     <div className="space-y-1">
                       <Label>Avaliação Técnica</Label>
