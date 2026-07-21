@@ -14,7 +14,7 @@ export default function TurnoverPage() {
   useEffect(() => {
     async function fetchData() {
       // We look at employees with INACTIVE status vs ACTIVE status
-      const { data: emps } = await supabase.from('employees').select('id, name, status, dismissed_at, observation');
+      const { data: emps } = await supabase.from('employees').select('id, name, status, dismissed_at, observation, created_at');
       
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
@@ -29,21 +29,19 @@ export default function TurnoverPage() {
         return d >= oneYearAgo;
       });
 
-      const monthStart = startOfMonth(new Date());
-      const monthEnd = endOfMonth(new Date());
-      
-      const ativosNoMes = ativos;
-      const desligadosNoMes = desligados.filter(e => {
-        if (!e.dismissed_at) return false;
-        const d = new Date(e.dismissed_at);
-        return d >= monthStart && d <= monthEnd;
-      });
+      // Filtrar admissões do último ano
+      const admissoesUltimoAno = emps?.filter(e => {
+        if (!e.created_at) return false;
+        const d = new Date(e.created_at);
+        return d >= oneYearAgo;
+      }) || [];
 
       // Headcount do último ano (ativos hoje + desligados no último ano)
       const total = ativos.length + desligadosUltimoAno.length;
       
-      const turnoverRate = (ativosNoMes.length + desligadosNoMes.length) > 0 
-        ? ((desligadosNoMes.length / ((ativosNoMes.length + desligadosNoMes.length + ativosNoMes.length) / 2)) * 100).toFixed(1) 
+      // Turnover = ((Admissões + Demissões) / 2) / Headcount * 100
+      const turnoverRate = total > 0 
+        ? (((admissoesUltimoAno.length + desligadosUltimoAno.length) / 2) / total * 100).toFixed(1) 
         : 0;
 
       setMetrics({ total, desligados: desligadosUltimoAno.length, turnover: Number(turnoverRate), history: desligadosUltimoAno });
@@ -62,23 +60,23 @@ export default function TurnoverPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Headcount Histórico</CardTitle>
+            <CardTitle className="text-sm font-medium">Headcount (12 meses)</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.total}</div>
-            <p className="text-xs text-muted-foreground">Total de matrículas geradas</p>
+            <p className="text-xs text-muted-foreground">Funcionários ativos e recentes</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Saídas</CardTitle>
+            <CardTitle className="text-sm font-medium">Saídas (12 meses)</CardTitle>
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.desligados}</div>
-            <p className="text-xs text-muted-foreground">Desligamentos acumulados</p>
+            <p className="text-xs text-muted-foreground">Desligamentos no último ano</p>
           </CardContent>
         </Card>
 
