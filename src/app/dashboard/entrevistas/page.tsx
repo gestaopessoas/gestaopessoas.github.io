@@ -9,9 +9,24 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 
+type PsychologicalTestInput = {
+  test_name: string;
+  score: string | number;
+  factors?: {
+    N?: string | number;
+    E?: string | number;
+    O?: string | number;
+    A?: string | number;
+    C?: string | number;
+  }
+};
+
 type Assessment = {
   psychological_test: string;
   tests_details?: string;
+  tests_list?: PsychologicalTestInput[];
+  age?: string | number;
+  education?: string;
   technical: string;
   communication: string;
   cultural_fit: string;
@@ -51,6 +66,9 @@ const resultStyle: Record<string, string> = {
 const defaultAssessment: Assessment = {
   psychological_test: "Não",
   tests_details: "",
+  tests_list: [],
+  age: "",
+  education: "Ensino Médio",
   technical: "",
   communication: "",
   cultural_fit: "",
@@ -130,9 +148,66 @@ export default function EntrevistasPage() {
 
   const handleGenerateTestText = async () => {
     setIsGeneratingTest(true);
-    const text = await generateTestText(selectedTest, selectedClass);
-    const currentText = assessmentForm.tests_details ? assessmentForm.tests_details + "\n\n" : "";
-    setAssessmentForm({ ...assessmentForm, tests_details: currentText + text });
+    const supabase = createClient();
+    
+    let combinedResults = "";
+    const list = assessmentForm.tests_list || [];
+    
+    for (const test of list) {
+      if (test.test_name.includes("NEO")) {
+        const factors = test.factors || {};
+        let neoResults = `${test.test_name}:\n`;
+        for (const [f, score] of Object.entries(factors)) {
+          if (!score) continue;
+          const numScore = Number(score);
+          const { data } = await supabase
+            .from('psychological_norms')
+            .select('*')
+            .eq('test_name', test.test_name)
+            .eq('factor', f)
+            .lte('min_score', numScore)
+            .gte('max_score', numScore)
+            .limit(1);
+          const classification = data?.[0]?.classification || "Não classificado (Tabela não encontrada)";
+          neoResults += `- Fator ${f}: Pontuação ${score} -> ${classification}\n`;
+        }
+        combinedResults += neoResults + "\n";
+      } else {
+        if (!test.score) continue;
+        const numScore = Number(test.score);
+        const { data } = await supabase
+          .from('psychological_norms')
+          .select('*')
+          .eq('test_name', test.test_name)
+          .lte('min_score', numScore)
+          .gte('max_score', numScore)
+          .limit(1);
+        
+        const classification = data?.[0]?.classification || "Não classificado (Tabela não encontrada)";
+        combinedResults += `${test.test_name}: Pontuação ${test.score} -> ${classification}\n\n`;
+      }
+    }
+    
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (apiKey && combinedResults.trim() !== "") {
+      const prompt = `O candidato de ${assessmentForm.age || 'idade não informada'} anos, escolaridade ${assessmentForm.education || 'não informada'}, realizou os seguintes testes psicológicos:\n${combinedResults}\nEscreva um parecer psicológico consolidado e profissional, em um parágrafo objetivo, explicando as características do candidato com base nessas classificações. O parecer deve focar estritamente nas classificações (inferior, médio, superior, etc) e no que elas significam.`;
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        const data = await res.json();
+        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+          const text = data.candidates[0].content.parts[0].text;
+          setAssessmentForm({ ...assessmentForm, tests_details: "RESULTADOS DA AVALIAÇÃO:\n" + combinedResults + "\nPARECER INTEGRADO DA IA:\n" + text });
+        }
+      } catch (e) {
+        setAssessmentForm({ ...assessmentForm, tests_details: "Erro ao comunicar com IA. Resultados brutos:\n" + combinedResults });
+      }
+    } else {
+      setAssessmentForm({ ...assessmentForm, tests_details: "Resultados consultados (IA não configurada ou sem testes):\n" + combinedResults });
+    }
     setIsGeneratingTest(false);
   };
 
@@ -701,53 +776,111 @@ Resultado Final: ${form.result || "N/C"}
                       </select>
                     </div>
 
-                    {assessmentForm.psychological_test === "Sim" && (
-                      <div className="space-y-3 md:col-span-2 p-4 bg-muted/30 rounded-lg border border-border/50">
-                        <div className="flex flex-col md:flex-row gap-3">
-                          <div className="flex-1 space-y-1">
-                            <Label>Teste</Label>
-                            <select 
-                              value={selectedTest} 
-                              onChange={e => setSelectedTest(e.target.value)}
-                              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
-                            >
-                              <option value="G36">G36 (Inteligência/Lógico)</option>
-                              <option value="TEALT">TEALT (Atenção Alternada)</option>
-                              <option value="TEADI">TEADI (Atenção Dividida)</option>
-                              <option value="TEACO-FF">TEACO-FF (Atenção Concentrada)</option>
-                              <option value="NEO PI-R">NEO PI-R (Personalidade)</option>
-                              <option value="NEO FFI">NEO FFI (Personalidade)</option>
-                              <option value="Palográfico">Palográfico</option>
-                            </select>
+                                        {assessmentForm.psychological_test === "Sim" && (
+                      <div className="space-y-4 md:col-span-2 p-5 bg-muted/30 rounded-lg border border-border/50">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-base font-semibold">Testes Psicológicos</Label>
+                          <Button type="button" size="sm" variant="outline" onClick={() => setAssessmentForm(p => ({...p, tests_list: [...(p.tests_list || []), { test_name: "G36", score: "" }]}))}>
+                            <Plus className="h-4 w-4 mr-2" /> Adicionar Teste
+                          </Button>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 border-b border-border/50 pb-4">
+                          <div className="space-y-1">
+                            <Label>Idade do Candidato</Label>
+                            <Input type="number" placeholder="Ex: 25" value={assessmentForm.age || ''} onChange={e => setAssessmentForm({...assessmentForm, age: e.target.value})} />
                           </div>
-                          <div className="flex-1 space-y-1">
-                            <Label>Classificação</Label>
-                            <select 
-                              value={selectedClass} 
-                              onChange={e => setSelectedClass(e.target.value)}
-                              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
-                            >
-                              <option value="Superior">Superior</option>
-                              <option value="Médio Superior">Médio Superior</option>
-                              <option value="Médio">Médio</option>
-                              <option value="Médio Inferior">Médio Inferior</option>
-                              <option value="Inferior">Inferior</option>
+                          <div className="space-y-1">
+                            <Label>Escolaridade</Label>
+                            <select value={assessmentForm.education || 'Ensino Médio'} onChange={e => setAssessmentForm({...assessmentForm, education: e.target.value})} className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm">
+                              <option value="Ensino Fundamental">Ensino Fundamental</option>
+                              <option value="Ensino Médio">Ensino Médio</option>
+                              <option value="Ensino Superior">Ensino Superior</option>
+                              <option value="Pós-graduação">Pós-graduação</option>
                             </select>
-                          </div>
-                          <div className="flex items-end">
-                            <Button type="button" onClick={handleGenerateTestText} disabled={isGeneratingTest} className="w-full">
-                              {isGeneratingTest ? "Gerando..." : "Gerar Texto"}
-                            </Button>
                           </div>
                         </div>
 
+                        <div className="space-y-3">
+                          {(assessmentForm.tests_list || []).map((t, index) => {
+                            const isNeo = t.test_name.includes("NEO");
+                            return (
+                            <div key={index} className="flex flex-col space-y-3 p-3 border border-border/50 bg-background rounded-md relative">
+                              <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100" onClick={() => {
+                                const list = [...(assessmentForm.tests_list || [])];
+                                list.splice(index, 1);
+                                setAssessmentForm(p => ({...p, tests_list: list}));
+                              }}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                              <div className="flex flex-col md:flex-row gap-3 pr-8">
+                                <div className="flex-1 space-y-1">
+                                  <Label>Nome do Teste</Label>
+                                  <select value={t.test_name} onChange={e => {
+                                      const list = [...(assessmentForm.tests_list || [])];
+                                      list[index] = { ...list[index], test_name: e.target.value };
+                                      if (e.target.value.includes("NEO")) list[index].factors = {N:"", E:"", O:"", A:"", C:""};
+                                      setAssessmentForm(p => ({...p, tests_list: list}));
+                                    }}
+                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm">
+                                    <option value="G36">G36 (Inteligência/Lógico)</option>
+                                    <option value="TEALT">TEALT (Atenção Alternada)</option>
+                                    <option value="TEADI">TEADI (Atenção Dividida)</option>
+                                    <option value="TEACO-FF">TEACO-FF (Atenção Concentrada)</option>
+                                    <option value="NEO PI-R">NEO PI-R (Personalidade)</option>
+                                    <option value="NEO FFI">NEO FFI (Personalidade)</option>
+                                    <option value="Palográfico">Palográfico</option>
+                                  </select>
+                                </div>
+                                {!isNeo && (
+                                  <div className="flex-1 space-y-1">
+                                    <Label>Pontuação (Acertos)</Label>
+                                    <Input type="number" placeholder="Ex: 45" value={t.score} onChange={e => {
+                                      const list = [...(assessmentForm.tests_list || [])];
+                                      list[index].score = e.target.value;
+                                      setAssessmentForm(p => ({...p, tests_list: list}));
+                                    }} />
+                                  </div>
+                                )}
+                              </div>
+                              {isNeo && (
+                                <div className="grid grid-cols-5 gap-2 mt-2 pt-2 border-t border-border/30">
+                                  {["N", "E", "O", "A", "C"].map(f => (
+                                    <div key={f} className="space-y-1">
+                                      <Label title={f === 'N' ? 'Neuroticismo' : f === 'E' ? 'Extroversão' : f === 'O' ? 'Abertura' : f === 'A' ? 'Amabilidade' : 'Conscienciosidade'} className="cursor-help">Fator {f}</Label>
+                                      <Input type="number" placeholder="0" value={t.factors?.[f as keyof typeof t.factors] || ''} onChange={e => {
+                                        const list = [...(assessmentForm.tests_list || [])];
+                                        if(!list[index].factors) list[index].factors = {};
+                                        // @ts-ignore
+                                        list[index].factors[f] = e.target.value;
+                                        setAssessmentForm(p => ({...p, tests_list: list}));
+                                      }} className="h-8 px-2" />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )})}
+                          {(assessmentForm.tests_list || []).length === 0 && (
+                            <div className="text-sm text-muted-foreground text-center py-4 border-2 border-dashed rounded-md">
+                              Nenhum teste adicionado. Clique no botão acima para adicionar.
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-end pt-2">
+                          <Button type="button" onClick={handleGenerateTestText} disabled={isGeneratingTest || (assessmentForm.tests_list || []).length === 0} className="w-full font-medium">
+                            {isGeneratingTest ? "Calculando e Gerando Parecer..." : "Calcular Classificação & Gerar Parecer (IA)"}
+                          </Button>
+                        </div>
+
                         <div className="space-y-1 pt-2">
-                          <Label>Testes Aplicados e Resultados</Label>
+                          <Label>Resultado Final dos Testes (Gerado)</Label>
                           <Textarea 
-                            placeholder="Ex: G-36: Percentil 80 (Superior). AC: Percentil 50 (Médio)."
+                            placeholder="O parecer detalhado aparecerá aqui após o cálculo..."
                             value={assessmentForm.tests_details || ''}
                             onChange={(e) => setAssessmentForm({ ...assessmentForm, tests_details: e.target.value })}
-                            className="min-h-[100px]"
+                            className="min-h-[120px]"
                           />
                         </div>
                       </div>
