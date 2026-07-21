@@ -74,7 +74,9 @@ export default function AnalyticsPage() {
 
   const requestStatus = countBy(requests.map((item) => item.status || "Sem status"));
   const applicationStatus = countBy(applications.map((item) => item.status || "Sem status"));
-  const units = countBy(employees.map((item) => item.unit || item.cost_center || "Sem alocação"));
+  
+  const activeForUnits = employees.filter((item) => item.status !== "Inativo" && item.status !== "Desligado");
+  const units = countBy(activeForUnits.map((item) => item.unit || item.cost_center || "Sem alocação"));
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -100,7 +102,7 @@ export default function AnalyticsPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           <StatusCard title="Solicitações por status" description={`${metrics.criticalRequests} urgentes/altas`} data={requestStatus} />
           <StatusCard title="Funil de candidaturas" description={`${applications.length} candidaturas`} data={applicationStatus} />
-          <StatusCard title="Headcount por alocação" description={`${employees.length} registros`} data={units} limit={8} />
+          <StatusCard title="Headcount por alocação" description={`${activeForUnits.length} colaboradores ativos`} data={units} limit={8} />
         </div>
 
         <Card>
