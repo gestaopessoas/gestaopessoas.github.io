@@ -59,6 +59,53 @@ const defaultAssessment: Assessment = {
   observations: "",
 };
 
+async function generateTestText(testName: string, classification: string): Promise<string> {
+  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  const prompt = `Escreva um parágrafo curto e profissional de parecer psicológico para um candidato de emprego. O teste realizado foi '${testName}' e o resultado obtido foi '${classification}'. Não invente características adicionais, apenas explique o que esse resultado significa nesse teste específico em 2 a 3 linhas de forma objetiva.`;
+
+  if (apiKey) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+        return data.candidates[0].content.parts[0].text;
+      }
+    } catch (e) {
+      console.error("Erro na API do Gemini, usando fallback:", e);
+    }
+  }
+
+  const levels: any = {
+    "Superior": "acima da média, demonstrando excelente capacidade",
+    "Médio Superior": "ligeiramente acima da média, demonstrando boa capacidade",
+    "Médio": "dentro do esperado para a população geral, demonstrando capacidade adequada",
+    "Médio Inferior": "abaixo da média, sugerindo alguma dificuldade",
+    "Inferior": "significativamente abaixo da média, indicando dificuldade acentuada"
+  };
+
+  const levelText = levels[classification] || "com desempenho compatível com a classificação " + classification;
+
+  switch (testName) {
+    case "G36":
+      return `No teste G36 (Raciocínio Lógico e Inteligência Não-Verbal), o candidato obteve classificação ${classification}. O resultado indica que o mesmo apresenta uma capacidade de raciocínio abstrato e resolução de problemas ${levelText}.`;
+    case "TEALT":
+      return `Na avaliação pelo TEALT (Teste de Atenção Alternada), o candidato apresentou classificação ${classification}. Isto sugere que sua capacidade de alternar o foco entre diferentes tarefas ou estímulos está ${levelText}.`;
+    case "TEADI":
+      return `No TEADI (Teste de Atenção Dividida), o candidato alcançou a classificação ${classification}. O resultado aponta que sua habilidade para dividir a atenção em mais de um estímulo simultâneo está ${levelText}.`;
+    case "TEACO-FF":
+      return `Submetido ao TEACO-FF (Teste de Atenção Concentrada), o candidato demonstrou classificação ${classification}. Evidencia-se que sua aptidão para manter o foco em tarefas sob pressão ou rotineiras encontra-se ${levelText}.`;
+    case "NEO PI-R":
+    case "NEO FFI":
+      return `O inventário de personalidade ${testName} indicou que o candidato apresenta traços predominantemente em nível ${classification} nos fatores avaliados, sugerindo características comportamentais que requerem análise de adequação à vaga.`;
+    default:
+      return `No teste ${testName}, o candidato apresentou classificação ${classification}, indicando um desempenho compatível com este nível de aptidão.`;
+  }
+}
+
 export default function EntrevistasPage() {
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [query, setQuery] = useState("");
@@ -75,6 +122,19 @@ export default function EntrevistasPage() {
     candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C"
   });
   const [assessmentForm, setAssessmentForm] = useState<Assessment>(defaultAssessment);
+  
+  // Test generation states
+  const [selectedTest, setSelectedTest] = useState("G36");
+  const [selectedClass, setSelectedClass] = useState("Médio");
+  const [isGeneratingTest, setIsGeneratingTest] = useState(false);
+
+  const handleGenerateTestText = async () => {
+    setIsGeneratingTest(true);
+    const text = await generateTestText(selectedTest, selectedClass);
+    const currentText = assessmentForm.tests_details ? assessmentForm.tests_details + "\n\n" : "";
+    setAssessmentForm({ ...assessmentForm, tests_details: currentText + text });
+    setIsGeneratingTest(false);
+  };
 
   const loadInterviews = async () => {
     setLoading(true);
@@ -642,14 +702,54 @@ Resultado Final: ${form.result || "N/C"}
                     </div>
 
                     {assessmentForm.psychological_test === "Sim" && (
-                      <div className="space-y-1 md:col-span-2">
-                        <Label>Testes Aplicados e Resultados</Label>
-                        <Textarea 
-                          placeholder="Ex: G-36: Percentil 80 (Superior). AC: Percentil 50 (Médio)."
-                          value={assessmentForm.tests_details || ''}
-                          onChange={(e) => setAssessmentForm({ ...assessmentForm, tests_details: e.target.value })}
-                          className="min-h-[80px]"
-                        />
+                      <div className="space-y-3 md:col-span-2 p-4 bg-muted/30 rounded-lg border border-border/50">
+                        <div className="flex flex-col md:flex-row gap-3">
+                          <div className="flex-1 space-y-1">
+                            <Label>Teste</Label>
+                            <select 
+                              value={selectedTest} 
+                              onChange={e => setSelectedTest(e.target.value)}
+                              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                            >
+                              <option value="G36">G36 (Inteligência/Lógico)</option>
+                              <option value="TEALT">TEALT (Atenção Alternada)</option>
+                              <option value="TEADI">TEADI (Atenção Dividida)</option>
+                              <option value="TEACO-FF">TEACO-FF (Atenção Concentrada)</option>
+                              <option value="NEO PI-R">NEO PI-R (Personalidade)</option>
+                              <option value="NEO FFI">NEO FFI (Personalidade)</option>
+                              <option value="Palográfico">Palográfico</option>
+                            </select>
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <Label>Classificação</Label>
+                            <select 
+                              value={selectedClass} 
+                              onChange={e => setSelectedClass(e.target.value)}
+                              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                            >
+                              <option value="Superior">Superior</option>
+                              <option value="Médio Superior">Médio Superior</option>
+                              <option value="Médio">Médio</option>
+                              <option value="Médio Inferior">Médio Inferior</option>
+                              <option value="Inferior">Inferior</option>
+                            </select>
+                          </div>
+                          <div className="flex items-end">
+                            <Button type="button" onClick={handleGenerateTestText} disabled={isGeneratingTest} className="w-full">
+                              {isGeneratingTest ? "Gerando..." : "Gerar Texto"}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1 pt-2">
+                          <Label>Testes Aplicados e Resultados</Label>
+                          <Textarea 
+                            placeholder="Ex: G-36: Percentil 80 (Superior). AC: Percentil 50 (Médio)."
+                            value={assessmentForm.tests_details || ''}
+                            onChange={(e) => setAssessmentForm({ ...assessmentForm, tests_details: e.target.value })}
+                            className="min-h-[100px]"
+                          />
+                        </div>
                       </div>
                     )}
 
