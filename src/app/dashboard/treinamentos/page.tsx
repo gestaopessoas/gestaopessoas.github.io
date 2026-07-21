@@ -57,17 +57,33 @@ export default function TreinamentosPage() {
 
   const handleSave = async () => {
     if (!editing) return;
+    if (!editing.theme || !editing.training_date) {
+      alert("Por favor, preencha o tema e a data do treinamento.");
+      return;
+    }
     setSaving(true);
-    await supabase
-      .from("training_sessions")
-      .update({
-        theme: editing.theme,
-        training_date: editing.training_date,
-        training_time: editing.training_time || null,
-        participant_count: editing.participant_count ?? null,
-        satisfaction_metrics: editing.satisfaction_metrics,
-      })
-      .eq("id", editing.id);
+    if (editing.id === "new") {
+      await supabase
+        .from("training_sessions")
+        .insert({
+          theme: editing.theme,
+          training_date: editing.training_date,
+          training_time: editing.training_time || null,
+          participant_count: editing.participant_count ?? null,
+          satisfaction_metrics: editing.satisfaction_metrics,
+        });
+    } else {
+      await supabase
+        .from("training_sessions")
+        .update({
+          theme: editing.theme,
+          training_date: editing.training_date,
+          training_time: editing.training_time || null,
+          participant_count: editing.participant_count ?? null,
+          satisfaction_metrics: editing.satisfaction_metrics,
+        })
+        .eq("id", editing.id);
+    }
     setSaving(false);
     setEditing(null);
     fetchSessions();
@@ -99,11 +115,16 @@ export default function TreinamentosPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Central de Treinamentos</h1>
-        <p className="text-muted-foreground text-sm">
-          Capacitações realizadas em 2026 — {sessions.length} treinamentos · {totalParticipants} participações
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Central de Treinamentos</h1>
+          <p className="text-muted-foreground text-sm">
+            Capacitações cadastradas — {sessions.length} treinamentos · {totalParticipants} participações
+          </p>
+        </div>
+        <Button onClick={() => setEditing({ id: "new", theme: "", training_date: new Date().toISOString().split("T")[0], training_time: null, participant_count: null, satisfaction_metrics: null })}>
+          Cadastrar Treinamento
+        </Button>
       </div>
 
       {loading ? (
@@ -193,7 +214,7 @@ export default function TreinamentosPage() {
       <Dialog open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Editar Treinamento</DialogTitle>
+            <DialogTitle>{editing?.id === "new" ? "Cadastrar Treinamento" : "Editar Treinamento"}</DialogTitle>
           </DialogHeader>
 
           {editing && (

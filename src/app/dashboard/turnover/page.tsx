@@ -16,9 +16,19 @@ export default function TurnoverPage() {
       // We look at employees with INACTIVE status vs ACTIVE status
       const { data: emps } = await supabase.from('employees').select('id, name, status, dismissed_at, observation');
       
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
       const ativos = emps?.filter(e => e.status !== 'Desligado' && e.status !== 'Inativo') || [];
       const desligados = emps?.filter(e => e.status === 'Desligado' || e.dismissed_at) || [];
       
+      // Filtrar para usar apenas desligamentos do último ano
+      const desligadosUltimoAno = desligados.filter(e => {
+        if (!e.dismissed_at) return false;
+        const d = new Date(e.dismissed_at);
+        return d >= oneYearAgo;
+      });
+
       const monthStart = startOfMonth(new Date());
       const monthEnd = endOfMonth(new Date());
       
@@ -29,12 +39,14 @@ export default function TurnoverPage() {
         return d >= monthStart && d <= monthEnd;
       });
 
-      const total = emps?.length || 0;
+      // Headcount do último ano (ativos hoje + desligados no último ano)
+      const total = ativos.length + desligadosUltimoAno.length;
+      
       const turnoverRate = (ativosNoMes.length + desligadosNoMes.length) > 0 
         ? ((desligadosNoMes.length / ((ativosNoMes.length + desligadosNoMes.length + ativosNoMes.length) / 2)) * 100).toFixed(1) 
         : 0;
 
-      setMetrics({ total, desligados: desligados.length, turnover: Number(turnoverRate), history: desligados });
+      setMetrics({ total, desligados: desligadosUltimoAno.length, turnover: Number(turnoverRate), history: desligadosUltimoAno });
       setLoading(false);
     }
     fetchData();
