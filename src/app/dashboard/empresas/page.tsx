@@ -13,9 +13,13 @@ type Company = {
   name: string;
   trading_name: string | null;
   dominio_code: string | null;
+  encargos_clt: number | null;
+  encargos_pj: number | null;
+  encargos_mei: number | null;
+  encargos_prolabore: number | null;
 };
 
-const emptyForm = { cnpj: "", name: "", trading_name: "", dominio_code: "" };
+const emptyForm = { cnpj: "", name: "", trading_name: "", dominio_code: "", encargos_clt: "", encargos_pj: "", encargos_mei: "", encargos_prolabore: "" };
 
 export default function EmpresasPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -31,7 +35,7 @@ export default function EmpresasPage() {
 
     const loadCompanies = async () => {
       const supabase = createClient();
-      const { data, error } = await supabase.from("companies").select("id, cnpj, name, trading_name, dominio_code").order("name");
+      const { data, error } = await supabase.from("companies").select("id, cnpj, name, trading_name, dominio_code, encargos_clt, encargos_pj, encargos_mei, encargos_prolabore").order("name");
 
       if (!active) return;
       setLoading(false);
@@ -63,7 +67,16 @@ export default function EmpresasPage() {
 
   const startEdit = (company: Company) => {
     setEditingId(company.id);
-    setForm({ cnpj: company.cnpj, name: company.name, trading_name: company.trading_name ?? "", dominio_code: company.dominio_code ?? "" });
+    setForm({ 
+      cnpj: company.cnpj, 
+      name: company.name, 
+      trading_name: company.trading_name ?? "", 
+      dominio_code: company.dominio_code ?? "",
+      encargos_clt: company.encargos_clt !== null ? String(company.encargos_clt) : "",
+      encargos_pj: company.encargos_pj !== null ? String(company.encargos_pj) : "",
+      encargos_mei: company.encargos_mei !== null ? String(company.encargos_mei) : "",
+      encargos_prolabore: company.encargos_prolabore !== null ? String(company.encargos_prolabore) : ""
+    });
     setError("");
   };
 
@@ -77,6 +90,10 @@ export default function EmpresasPage() {
       name: form.name.trim(),
       trading_name: form.trading_name.trim() || null,
       dominio_code: form.dominio_code.trim() || null,
+      encargos_clt: form.encargos_clt ? Number(form.encargos_clt.replace(",", ".")) : 0,
+      encargos_pj: form.encargos_pj ? Number(form.encargos_pj.replace(",", ".")) : 0,
+      encargos_mei: form.encargos_mei ? Number(form.encargos_mei.replace(",", ".")) : 0,
+      encargos_prolabore: form.encargos_prolabore ? Number(form.encargos_prolabore.replace(",", ".")) : 0,
     };
 
     const supabase = createClient();
@@ -147,11 +164,17 @@ export default function EmpresasPage() {
             <h2 className="font-semibold">{editingId ? "Editar empresa" : "Adicionar empresa"}</h2>
             {editingId && <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={startNew}><X className="h-4 w-4" /></Button>}
           </div>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-4 mb-4">
             <Field label="CNPJ *"><Input required value={form.cnpj} onChange={(event) => setForm({ ...form, cnpj: event.target.value })} /></Field>
             <Field label="Razão social *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
             <Field label="Nome fantasia"><Input value={form.trading_name} onChange={(event) => setForm({ ...form, trading_name: event.target.value })} /></Field>
             <Field label="Cód. Domínio"><Input value={form.dominio_code} onChange={(event) => setForm({ ...form, dominio_code: event.target.value })} /></Field>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            <Field label="Encargos CLT (%)"><Input type="number" step="0.01" value={form.encargos_clt} onChange={(event) => setForm({ ...form, encargos_clt: event.target.value })} /></Field>
+            <Field label="Encargos PJ (%)"><Input type="number" step="0.01" value={form.encargos_pj} onChange={(event) => setForm({ ...form, encargos_pj: event.target.value })} /></Field>
+            <Field label="Encargos MEI (%)"><Input type="number" step="0.01" value={form.encargos_mei} onChange={(event) => setForm({ ...form, encargos_mei: event.target.value })} /></Field>
+            <Field label="Encargos Prolabore (%)"><Input type="number" step="0.01" value={form.encargos_prolabore} onChange={(event) => setForm({ ...form, encargos_prolabore: event.target.value })} /></Field>
           </div>
           <div className="mt-4 flex justify-end">
             <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>

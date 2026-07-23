@@ -17,14 +17,15 @@ type RelatedRow = Record<string, string | number | boolean | null> & { id: strin
 
 const pageSize = 1000;
 const fields = [
-  "id", "name", "registration_number", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id"
+  "id", "name", "registration_number", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days"
 ].join(", ");
 
 const emptyForm = {
   name: "", registration_number: "", profile_code: "", department_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "", boot_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
-  cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: ""
+  cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
+  work_schedule_start_1: "", work_schedule_end_1: "", work_schedule_start_2: "", work_schedule_end_2: "", weekly_hours: "", work_days: ""
 };
 
 type EmployeeForm = typeof emptyForm;
@@ -209,6 +210,21 @@ export default function ColaboradoresPage() {
     setRefresh((value) => value + 1);
   };
 
+  const deleteEmployee = async (id: string, name: string) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o colaborador "${name}"? Esta ação não pode ser desfeita.`)) return;
+    
+    setSaving(true);
+    const supabase = createClient();
+    const { error } = await supabase.from("employees").delete().eq("id", id);
+    setSaving(false);
+    
+    if (error) {
+      alert(`Erro ao excluir colaborador: ${error.message}`);
+    } else {
+      setRefresh(v => v + 1);
+    }
+  };
+
   const getTrialInfo = (admissionDateStr: string | null) => {
     if (!admissionDateStr) return null;
     const admission = parseISO(admissionDateStr);
@@ -335,6 +351,15 @@ export default function ColaboradoresPage() {
               <Field label="Tamanho da botina"><Select value={form.boot_size} onChange={(value) => update("boot_size", value)} options={["", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46"]} /></Field>
             </Section>
 
+            <Section title="Jornada de trabalho">
+              <Field label="Entrada (Turno 1)"><Input type="time" value={form.work_schedule_start_1} onChange={(e) => update("work_schedule_start_1", e.target.value)} /></Field>
+              <Field label="Saída (Turno 1)"><Input type="time" value={form.work_schedule_end_1} onChange={(e) => update("work_schedule_end_1", e.target.value)} /></Field>
+              <Field label="Entrada (Turno 2)"><Input type="time" value={form.work_schedule_start_2} onChange={(e) => update("work_schedule_start_2", e.target.value)} /></Field>
+              <Field label="Saída (Turno 2)"><Input type="time" value={form.work_schedule_end_2} onChange={(e) => update("work_schedule_end_2", e.target.value)} /></Field>
+              <Field label="Carga Horária (Semanal)"><Input type="number" step="0.5" value={form.weekly_hours} onChange={(e) => update("weekly_hours", e.target.value)} /></Field>
+              <Field label="Dias de trabalho"><Select value={form.work_days} onChange={(value) => update("work_days", value)} options={["", "Segunda a Sexta", "Segunda a Sábado", "Escala 12x36", "Escala 5x2", "Escala 6x1"]} /></Field>
+            </Section>
+
             <Section title="Documentos e arquivo">
               <Field label="CTPS"><Input value={form.ctps} onChange={(e) => update("ctps", e.target.value)} /></Field>
               <Field label="Série CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
@@ -421,6 +446,9 @@ export default function ColaboradoresPage() {
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => startEdit(employee)}>
                           <Edit3 className="mr-2 h-3.5 w-3.5" />Abrir
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => deleteEmployee(employee.id, String(employee.name || "Sem Nome"))} title="Excluir Colaborador">
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </td>

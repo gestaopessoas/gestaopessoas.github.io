@@ -1,0 +1,59 @@
+{
+  "test": "G36",
+  "tables": [
+    {
+      "table_number": 19,
+      "title": "Percentil dos candidatos a empregos em organizações industriais e de prestação de serviços de Recife",
+      "columns": ["Indústria", "Prestação de Serviços", "Total"],
+      "data": [
+        { "classificacao": "Muito Superior", "percentil": 99, "scores": { "Indústria": 31, "Prestação de Serviços": 32, "Total": 32 } },
+        { "classificacao": "Superior",       "percentil": 98, "scores": { "Prestação de Serviços": 31, "Total": 31 } },
+        { "classificacao": "Superior",       "percentil": 97, "scores": { "Prestação de Serviços": 30, "Total": 30 } },
+        { "classificacao": "Superior",       "percentil": 96, "scores": { "Prestação de Serviços": 29 } },
+        { "classificacao": "Superior",       "percentil": 95, "scores": { "Indústria": 30, "Total": 29 } },
+        { "classificacao": "Médio Superior", "percentil": 90, "scores": { "Indústria": "29-27", "Prestação de Serviços": 28, "Total": 28 } },
+        { "classificacao": "Médio Superior", "percentil": 85, "scores": { "Indústria": "26-25", "Prestação de Serviços": 27, "Total": "27-26" } },
+        { "classificacao": "Médio Superior", "percentil": 80, "scores": { "Indústria": 24, "Prestação de Serviços": 26 } },
+        { "classificacao": "Médio Superior", "percentil": 75, "scores": { "Indústria": 23, "Total": 25 } },
+        { "classificacao": "Médio",          "percentil": 70, "scores": { "Indústria": 22, "Prestação de Serviços": 25 } },
+        { "classificacao": "Médio",          "percentil": 65, "scores": { "Indústria": "21-19", "Prestação de Serviços": 24, "Total": 24 } },
+        { "classificacao": "Médio",          "percentil": 60, "scores": { "Indústria": "17-15", "Prestação de Serviços": 23, "Total": 23 } },
+        { "classificacao": "Médio",          "percentil": 55, "scores": { "Indústria": 14, "Prestação de Serviços": 22, "Total": 22 } },
+        { "classificacao": "Médio",          "percentil": 50, "scores": { "Indústria": "13-12", "Prestação de Serviços": 21, "Total": "21-20" } },
+        { "classificacao": "Médio",          "percentil": 45, "scores": { "Indústria": "11-10", "Prestação de Serviços": 20, "Total": 19 } },
+        { "classificacao": "Médio",          "percentil": 40, "scores": { "Indústria": "9-8", "Prestação de Serviços": 19, "Total": 18 } },
+        { "classificacao": "Médio",          "percentil": 35, "scores": { "Prestação de Serviços": 18, "Total": "17-16" } },
+        { "classificacao": "Médio",          "percentil": 30, "scores": { "Indústria": 7, "Prestação de Serviços": "17-16", "Total": 15 } },
+        { "classificacao": "Médio Inferior", "percentil": 25, "scores": { "Indústria": 6, "Prestação de Serviços": "15-14", "Total": "14-12" } },
+        { "classificacao": "Médio Inferior", "percentil": 20, "scores": { "Indústria": 5, "Prestação de Serviços": "13-12", "Total": "11-10" } },
+        { "classificacao": "Médio Inferior", "percentil": 15, "scores": { "Prestação de Serviços": "11-10", "Total": "9-8" } },
+        { "classificacao": "Médio Inferior", "percentil": 10, "scores": { "Indústria": 4, "Prestação de Serviços": "9-7", "Total": "7-6" } },
+        { "classificacao": "Inferior",       "percentil": 5,  "scores": { "Indústria": 2, "Prestação de Serviços": 6, "Total": 5 } },
+        { "classificacao": "Inferior",       "percentil": 3,  "scores": { "Prestação de Serviços": "5-4", "Total": "4-5" } },
+        { "classificacao": "Inferior",       "percentil": 1,  "scores": { "Prestação de Serviços": 3, "Total": 2 } }
+      ]
+    },
+    {
+      "table_number": 20,
+      "title": "Percentil em função da escolaridade - Amostra de Seleção de São Paulo",
+      "columns": ["Ens. Médio", "Superior", "Geral"],
+      "data": [
+        { "classificacao": "Inferior",       "percentil": 1,  "scores": { "Ens. Médio": 7,  "Superior": 8,  "Geral": 7  } },
+        { "classificacao": "Inferior",       "percentil": 5,  "scores": { "Ens. Médio": 11, "Superior": 17, "Geral": 13 } },
+        { "classificacao": "Médio Inferior", "percentil": 10, "scores": { "Ens. Médio": 13, "Superior": 18, "Geral": 15 } },
+        { "classificacao": "Médio Inferior", "percentil": 20, "scores": { "Ens. Médio": 16, "Superior": 20, "Geral": 17 } },
+        { "classificacao": "Médio Inferior", "percentil": 25, "scores": { "Ens. Médio": 17, "Superior": 21, "Geral": 18 } },
+        { "classificacao": "Médio",          "percentil": 30, "scores": { "Ens. Médio": 18, "Superior": 21, "Geral": 20 } },
+        { "classificacao": "Médio",          "percentil": 40, "scores": { "Ens. Médio": 19, "Superior": 23, "Geral": 21 } },
+        { "classificacao": "Médio",          "percentil": 50, "scores": { "Ens. Médio": 21, "Superior": 24, "Geral": 23 } },
+        { "classificacao": "Médio",          "percentil": 60, "scores": { "Ens. Médio": 23, "Superior": 26, "Geral": 25 } },
+        { "classificacao": "Médio",          "percentil": 70, "scores": { "Ens. Médio": 25, "Superior": 28, "Geral": 26 } },
+        { "classificacao": "Médio Superior", "percentil": 75, "scores": { "Ens. Médio": 26, "Superior": 28, "Geral": 27 } },
+        { "classificacao": "Médio Superior", "percentil": 80, "scores": { "Ens. Médio": 27, "Superior": 29, "Geral": 28 } },
+        { "classificacao": "Médio Superior", "percentil": 90, "scores": { "Ens. Médio": 29, "Superior": 31, "Geral": 30 } },
+        { "classificacao": "Superior",       "percentil": 95, "scores": { "Ens. Médio": 30, "Superior": 33, "Geral": 32 } },
+        { "classificacao": "Muito Superior", "percentil": 99, "scores": { "Ens. Médio": 34, "Superior": 34, "Geral": 34 } }
+      ]
+    }
+  ]
+}

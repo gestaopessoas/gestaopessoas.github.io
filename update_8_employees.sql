@@ -1,0 +1,7 @@
+UPDATE employees SET registration_number = '19561', admission_date = '2025-05-20', company_id = '684082e6-fdb5-42d2-b172-ffe5cfa615f1' WHERE id = 'a3c2bc14-0d8d-459f-bdbd-68df1f7b8ac1';
+UPDATE employees SET registration_number = '19551', admission_date = '2025-05-12', company_id = '684082e6-fdb5-42d2-b172-ffe5cfa615f1' WHERE id = 'edc42a62-068b-47dd-85a7-d002d5231cbe';
+UPDATE employees SET registration_number = '19564', admission_date = '2025-05-20', company_id = '684082e6-fdb5-42d2-b172-ffe5cfa615f1' WHERE id = 'e71cbe8a-7212-4373-8e14-69757eec53e7';
+UPDATE employees SET registration_number = '19715', admission_date = '2026-02-12', company_id = '684082e6-fdb5-42d2-b172-ffe5cfa615f1' WHERE id = 'aa3a2f92-4d57-45a7-800c-c35cd78eb0df';
+UPDATE employees SET registration_number = '19599', admission_date = '2025-07-01', company_id = '684082e6-fdb5-42d2-b172-ffe5cfa615f1' WHERE id = 'e1a4d7a5-3a1e-4b40-812a-c792b2cb05c6';
+UPDATE employees SET registration_number = '19541', admission_date = '2025-05-05', company_id = '684082e6-fdb5-42d2-b172-ffe5cfa615f1' WHERE id = '5ebc9818-5811-40a1-bc32-716e5b5d3fb7';
+UPDATE employees SET registration_number = '19846', admission_date = '2026-06-01', company_id = '684082e6-fdb5-42d2-b172-ffe5cfa615f1' WHERE id = '31ce684c-f19c-4941-9fb9-636c9d9a340e';

@@ -1,0 +1,4005 @@
+{
+  "test": "TEADI",
+  "tables": [
+    {
+      "table_number": 45,
+      "title": "Normas do TEADI para a população geral considerando todos os estados",
+      "columns": [
+        "Pontuação no TEADI"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Pontuação no TEADI": -14
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Pontuação no TEADI": 21
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Pontuação no TEADI": 42
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Pontuação no TEADI": 57
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Pontuação no TEADI": 68
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Pontuação no TEADI": 77
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Pontuação no TEADI": 86
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Pontuação no TEADI": 94
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Pontuação no TEADI": 99
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Pontuação no TEADI": 105
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Pontuação no TEADI": 110
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Pontuação no TEADI": 115
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Pontuação no TEADI": 120
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Pontuação no TEADI": 126
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Pontuação no TEADI": 131
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Pontuação no TEADI": 137
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Pontuação no TEADI": 144
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Pontuação no TEADI": 152
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Pontuação no TEADI": 160
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Pontuação no TEADI": 169
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Pontuação no TEADI": 178
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 46,
+      "title": "Normas do TEADI para a população geral por faixa etária",
+      "columns": [
+        "Até 25 anos",
+        "26 a 33 anos",
+        "34 a 39 anos",
+        "40 a 46 anos",
+        "47 anos ou mais"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Até 25 anos": 3,
+            "26 a 33 anos": -10,
+            "34 a 39 anos": -26,
+            "40 a 46 anos": -28,
+            "47 anos ou mais": -67
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Até 25 anos": 43,
+            "26 a 33 anos": 16,
+            "34 a 39 anos": 11,
+            "40 a 46 anos": 9,
+            "47 anos ou mais": 8
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Até 25 anos": 66,
+            "26 a 33 anos": 36,
+            "34 a 39 anos": 26,
+            "40 a 46 anos": 20,
+            "47 anos ou mais": 18
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Até 25 anos": 80,
+            "26 a 33 anos": 54,
+            "34 a 39 anos": 45,
+            "40 a 46 anos": 39,
+            "47 anos ou mais": 26
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Até 25 anos": 90,
+            "26 a 33 anos": 65,
+            "34 a 39 anos": 57,
+            "40 a 46 anos": 46,
+            "47 anos ou mais": 33
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Até 25 anos": 95,
+            "26 a 33 anos": 72,
+            "34 a 39 anos": 65,
+            "40 a 46 anos": 52,
+            "47 anos ou mais": 38
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Até 25 anos": 101,
+            "26 a 33 anos": 81,
+            "34 a 39 anos": 71,
+            "40 a 46 anos": 58,
+            "47 anos ou mais": 44
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Até 25 anos": 106,
+            "26 a 33 anos": 88,
+            "34 a 39 anos": 77,
+            "40 a 46 anos": 64,
+            "47 anos ou mais": 51
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Até 25 anos": 110,
+            "26 a 33 anos": 95,
+            "34 a 39 anos": 85,
+            "40 a 46 anos": 69,
+            "47 anos ou mais": 55
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Até 25 anos": 115,
+            "26 a 33 anos": 103,
+            "34 a 39 anos": 89,
+            "40 a 46 anos": 74,
+            "47 anos ou mais": 64
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Até 25 anos": 121,
+            "26 a 33 anos": 108,
+            "34 a 39 anos": 96,
+            "40 a 46 anos": 77,
+            "47 anos ou mais": 72
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Até 25 anos": 125,
+            "26 a 33 anos": 114,
+            "34 a 39 anos": 101,
+            "40 a 46 anos": 85,
+            "47 anos ou mais": 77
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Até 25 anos": 129,
+            "26 a 33 anos": 119,
+            "34 a 39 anos": 105,
+            "40 a 46 anos": 93,
+            "47 anos ou mais": 83
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Até 25 anos": 134,
+            "26 a 33 anos": 125,
+            "34 a 39 anos": 111,
+            "40 a 46 anos": 99,
+            "47 anos ou mais": 93
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Até 25 anos": 139,
+            "26 a 33 anos": 130,
+            "34 a 39 anos": 117,
+            "40 a 46 anos": 107,
+            "47 anos ou mais": 99
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Até 25 anos": 144,
+            "26 a 33 anos": 136,
+            "34 a 39 anos": 121,
+            "40 a 46 anos": 112,
+            "47 anos ou mais": 103
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Até 25 anos": 151,
+            "26 a 33 anos": 144,
+            "34 a 39 anos": 130,
+            "40 a 46 anos": 118,
+            "47 anos ou mais": 111
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Até 25 anos": 156,
+            "26 a 33 anos": 150,
+            "34 a 39 anos": 139,
+            "40 a 46 anos": 124,
+            "47 anos ou mais": 119
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Até 25 anos": 163,
+            "26 a 33 anos": 160,
+            "34 a 39 anos": 150,
+            "40 a 46 anos": 142,
+            "47 anos ou mais": 132
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Até 25 anos": 172,
+            "26 a 33 anos": 168,
+            "34 a 39 anos": 161,
+            "40 a 46 anos": 158,
+            "47 anos ou mais": 146
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Até 25 anos": 179,
+            "26 a 33 anos": 177,
+            "34 a 39 anos": 175,
+            "40 a 46 anos": 178,
+            "47 anos ou mais": 172
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 47,
+      "title": "Normas do TEADI para a população geral por escolaridade",
+      "columns": [
+        "Fundamental",
+        "Médio",
+        "Superior"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Fundamental": -33,
+            "Médio": -24,
+            "Superior": -16
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Fundamental": 9,
+            "Médio": 29,
+            "Superior": 41
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Fundamental": 23,
+            "Médio": 52,
+            "Superior": 67
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Fundamental": 37,
+            "Médio": 68,
+            "Superior": 82
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Fundamental": 45,
+            "Médio": 77,
+            "Superior": 92
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Fundamental": 53,
+            "Médio": 86,
+            "Superior": 99
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Fundamental": 60,
+            "Médio": 93,
+            "Superior": 104
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Fundamental": 67,
+            "Médio": 98,
+            "Superior": 110
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Fundamental": 73,
+            "Médio": 104,
+            "Superior": 115
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Fundamental": 81,
+            "Médio": 109,
+            "Superior": 120
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Fundamental": 89,
+            "Médio": 114,
+            "Superior": 125
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Fundamental": 94,
+            "Médio": 119,
+            "Superior": 129
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Fundamental": 99,
+            "Médio": 125,
+            "Superior": 134
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Fundamental": 104,
+            "Médio": 130,
+            "Superior": 139
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Fundamental": 111,
+            "Médio": 135,
+            "Superior": 144
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Fundamental": 116,
+            "Médio": 141,
+            "Superior": 148
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Fundamental": 122,
+            "Médio": 147,
+            "Superior": 155
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Fundamental": 130,
+            "Médio": 154,
+            "Superior": 162
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Fundamental": 139,
+            "Médio": 162,
+            "Superior": 166
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Fundamental": 152,
+            "Médio": 170,
+            "Superior": 173
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Fundamental": 172,
+            "Médio": 178,
+            "Superior": 180
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 48,
+      "title": "Normas do TEADI para a população geral da Bahia",
+      "columns": [
+        "Pontuação no TEADI"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Pontuação no TEADI": -26
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Pontuação no TEADI": 38
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Pontuação no TEADI": 49
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Pontuação no TEADI": 63
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Pontuação no TEADI": 72
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Pontuação no TEADI": 78
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Pontuação no TEADI": 87
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Pontuação no TEADI": 92
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Pontuação no TEADI": 98
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Pontuação no TEADI": 103
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Pontuação no TEADI": 108
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Pontuação no TEADI": 112
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Pontuação no TEADI": 118
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Pontuação no TEADI": 122
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Pontuação no TEADI": 128
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Pontuação no TEADI": 132
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Pontuação no TEADI": 139
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Pontuação no TEADI": 146
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Pontuação no TEADI": 155
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Pontuação no TEADI": 167
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Pontuação no TEADI": 176
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 49,
+      "title": "Normas do TEADI para a população geral da Bahia por faixa etária",
+      "columns": [
+        "Até 25 anos",
+        "26 a 33 anos",
+        "34 a 39 anos",
+        "40 a 46 anos",
+        "47 anos ou mais"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Até 25 anos": 9,
+            "26 a 33 anos": 7,
+            "34 a 39 anos": -39,
+            "40 a 46 anos": -48,
+            "47 anos ou mais": -93
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Até 25 anos": 51,
+            "26 a 33 anos": 49,
+            "34 a 39 anos": -9,
+            "40 a 46 anos": -26,
+            "47 anos ou mais": -43
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Até 25 anos": 70,
+            "26 a 33 anos": 59,
+            "34 a 39 anos": 41,
+            "40 a 46 anos": 22,
+            "47 anos ou mais": 12
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Até 25 anos": 79,
+            "26 a 33 anos": 67,
+            "34 a 39 anos": 44,
+            "40 a 46 anos": 25,
+            "47 anos ou mais": 23
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Até 25 anos": 90,
+            "26 a 33 anos": 75,
+            "34 a 39 anos": 52,
+            "40 a 46 anos": 42,
+            "47 anos ou mais": 37
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Até 25 anos": 94,
+            "26 a 33 anos": 80,
+            "34 a 39 anos": 64,
+            "40 a 46 anos": 47,
+            "47 anos ou mais": 39
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Até 25 anos": 101,
+            "26 a 33 anos": 85,
+            "34 a 39 anos": 70,
+            "40 a 46 anos": 49,
+            "47 anos ou mais": 40
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Até 25 anos": 105,
+            "26 a 33 anos": 89,
+            "34 a 39 anos": 75,
+            "40 a 46 anos": 53,
+            "47 anos ou mais": 41
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Até 25 anos": 109,
+            "26 a 33 anos": 94,
+            "34 a 39 anos": 83,
+            "40 a 46 anos": 62,
+            "47 anos ou mais": 45
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Até 25 anos": 114,
+            "26 a 33 anos": 101,
+            "34 a 39 anos": 89,
+            "40 a 46 anos": 64,
+            "47 anos ou mais": 49
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Até 25 anos": 119,
+            "26 a 33 anos": 105,
+            "34 a 39 anos": 96,
+            "40 a 46 anos": 65,
+            "47 anos ou mais": 53
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Até 25 anos": 124,
+            "26 a 33 anos": 112,
+            "34 a 39 anos": 102,
+            "40 a 46 anos": 72,
+            "47 anos ou mais": 63
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Até 25 anos": 128,
+            "26 a 33 anos": 113,
+            "34 a 39 anos": 110,
+            "40 a 46 anos": 76,
+            "47 anos ou mais": 71
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Até 25 anos": 133,
+            "26 a 33 anos": 118,
+            "34 a 39 anos": 115,
+            "40 a 46 anos": 85,
+            "47 anos ou mais": 73
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Até 25 anos": 138,
+            "26 a 33 anos": 121,
+            "34 a 39 anos": 119,
+            "40 a 46 anos": 95,
+            "47 anos ou mais": 76
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Até 25 anos": 143,
+            "26 a 33 anos": 126,
+            "34 a 39 anos": 124,
+            "40 a 46 anos": 102,
+            "47 anos ou mais": 83
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Até 25 anos": 147,
+            "26 a 33 anos": 130,
+            "34 a 39 anos": 128,
+            "40 a 46 anos": 106,
+            "47 anos ou mais": 99
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Até 25 anos": 153,
+            "26 a 33 anos": 136,
+            "34 a 39 anos": 133,
+            "40 a 46 anos": 117,
+            "47 anos ou mais": 112
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Até 25 anos": 161,
+            "26 a 33 anos": 151,
+            "34 a 39 anos": 146,
+            "40 a 46 anos": 140,
+            "47 anos ou mais": 120
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Até 25 anos": 169,
+            "26 a 33 anos": 166,
+            "34 a 39 anos": 158,
+            "40 a 46 anos": 152,
+            "47 anos ou mais": 140
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Até 25 anos": 177,
+            "26 a 33 anos": 175,
+            "34 a 39 anos": 173,
+            "40 a 46 anos": 170,
+            "47 anos ou mais": 167
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 50,
+      "title": "Normas do TEADI para a população geral da Bahia por escolaridade",
+      "columns": [
+        "Fundamental",
+        "Médio",
+        "Superior"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Fundamental": -87,
+            "Médio": 13,
+            "Superior": 52
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Fundamental": 11,
+            "Médio": 49,
+            "Superior": 83
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Fundamental": 31,
+            "Médio": 64,
+            "Superior": 93
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Fundamental": 40,
+            "Médio": 71,
+            "Superior": 100
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Fundamental": 44,
+            "Médio": 77,
+            "Superior": 106
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Fundamental": 49,
+            "Médio": 84,
+            "Superior": 114
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Fundamental": 58,
+            "Médio": 88,
+            "Superior": 119
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Fundamental": 63,
+            "Médio": 94,
+            "Superior": 122
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Fundamental": 72,
+            "Médio": 98,
+            "Superior": 124
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Fundamental": 76,
+            "Médio": 103,
+            "Superior": 128
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Fundamental": 86,
+            "Médio": 109,
+            "Superior": 131
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Fundamental": 94,
+            "Médio": 113,
+            "Superior": 134
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Fundamental": 99,
+            "Médio": 118,
+            "Superior": 137
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Fundamental": 104,
+            "Médio": 123,
+            "Superior": 141
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Fundamental": 109,
+            "Médio": 128,
+            "Superior": 145
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Fundamental": 112,
+            "Médio": 133,
+            "Superior": 147
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Fundamental": 116,
+            "Médio": 142,
+            "Superior": 155
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Fundamental": 121,
+            "Médio": 151,
+            "Superior": 164
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Fundamental": 132,
+            "Médio": 158,
+            "Superior": 174
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Fundamental": 138,
+            "Médio": 167,
+            "Superior": 176
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Fundamental": 146,
+            "Médio": 175,
+            "Superior": 180
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 51,
+      "title": "Normas do TEADI para a população geral de Mato Grosso do Sul",
+      "columns": [
+        "Pontuação no TEADI"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Pontuação no TEADI": 7
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Pontuação no TEADI": 41
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Pontuação no TEADI": 62
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Pontuação no TEADI": 74
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Pontuação no TEADI": 86
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Pontuação no TEADI": 94
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Pontuação no TEADI": 102
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Pontuação no TEADI": 108
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Pontuação no TEADI": 113
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Pontuação no TEADI": 119
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Pontuação no TEADI": 123
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Pontuação no TEADI": 127
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Pontuação no TEADI": 134
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Pontuação no TEADI": 139
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Pontuação no TEADI": 144
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Pontuação no TEADI": 150
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Pontuação no TEADI": 155
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Pontuação no TEADI": 162
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Pontuação no TEADI": 167
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Pontuação no TEADI": 174
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Pontuação no TEADI": 180
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 52,
+      "title": "Normas do TEADI para a população geral de Mato Grosso do Sul por faixa etária",
+      "columns": [
+        "Até 25 anos",
+        "26 a 33 anos",
+        "34 a 39 anos",
+        "40 a 46 anos",
+        "47 anos ou mais"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Até 25 anos": 44,
+            "26 a 33 anos": 20,
+            "34 a 39 anos": 7,
+            "40 a 46 anos": 0,
+            "47 anos ou mais": -3
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Até 25 anos": 77,
+            "26 a 33 anos": 52,
+            "34 a 39 anos": 46,
+            "40 a 46 anos": 19,
+            "47 anos ou mais": 11
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Até 25 anos": 89,
+            "26 a 33 anos": 68,
+            "34 a 39 anos": 66,
+            "40 a 46 anos": 37,
+            "47 anos ou mais": 21
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Até 25 anos": 103,
+            "26 a 33 anos": 81,
+            "34 a 39 anos": 73,
+            "40 a 46 anos": 48,
+            "47 anos ou mais": 33
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Até 25 anos": 108,
+            "26 a 33 anos": 92,
+            "34 a 39 anos": 81,
+            "40 a 46 anos": 52,
+            "47 anos ou mais": 37
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Até 25 anos": 112,
+            "26 a 33 anos": 101,
+            "34 a 39 anos": 86,
+            "40 a 46 anos": 56,
+            "47 anos ou mais": 48
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Até 25 anos": 117,
+            "26 a 33 anos": 109,
+            "34 a 39 anos": 89,
+            "40 a 46 anos": 63,
+            "47 anos ou mais": 56
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Até 25 anos": 122,
+            "26 a 33 anos": 114,
+            "34 a 39 anos": 98,
+            "40 a 46 anos": 69,
+            "47 anos ou mais": 65
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Até 25 anos": 125,
+            "26 a 33 anos": 120,
+            "34 a 39 anos": 102,
+            "40 a 46 anos": 76,
+            "47 anos ou mais": 70
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Até 25 anos": 129,
+            "26 a 33 anos": 124,
+            "34 a 39 anos": 106,
+            "40 a 46 anos": 91,
+            "47 anos ou mais": 77
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Até 25 anos": 134,
+            "26 a 33 anos": 129,
+            "34 a 39 anos": 109,
+            "40 a 46 anos": 96,
+            "47 anos ou mais": 84
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Até 25 anos": 139,
+            "26 a 33 anos": 134,
+            "34 a 39 anos": 113,
+            "40 a 46 anos": 102,
+            "47 anos ou mais": 92
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Até 25 anos": 145,
+            "26 a 33 anos": 137,
+            "34 a 39 anos": 122,
+            "40 a 46 anos": 108,
+            "47 anos ou mais": 99
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Até 25 anos": 150,
+            "26 a 33 anos": 141,
+            "34 a 39 anos": 124,
+            "40 a 46 anos": 112,
+            "47 anos ou mais": 101
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Até 25 anos": 154,
+            "26 a 33 anos": 146,
+            "34 a 39 anos": 137,
+            "40 a 46 anos": 119,
+            "47 anos ou mais": 111
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Até 25 anos": 158,
+            "26 a 33 anos": 150,
+            "34 a 39 anos": 140,
+            "40 a 46 anos": 125,
+            "47 anos ou mais": 117
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Até 25 anos": 162,
+            "26 a 33 anos": 156,
+            "34 a 39 anos": 147,
+            "40 a 46 anos": 131,
+            "47 anos ou mais": 120
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Até 25 anos": 166,
+            "26 a 33 anos": 163,
+            "34 a 39 anos": 152,
+            "40 a 46 anos": 142,
+            "47 anos ou mais": 123
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Até 25 anos": 172,
+            "26 a 33 anos": 167,
+            "34 a 39 anos": 162,
+            "40 a 46 anos": 147,
+            "47 anos ou mais": 139
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Até 25 anos": 176,
+            "26 a 33 anos": 174,
+            "34 a 39 anos": 167,
+            "40 a 46 anos": 161,
+            "47 anos ou mais": 144
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Até 25 anos": 180,
+            "26 a 33 anos": 179,
+            "34 a 39 anos": 178,
+            "40 a 46 anos": 176,
+            "47 anos ou mais": 170
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 53,
+      "title": "Normas do TEADI para a população geral de Mato Grosso do Sul por escolaridade",
+      "columns": [
+        "Fundamental",
+        "Médio",
+        "Superior"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Fundamental": 0,
+            "Médio": 42,
+            "Superior": 54
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Fundamental": 20,
+            "Médio": 69,
+            "Superior": 76
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Fundamental": 35,
+            "Médio": 86,
+            "Superior": 98
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Fundamental": 50,
+            "Médio": 97,
+            "Superior": 109
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Fundamental": 64,
+            "Médio": 105,
+            "Superior": 112
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Fundamental": 71,
+            "Médio": 110,
+            "Superior": 115
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Fundamental": 77,
+            "Médio": 115,
+            "Superior": 120
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Fundamental": 89,
+            "Médio": 120,
+            "Superior": 124
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Fundamental": 94,
+            "Médio": 124,
+            "Superior": 128
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Fundamental": 101,
+            "Médio": 129,
+            "Superior": 133
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Fundamental": 107,
+            "Médio": 134,
+            "Superior": 140
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Fundamental": 112,
+            "Médio": 139,
+            "Superior": 144
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Fundamental": 117,
+            "Médio": 142,
+            "Superior": 148
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Fundamental": 122,
+            "Médio": 146,
+            "Superior": 153
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Fundamental": 127,
+            "Médio": 151,
+            "Superior": 161
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Fundamental": 134,
+            "Médio": 156,
+            "Superior": 164
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Fundamental": 139,
+            "Médio": 162,
+            "Superior": 166
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Fundamental": 148,
+            "Médio": 166,
+            "Superior": 170
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Fundamental": 156,
+            "Médio": 170,
+            "Superior": 172
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Fundamental": 168,
+            "Médio": 176,
+            "Superior": 177
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Fundamental": 178,
+            "Médio": 179,
+            "Superior": 180
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 54,
+      "title": "Normas do TEADI para a população geral do Paraná",
+      "columns": [
+        "Pontuação no TEADI"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Pontuação no TEADI": -8
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Pontuação no TEADI": 15
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Pontuação no TEADI": 32
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Pontuação no TEADI": 49
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Pontuação no TEADI": 61
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Pontuação no TEADI": 72
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Pontuação no TEADI": 79
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Pontuação no TEADI": 88
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Pontuação no TEADI": 96
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Pontuação no TEADI": 100
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Pontuação no TEADI": 106
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Pontuação no TEADI": 112
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Pontuação no TEADI": 118
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Pontuação no TEADI": 123
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Pontuação no TEADI": 127
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Pontuação no TEADI": 134
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Pontuação no TEADI": 141
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Pontuação no TEADI": 151
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Pontuação no TEADI": 158
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Pontuação no TEADI": 168
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Pontuação no TEADI": 177
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 55,
+      "title": "Normas do TEADI para a população geral do Paraná por faixa etária",
+      "columns": [
+        "Até 25 anos",
+        "26 a 33 anos",
+        "34 a 39 anos",
+        "40 a 46 anos",
+        "47 anos ou mais"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Até 25 anos": -10,
+            "26 a 33 anos": -20,
+            "34 a 39 anos": -27,
+            "40 a 46 anos": -32,
+            "47 anos ou mais": -44
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Até 25 anos": 26,
+            "26 a 33 anos": 16,
+            "34 a 39 anos": 9,
+            "40 a 46 anos": 2,
+            "47 anos ou mais": -10
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Até 25 anos": 61,
+            "26 a 33 anos": 23,
+            "34 a 39 anos": 16,
+            "40 a 46 anos": 13,
+            "47 anos ou mais": 9
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Até 25 anos": 77,
+            "26 a 33 anos": 34,
+            "34 a 39 anos": 29,
+            "40 a 46 anos": 24,
+            "47 anos ou mais": 16
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Até 25 anos": 86,
+            "26 a 33 anos": 41,
+            "34 a 39 anos": 36,
+            "40 a 46 anos": 32,
+            "47 anos ou mais": 23
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Até 25 anos": 94,
+            "26 a 33 anos": 58,
+            "34 a 39 anos": 49,
+            "40 a 46 anos": 44,
+            "47 anos ou mais": 33
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Até 25 anos": 97,
+            "26 a 33 anos": 68,
+            "34 a 39 anos": 57,
+            "40 a 46 anos": 54,
+            "47 anos ou mais": 48
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Até 25 anos": 105,
+            "26 a 33 anos": 77,
+            "34 a 39 anos": 64,
+            "40 a 46 anos": 57,
+            "47 anos ou mais": 52
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Até 25 anos": 111,
+            "26 a 33 anos": 93,
+            "34 a 39 anos": 70,
+            "40 a 46 anos": 61,
+            "47 anos ou mais": 54
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Até 25 anos": 115,
+            "26 a 33 anos": 99,
+            "34 a 39 anos": 74,
+            "40 a 46 anos": 71,
+            "47 anos ou mais": 60
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Até 25 anos": 121,
+            "26 a 33 anos": 104,
+            "34 a 39 anos": 80,
+            "40 a 46 anos": 77,
+            "47 anos ou mais": 69
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Até 25 anos": 125,
+            "26 a 33 anos": 110,
+            "34 a 39 anos": 85,
+            "40 a 46 anos": 83,
+            "47 anos ou mais": 77
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Até 25 anos": 129,
+            "26 a 33 anos": 115,
+            "34 a 39 anos": 91,
+            "40 a 46 anos": 87,
+            "47 anos ou mais": 80
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Até 25 anos": 133,
+            "26 a 33 anos": 118,
+            "34 a 39 anos": 97,
+            "40 a 46 anos": 90,
+            "47 anos ou mais": 85
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Até 25 anos": 138,
+            "26 a 33 anos": 124,
+            "34 a 39 anos": 101,
+            "40 a 46 anos": 99,
+            "47 anos ou mais": 96
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Até 25 anos": 144,
+            "26 a 33 anos": 127,
+            "34 a 39 anos": 105,
+            "40 a 46 anos": 103,
+            "47 anos ou mais": 101
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Até 25 anos": 151,
+            "26 a 33 anos": 135,
+            "34 a 39 anos": 114,
+            "40 a 46 anos": 106,
+            "47 anos ou mais": 109
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Até 25 anos": 156,
+            "26 a 33 anos": 148,
+            "34 a 39 anos": 122,
+            "40 a 46 anos": 111,
+            "47 anos ou mais": 117
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Até 25 anos": 162,
+            "26 a 33 anos": 160,
+            "34 a 39 anos": 144,
+            "40 a 46 anos": 124,
+            "47 anos ou mais": 121
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Até 25 anos": 171,
+            "26 a 33 anos": 170,
+            "34 a 39 anos": 155,
+            "40 a 46 anos": 134,
+            "47 anos ou mais": 134
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Até 25 anos": 178,
+            "26 a 33 anos": 176,
+            "34 a 39 anos": 165,
+            "40 a 46 anos": 154,
+            "47 anos ou mais": 150
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 56,
+      "title": "Normas do TEADI para a população geral do Paraná por escolaridade",
+      "columns": [
+        "Fundamental",
+        "Médio",
+        "Superior"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Fundamental": -35,
+            "Médio": -13,
+            "Superior": 15
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Fundamental": 9,
+            "Médio": 15,
+            "Superior": 56
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Fundamental": 22,
+            "Médio": 32,
+            "Superior": 77
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Fundamental": 32,
+            "Médio": 55,
+            "Superior": 84
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Fundamental": 42,
+            "Médio": 68,
+            "Superior": 97
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Fundamental": 51,
+            "Médio": 77,
+            "Superior": 99
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Fundamental": 58,
+            "Médio": 88,
+            "Superior": 106
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Fundamental": 64,
+            "Médio": 95,
+            "Superior": 113
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Fundamental": 72,
+            "Médio": 101,
+            "Superior": 118
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Fundamental": 79,
+            "Médio": 106,
+            "Superior": 126
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Fundamental": 84,
+            "Médio": 114,
+            "Superior": 134
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Fundamental": 90,
+            "Médio": 120,
+            "Superior": 138
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Fundamental": 96,
+            "Médio": 124,
+            "Superior": 144
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Fundamental": 103,
+            "Médio": 129,
+            "Superior": 148
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Fundamental": 106,
+            "Médio": 134,
+            "Superior": 154
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Fundamental": 112,
+            "Médio": 139,
+            "Superior": 159
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Fundamental": 118,
+            "Médio": 147,
+            "Superior": 156
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Fundamental": 124,
+            "Médio": 154,
+            "Superior": 164
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Fundamental": 130,
+            "Médio": 162,
+            "Superior": 170
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Fundamental": 148,
+            "Médio": 171,
+            "Superior": 174
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Fundamental": 170,
+            "Médio": 178,
+            "Superior": 180
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 57,
+      "title": "Normas do TEADI para a população geral de Santa Catarina",
+      "columns": [
+        "Pontuação no TEADI"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Pontuação no TEADI": -47
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Pontuação no TEADI": 11
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Pontuação no TEADI": 32
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Pontuação no TEADI": 45
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Pontuação no TEADI": 55
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Pontuação no TEADI": 65
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Pontuação no TEADI": 72
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Pontuação no TEADI": 79
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Pontuação no TEADI": 88
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Pontuação no TEADI": 95
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Pontuação no TEADI": 101
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Pontuação no TEADI": 106
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Pontuação no TEADI": 112
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Pontuação no TEADI": 117
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Pontuação no TEADI": 125
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Pontuação no TEADI": 132
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Pontuação no TEADI": 136
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Pontuação no TEADI": 142
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Pontuação no TEADI": 151
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Pontuação no TEADI": 164
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Pontuação no TEADI": 176
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 58,
+      "title": "Normas do TEADI para a população geral de Santa Catarina por faixa etária",
+      "columns": [
+        "Até 25 anos",
+        "26 a 33 anos",
+        "34 a 39 anos",
+        "40 a 46 anos",
+        "47 anos ou mais"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Até 25 anos": -15,
+            "26 a 33 anos": -47,
+            "34 a 39 anos": -20,
+            "40 a 46 anos": -27,
+            "47 anos ou mais": -98
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Até 25 anos": 34,
+            "26 a 33 anos": 10,
+            "34 a 39 anos": -15,
+            "40 a 46 anos": -6,
+            "47 anos ou mais": -69
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Até 25 anos": 53,
+            "26 a 33 anos": 15,
+            "34 a 39 anos": 19,
+            "40 a 46 anos": 13,
+            "47 anos ou mais": -39
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Até 25 anos": 68,
+            "26 a 33 anos": 25,
+            "34 a 39 anos": 25,
+            "40 a 46 anos": 24,
+            "47 anos ou mais": 16
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Até 25 anos": 79,
+            "26 a 33 anos": 36,
+            "34 a 39 anos": 35,
+            "40 a 46 anos": 37,
+            "47 anos ou mais": 25
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Até 25 anos": 90,
+            "26 a 33 anos": 54,
+            "34 a 39 anos": 44,
+            "40 a 46 anos": 41,
+            "47 anos ou mais": 26
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Até 25 anos": 97,
+            "26 a 33 anos": 60,
+            "34 a 39 anos": 46,
+            "40 a 46 anos": 46,
+            "47 anos ou mais": 35
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Até 25 anos": 102,
+            "26 a 33 anos": 65,
+            "34 a 39 anos": 50,
+            "40 a 46 anos": 50,
+            "47 anos ou mais": 44
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Até 25 anos": 105,
+            "26 a 33 anos": 69,
+            "34 a 39 anos": 53,
+            "40 a 46 anos": 53,
+            "47 anos ou mais": 50
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Até 25 anos": 110,
+            "26 a 33 anos": 73,
+            "34 a 39 anos": 57,
+            "40 a 46 anos": 57,
+            "47 anos ou mais": 56
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Até 25 anos": 115,
+            "26 a 33 anos": 82,
+            "34 a 39 anos": 66,
+            "40 a 46 anos": 66,
+            "47 anos ou mais": 66
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Até 25 anos": 118,
+            "26 a 33 anos": 90,
+            "34 a 39 anos": 69,
+            "40 a 46 anos": 69,
+            "47 anos ou mais": 74
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Até 25 anos": 125,
+            "26 a 33 anos": 93,
+            "34 a 39 anos": 74,
+            "40 a 46 anos": 74,
+            "47 anos ou mais": 82
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Até 25 anos": 131,
+            "26 a 33 anos": 103,
+            "34 a 39 anos": 79,
+            "40 a 46 anos": 79,
+            "47 anos ou mais": 89
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Até 25 anos": 135,
+            "26 a 33 anos": 108,
+            "34 a 39 anos": 83,
+            "40 a 46 anos": 83,
+            "47 anos ou mais": 94
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Até 25 anos": 140,
+            "26 a 33 anos": 113,
+            "34 a 39 anos": 88,
+            "40 a 46 anos": 88,
+            "47 anos ou mais": 105
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Até 25 anos": 143,
+            "26 a 33 anos": 126,
+            "34 a 39 anos": 92,
+            "40 a 46 anos": 92,
+            "47 anos ou mais": 125
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Até 25 anos": 150,
+            "26 a 33 anos": 132,
+            "34 a 39 anos": 109,
+            "40 a 46 anos": 109,
+            "47 anos ou mais": 129
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Até 25 anos": 158,
+            "26 a 33 anos": 136,
+            "34 a 39 anos": 122,
+            "40 a 46 anos": 122,
+            "47 anos ou mais": 155
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Até 25 anos": 168,
+            "26 a 33 anos": 142,
+            "34 a 39 anos": 153,
+            "40 a 46 anos": 153,
+            "47 anos ou mais": 164
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Até 25 anos": 178,
+            "26 a 33 anos": 170,
+            "34 a 39 anos": 162,
+            "40 a 46 anos": 162,
+            "47 anos ou mais": 176
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 59,
+      "title": "Normas do TEADI para a população geral de Santa Catarina por escolaridade",
+      "columns": [
+        "Fundamental",
+        "Médio",
+        "Superior"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Fundamental": -88,
+            "Médio": -15,
+            "Superior": -1
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Fundamental": -13,
+            "Médio": 21,
+            "Superior": 29
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Fundamental": 11,
+            "Médio": 45,
+            "Superior": 56
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Fundamental": 24,
+            "Médio": 59,
+            "Superior": 67
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Fundamental": 33,
+            "Médio": 66,
+            "Superior": 72
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Fundamental": 42,
+            "Médio": 77,
+            "Superior": 83
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Fundamental": 48,
+            "Médio": 83,
+            "Superior": 98
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Fundamental": 54,
+            "Médio": 90,
+            "Superior": 106
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Fundamental": 62,
+            "Médio": 96,
+            "Superior": 114
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Fundamental": 69,
+            "Médio": 103,
+            "Superior": 119
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Fundamental": 72,
+            "Médio": 107,
+            "Superior": 122
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Fundamental": 77,
+            "Médio": 112,
+            "Superior": 125
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Fundamental": 86,
+            "Médio": 117,
+            "Superior": 128
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Fundamental": 92,
+            "Médio": 126,
+            "Superior": 130
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Fundamental": 96,
+            "Médio": 132,
+            "Superior": 134
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Fundamental": 102,
+            "Médio": 137,
+            "Superior": 139
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Fundamental": 112,
+            "Médio": 141,
+            "Superior": 144
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Fundamental": 117,
+            "Médio": 147,
+            "Superior": 153
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Fundamental": 127,
+            "Médio": 156,
+            "Superior": 164
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Fundamental": 142,
+            "Médio": 167,
+            "Superior": 172
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Fundamental": 176,
+            "Médio": 176,
+            "Superior": 180
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 60,
+      "title": "Normas do TEADI para a população geral de São Paulo",
+      "columns": [
+        "Pontuação no TEADI"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Pontuação no TEADI": 4
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Pontuação no TEADI": 20
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Pontuação no TEADI": 37
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Pontuação no TEADI": 51
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Pontuação no TEADI": 63
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Pontuação no TEADI": 73
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Pontuação no TEADI": 79
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Pontuação no TEADI": 86
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Pontuação no TEADI": 92
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Pontuação no TEADI": 96
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Pontuação no TEADI": 101
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Pontuação no TEADI": 106
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Pontuação no TEADI": 110
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Pontuação no TEADI": 115
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Pontuação no TEADI": 119
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Pontuação no TEADI": 126
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Pontuação no TEADI": 132
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Pontuação no TEADI": 139
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Pontuação no TEADI": 148
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Pontuação no TEADI": 161
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Pontuação no TEADI": 174
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 61,
+      "title": "Normas do TEADI para a população geral de São Paulo por faixa etária",
+      "columns": [
+        "Até 25 anos",
+        "26 a 33 anos",
+        "34 a 39 anos",
+        "40 a 46 anos",
+        "47 anos ou mais"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Até 25 anos": 7,
+            "26 a 33 anos": -9,
+            "34 a 39 anos": -14,
+            "40 a 46 anos": -25,
+            "47 anos ou mais": -36
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Até 25 anos": 33,
+            "26 a 33 anos": 12,
+            "34 a 39 anos": 9,
+            "40 a 46 anos": 4,
+            "47 anos ou mais": 6
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Até 25 anos": 57,
+            "26 a 33 anos": 26,
+            "34 a 39 anos": 23,
+            "40 a 46 anos": 19,
+            "47 anos ou mais": 18
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Até 25 anos": 73,
+            "26 a 33 anos": 37,
+            "34 a 39 anos": 33,
+            "40 a 46 anos": 26,
+            "47 anos ou mais": 23
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Até 25 anos": 82,
+            "26 a 33 anos": 49,
+            "34 a 39 anos": 44,
+            "40 a 46 anos": 38,
+            "47 anos ou mais": 33
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Até 25 anos": 89,
+            "26 a 33 anos": 57,
+            "34 a 39 anos": 50,
+            "40 a 46 anos": 44,
+            "47 anos ou mais": 36
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Até 25 anos": 93,
+            "26 a 33 anos": 68,
+            "34 a 39 anos": 63,
+            "40 a 46 anos": 58,
+            "47 anos ou mais": 39
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Até 25 anos": 97,
+            "26 a 33 anos": 74,
+            "34 a 39 anos": 71,
+            "40 a 46 anos": 64,
+            "47 anos ou mais": 44
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Até 25 anos": 100,
+            "26 a 33 anos": 81,
+            "34 a 39 anos": 79,
+            "40 a 46 anos": 75,
+            "47 anos ou mais": 53
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Até 25 anos": 103,
+            "26 a 33 anos": 87,
+            "34 a 39 anos": 84,
+            "40 a 46 anos": 76,
+            "47 anos ou mais": 58
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Até 25 anos": 108,
+            "26 a 33 anos": 94,
+            "34 a 39 anos": 89,
+            "40 a 46 anos": 77,
+            "47 anos ou mais": 72
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Até 25 anos": 113,
+            "26 a 33 anos": 101,
+            "34 a 39 anos": 93,
+            "40 a 46 anos": 90,
+            "47 anos ou mais": 78
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Até 25 anos": 116,
+            "26 a 33 anos": 108,
+            "34 a 39 anos": 98,
+            "40 a 46 anos": 94,
+            "47 anos ou mais": 91
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Até 25 anos": 120,
+            "26 a 33 anos": 115,
+            "34 a 39 anos": 104,
+            "40 a 46 anos": 101,
+            "47 anos ou mais": 97
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Até 25 anos": 126,
+            "26 a 33 anos": 118,
+            "34 a 39 anos": 110,
+            "40 a 46 anos": 106,
+            "47 anos ou mais": 100
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Até 25 anos": 132,
+            "26 a 33 anos": 128,
+            "34 a 39 anos": 114,
+            "40 a 46 anos": 112,
+            "47 anos ou mais": 103
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Até 25 anos": 136,
+            "26 a 33 anos": 132,
+            "34 a 39 anos": 117,
+            "40 a 46 anos": 116,
+            "47 anos ou mais": 108
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Até 25 anos": 143,
+            "26 a 33 anos": 144,
+            "34 a 39 anos": 118,
+            "40 a 46 anos": 126,
+            "47 anos ou mais": 117
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Até 25 anos": 152,
+            "26 a 33 anos": 149,
+            "34 a 39 anos": 126,
+            "40 a 46 anos": 130,
+            "47 anos ou mais": 130
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Até 25 anos": 164,
+            "26 a 33 anos": 164,
+            "34 a 39 anos": 133,
+            "40 a 46 anos": 159,
+            "47 anos ou mais": 141
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Até 25 anos": 179,
+            "26 a 33 anos": 171,
+            "34 a 39 anos": 156,
+            "40 a 46 anos": 168,
+            "47 anos ou mais": 149
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 62,
+      "title": "Normas do TEADI para a população geral de São Paulo por escolaridade",
+      "columns": [
+        "Fundamental",
+        "Médio",
+        "Superior"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Fundamental": -29,
+            "Médio": 20,
+            "Superior": 26
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Fundamental": 9,
+            "Médio": 39,
+            "Superior": 66
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Fundamental": 20,
+            "Médio": 57,
+            "Superior": 84
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Fundamental": 30,
+            "Médio": 68,
+            "Superior": 89
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Fundamental": 39,
+            "Médio": 71,
+            "Superior": 95
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Fundamental": 47,
+            "Médio": 77,
+            "Superior": 98
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Fundamental": 55,
+            "Médio": 80,
+            "Superior": 99
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Fundamental": 58,
+            "Médio": 86,
+            "Superior": 101
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Fundamental": 63,
+            "Médio": 92,
+            "Superior": 104
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Fundamental": 69,
+            "Médio": 95,
+            "Superior": 106
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Fundamental": 75,
+            "Médio": 100,
+            "Superior": 112
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Fundamental": 83,
+            "Médio": 106,
+            "Superior": 114
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Fundamental": 88,
+            "Médio": 110,
+            "Superior": 117
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Fundamental": 94,
+            "Médio": 115,
+            "Superior": 119
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Fundamental": 97,
+            "Médio": 117,
+            "Superior": 121
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Fundamental": 104,
+            "Médio": 125,
+            "Superior": 129
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Fundamental": 112,
+            "Médio": 132,
+            "Superior": 134
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Fundamental": 121,
+            "Médio": 144,
+            "Superior": 142
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Fundamental": 128,
+            "Médio": 152,
+            "Superior": 151
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Fundamental": 135,
+            "Médio": 163,
+            "Superior": 162
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Fundamental": 165,
+            "Médio": 179,
+            "Superior": 180
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 63,
+      "title": "Normas do TEADI para a população geral de Sergipe",
+      "columns": [
+        "Pontuação no TEADI"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Pontuação no TEADI": -50
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Pontuação no TEADI": 23
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Pontuação no TEADI": 50
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Pontuação no TEADI": 70
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Pontuação no TEADI": 83
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Pontuação no TEADI": 92
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Pontuação no TEADI": 100
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Pontuação no TEADI": 106
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Pontuação no TEADI": 112
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Pontuação no TEADI": 119
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Pontuação no TEADI": 124
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Pontuação no TEADI": 129
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Pontuação no TEADI": 134
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Pontuação no TEADI": 140
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Pontuação no TEADI": 144
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Pontuação no TEADI": 149
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Pontuação no TEADI": 154
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Pontuação no TEADI": 160
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Pontuação no TEADI": 164
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Pontuação no TEADI": 173
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Pontuação no TEADI": 180
+          }
+        }
+      ]
+    },
+    {
+      "table_number": 64,
+      "title": "Normas do TEADI para a população geral de Sergipe por faixa etária",
+      "columns": [
+        "Até 25 anos",
+        "26 a 33 anos",
+        "34 a 39 anos",
+        "40 a 46 anos",
+        "47 anos ou mais"
+      ],
+      "data": [
+        {
+          "classificacao": "Inferior",
+          "percentil": 1,
+          "scores": {
+            "Até 25 anos": -10,
+            "26 a 33 anos": -56,
+            "34 a 39 anos": -59,
+            "40 a 46 anos": -59,
+            "47 anos ou mais": -59
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 5,
+          "scores": {
+            "Até 25 anos": 46,
+            "26 a 33 anos": 3,
+            "34 a 39 anos": -50,
+            "40 a 46 anos": -59,
+            "47 anos ou mais": -59
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 10,
+          "scores": {
+            "Até 25 anos": 74,
+            "26 a 33 anos": 29,
+            "34 a 39 anos": -17,
+            "40 a 46 anos": 17,
+            "47 anos ou mais": -59
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 15,
+          "scores": {
+            "Até 25 anos": 84,
+            "26 a 33 anos": 49,
+            "34 a 39 anos": 31,
+            "40 a 46 anos": 22,
+            "47 anos ou mais": -50
+          }
+        },
+        {
+          "classificacao": "Inferior",
+          "percentil": 20,
+          "scores": {
+            "Até 25 anos": 93,
+            "26 a 33 anos": 68,
+            "34 a 39 anos": 46,
+            "40 a 46 anos": 26,
+            "47 anos ou mais": -31
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 25,
+          "scores": {
+            "Até 25 anos": 101,
+            "26 a 33 anos": 75,
+            "34 a 39 anos": 59,
+            "40 a 46 anos": 50,
+            "47 anos ou mais": -8
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 30,
+          "scores": {
+            "Até 25 anos": 106,
+            "26 a 33 anos": 83,
+            "34 a 39 anos": 65,
+            "40 a 46 anos": 55,
+            "47 anos ou mais": -8
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 35,
+          "scores": {
+            "Até 25 anos": 113,
+            "26 a 33 anos": 94,
+            "34 a 39 anos": 91,
+            "40 a 46 anos": 61,
+            "47 anos ou mais": 10
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 40,
+          "scores": {
+            "Até 25 anos": 119,
+            "26 a 33 anos": 101,
+            "34 a 39 anos": 95,
+            "40 a 46 anos": 65,
+            "47 anos ou mais": 13
+          }
+        },
+        {
+          "classificacao": "Médio Inferior",
+          "percentil": 45,
+          "scores": {
+            "Até 25 anos": 124,
+            "26 a 33 anos": 107,
+            "34 a 39 anos": 101,
+            "40 a 46 anos": 70,
+            "47 anos ou mais": 16
+          }
+        },
+        {
+          "classificacao": "Médio",
+          "percentil": 50,
+          "scores": {
+            "Até 25 anos": 128,
+            "26 a 33 anos": 125,
+            "34 a 39 anos": 112,
+            "40 a 46 anos": 78,
+            "47 anos ou mais": 23
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 55,
+          "scores": {
+            "Até 25 anos": 132,
+            "26 a 33 anos": 130,
+            "34 a 39 anos": 117,
+            "40 a 46 anos": 82,
+            "47 anos ou mais": 34
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 60,
+          "scores": {
+            "Até 25 anos": 136,
+            "26 a 33 anos": 138,
+            "34 a 39 anos": 120,
+            "40 a 46 anos": 91,
+            "47 anos ou mais": 45
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 65,
+          "scores": {
+            "Até 25 anos": 141,
+            "26 a 33 anos": 141,
+            "34 a 39 anos": 131,
+            "40 a 46 anos": 104,
+            "47 anos ou mais": 61
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 70,
+          "scores": {
+            "Até 25 anos": 146,
+            "26 a 33 anos": 145,
+            "34 a 39 anos": 141,
+            "40 a 46 anos": 109,
+            "47 anos ou mais": 80
+          }
+        },
+        {
+          "classificacao": "Médio Superior",
+          "percentil": 75,
+          "scores": {
+            "Até 25 anos": 150,
+            "26 a 33 anos": 147,
+            "34 a 39 anos": 147,
+            "40 a 46 anos": 110,
+            "47 anos ou mais": 99
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 80,
+          "scores": {
+            "Até 25 anos": 156,
+            "26 a 33 anos": 153,
+            "34 a 39 anos": 152,
+            "40 a 46 anos": 115,
+            "47 anos ou mais": 106
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 85,
+          "scores": {
+            "Até 25 anos": 162,
+            "26 a 33 anos": 158,
+            "34 a 39 anos": 158,
+            "40 a 46 anos": 124,
+            "47 anos ou mais": 109
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 90,
+          "scores": {
+            "Até 25 anos": 169,
+            "26 a 33 anos": 163,
+            "34 a 39 anos": 162,
+            "40 a 46 anos": 133,
+            "47 anos ou mais": 111
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 95,
+          "scores": {
+            "Até 25 anos": 175,
+            "26 a 33 anos": 171,
+            "34 a 39 anos": 168,
+            "40 a 46 anos": 142,
+            "47 anos ou mais": 112
+          }
+        },
+        {
+          "classificacao": "Superior",
+          "percentil": 99,
+          "scores": {
+            "Até 25 anos": 180,
+            "26 a 33 anos": 177,
+            "34 a 39 anos": 169,
+            "40 a 46 anos": 142,
+            "47 anos ou mais": 112
+          }
+        }
+      ]
+    }
+  ]
+}

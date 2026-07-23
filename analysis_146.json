@@ -1,0 +1,569 @@
+{
+  "reativar": [],
+  "novos": [
+    {
+      "nome": "ALEXANDRE DA SILVA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "CLAISON DE PAULA DA FONSECA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "CLAUDIA DA FONSECA LEITZKE",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "DAIANE PINTO DUARTE",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "DIEGO DOS ANJOS ROCKEMBACH",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "ELIZIANE ROCHEL GONCALVES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "GABRIELA RODRIGUES RUBIM",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "GUILHERME LOUZADA DE FREITAS",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "JOYCE CAROLINE DA SILVA MARQUES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "MOACIR DA SILVA BILHALVA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "PRISCILA HIRSCHMANN DA CRUZ",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "SUELEN DIAS CAVALHEIRO",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "TAIANE DE FREITAS GONCALVES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "ALEX ALEXANDRE GOMES DA CUNHA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "FELIPE SILVEIRA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "GERALD DA SILVA DUARTE",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "ILTON DE FREITAS DOS SANTOS",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "JOSE LUIS GOMES ABELAIRA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "JULISMAR BORGES BRITO",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "LEANDRO FERNANDES CORREA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "MARCELO XAVIER LOPES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "MAURICIO NUNES DE OLIVEIRA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "RAFAELA DIAS GONCALVES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "ROBSON VIEIRA ABEL",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "RUBENS CORREA SILVEIRA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "CARINA MEDEIROS",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "CLAUDIO LAERTE MACHADO LOPES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "DANIEL DUARTE SILVEIRA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "ERIVELTON MACHADO DA SILVA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "JARDEL MACHADO RODRIGUES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "JOAO CARLOS LOPES DE LIMA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "KLEBER GOULART NUNES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "MARIA LORECI MESQUITA PORTO",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "SAMUEL PEREIRA RAMSON",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "CASSIO PETER LAUTENSCHLAGER",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "JOSE MANOEL MONTEIRO CUNHA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "RUDIMAR TEIROBA ALVES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "JAMILE MOURA DIAS",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "ADRIAN BUENO MASCARENHAS",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "CARLOS ROBERTO MACHADO DIAS",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "CARLOS ROBERTO XAVIER DA SILVA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "CLAUDINEI SANTOS DOS SANTOS",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "CRISTIANO DE MOURA CAMPOS",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "ELVEND JOSE ROMERO MATUTE",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "FABRICIO DA SILVA WASIELESKI PEREIRA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "FELIPE DIAS MOREIRA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "FELIPE RODRIGUES RIBEIRO",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "FRANCK VIEIRA GONCALVES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "HENRIQUE OLIVEIRA JANNER",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "JOSIELE DOS SANTOS SOARES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "LETICIA KOLLING DOS SANTOS",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "LUIS AUGUSTO DA SILVA MEVS",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "MARCO ANTONIO MADRUGA GOMES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "PIERO COSTA FERNANDES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "RENI JESUS BARROS DOS SANTOS",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "SELMAR DA SILVA DE SOUZA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "TAMARA BOHRER RICKES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "ADAO PAULO DA COSTA MAIA",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "ALCIR DUARTE DE QUEVEDO",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "CARLOS LEONEL LOPES DE LIMA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "JULIANO TAVARES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "LUAN DE AZEVEDO ALVES",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "LUCAS BOTELHO VASCONCELLOS",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "LUCIANO DUARTE DE SOUZA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "RENATO GONCALVES LEMOS",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "THAINARA FERNANDES CORREA",
+      "empresa": "Spe Moov Residencial LTDA"
+    },
+    {
+      "nome": "RAFAEL DE CANTOS MARTINS",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "HERNANDES LUIS CORREA CAMPOS",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "ROBERTO LUIS DOS SANTOS MARTINS",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "ALEXANDRE TABELIAO DA ROCHA",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "ANTONIO CARLOS DE SOUZA FEIJO",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "CARLOS ROBERTO GONCALVES DE OLIVEIRA",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "CHARLES AVILA WITTER",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "CLAUDINO MELLO OLIVEIRA",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "DANIEL RIBEIRO DE SOUZA",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "FRANCISCO CARLOS DUARTE DE DUARTE",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "IVAN FRANCISCO PEDROSO MATIAS",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "JOAO CARLOS SILVA DA SILVA",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "JOSE DIOGO DA SILVA NETO",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "JOSE RENATO LUCAS DA SILVA",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "LUCAS COSTA QUEVEDO",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "LUIS FELIPE CUNHA LEROY",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "MAICON PEDROSO ROSA",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "MIGUEL SILVA DUTRA",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "PATRICK MARTINS HERNANDEZ",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "PAULO CESAR DE MOURA MARTTA",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "PAULO OTAVIO NUNES BARBOZA",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "RAFAEL SILVEIRA BELASQUEM",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "RAINAN BRIZOLARA PRESTES",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "RENATA MATIAS GUIMARAES",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "SYMON ARRUDA RIOS",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "VAGNER BASTOS DA CUNHA",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "VINICIUS GARCIA FURTADO",
+      "empresa": "Spe Connect Duque Residence LTDA"
+    },
+    {
+      "nome": "ANGELICA VALDES DA SILVA",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "ANNA BEATRIZ PERCEGO",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "CLAUDIO DE SOUZA MORGADO",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "DIEGO BARBOSA VALDEZ",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "DIONATHAN WILLIAM DUARTE DOS SANTOS",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "GREGORY RAFAEL GEHLING",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "HALLAN PIERRE MARIN URQUIA",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "ISRAEL RODALLES RODRIGUES",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "JOAO CARLOS DOS SANTOS ROSARIO JUNIOR",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "JONATHAN SAN MARTIN ANASTACIO",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "LUCAS BEZERRA DE JESUS",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "LUIGI BRAGA SAN MARTINS",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "LUIZ PAULO OLIVEIRA MENDES",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "MAICON GONCALVES NORONHA",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "NICOLAS VARGAS RODRIGUES",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "PAULO HENRIQUE DA CONCEICAO MORAES",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "RANIELI FERNANDES PADILHA",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "RICHAR GOMES DUTRA",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "VALDINEI DA CONCEICAO",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "VINICIOS SILVEIRA THURMER",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "ALEXANDRE COELHO BELEM",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "ANDRE LUIZ FONSECA LOPES ROLLO",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "ANTONIO ELISEU MARIA",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "CLEIDIOSNI RIBAS PINTO",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "DIEGO PIERRE URQUIA PACHECO",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "EDERSON ROGERIO MARTINS DOS PASSOS",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "FLORDUALDO DE SOUZA LOPES",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "FRANCESCO DE OLIVEIRA DAMASCENO",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "JAIRO LUIS LUGO MORGADO",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "JOSE WILIAN DA SILVA CORDEIRO",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "JULIO CEZAR FURTADO DOS SANTOS",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "KAUAN CHAGAS GARCEZ",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "KEWIN PIERRE NOVO URQUIA",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "LUIS CARLOS DOS SANTOS",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "MARCOS DARLAN NUNES NEVES",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "MARCOS SOTTER VERGARA",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "MARISTELA DA SILVA BEZERRA",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "MATHEUS PLADIEL GARCIA",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "PAULO ROBERTO DOS SANTOS SALUM",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "ROGERIO FARIAS TERRA",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "ROSA MARIA SILVEIRA DOS SANTOS",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "THAUANY VERGARA BRUM",
+      "empresa": "Acpo Life.rio Grande Spe LTDA"
+    },
+    {
+      "nome": "WESLEY MORAES LEITE",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "ANDRE OLIVEIRA DE SOUZA",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "ELISANDRO DA ROSA NOGUEZ",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "GIOVANA MARTINS DA SILVA",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "LUIZ CUNHA FILHO",
+      "empresa": "Nao identificada (Usar Construtora)"
+    },
+    {
+      "nome": "ROBERTO CARLOS BARBOSA",
+      "empresa": "Nao identificada (Usar Construtora)"
+    }
+  ]
+}

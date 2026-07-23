@@ -11,6 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 type PsychologicalTestInput = {
   test_name: string;
+  table_name?: string;
+  demographic_type?: string;
+  demographic_value?: string;
   score: string | number;
   factors?: {
     N?: string | number;
@@ -124,6 +127,258 @@ async function generateTestText(testName: string, classification: string): Promi
   }
 }
 
+
+const TEST_OPTIONS: Record<string, { table_name: string; demographic_type?: string; demographic_value?: string; label: string }[]> = {
+  "TEADI": [
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Geral",
+      "demographic_value": "Geral",
+      "label": "População Geral - Brasil"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "Até 25 anos",
+      "label": "População Geral - Brasil (Até 25 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "26 a 33 anos",
+      "label": "População Geral - Brasil (26 a 33 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "34 a 39 anos",
+      "label": "População Geral - Brasil (34 a 39 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "40 a 46 anos",
+      "label": "População Geral - Brasil (40 a 46 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "47 anos ou mais",
+      "label": "População Geral - Brasil (47 anos ou mais) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Escolaridade",
+      "demographic_value": "Ensino Fundamental",
+      "label": "População Geral - Brasil (Ensino Fundamental) - Escolaridade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Escolaridade",
+      "demographic_value": "Ensino Médio",
+      "label": "População Geral - Brasil (Ensino Médio) - Escolaridade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Escolaridade",
+      "demographic_value": "Superior",
+      "label": "População Geral - Brasil (Superior) - Escolaridade"
+    }
+  ],
+  "TEALT": [
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Geral",
+      "demographic_value": "Geral",
+      "label": "População Geral - Brasil"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "Até 22 anos",
+      "label": "População Geral - Brasil (Até 22 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "23 a 30 anos",
+      "label": "População Geral - Brasil (23 a 30 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "31 a 37 anos",
+      "label": "População Geral - Brasil (31 a 37 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "38 a 44 anos",
+      "label": "População Geral - Brasil (38 a 44 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "45 anos ou mais",
+      "label": "População Geral - Brasil (45 anos ou mais) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Escolaridade",
+      "demographic_value": "Ensino Fundamental",
+      "label": "População Geral - Brasil (Ensino Fundamental) - Escolaridade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Escolaridade",
+      "demographic_value": "Ensino Médio",
+      "label": "População Geral - Brasil (Ensino Médio) - Escolaridade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Escolaridade",
+      "demographic_value": "Superior",
+      "label": "População Geral - Brasil (Superior) - Escolaridade"
+    }
+  ],
+  "TEACO-FF": [
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Geral",
+      "demographic_value": "Geral",
+      "label": "População Geral - Brasil"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "18 a 19 anos",
+      "label": "População Geral - Brasil (18 a 19 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "20 a 29 anos",
+      "label": "População Geral - Brasil (20 a 29 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "30 a 39 anos",
+      "label": "População Geral - Brasil (30 a 39 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "40 a 49 anos",
+      "label": "População Geral - Brasil (40 a 49 anos) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Idade",
+      "demographic_value": "50 anos ou mais",
+      "label": "População Geral - Brasil (50 anos ou mais) - Idade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Escolaridade",
+      "demographic_value": "Ensino Fundamental",
+      "label": "População Geral - Brasil (Ensino Fundamental) - Escolaridade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Escolaridade",
+      "demographic_value": "Ensino Médio",
+      "label": "População Geral - Brasil (Ensino Médio) - Escolaridade"
+    },
+    {
+      "table_name": "População Geral - Brasil",
+      "demographic_type": "Escolaridade",
+      "demographic_value": "Superior",
+      "label": "População Geral - Brasil (Superior) - Escolaridade"
+    },
+    {
+      "table_name": "Tabela 43. População Geral - Brasil",
+      "label": "Tabela 43. População Geral - Brasil"
+    },
+    {
+      "table_name": "Tabela 44. População Geral - Brasil (Ensino Fundamental)",
+      "label": "Tabela 44. População Geral - Brasil (Ensino Fundamental)"
+    },
+    {
+      "table_name": "Tabela 44. População Geral - Brasil (Ensino Médio)",
+      "label": "Tabela 44. População Geral - Brasil (Ensino Médio)"
+    },
+    {
+      "table_name": "Tabela 44. População Geral - Brasil (Ensino Superior)",
+      "label": "Tabela 44. População Geral - Brasil (Ensino Superior)"
+    },
+    {
+      "table_name": "Tabela 55. População Geral - São Paulo",
+      "label": "Tabela 55. População Geral - São Paulo"
+    }
+  ],
+  "NEO PI-R": [
+    {
+      "table_name": "Geral",
+      "demographic_type": "Geral",
+      "demographic_value": "Geral",
+      "label": "Geral"
+    },
+    {
+      "table_name": "Masculino",
+      "demographic_type": "Sexo",
+      "demographic_value": "Masculino",
+      "label": "Masculino - Sexo"
+    },
+    {
+      "table_name": "Feminino",
+      "demographic_type": "Sexo",
+      "demographic_value": "Feminino",
+      "label": "Feminino - Sexo"
+    }
+  ],
+  "NEO FFI-R": [
+    {
+      "table_name": "Geral",
+      "demographic_type": "Geral",
+      "demographic_value": "Geral",
+      "label": "Geral"
+    },
+    {
+      "table_name": "Masculino",
+      "demographic_type": "Sexo",
+      "demographic_value": "Masculino",
+      "label": "Masculino - Sexo"
+    },
+    {
+      "table_name": "Feminino",
+      "demographic_type": "Sexo",
+      "demographic_value": "Feminino",
+      "label": "Feminino - Sexo"
+    }
+  ],
+  "G36": [
+    {
+      "table_name": "Tabela 20. Seleção de São Paulo",
+      "demographic_type": "Ensino Médio",
+      "demographic_value": "",
+      "label": "Tabela 20. Seleção de São Paulo - Ensino Médio"
+    },
+    {
+      "table_name": "Tabela 20. Seleção de São Paulo",
+      "demographic_type": "Superior",
+      "demographic_value": "",
+      "label": "Tabela 20. Seleção de São Paulo - Superior"
+    },
+    {
+      "table_name": "Tabela 20. Seleção de São Paulo",
+      "demographic_type": "Geral",
+      "demographic_value": "",
+      "label": "Tabela 20. Seleção de São Paulo"
+    }
+  ]
+};
+
 export default function EntrevistasPage() {
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [query, setQuery] = useState("");
@@ -164,6 +419,9 @@ export default function EntrevistasPage() {
             .from('psychological_norms')
             .select('*')
             .eq('test_name', test.test_name)
+            .eq('table_name', test.table_name || '')
+            .eq('demographic_type', test.demographic_type || '')
+            .eq('demographic_value', test.demographic_value || '')
             .eq('factor', f)
             .lte('min_score', numScore)
             .gte('max_score', numScore)
@@ -179,6 +437,9 @@ export default function EntrevistasPage() {
           .from('psychological_norms')
           .select('*')
           .eq('test_name', test.test_name)
+          .eq('table_name', test.table_name || '')
+          .eq('demographic_type', test.demographic_type || '')
+          .eq('demographic_value', test.demographic_value || '')
           .lte('min_score', numScore)
           .gte('max_score', numScore)
           .limit(1);
@@ -818,8 +1079,18 @@ Resultado Final: ${form.result || "N/C"}
                                   <Label>Nome do Teste</Label>
                                   <select value={t.test_name} onChange={e => {
                                       const list = [...(assessmentForm.tests_list || [])];
-                                      list[index] = { ...list[index], test_name: e.target.value };
-                                      if (e.target.value.includes("NEO")) list[index].factors = {N:"", E:"", O:"", A:"", C:""};
+                                      const newTest = e.target.value;
+                                      list[index] = { ...list[index], test_name: newTest };
+                                      if (newTest.includes("NEO")) list[index].factors = {N:"", E:"", O:"", A:"", C:""};
+                                      
+                                      const opts = TEST_OPTIONS[newTest];
+                                      if (opts && opts.length > 0) {
+                                        list[index].table_name = opts[0].table_name;
+                                        list[index].demographic_type = opts[0].demographic_type;
+                                        list[index].demographic_value = opts[0].demographic_value;
+                                      } else {
+                                        list[index].table_name = ""; list[index].demographic_type = ""; list[index].demographic_value = "";
+                                      }
                                       setAssessmentForm(p => ({...p, tests_list: list}));
                                     }}
                                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm">
@@ -828,8 +1099,25 @@ Resultado Final: ${form.result || "N/C"}
                                     <option value="TEADI">TEADI (Atenção Dividida)</option>
                                     <option value="TEACO-FF">TEACO-FF (Atenção Concentrada)</option>
                                     <option value="NEO PI-R">NEO PI-R (Personalidade)</option>
-                                    <option value="NEO FFI">NEO FFI (Personalidade)</option>
+                                    <option value="NEO FFI-R">NEO FFI-R (Personalidade)</option>
                                     <option value="Palográfico">Palográfico</option>
+                                  </select>
+                                </div>
+                                <div className="flex-[2] space-y-1">
+                                  <Label>Tabela Normativa</Label>
+                                  <select value={t.table_name + "|" + t.demographic_type + "|" + t.demographic_value} onChange={e => {
+                                      const [tb, dt, dv] = e.target.value.split('|');
+                                      const list = [...(assessmentForm.tests_list || [])];
+                                      list[index] = { ...list[index], table_name: tb, demographic_type: dt, demographic_value: dv };
+                                      setAssessmentForm(p => ({...p, tests_list: list}));
+                                    }}
+                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm truncate">
+                                    {(TEST_OPTIONS[t.test_name] || []).map((opt, i) => (
+                                      <option key={i} value={`${opt.table_name}|${opt.demographic_type}|${opt.demographic_value}`}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                    {!(TEST_OPTIONS[t.test_name] || []).length && <option value="||">Nenhuma tabela (Teste não cadastrado)</option>}
                                   </select>
                                 </div>
                                 {!isNeo && (

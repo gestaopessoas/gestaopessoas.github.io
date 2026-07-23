@@ -1,0 +1,1271 @@
+[
+  {
+    "id": "0c2f954f-c3e1-4339-b992-40da4460d200",
+    "name": "ALEXANDRE DA SILVA",
+    "registration_number": "19830",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "eedd2b72-e965-4a51-8240-de502ff75abf",
+    "name": "CLAISON DE PAULA DA FONSECA",
+    "registration_number": "19832",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "ada599d8-582f-47ec-89b5-6aaf133b7d8b",
+    "name": "CLAUDIA DA FONSECA LEITZKE",
+    "registration_number": "19833",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "f81d4a38-57c0-4b2f-b288-2c1707a93b5e",
+    "name": "DAIANE PINTO DUARTE",
+    "registration_number": "19834",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "75259ced-d947-473d-815e-81e960187d70",
+    "name": "DIEGO DOS ANJOS ROCKEMBACH",
+    "registration_number": "19835",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "78fafaa4-63da-401b-ae5b-db088cc668a4",
+    "name": "ELIZIANE ROCHEL GONCALVES",
+    "registration_number": "19836",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "097c2ce4-ab54-4440-8e15-425764b6f9c2",
+    "name": "GABRIELA RODRIGUES RUBIM",
+    "registration_number": "19840",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "4bae0d75-8879-4c0e-b5fe-98f26194cb26",
+    "name": "GUILHERME LOUZADA DE FREITAS",
+    "registration_number": "19843",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "f2a94f39-298a-4876-b019-843318533214",
+    "name": "JOYCE CAROLINE DA SILVA MARQUES",
+    "registration_number": "19844",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "0e8ac115-2002-4adb-a8d7-79a06ac7e178",
+    "name": "MOACIR DA SILVA BILHALVA",
+    "registration_number": "19849",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "3d12b8a0-3649-46f0-afc5-4e1dbb782c3c",
+    "name": "PRISCILA HIRSCHMANN DA CRUZ",
+    "registration_number": "19854",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "9b0c60dc-523e-4bef-a6b1-c99f30b21fc1",
+    "name": "SUELEN DIAS CAVALHEIRO",
+    "registration_number": "19735",
+    "admission_date": "2026-03-16",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "1888136a-add8-47dc-9d78-7fa5b91dd850",
+    "name": "TAIANE DE FREITAS GONCALVES",
+    "registration_number": "19856",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "5b6bdb3c-f563-4a82-95db-15422e96e1bf",
+    "name": "ALEX ALEXANDRE GOMES DA CUNHA",
+    "registration_number": "19893",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "e4ea7a9c-837f-43e2-b576-215789b33d9b",
+    "name": "FELIPE SILVEIRA",
+    "registration_number": "19894",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "fe920d6a-da8b-4356-ae62-444faad2265b",
+    "name": "GERALD DA SILVA DUARTE",
+    "registration_number": "19895",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "b36d403f-63c9-43ea-a8b2-ffcc3d33919e",
+    "name": "ILTON DE FREITAS DOS SANTOS",
+    "registration_number": "19896",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "10717244-bd2b-4c14-9a2b-414f362cda23",
+    "name": "JOSE LUIS GOMES ABELAIRA",
+    "registration_number": "19897",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "3b2a1445-bfe6-48bf-9b7f-942589b49363",
+    "name": "JULISMAR BORGES BRITO",
+    "registration_number": "19898",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "c94787c8-18ce-4a5c-8a52-f752f242e5ba",
+    "name": "LEANDRO FERNANDES CORREA",
+    "registration_number": "19899",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "3cf90e6f-04ba-4965-ae76-c16a08467161",
+    "name": "MARCELO XAVIER LOPES",
+    "registration_number": "19900",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "12798e7b-5b88-4e2c-ab0e-1fa77f8eb671",
+    "name": "MAURICIO NUNES DE OLIVEIRA",
+    "registration_number": "19847",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "ce209317-5d1b-49f3-b5da-b215f6d52724",
+    "name": "RAFAELA DIAS GONCALVES",
+    "registration_number": "19902",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "018be270-eb4c-4fbe-80ef-0b9e273fa6d7",
+    "name": "ROBSON VIEIRA ABEL",
+    "registration_number": "19810",
+    "admission_date": "2019-02-25",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "be55ac37-3cfe-4c23-ab56-aebef736515c",
+    "name": "RUBENS CORREA SILVEIRA",
+    "registration_number": "19826",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "5d2df942-b60a-4670-87b7-4609480eaa25",
+    "name": "CARINA MEDEIROS",
+    "registration_number": null,
+    "admission_date": null,
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "d442bc03-e34b-4733-a3aa-85c5a4b19134",
+    "name": "CLAUDIO LAERTE MACHADO LOPES",
+    "registration_number": "19802",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "35ed5eb2-93be-4eb3-add6-5d4e667be637",
+    "name": "DANIEL DUARTE SILVEIRA",
+    "registration_number": "19803",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "d1942aa0-1d46-4945-940c-11fa79c06286",
+    "name": "ERIVELTON MACHADO DA SILVA",
+    "registration_number": "19804",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "1b443383-8066-4607-b150-03132b60ee3e",
+    "name": "JARDEL MACHADO RODRIGUES",
+    "registration_number": "19806",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "c9a725c4-4538-4ca7-be95-751f8c3f26c6",
+    "name": "JOAO CARLOS LOPES DE LIMA",
+    "registration_number": "19807",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "078b5817-8919-4d10-b151-42eb11e7d59c",
+    "name": "KLEBER GOULART NUNES",
+    "registration_number": "19808",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "7d342543-eaba-4e9a-b7aa-0f9b692b966a",
+    "name": "MARIA LORECI MESQUITA PORTO",
+    "registration_number": "19886",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "38ceaae7-7f43-4ad8-9d32-43c25bce95de",
+    "name": "SAMUEL PEREIRA RAMSON",
+    "registration_number": "19887",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "69818e62-a543-46f9-9f70-b95639884425",
+    "name": "CASSIO PETER LAUTENSCHLAGER",
+    "registration_number": "19572",
+    "admission_date": "2025-06-02",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "db8b5527-b7e5-4d0b-951e-89cac78a783e",
+    "name": "JOSE MANOEL MONTEIRO CUNHA",
+    "registration_number": "19437",
+    "admission_date": "2024-12-02",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "be79b98b-03f0-492d-8463-c9ff1de5e687",
+    "name": "RUDIMAR TEIROBA ALVES",
+    "registration_number": "19503",
+    "admission_date": "2025-03-11",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "cae14ae8-b52d-4bb2-80d6-023d50f32531",
+    "name": "JAMILE MOURA DIAS",
+    "registration_number": "19827",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "62e04b96-958e-4542-89eb-757daa838461",
+    "name": "ADRIAN BUENO MASCARENHAS",
+    "registration_number": "19889",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "811f5985-e1d9-43df-afe0-bbbbb634fcca",
+    "name": "CARLOS ROBERTO MACHADO DIAS",
+    "registration_number": "19587",
+    "admission_date": "2025-06-12",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "9b593281-15a5-4066-8438-63d8c5e3ce0e",
+    "name": "CARLOS ROBERTO XAVIER DA SILVA",
+    "registration_number": "19801",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "8f80a6ac-9f9d-4bbf-8062-60605ee8513f",
+    "name": "CLAUDINEI SANTOS DOS SANTOS",
+    "registration_number": "19615",
+    "admission_date": "2025-07-21",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "6aebe471-45d4-45ba-832f-ac1ba5b21838",
+    "name": "CRISTIANO DE MOURA CAMPOS",
+    "registration_number": "19890",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "10401fda-1068-46db-8355-b77aafd5d76c",
+    "name": "ELVEND JOSE ROMERO MATUTE",
+    "registration_number": "19907",
+    "admission_date": "2026-07-09",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "ceb06c5b-d88e-401a-809e-31d1b45159a5",
+    "name": "FABRICIO DA SILVA WASIELESKI PEREIRA",
+    "registration_number": "19684",
+    "admission_date": "2025-12-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "474b16d5-c2ac-4da7-b4e9-270363346d0b",
+    "name": "FELIPE DIAS MOREIRA",
+    "registration_number": "19570",
+    "admission_date": "2025-06-02",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "68d9189e-a7f2-469e-9fec-cf680dab9eaa",
+    "name": "FELIPE RODRIGUES RIBEIRO",
+    "registration_number": "19519",
+    "admission_date": "2025-04-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "e422433f-75bb-4a04-bb85-53ce975ffe2e",
+    "name": "FRANCK VIEIRA GONCALVES",
+    "registration_number": "19732",
+    "admission_date": "2026-03-16",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "d95037c3-16c9-4c0e-b9c4-f1df69fe6666",
+    "name": "HENRIQUE OLIVEIRA JANNER",
+    "registration_number": "19470",
+    "admission_date": "2025-02-04",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "870be9db-8990-48b0-a4db-9d9ba0bee25c",
+    "name": "JOSIELE DOS SANTOS SOARES",
+    "registration_number": "19891",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "5e0ef145-e16c-4a32-970b-e9aacf2b6a8e",
+    "name": "LETICIA KOLLING DOS SANTOS",
+    "registration_number": "19916",
+    "admission_date": "2026-07-15",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "6c262381-967d-46fe-9d23-e9ac6527da71",
+    "name": "LUIS AUGUSTO DA SILVA MEVS",
+    "registration_number": "19594",
+    "admission_date": "2025-06-24",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "dd194161-f5ed-47bd-8adf-1e830840eeac",
+    "name": "MARCO ANTONIO MADRUGA GOMES",
+    "registration_number": "19892",
+    "admission_date": "2026-07-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "0e1f3f30-fe41-4d1d-8e38-551ca9708bdf",
+    "name": "PIERO COSTA FERNANDES",
+    "registration_number": "19664",
+    "admission_date": "2025-10-15",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "6fbc1c59-3ebf-48e0-b226-21fac8f4a5f0",
+    "name": "RENI JESUS BARROS DOS SANTOS",
+    "registration_number": "19600",
+    "admission_date": "2025-07-02",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "d9e907f7-e0fd-4792-ba6f-ecb92e15dc96",
+    "name": "SELMAR DA SILVA DE SOUZA",
+    "registration_number": "19860",
+    "admission_date": "2026-06-01",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "9d242c8a-f9d4-4ae9-bb8c-0b5737bb3d35",
+    "name": "TAMARA BOHRER RICKES",
+    "registration_number": "19588",
+    "admission_date": "2025-06-16",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "cb2c9880-9c8b-4cb0-9029-01f9261460d4",
+    "name": "ADAO PAULO DA COSTA MAIA",
+    "registration_number": "19733",
+    "admission_date": "2026-03-16",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "ab4fa9af-7220-4211-932a-c6aa713ebc1f",
+    "name": "ALCIR DUARTE DE QUEVEDO",
+    "registration_number": "19766",
+    "admission_date": "2026-05-04",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "2ecb39b1-9280-4547-bef8-bc75b669aceb",
+    "name": "CARLOS LEONEL LOPES DE LIMA",
+    "registration_number": "19708",
+    "admission_date": "2026-02-09",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "615f4d9a-9758-4cd5-9335-8b4cc8d72838",
+    "name": "JULIANO TAVARES",
+    "registration_number": "19636",
+    "admission_date": "2025-08-25",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "40f6996a-ba48-4824-8d92-c7b64eecbbee",
+    "name": "LUAN DE AZEVEDO ALVES",
+    "registration_number": "19911",
+    "admission_date": "2026-07-14",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "e0ed6678-23b5-45b8-9a6d-bacff3fa23fd",
+    "name": "LUCAS BOTELHO VASCONCELLOS",
+    "registration_number": "19876",
+    "admission_date": "2026-06-24",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "1bac1222-eb8f-46d6-8a28-cfc58be79111",
+    "name": "LUCIANO DUARTE DE SOUZA",
+    "registration_number": "19731",
+    "admission_date": "2026-03-16",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "408e2345-4270-43a3-b50d-a60d6b8fcfbe",
+    "name": "RENATO GONCALVES LEMOS",
+    "registration_number": "19540",
+    "admission_date": "2025-05-05",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "88a5b9e9-3778-456b-bdd5-5c2437ab87c6",
+    "name": "THAINARA FERNANDES CORREA",
+    "registration_number": "19617",
+    "admission_date": "2025-07-23",
+    "company_id": "47dfd620-ae33-4ae6-958c-87b442e930ae",
+    "cost_center_id": "8ccb799f-56f5-40f4-9fc4-6f82e7fa124f",
+    "status": "Ativo"
+  },
+  {
+    "id": "eeb4da7a-7670-4e3f-a64d-09f4cd141181",
+    "name": "RAFAEL DE CANTOS MARTINS",
+    "registration_number": "19529",
+    "admission_date": "2025-04-22",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "4cd99f79-eac6-4c20-b66c-56eb15d4da7e",
+    "name": "HERNANDES LUIS CORREA CAMPOS",
+    "registration_number": "19397",
+    "admission_date": "2017-08-01",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "074f523a-36b8-4ac9-b7e6-bb54d6cddba7",
+    "name": "ROBERTO LUIS DOS SANTOS MARTINS",
+    "registration_number": "19350",
+    "admission_date": "2024-04-24",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "dc5d7244-828c-42a0-94a8-772bef9ca145",
+    "name": "ALEXANDRE TABELIAO DA ROCHA",
+    "registration_number": "19903",
+    "admission_date": "2026-07-01",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "7dcb8433-2426-4251-a68e-aa072204adc6",
+    "name": "ANTONIO CARLOS DE SOUZA FEIJO",
+    "registration_number": "19526",
+    "admission_date": "2025-04-14",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "70d11c2d-ea2b-4594-8b0a-2cd634c0825b",
+    "name": "CARLOS ROBERTO GONCALVES DE OLIVEIRA",
+    "registration_number": "19877",
+    "admission_date": "2026-06-24",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "04dfaea8-6f55-49ca-a3e2-1a53f401a82a",
+    "name": "CHARLES AVILA WITTER",
+    "registration_number": "19512",
+    "admission_date": "2025-03-20",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "5fb71c8f-37d3-4ac2-b909-9e8dd239e45c",
+    "name": "CLAUDINO MELLO OLIVEIRA",
+    "registration_number": "19578",
+    "admission_date": "2025-06-04",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "1b0cff9e-4a7a-45fa-a789-a0faaaf45894",
+    "name": "DANIEL RIBEIRO DE SOUZA",
+    "registration_number": "19870",
+    "admission_date": "2026-06-22",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "11948da1-632d-4422-b378-5d207d581a23",
+    "name": "FRANCISCO CARLOS DUARTE DE DUARTE",
+    "registration_number": "19396",
+    "admission_date": "2019-08-08",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "61128310-4c1b-4d54-8640-4ca896d18ae1",
+    "name": "IVAN FRANCISCO PEDROSO MATIAS",
+    "registration_number": "19398",
+    "admission_date": "2022-12-12",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "aa36dc98-3875-4181-8aec-96e35d39f5a1",
+    "name": "JOAO CARLOS SILVA DA SILVA",
+    "registration_number": "19909",
+    "admission_date": "2026-07-13",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "2eae64a1-59b3-42b2-81c6-b9270a80f17c",
+    "name": "JOSE DIOGO DA SILVA NETO",
+    "registration_number": "19865",
+    "admission_date": "2026-06-15",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "930d5880-c581-4a72-a3bb-4d4239a327f7",
+    "name": "JOSE RENATO LUCAS DA SILVA",
+    "registration_number": "19262",
+    "admission_date": "2023-11-13",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "37f0f4df-5b1b-461c-8c0d-bd38b44a58b9",
+    "name": "LUCAS COSTA QUEVEDO",
+    "registration_number": "19875",
+    "admission_date": "2026-06-23",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "7e5fc62a-2033-4660-b204-e5ee625adc84",
+    "name": "LUIS FELIPE CUNHA LEROY",
+    "registration_number": "19362",
+    "admission_date": "2024-04-26",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "8b929721-8c21-4a1d-a721-bfc268266112",
+    "name": "MAICON PEDROSO ROSA",
+    "registration_number": "19912",
+    "admission_date": "2026-07-14",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "3304aec1-bcaa-4300-bf4d-0ae27d47037f",
+    "name": "MIGUEL SILVA DUTRA",
+    "registration_number": "19872",
+    "admission_date": "2026-06-22",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "4279277c-ad69-4986-87ac-63b65350934a",
+    "name": "PATRICK MARTINS HERNANDEZ",
+    "registration_number": "19918",
+    "admission_date": "2026-07-20",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "cc5e665b-f159-4a4d-81b5-b74a6a526d59",
+    "name": "PAULO CESAR DE MOURA MARTTA",
+    "registration_number": "19779",
+    "admission_date": "2026-05-25",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "1dfcb702-d98a-424e-89f7-d8b7955324a6",
+    "name": "PAULO OTAVIO NUNES BARBOZA",
+    "registration_number": "19537",
+    "admission_date": "2025-04-24",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "55dcc19e-4b3f-4693-9296-3f314e6beafd",
+    "name": "RAFAEL SILVEIRA BELASQUEM",
+    "registration_number": "19563",
+    "admission_date": "2025-05-20",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "d762e362-7864-46d7-86c2-e5b33aa5d559",
+    "name": "RAINAN BRIZOLARA PRESTES",
+    "registration_number": "19771",
+    "admission_date": "2026-05-11",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "d0ed7b66-1eeb-4452-9cf3-d81e7d1c83ad",
+    "name": "RENATA MATIAS GUIMARAES",
+    "registration_number": "19776",
+    "admission_date": "2026-05-18",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "d0f6c5f1-6e79-4f04-99c6-e1b9b6c42ce2",
+    "name": "SYMON ARRUDA RIOS",
+    "registration_number": "19908",
+    "admission_date": "2026-07-13",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "e050d78d-7dd0-4775-9f43-f9408db8b57a",
+    "name": "VAGNER BASTOS DA CUNHA",
+    "registration_number": "19768",
+    "admission_date": "2026-05-11",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "94e0b701-46e2-4ea1-a728-452b04c75924",
+    "name": "VINICIUS GARCIA FURTADO",
+    "registration_number": "19862",
+    "admission_date": "2026-06-08",
+    "company_id": "9e7c3c02-771c-40db-95dd-0f86d9cd62fe",
+    "cost_center_id": "75b17271-f725-4f54-8b5d-0b82463bfd3a",
+    "status": "Ativo"
+  },
+  {
+    "id": "c989a748-f4bc-4d8d-addd-88f2ff4a200a",
+    "name": "ANGELICA VALDES DA SILVA",
+    "registration_number": "19738",
+    "admission_date": "2026-03-23",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "f196f98b-a6d0-4933-8318-8f77fd881c47",
+    "name": "ANNA BEATRIZ PERCEGO",
+    "registration_number": "19915",
+    "admission_date": "2026-07-15",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "3ae78d82-1c7d-4fd8-8a0f-cc005848d0db",
+    "name": "CLAUDIA DE SOUZA MORGADO",
+    "registration_number": "19736",
+    "admission_date": "2026-03-16",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "4b02e97c-7827-4b43-9abe-aab25e4f96de",
+    "name": "DIEGO BARBOSA VALDEZ",
+    "registration_number": "19873",
+    "admission_date": "2026-06-22",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "d6575648-d978-40a8-8b20-ee730c63d598",
+    "name": "DIONATHAN WILLIAM DUARTE DOS SANTOS",
+    "registration_number": "19687",
+    "admission_date": "2025-12-08",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "c4972a04-da1f-4a8e-a419-4bd02bdac89b",
+    "name": "GREGORY RAFAEL GEHLING",
+    "registration_number": "19758",
+    "admission_date": "2026-04-27",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "7425e489-c3e5-4310-b8f1-4a37185e83c8",
+    "name": "HALLAN PIERRE MARIN URQUIA",
+    "registration_number": "19811",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "fa69eb74-b214-4cb9-9d10-716dda5f8301",
+    "name": "ISRAEL RODALLES RODRIGUES",
+    "registration_number": "19719",
+    "admission_date": "2026-02-23",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "eb7a5069-d73f-432a-90c8-b902f3972646",
+    "name": "JOAO CARLOS DOS SANTOS ROSARIO JUNIOR",
+    "registration_number": "19750",
+    "admission_date": "2026-03-13",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "ccf68624-1ed4-464e-a6a7-615e250e7051",
+    "name": "JONATHAN SAN MARTIN ANASTACIO",
+    "registration_number": "19724",
+    "admission_date": "2026-03-02",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "323ca389-9848-4371-8dfc-a216c75c0bbc",
+    "name": "LUCAS BEZERRA DE JESUS",
+    "registration_number": "19718",
+    "admission_date": "2026-02-23",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "63df52af-2067-4051-bd6d-0e0ea337a331",
+    "name": "LUIGI BRAGA SAN MARTINS",
+    "registration_number": "19740",
+    "admission_date": "2026-04-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "c974faf1-c3a7-4dd1-bbf0-65ea1154d242",
+    "name": "LUIZ PAULO OLIVEIRA MENDES",
+    "registration_number": "19874",
+    "admission_date": "2026-06-22",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "a91a7508-98a2-4db3-875b-f9f1c9071dad",
+    "name": "MAICON GONCALVES NORONHA",
+    "registration_number": "19759",
+    "admission_date": "2026-04-27",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "37f1cb07-201f-44c0-8e7a-15fb04c2a989",
+    "name": "NICOLAS VARGAS RODRIGUES",
+    "registration_number": "19726",
+    "admission_date": "2026-03-04",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "7c174a56-3a01-41e3-9780-630998d5cc27",
+    "name": "PAULO HENRIQUE DA CONCEICAO MORAES",
+    "registration_number": "19864",
+    "admission_date": "2026-06-08",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "c0df6a52-f4f0-4292-88de-adbf0288677b",
+    "name": "RANIELI FERNANDES PADILHA",
+    "registration_number": "19689",
+    "admission_date": "2026-01-05",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "9ec01ba4-6f33-4c1d-b68d-345801f8619f",
+    "name": "RICHAR GOMES DUTRA",
+    "registration_number": "19863",
+    "admission_date": "2026-06-08",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "470cde49-33a0-4c9a-83c7-e956183f5024",
+    "name": "VALDINEI DA CONCEICAO",
+    "registration_number": "19825",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "61226af5-ac32-4c98-b728-5a763c7d90d9",
+    "name": "VINICIOS SILVEIRA THURMER",
+    "registration_number": "19760",
+    "admission_date": "2026-04-27",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "d2f74d0c-92f6-48ae-bec9-eb3e459d1b84",
+    "name": "ALEXANDRE COELHO BELEM",
+    "registration_number": "19786",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "d1074728-f3b9-4407-b595-833bb48ec52d",
+    "name": "ANDRE LUIZ FONSECA LOPES ROLLO",
+    "registration_number": "19788",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "5a38b728-144c-40c6-a33c-b34742720d5d",
+    "name": "ANTONIO ELISEU MARIA",
+    "registration_number": "19791",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "69702d1a-6f37-49bc-a9e0-4cf43b1c6515",
+    "name": "CLEIDIOSNI RIBAS PINTO",
+    "registration_number": "19793",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "8b41a820-c2c1-4597-8670-6e42bd378f56",
+    "name": "DIEGO PIERRE URQUIA PACHECO",
+    "registration_number": "19795",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "be026780-e3ba-44d6-99f4-fa5f3064279e",
+    "name": "EDERSON ROGERIO MARTINS DOS PASSOS",
+    "registration_number": "19797",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "abd6a8fa-a4b4-4944-9bd1-2c41bd76f2c7",
+    "name": "FLORDUALDO DE SOUZA LOPES",
+    "registration_number": "19798",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "01027b8c-4482-4896-a64d-4d75e4fd1b0f",
+    "name": "FRANCESCO DE OLIVEIRA DAMASCENO",
+    "registration_number": "19799",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "7514e6eb-da3f-43bc-8992-b7f10a861a54",
+    "name": "JAIRO LUIS LUGO MORGADO",
+    "registration_number": "19812",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "0144ef86-8f46-4088-88c3-fd8d7c319cf6",
+    "name": "JOSE WILIAN DA SILVA CORDEIRO",
+    "registration_number": "19814",
+    "admission_date": "2024-02-26",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "7d2bc691-d652-445c-8d62-3160ba29d869",
+    "name": "JULIO CEZAR FURTADO DOS SANTOS",
+    "registration_number": "19868",
+    "admission_date": "2026-06-22",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "d17d216b-d133-4b55-a359-9b16e281d5fa",
+    "name": "KAUAN CHAGAS GARCEZ",
+    "registration_number": "19815",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "7637269d-07eb-4588-9399-23a690de35b5",
+    "name": "KEWIN PIERRE NOVO URQUIA",
+    "registration_number": "19686",
+    "admission_date": "2025-12-08",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "556232bc-ec01-4166-9e03-392471b3a781",
+    "name": "LUIS CARLOS DOS SANTOS",
+    "registration_number": "19816",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "4102ebcd-78df-48cb-a9a4-5b344a7ec55d",
+    "name": "MARCOS DARLAN NUNES NEVES",
+    "registration_number": "19817",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "d51a6045-4742-49ef-92ff-a0c19f8844a4",
+    "name": "MARCOS SOTTER VERGARA",
+    "registration_number": "19904",
+    "admission_date": "2026-07-06",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "3beab8e6-bb3d-4283-9b25-7ec6b40376d3",
+    "name": "MARISTELA DA SILVA BEZERRA",
+    "registration_number": "19818",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "e9405d33-65b2-4014-b0bd-6aa16ae5b843",
+    "name": "MATHEUS PLADIEL GARCIA",
+    "registration_number": "19819",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "8a0a4d26-14ad-440d-8cdd-11ff09436b3f",
+    "name": "PAULO ROBERTO DOS SANTOS SALUM",
+    "registration_number": "19820",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "03534865-d322-4fea-b81c-edd44a69b1be",
+    "name": "ROGERIO FARIAS TERRA",
+    "registration_number": "19821",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "fe8fb2a8-4f3c-4480-b2a4-75a54a6ff79b",
+    "name": "ROSA MARIA SILVEIRA DOS SANTOS",
+    "registration_number": "19879",
+    "admission_date": "2026-07-01",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "e8d379f3-5594-4f06-990e-a976c94ea33f",
+    "name": "THAUANY VERGARA BRUM",
+    "registration_number": "19822",
+    "admission_date": "2026-06-01",
+    "company_id": "db4631b2-5d91-4544-9ec8-93978bb0b884",
+    "cost_center_id": "3cf775db-a3fe-4a0a-8cd0-01d80105e086",
+    "status": "Ativo"
+  },
+  {
+    "id": "c0226a00-25e7-46ff-8783-ab06d42378bb",
+    "name": "WESLEY MORAES LEITE",
+    "registration_number": "19914",
+    "admission_date": "2026-07-14",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "8f6b8182-8360-4153-9719-a0aceb8e8c8f",
+    "name": "ANDRE OLIVEIRA DE SOUZA",
+    "registration_number": "83",
+    "admission_date": "2025-11-18",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "bd596a13-b5b5-4ea1-9fc5-997ce643da55",
+    "name": "ELISANDRO DA ROSA NOGUEZ",
+    "registration_number": "84",
+    "admission_date": "2025-11-18",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "9972ff6c-ce25-4fb1-8c05-a55b8cbe61b4",
+    "name": "GIOVANA MARTINS DA SILVA",
+    "registration_number": "77",
+    "admission_date": "2024-12-23",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "97bf4b73-4647-4c7a-916e-f2d56d8b333b",
+    "name": "LUIZ CUNHA FILHO",
+    "registration_number": "87",
+    "admission_date": "2026-02-18",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  },
+  {
+    "id": "c3a28696-d4fa-4e65-b82e-03612b04f516",
+    "name": "ROBERTO CARLOS BARBOSA",
+    "registration_number": "60",
+    "admission_date": "2024-04-24",
+    "company_id": "42a85c6f-f01d-4c6d-9cef-5f9eee5d06fd",
+    "cost_center_id": "1b852425-1e45-48ee-9339-e9803d4b2223",
+    "status": "Ativo"
+  }
+]
