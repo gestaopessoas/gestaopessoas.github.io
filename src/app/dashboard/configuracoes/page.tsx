@@ -7,24 +7,26 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Save, Loader2, DownloadCloud } from "lucide-react"
+import { Save, Loader2, DownloadCloud, ShieldAlert } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { usePermissions } from "@/hooks/usePermissions"
+import { GlobalHistoryTab } from "@/components/configuracoes/GlobalHistoryTab"
 
-const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "talentos", "recrutamento", "armarios", "uniformes", "ponto", "rgs", "ilhas", "admissao", "onboarding", "centros_de_custo", "departamentos", "cargos", "empresas", "obras", "beneficios", "treinamentos", "ferias", "holerites", "avaliacoes", "clima", "metas", "pdi", "competencias", "turnover", "analytics", "salarios", "configuracoes"] as const
+const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "talentos", "recrutamento", "armarios", "uniformes", "ponto", "rgs", "ilhas", "admissao", "onboarding", "centros_de_custo", "departamentos", "cargos", "empresas", "obras", "beneficios", "treinamentos", "ferias", "holerites", "avaliacoes", "clima", "metas", "pdi", "competencias", "turnover", "analytics", "salarios", "configuracoes", "financeiro"] as const
 const ACTIONS = ["view", "create", "edit", "delete"] as const
 
 type UserPerms = Record<string, Record<string, boolean>>
 type ProfileRow = { id: string; name: string | null; level: number; permissions: UserPerms | null }
 
 export default function ConfiguracoesPage() {
-  const [modules, setModules] = useState({ ats: true, admissao: true, pdi: true, gestor: true, rgs_tracking: true })
+  const [modules, setModules] = useState({ ats: true, admissao: true, pdi: true, gestor: true, rgs_tracking: true, financeiro: false })
   const [permissions, setPermissions] = useState({ "2fa": true, ai_notifications: true })
   const [jobRequestCode, setJobRequestCode] = useState("")
+  const [pauseHistory, setPauseHistory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
-  const { loading: permLoading, can } = usePermissions()
+  const { loading: permLoading, can, level } = usePermissions()
 
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
   const [profilesLoading, setProfilesLoading] = useState(true)
@@ -61,10 +63,13 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('system_settings').select('*').in('key', ['modules', 'permissions'])
+      const { data } = await supabase.from('system_settings').select('key, value, pause_history_tracking').in('key', ['modules', 'permissions'])
       if (data) {
         data.forEach(row => {
-          if (row.key === 'modules') setModules(row.value)
+          if (row.key === 'modules') {
+            setModules(row.value)
+            setPauseHistory(row.pause_history_tracking || false)
+          }
           if (row.key === 'permissions') setPermissions(row.value)
         })
       }
@@ -80,8 +85,8 @@ export default function ConfiguracoesPage() {
     setSaving(true)
     try {
       const { error: settingsError } = await supabase.from('system_settings').upsert([
-        { key: 'modules', value: modules },
-        { key: 'permissions', value: permissions }
+        { key: 'modules', value: modules, pause_history_tracking: pauseHistory },
+        { key: 'permissions', value: permissions, pause_history_tracking: pauseHistory }
       ], { onConflict: 'key' });
       
       if (settingsError) throw new Error(settingsError.message);
@@ -97,7 +102,7 @@ export default function ConfiguracoesPage() {
         entity_name: 'system_settings',
         user_identifier: 'Administrador',
         ip_address: 'browser',
-        details: { modules, permissions }
+        details: { modules, permissions, pauseHistory }
       });
       
       alert("Configurações salvas com sucesso!");
@@ -169,6 +174,9 @@ export default function ConfiguracoesPage() {
             {can('configuracoes', 'edit') && (
               <TabsTrigger value="usuarios" className="text-sm rounded-md data-[state=active]:shadow-sm">Usuários & Permissões</TabsTrigger>
             )}
+            {level >= 50 && (
+              <TabsTrigger value="log" className="text-sm rounded-md data-[state=active]:shadow-sm">Log de Histórico</TabsTrigger>
+            )}
           </TabsList>
           
           <TabsContent value="modulos" className="mt-6 space-y-6">
@@ -212,6 +220,22 @@ export default function ConfiguracoesPage() {
                     <p className="text-sm text-muted-foreground">Criar registros automaticamente no RGS ao alterar colaboradores (Admissão, Demissão, Alterações).</p>
                   </div>
                   <Switch checked={modules.rgs_tracking ?? true} onCheckedChange={(c) => setModules({...modules, rgs_tracking: c})} />
+                </div>
+                {level === 100 && (
+                  <div className="flex items-center justify-between border-t border-border/40 pt-4">
+                    <div className="space-y-0.5">
+                      <Label className="text-base font-medium">Histórico de Colaboradores</Label>
+                      <p className="text-sm text-muted-foreground">Habilitar ou pausar a criação automática de registros no Histórico do Colaborador.</p>
+                    </div>
+                    <Switch checked={!pauseHistory} onCheckedChange={(c) => setPauseHistory(!c)} />
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t border-border/40 pt-4">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-medium">Resumo Financeiro</Label>
+                    <p className="text-sm text-muted-foreground">Exibir a aba de consolidação financeira e custos de folha.</p>
+                  </div>
+                  <Switch checked={modules.financeiro ?? false} onCheckedChange={(c) => setModules({...modules, financeiro: c})} />
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/20 border-t border-border/40 pt-4 flex justify-end">
@@ -356,6 +380,12 @@ export default function ConfiguracoesPage() {
               </CardContent>
             </Card>
           </TabsContent>
+          {level >= 50 && (
+            <TabsContent value="log" className="mt-6 space-y-6">
+              <GlobalHistoryTab />
+            </TabsContent>
+          )}
+
         </Tabs>
       </div>
     </div>

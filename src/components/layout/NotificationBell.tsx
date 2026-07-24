@@ -157,7 +157,8 @@ export function NotificationBell() {
             continue;
           }
           
-          // Elegíveis (Inclusão pendente)
+          // Elegíveis (Inclusão pendente) - Removido a pedido do usuário
+          /*
           if (["Ativo", "Férias", "Afastado"].includes(emp.status)) {
             if (ignores.includes(emp.id)) continue;
             if (!emp.admission_date) continue;
@@ -178,6 +179,7 @@ export function NotificationBell() {
               }
             }
           }
+          */
         }
         
         setBenefitNotifications(benefitList);

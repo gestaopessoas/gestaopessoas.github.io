@@ -5,19 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Plus, Search, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, CheckCircle2, XCircle, TrendingUp, Package, Activity, Download, AlertCircle, X, Printer } from "lucide-react";
+import { Edit3, Plus, Search, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, CheckCircle2, XCircle, TrendingUp, Package, Activity, Download, AlertCircle, X, Printer, History } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 
 type Department = { id: string; name: string };
-type Entity = { id: string; name: string; trading_name?: string | null };
+type Entity = { id: string; name: string; trading_name?: string | null; tax_rate_clt?: number; tax_rate_prolabore?: number; };
 type Employee = Record<string, string | null | any> & { id: string; name: string; departments?: Entity | null; level?: string | null; companies?: Entity | null; cost_centers?: Entity | null; workplaces?: Entity | null; };
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
 const pageSize = 1000;
 const fields = [
-  "id", "name", "registration_number", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days"
+  "id", "name", "registration_number", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
 ].join(", ");
 
 const emptyForm = {
@@ -25,7 +25,8 @@ const emptyForm = {
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "", boot_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
-  work_schedule_start_1: "", work_schedule_end_1: "", work_schedule_start_2: "", work_schedule_end_2: "", weekly_hours: "", work_days: ""
+  work_schedule_start_1: "", work_schedule_end_1: "", work_schedule_start_2: "", work_schedule_end_2: "", weekly_hours: "", work_days: "",
+  base_salary: "", variable_salary: "", commission: ""
 };
 
 type EmployeeForm = typeof emptyForm;
@@ -42,7 +43,6 @@ export default function ColaboradoresPage() {
   const [costCenters, setCostCenters] = useState<Entity[]>([]);
   const [workplaces, setWorkplaces] = useState<Entity[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
-  const [employeeBenefits, setEmployeeBenefits] = useState<{employee_id: string, benefit_name: string}[]>([]);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   
@@ -62,7 +62,7 @@ export default function ColaboradoresPage() {
     admission_end: "",
   });
   
-  const [activeTab, setActiveTab] = useState<"todos" | "aniversarios" | "experiencia">("todos");
+  const [activeTab, setActiveTab] = useState<"todos" | "aniversarios" | "experiencia" | "inativos">("todos");
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
 
   const [query, setQuery] = useState("");
@@ -76,14 +76,11 @@ export default function ColaboradoresPage() {
   useEffect(() => {
     const supabase = createClient();
     supabase.from("departments").select("id, name").order("name").then(({ data }) => setDepartments((data ?? []) as Entity[]));
-    supabase.from("companies").select("id, name, trading_name").order("name").then(({ data }) => setCompanies((data ?? []) as Entity[]));
+    supabase.from("companies").select("id, name, trading_name, tax_rate_clt, tax_rate_prolabore").order("name").then(({ data }) => setCompanies((data ?? []) as Entity[]));
     supabase.from("cost_centers").select("id, name").order("name").then(({ data }) => setCostCenters((data ?? []) as Entity[]));
     supabase.from("workplaces").select("id, name").order("name").then(({ data }) => setWorkplaces((data ?? []) as Entity[]));
     supabase.from("job_profiles").select("title").then(({ data }) => {
       if (data) setRoles(Array.from(new Set(data.map((d: any) => d.title))).sort() as string[]);
-    });
-    supabase.from("employee_benefits").select("employee_id, benefit_name").then(({ data }) => {
-      setEmployeeBenefits((data || []) as any);
     });
 
     const params = new URLSearchParams(window.location.search);
@@ -117,10 +114,12 @@ export default function ColaboradoresPage() {
         .order("name")
         .range(page * pageSize, page * pageSize + pageSize - 1);
       
-      if (advancedFilters.status) {
+      if (activeTab === "inativos") {
+        request = request.eq("status", "inactive");
+      } else if (advancedFilters.status) {
         request = request.eq("status", advancedFilters.status);
       } else {
-        request = request.neq("status", "Desligado").neq("status", "Arquivo Morto");
+        request = request.neq("status", "Desligado").neq("status", "Arquivo Morto").neq("status", "inactive");
       }
       
       const term = query.trim().replace(/[,%()]/g, " ");
@@ -144,9 +143,15 @@ export default function ColaboradoresPage() {
       setTotal(count ?? 0);
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [page, query, refresh, advancedFilters]);
+  }, [page, query, refresh, advancedFilters, activeTab]);
 
-  const update = (field: keyof EmployeeForm, value: string) => setForm((current) => ({ ...current, [field]: value }));
+  const update = (field: keyof EmployeeForm, value: string) => setForm((current) => {
+    const updated = { ...current, [field]: value };
+    if (field === "status" && value !== "Desligado" && value !== "Arquivo Morto") {
+      updated.dismissed_at = "";
+    }
+    return updated;
+  });
 
   const startNew = () => {
     setEditingId(null);
@@ -308,6 +313,9 @@ export default function ColaboradoresPage() {
         <Button variant={activeTab === "experiencia" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("experiencia")}>
           <CalendarDays className="mr-2 h-4 w-4" /> Fim de Experiência (90d)
         </Button>
+        <Button variant={activeTab === "inativos" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("inativos")}>
+          <AlertCircle className="mr-2 h-4 w-4" /> Inativos
+        </Button>
       </div>
 
       {error && <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
@@ -318,6 +326,16 @@ export default function ColaboradoresPage() {
           <DialogHeader className="mb-4">
             <DialogTitle className="text-2xl">{editingId ? "Registro completo do colaborador" : "Novo colaborador"}</DialogTitle>
             <DialogDescription>Dados pessoais, contratuais, documentos, saúde ocupacional e histórico.</DialogDescription>
+            {form.company_id && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
+                  Taxa Encargo CLT: {companies.find(c => c.id === form.company_id)?.tax_rate_clt ?? 65.98}%
+                </span>
+                <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
+                  Taxa Pro Labore: {companies.find(c => c.id === form.company_id)?.tax_rate_prolabore ?? 20.00}%
+                </span>
+              </div>
+            )}
           </DialogHeader>
           
           <form onSubmit={save} className="mt-4">
@@ -349,6 +367,12 @@ export default function ColaboradoresPage() {
               <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} /></Field>
               <Field label="Tamanho da camisa"><Select value={form.shirt_size} onChange={(value) => update("shirt_size", value)} options={["", "PP", "P", "M", "G", "GG", "XG", "XXG"]} /></Field>
               <Field label="Tamanho da botina"><Select value={form.boot_size} onChange={(value) => update("boot_size", value)} options={["", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46"]} /></Field>
+            </Section>
+
+            <Section title="Remuneração">
+              <Field label="Salário Base"><Input type="number" step="0.01" value={form.base_salary} onChange={(e) => update("base_salary", e.target.value)} /></Field>
+              <Field label="Comissão"><Input type="number" step="0.01" value={form.commission} onChange={(e) => update("commission", e.target.value)} /></Field>
+              <Field label="Variável"><Input type="number" step="0.01" value={form.variable_salary} onChange={(e) => update("variable_salary", e.target.value)} /></Field>
             </Section>
 
             <Section title="Jornada de trabalho">
@@ -407,17 +431,9 @@ export default function ColaboradoresPage() {
                           const isRed = (isActive && (!employee.admission_date || !employee.registration_number || !employee.birthday || !employee.cost_center_id || !employee.company_id || !employee.workplace_id)) || 
                                         (["Inativo", "Desligado"].includes(employee.status) && !employee.dismissed_at);
                                         
-                          const isEligible = isActive && employee.admission_date && differenceInDays(new Date(), parseISO(employee.admission_date)) > 90;
-                          const empBens = employeeBenefits.filter(b => b.employee_id === employee.id);
-                          const hasSaude = empBens.some(b => b.benefit_name?.toLowerCase().includes('saúde') || b.benefit_name?.toLowerCase().includes('saude'));
-                          const hasOdonto = empBens.some(b => b.benefit_name?.toLowerCase().includes('odonto'));
-                          const hasFarmacia = empBens.some(b => b.benefit_name?.toLowerCase().includes('farmácia') || b.benefit_name?.toLowerCase().includes('farmacia'));
-                          const isPurple = isEligible && (!hasSaude || !hasOdonto || !hasFarmacia);
-                          
                           return (
                             <div className="flex gap-1.5 ml-1">
                               {isRed && <span title="Cadastro Incompleto (Admissão, Matrícula, Nascimento, Centro de Custo, Empresa, Obra ou Desligamento)" className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-sm" />}
-                              {isPurple && <span title="Benefícios Pendentes (Saúde, Odonto ou Farmácia)" className="h-2.5 w-2.5 rounded-full bg-purple-500 shadow-sm" />}
                               {trialInfo?.isWarning && <span title="Fim de Experiência Próximo (90 Dias)" className="h-2.5 w-2.5 rounded-full bg-yellow-400 shadow-sm" />}
                             </div>
                           );
@@ -447,6 +463,9 @@ export default function ColaboradoresPage() {
                         <Button size="sm" variant="outline" onClick={() => startEdit(employee)}>
                           <Edit3 className="mr-2 h-3.5 w-3.5" />Abrir
                         </Button>
+                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); window.location.href = `/dashboard/historico?id=${employee.id}`; }} title="Ver Histórico">
+                          <History className="h-3.5 w-3.5 text-primary" />
+                        </Button>
                         <Button size="sm" variant="destructive" onClick={() => deleteEmployee(employee.id, String(employee.name || "Sem Nome"))} title="Excluir Colaborador">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -459,6 +478,60 @@ export default function ColaboradoresPage() {
           </div>
 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
+            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button></div>
+          </div>
+        </>
+      )}
+
+      {activeTab === "inativos" && (
+        <>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2"><AlertCircle className="h-5 w-5 text-primary" /> Colaboradores Inativos</h2>
+            <p className="text-sm text-muted-foreground">Estes colaboradores estão marcados como inativos, mas ainda não foram enviados para o Arquivo Morto. Revise e atualize o status quando necessário.</p>
+          </div>
+
+          <div className="relative max-w-md flex items-center gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nome, CPF, RG ou cargo" className="pl-9" />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border bg-card">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotação</th><th className="p-3">Status</th><th className="p-3 text-right">Ações</th></tr></thead>
+              <tbody>
+                {loading ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : employees.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum colaborador inativo encontrado.</td></tr> : employees.map((employee) => (
+                  <tr key={employee.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => startEdit(employee)}>
+                    <td className="p-3">
+                      <div className="font-medium flex items-center gap-2">{employee.name}</div>
+                      {employee.registration_number && (
+                        <div className="text-xs text-muted-foreground mt-0.5">Matrícula: {employee.registration_number}</div>
+                      )}
+                    </td>
+                    <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
+                    <td className="p-3">
+                      <div>{String(employee.role ?? "-")}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {employee.companies?.trading_name || employee.companies?.name ? `${employee.companies.trading_name || employee.companies.name}` : ""}
+                      </div>
+                    </td>
+                    <td className="p-3"><span className="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20">{String(employee.status ?? "-")}</span></td>
+                    <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => startEdit(employee)}>
+                          <Edit3 className="mr-2 h-3.5 w-3.5" />Abrir
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-between text-sm text-muted-foreground mt-4">
             <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
             <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button></div>
           </div>
