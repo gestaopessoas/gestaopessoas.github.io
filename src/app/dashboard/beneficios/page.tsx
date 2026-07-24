@@ -133,6 +133,24 @@ export default function BeneficiosPage() {
     await fetchData();
   };
 
+  const handleIgnoreAllInclusions = async () => {
+    if (elegiveisPlanos.length === 0) return;
+    if (!confirm(`Deseja ignorar a inclusão pendente para TODOS os ${elegiveisPlanos.length} colaboradores listados?`)) return;
+    setLoading(true);
+    const inserts = elegiveisPlanos.map(emp => ({ employee_id: emp.id }));
+    await supabase.from("benefit_ignores").insert(inserts);
+    await fetchData();
+  };
+
+  const handleRemoveAllCuts = async () => {
+    if (pendentesCorte.length === 0) return;
+    if (!confirm(`Confirmar a exclusão de TODOS os benefícios dos ${pendentesCorte.length} colaboradores desligados listados?`)) return;
+    setLoading(true);
+    const ids = pendentesCorte.map(emp => emp.id);
+    await supabase.from("employee_benefits").delete().in("employee_id", ids);
+    await fetchData();
+  };
+
   return (
     <div className="space-y-6 p-6">
       <div>
@@ -163,9 +181,14 @@ export default function BeneficiosPage() {
                 <CardTitle>Colaboradores Elegíveis</CardTitle>
                 <CardDescription>Ativos com mais de 90 dias de admissão e pendentes de inclusão em Saúde, Odonto ou Farmácia.</CardDescription>
               </div>
-              <Button onClick={() => exportCSV(elegiveisPlanos.map(e => ({ Nome: e.name, Admissao: e.admission_date, Setor: e.department })), 'elegiveis_planos')} size="sm" variant="outline" className="gap-2">
-                <Download className="w-4 h-4" /> Exportar CSV
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleIgnoreAllInclusions} disabled={elegiveisPlanos.length === 0} size="sm" variant="outline" className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50">
+                  <EyeOff className="w-4 h-4" /> Ignorar Todos
+                </Button>
+                <Button onClick={() => exportCSV(elegiveisPlanos.map(e => ({ Nome: e.name, Admissao: e.admission_date, Setor: e.department })), 'elegiveis_planos')} size="sm" variant="outline" className="gap-2">
+                  <Download className="w-4 h-4" /> Exportar CSV
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
@@ -210,6 +233,9 @@ export default function BeneficiosPage() {
                 <CardTitle>Cortes Pós-Demissão</CardTitle>
                 <CardDescription>Colaboradores desligados que ainda constam com benefícios ativos no sistema.</CardDescription>
               </div>
+              <Button onClick={handleRemoveAllCuts} disabled={pendentesCorte.length === 0} size="sm" variant="outline" className="gap-2 text-green-600 hover:text-green-700 hover:bg-green-50">
+                <CheckCircle2 className="w-4 h-4" /> Marcar Feito em Todos
+              </Button>
             </CardHeader>
             <CardContent>
               {loading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
