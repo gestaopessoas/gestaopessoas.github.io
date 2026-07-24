@@ -167,6 +167,21 @@ export default function ColaboradoresPage() {
     setIsEmployeeModalOpen(true);
   };
 
+  // Keyboard navigation between employees: [ = prev, ] = next
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!isEmployeeModalOpen || !editingId) return;
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      const idx = employees.findIndex(emp => emp.id === editingId);
+      if (idx === -1) return;
+      if (e.key === '[' && idx > 0) startEdit(employees[idx - 1]);
+      if (e.key === ']' && idx < employees.length - 1) startEdit(employees[idx + 1]);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isEmployeeModalOpen, editingId, employees]);
+
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
@@ -324,7 +339,33 @@ export default function ColaboradoresPage() {
       <Dialog open={isEmployeeModalOpen} onOpenChange={setIsEmployeeModalOpen}>
         <DialogContent className="max-w-[95vw] lg:max-w-6xl max-h-[95vh] overflow-y-auto p-6 md:p-8">
           <DialogHeader className="mb-4">
-            <DialogTitle className="text-2xl">{editingId ? "Registro completo do colaborador" : "Novo colaborador"}</DialogTitle>
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle className="text-2xl">{editingId ? "Registro completo do colaborador" : "Novo colaborador"}</DialogTitle>
+              {editingId && (() => {
+                const idx = employees.findIndex(emp => emp.id === editingId);
+                return (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      type="button" size="sm" variant="outline"
+                      disabled={idx <= 0}
+                      onClick={() => idx > 0 && startEdit(employees[idx - 1])}
+                      title="Colaborador anterior [ ]"
+                    >
+                      ← Anterior
+                    </Button>
+                    <span className="text-xs text-muted-foreground px-1">{idx + 1}/{employees.length}</span>
+                    <Button
+                      type="button" size="sm" variant="outline"
+                      disabled={idx >= employees.length - 1}
+                      onClick={() => idx < employees.length - 1 && startEdit(employees[idx + 1])}
+                      title="Próximo colaborador [ ]"
+                    >
+                      Próximo →
+                    </Button>
+                  </div>
+                );
+              })()}
+            </div>
             <DialogDescription>Dados pessoais, contratuais, documentos, saúde ocupacional e histórico.</DialogDescription>
             {form.company_id && (
               <div className="mt-2 flex items-center gap-2">
