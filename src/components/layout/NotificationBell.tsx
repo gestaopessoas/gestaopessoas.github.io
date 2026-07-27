@@ -3,42 +3,26 @@
 import { useEffect, useState, useRef } from "react";
 import { Bell, UserX, AlertTriangle, Briefcase, ChevronRight, HeartPulse } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { differenceInDays, isValid, parseISO } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-type TrialNotification = {
-  id: string;
-  name: string;
-  daysRemaining: number;
-  isWarning: boolean;
-};
-
-type RgsNotification = {
-  id: string;
-  name: string;
-  type: string;
-  daysPending: number;
-};
-
-type BenefitNotification = {
-  id: string;
-  name: string;
-  type: "INCLUSAO" | "CORTE";
-};
-
-type PendingProfileNotification = {
-  id: string;
-  name: string;
-  missingFields: string[];
-};
+import { 
+  TrialNotification, 
+  RgsNotification, 
+  BenefitNotification, 
+  PendingProfileNotification,
+  UserPreferences,
+  generatePendingProfileNotifications,
+  generateTrialNotifications,
+  generateRgsNotifications,
+  generateBenefitNotifications
+} from "@/lib/notifications";
 
 export function NotificationBell() {
   const [trialNotifications, setTrialNotifications] = useState<TrialNotification[]>([]);
   const [rgsNotifications, setRgsNotifications] = useState<RgsNotification[]>([]);
   const [benefitNotifications, setBenefitNotifications] = useState<BenefitNotification[]>([]);
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfileNotification[]>([]);
-  const [preferences, setPreferences] = useState({ trial: true, rgs: true, benefits: true, profile: true });
+  const [preferences, setPreferences] = useState<UserPreferences>({ trial: true, rgs: true, benefits: true, profile: true });
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -46,7 +30,6 @@ export function NotificationBell() {
   useEffect(() => {
     const fetchNotifications = async () => {
       const supabase = createClient();
-      const today = new Date();
       
       const { data: authData } = await supabase.auth.getUser();
       let userPrefs = { trial: true, rgs: true, benefits: true, profile: true };
@@ -59,132 +42,33 @@ export function NotificationBell() {
         }
       }
 
-      // 1. Fetch Employees for both Trial and Benefits
-      const { data: empData, error: empError } = await supabase
-        .from("employees")
-        .select("id, name, admission_date, contract_type, status, registration_number, birthday, cost_center_id, company_id, workplace_id, dismissed_at")
-        .neq("status", "Arquivo Morto");
+      const [
+        { data: empData, error: empError },
+        { data: rgsData, error: rgsError },
+        { data: bens },
+        { data: igs }
+      ] = await Promise.all([
+        supabase
+          .from("employees")
+          .select("id, name, admission_date, contract_type, status, registration_number, birthday, cost_center_id, company_id, workplace_id, dismissed_at")
+          .neq("status", "Arquivo Morto"),
+        supabase
+          .from("rgs_processes")
+          .select("id, employee_name, process_type, created_at, status")
+          .eq("status", "Pendente"),
+        supabase.from("employee_benefits").select("employee_id, benefit_name"),
+        supabase.from("benefit_ignores").select("employee_id")
+      ]);
 
-      const trialList: TrialNotification[] = [];
-      const pendingProfileList: PendingProfileNotification[] = [];
-      
       if (!empError && empData) {
-        for (const emp of empData) {
-          // Pendências de Perfil
-          const missing: string[] = [];
-          if (["Ativo", "Férias", "Afastado"].includes(emp.status)) {
-            if (!emp.admission_date) missing.push("Admissão");
-            if (!emp.registration_number) missing.push("Matrícula");
-            if (!emp.birthday) missing.push("Nascimento");
-            if (!emp.cost_center_id) missing.push("Centro de Custo");
-            if (!emp.company_id) missing.push("Empresa");
-            if (!emp.workplace_id) missing.push("Obra");
-          } else if (["Inativo", "Desligado"].includes(emp.status)) {
-            if (!emp.dismissed_at) missing.push("Desligamento");
-          }
-          if (missing.length > 0 && userPrefs.profile) {
-            pendingProfileList.push({ id: emp.id, name: emp.name, missingFields: missing });
-          }
-
-          if (["Inativo", "Desligado"].includes(emp.status)) continue;
-          if (!emp.admission_date) continue;
-          if (emp.contract_type && emp.contract_type !== "CLT") continue;
-          
-          const admission = parseISO(emp.admission_date);
-          if (!isValid(admission)) continue;
-          
-          const daysElapsed = differenceInDays(today, admission);
-          const daysRemaining = 90 - daysElapsed;
-          
-          if (daysRemaining >= 0 && daysRemaining <= 15 && userPrefs.trial) {
-            trialList.push({
-              id: emp.id,
-              name: emp.name,
-              daysRemaining,
-              isWarning: daysRemaining <= 7,
-            });
-          }
-        }
-        trialList.sort((a, b) => a.daysRemaining - b.daysRemaining);
-        setTrialNotifications(trialList);
-        setPendingProfiles(pendingProfileList);
+        setPendingProfiles(generatePendingProfileNotifications(empData as any[], userPrefs));
+        setTrialNotifications(generateTrialNotifications(empData as any[], userPrefs));
+        setBenefitNotifications(generateBenefitNotifications(empData as any[], bens as any[] || [], userPrefs));
       }
-
-      // 2. Fetch RGS Notifications
-      const { data: rgsData, error: rgsError } = await supabase
-        .from("rgs_processes")
-        .select("id, employee_name, process_type, created_at, status")
-        .eq("status", "Pendente");
 
       if (!rgsError && rgsData) {
-        const rgsList: RgsNotification[] = [];
-        for (const rgs of rgsData) {
-          if (!rgs.created_at) continue;
-          const createdAt = parseISO(rgs.created_at);
-          if (!isValid(createdAt)) continue;
-          
-          const daysPending = differenceInDays(today, createdAt);
-          
-          if (daysPending >= 3 && userPrefs.rgs) {
-            rgsList.push({
-              id: rgs.id,
-              name: rgs.employee_name || "Desconhecido",
-              type: rgs.process_type || "Processo",
-              daysPending,
-            });
-          }
-        }
-        rgsList.sort((a, b) => b.daysPending - a.daysPending);
-        setRgsNotifications(rgsList);
+        setRgsNotifications(generateRgsNotifications(rgsData as any[], userPrefs));
       }
-      
-      // 3. Fetch Benefits Notifications
-      if (!empError && empData) {
-        const { data: bens } = await supabase.from("employee_benefits").select("employee_id, benefit_name");
-        const { data: igs } = await supabase.from("benefit_ignores").select("employee_id");
-        
-        const benefits = bens || [];
-        const ignores = (igs || []).map(i => i.employee_id);
-        const benefitList: BenefitNotification[] = [];
-        
-        for (const emp of empData) {
-          // Pendentes de Corte (Desligados com benefício)
-          if (emp.status === "Desligado") {
-            const hasBenefits = benefits.some(b => b.employee_id === emp.id);
-            if (hasBenefits && userPrefs.benefits) {
-              benefitList.push({ id: emp.id, name: emp.name, type: "CORTE" });
-            }
-            continue;
-          }
-          
-          // Elegíveis (Inclusão pendente) - Removido a pedido do usuário
-          /*
-          if (["Ativo", "Férias", "Afastado"].includes(emp.status)) {
-            if (ignores.includes(emp.id)) continue;
-            if (!emp.admission_date) continue;
-            
-            const admission = parseISO(emp.admission_date);
-            if (!isValid(admission)) continue;
-            
-            const days = differenceInDays(today, admission);
-            if (days <= 90) continue;
-            
-            const hasSaude = benefits.some(b => b.employee_id === emp.id && (b.benefit_name?.toLowerCase().includes('saúde') || b.benefit_name?.toLowerCase().includes('saude')));
-            const hasOdonto = benefits.some(b => b.employee_id === emp.id && b.benefit_name?.toLowerCase().includes('odonto'));
-            const hasFarmacia = benefits.some(b => b.employee_id === emp.id && (b.benefit_name?.toLowerCase().includes('farmácia') || b.benefit_name?.toLowerCase().includes('farmacia')));
-            
-            if (!hasSaude || !hasOdonto || !hasFarmacia) {
-              if (userPrefs.benefits) {
-                benefitList.push({ id: emp.id, name: emp.name, type: "INCLUSAO" });
-              }
-            }
-          }
-          */
-        }
-        
-        setBenefitNotifications(benefitList);
-      }
-
     };
 
     fetchNotifications();

@@ -1,14 +1,16 @@
-"use client";
+﻿"use client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Plus, Search, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, CheckCircle2, XCircle, TrendingUp, Package, Activity, Download, AlertCircle, X, Printer, History } from "lucide-react";
+import { Edit3, Plus, Search, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import { RelatedRecords } from "./components/RelatedRecords";
+import { Section, Field, Select } from "./components/FormHelpers";
 
 type Department = { id: string; name: string };
 type Entity = { id: string; name: string; trading_name?: string | null; tax_rate_clt?: number; tax_rate_prolabore?: number; };
@@ -32,7 +34,7 @@ const emptyForm = {
 type EmployeeForm = typeof emptyForm;
 
 const MONTHS = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Janeiro", "Fevereiro", "MarÃƒÂ§o", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
@@ -75,12 +77,19 @@ export default function ColaboradoresPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.from("departments").select("id, name").order("name").then(({ data }) => setDepartments((data ?? []) as Entity[]));
-    supabase.from("companies").select("id, name, trading_name, tax_rate_clt, tax_rate_prolabore").order("name").then(({ data }) => setCompanies((data ?? []) as Entity[]));
-    supabase.from("cost_centers").select("id, name").order("name").then(({ data }) => setCostCenters((data ?? []) as Entity[]));
-    supabase.from("workplaces").select("id, name").order("name").then(({ data }) => setWorkplaces((data ?? []) as Entity[]));
-    supabase.from("job_profiles").select("title").then(({ data }) => {
-      if (data) setRoles(Array.from(new Set(data.map((d: any) => d.title))).sort() as string[]);
+    
+    Promise.all([
+      supabase.from("departments").select("id, name").order("name"),
+      supabase.from("companies").select("id, name, trading_name, tax_rate_clt, tax_rate_prolabore").order("name"),
+      supabase.from("cost_centers").select("id, name").order("name"),
+      supabase.from("workplaces").select("id, name").order("name"),
+      supabase.from("job_profiles").select("title")
+    ]).then(([depsRes, compsRes, ccRes, wpRes, rolesRes]) => {
+      if (depsRes.data) setDepartments(depsRes.data as Entity[]);
+      if (compsRes.data) setCompanies(compsRes.data as Entity[]);
+      if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
+      if (wpRes.data) setWorkplaces(wpRes.data as Entity[]);
+      if (rolesRes.data) setRoles(Array.from(new Set(rolesRes.data.map((d: any) => d.title))).sort() as string[]);
     });
 
     const params = new URLSearchParams(window.location.search);
@@ -136,7 +145,7 @@ export default function ColaboradoresPage() {
       const { data, error: loadError, count } = await request;
       setLoading(false);
       if (loadError) {
-        setError(`Não foi possível carregar os colaboradores: ${loadError.message}`);
+        setError(`NÃƒÂ£o foi possÃƒÂ­vel carregar os colaboradores: ${loadError.message}`);
         return;
       }
       setEmployees((data ?? []) as unknown as Employee[]);
@@ -207,7 +216,7 @@ export default function ColaboradoresPage() {
       const rgsTrackingEnabled = settingsData?.value?.rgs_tracking ?? true;
       
       if (rgsTrackingEnabled) {
-        const rgsType = isNew ? "Contratação" : isDismissed ? "Desligamento" : "Alteração de cargo/local";
+        const rgsType = isNew ? "ContrataÃƒÂ§ÃƒÂ£o" : isDismissed ? "Desligamento" : "AlteraÃƒÂ§ÃƒÂ£o de cargo/local";
         await supabase.from("rgs_processes").insert({
           process_type: rgsType,
           process_date: new Date().toISOString().split("T")[0],
@@ -221,7 +230,7 @@ export default function ColaboradoresPage() {
 
     setSaving(false);
     if (result.error) {
-      setError(`Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
+      setError(`NÃƒÂ£o foi possÃƒÂ­vel salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
       return;
     }
     setIsEmployeeModalOpen(false);
@@ -231,7 +240,7 @@ export default function ColaboradoresPage() {
   };
 
   const deleteEmployee = async (id: string, name: string) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o colaborador "${name}"? Esta ação não pode ser desfeita.`)) return;
+    if (!window.confirm(`Tem certeza que deseja excluir o colaborador "${name}"? Esta aÃƒÂ§ÃƒÂ£o nÃƒÂ£o pode ser desfeita.`)) return;
     
     setSaving(true);
     const supabase = createClient();
@@ -284,7 +293,7 @@ export default function ColaboradoresPage() {
 
   const exportBirthdaysCsv = () => {
     if (birthdaysThisMonth.length === 0) return;
-    const headers = ["Colaborador", "Cargo", "Departamento", "Dia do Aniversário", "Idade Atual", "Data de Nascimento"];
+    const headers = ["Colaborador", "Cargo", "Departamento", "Dia do AniversÃƒÂ¡rio", "Idade Atual", "Data de Nascimento"];
     const rows = birthdaysThisMonth.map(e => {
       const info = getBirthdayInfo(e.birthday as string | null)!;
       const age = differenceInYears(new Date(), info.date);
@@ -312,7 +321,7 @@ export default function ColaboradoresPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Colaboradores</h1>
-          <p className="text-sm text-muted-foreground">{total.toLocaleString("pt-BR")} registros ativos ou em movimentação.</p>
+          <p className="text-sm text-muted-foreground">{total.toLocaleString("pt-BR")} registros ativos ou em movimentaÃƒÂ§ÃƒÂ£o.</p>
         </div>
         <Button onClick={startNew}><Plus className="mr-2 h-4 w-4" />Novo colaborador</Button>
       </header>
@@ -326,7 +335,7 @@ export default function ColaboradoresPage() {
           <Cake className="mr-2 h-4 w-4" /> Aniversariantes
         </Button>
         <Button variant={activeTab === "experiencia" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("experiencia")}>
-          <CalendarDays className="mr-2 h-4 w-4" /> Fim de Experiência (90d)
+          <CalendarDays className="mr-2 h-4 w-4" /> Fim de ExperiÃƒÂªncia (90d)
         </Button>
         <Button variant={activeTab === "inativos" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("inativos")}>
           <AlertCircle className="mr-2 h-4 w-4" /> Inativos
@@ -351,22 +360,22 @@ export default function ColaboradoresPage() {
                       onClick={() => idx > 0 && startEdit(employees[idx - 1])}
                       title="Colaborador anterior [ ]"
                     >
-                      ← Anterior
+                      Ã¢â€ Â Anterior
                     </Button>
                     <span className="text-xs text-muted-foreground px-1">{idx + 1}/{employees.length}</span>
                     <Button
                       type="button" size="sm" variant="outline"
                       disabled={idx >= employees.length - 1}
                       onClick={() => idx < employees.length - 1 && startEdit(employees[idx + 1])}
-                      title="Próximo colaborador [ ]"
+                      title="PrÃƒÂ³ximo colaborador [ ]"
                     >
-                      Próximo →
+                      PrÃƒÂ³ximo Ã¢â€ â€™
                     </Button>
                   </div>
                 );
               })()}
             </div>
-            <DialogDescription>Dados pessoais, contratuais, documentos, saúde ocupacional e histórico.</DialogDescription>
+            <DialogDescription>Dados pessoais, contratuais, documentos, saÃƒÂºde ocupacional e histÃƒÂ³rico.</DialogDescription>
             {form.company_id && (
               <div className="mt-2 flex items-center gap-2">
                 <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
@@ -380,57 +389,57 @@ export default function ColaboradoresPage() {
           </DialogHeader>
           
           <form onSubmit={save} className="mt-4">
-            <Section title="Identificação">
+            <Section title="IdentificaÃƒÂ§ÃƒÂ£o">
               <Field label="Nome completo *" span><Input required value={form.name} onChange={(e) => update("name", e.target.value)} /></Field>
-              <Field label="Matrícula"><Input value={form.registration_number} onChange={(e) => update("registration_number", e.target.value)} /></Field>
-              <Field label="Código do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} /></Field>
+              <Field label="MatrÃƒÂ­cula"><Input value={form.registration_number} onChange={(e) => update("registration_number", e.target.value)} /></Field>
+              <Field label="CÃƒÂ³digo do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} /></Field>
               <Field label="CPF"><Input value={form.cpf} onChange={(e) => update("cpf", e.target.value)} /></Field>
               <Field label="RG"><Input value={form.rg} onChange={(e) => update("rg", e.target.value)} /></Field>
               <Field label="Nascimento"><Input type="date" value={form.birthday} onChange={(e) => update("birthday", e.target.value)} /></Field>
-              <Field label="Gênero"><Select value={form.gender} onChange={(value) => update("gender", value)} options={["", "Masculino", "Feminino", "Outro"]} /></Field>
-              <Field label="Estado civil"><Select value={form.marital_status} onChange={(value) => update("marital_status", value)} options={["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"]} /></Field>
+              <Field label="GÃƒÂªnero"><Select value={form.gender} onChange={(value) => update("gender", value)} options={["", "Masculino", "Feminino", "Outro"]} /></Field>
+              <Field label="Estado civil"><Select value={form.marital_status} onChange={(value) => update("marital_status", value)} options={["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "ViÃƒÂºvo(a)", "UniÃƒÂ£o EstÃƒÂ¡vel"]} /></Field>
               <Field label="Telefone"><Input value={form.phone} onChange={(e) => update("phone", e.target.value)} /></Field>
               <Field label="E-mail pessoal"><Input type="email" value={form.email_personal} onChange={(e) => update("email_personal", e.target.value)} /></Field>
               <Field label="E-mail corporativo"><Input type="email" value={form.email_corporate} onChange={(e) => update("email_corporate", e.target.value)} /></Field>
             </Section>
 
-            <Section title="Vínculo e lotação">
-              <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "Férias", "Afastado", "Inativo", "Desligado"]} /></Field>
+            <Section title="VÃƒÂ­nculo e lotaÃƒÂ§ÃƒÂ£o">
+              <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "FÃƒÂ©rias", "Afastado", "Inativo", "Desligado"]} /></Field>
               <Field label="Cargo"><Input list="roles-list" value={form.role} onChange={(e) => update("role", e.target.value)} /><datalist id="roles-list">{roles.map(r => <option key={r} value={r} />)}</datalist></Field>
-              <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Nível VIII", "Nível IX", "Nível X", "Nível XI", "Nível XII", "Nível XIII", "Nível XIV", "Nível XV", "Diretoria"]} /></Field>
+              <Field label="NÃƒÂ­vel"><Select value={form.level} onChange={(value) => update("level", value)} options={["", "NÃƒÂ­vel I", "NÃƒÂ­vel II", "NÃƒÂ­vel III", "NÃƒÂ­vel IV", "NÃƒÂ­vel V", "NÃƒÂ­vel VI", "NÃƒÂ­vel VII", "NÃƒÂ­vel VIII", "NÃƒÂ­vel IX", "NÃƒÂ­vel X", "NÃƒÂ­vel XI", "NÃƒÂ­vel XII", "NÃƒÂ­vel XIII", "NÃƒÂ­vel XIV", "NÃƒÂ­vel XV", "Diretoria"]} /></Field>
               <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.trading_name || c.name}</option>)}</select></Field>
               <Field label="Centro de Custo *"><select value={form.cost_center_id} onChange={(e) => update("cost_center_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{costCenters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
-              <Field label="Obra/Unidade"><select value={form.workplace_id} onChange={(e) => update("workplace_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{workplaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
-              <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
+              <Field label="Obra/Unidade"><select value={form.workplace_id} onChange={(e) => update("workplace_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">NÃƒÂ£o informado</option>{workplaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
+              <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">NÃƒÂ£o informado</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
               <Field label="Tipo de contrato"><Select value={form.contract_type} onChange={(value) => update("contract_type", value)} options={["", "CLT", "MEI", "PJ"]} /></Field>
-              <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
+              <Field label="Data de admissÃƒÂ£o"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
               <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
               <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} /></Field>
               <Field label="Tamanho da camisa"><Select value={form.shirt_size} onChange={(value) => update("shirt_size", value)} options={["", "PP", "P", "M", "G", "GG", "XG", "XXG"]} /></Field>
               <Field label="Tamanho da botina"><Select value={form.boot_size} onChange={(value) => update("boot_size", value)} options={["", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46"]} /></Field>
             </Section>
 
-            <Section title="Remuneração">
-              <Field label="Salário Base"><Input type="number" step="0.01" value={form.base_salary} onChange={(e) => update("base_salary", e.target.value)} /></Field>
-              <Field label="Comissão"><Input type="number" step="0.01" value={form.commission} onChange={(e) => update("commission", e.target.value)} /></Field>
-              <Field label="Variável"><Input type="number" step="0.01" value={form.variable_salary} onChange={(e) => update("variable_salary", e.target.value)} /></Field>
+            <Section title="RemuneraÃƒÂ§ÃƒÂ£o">
+              <Field label="SalÃƒÂ¡rio Base"><Input type="number" step="0.01" value={form.base_salary} onChange={(e) => update("base_salary", e.target.value)} /></Field>
+              <Field label="ComissÃƒÂ£o"><Input type="number" step="0.01" value={form.commission} onChange={(e) => update("commission", e.target.value)} /></Field>
+              <Field label="VariÃƒÂ¡vel"><Input type="number" step="0.01" value={form.variable_salary} onChange={(e) => update("variable_salary", e.target.value)} /></Field>
             </Section>
 
             <Section title="Jornada de trabalho">
               <Field label="Entrada (Turno 1)"><Input type="time" value={form.work_schedule_start_1} onChange={(e) => update("work_schedule_start_1", e.target.value)} /></Field>
-              <Field label="Saída (Turno 1)"><Input type="time" value={form.work_schedule_end_1} onChange={(e) => update("work_schedule_end_1", e.target.value)} /></Field>
+              <Field label="SaÃƒÂ­da (Turno 1)"><Input type="time" value={form.work_schedule_end_1} onChange={(e) => update("work_schedule_end_1", e.target.value)} /></Field>
               <Field label="Entrada (Turno 2)"><Input type="time" value={form.work_schedule_start_2} onChange={(e) => update("work_schedule_start_2", e.target.value)} /></Field>
-              <Field label="Saída (Turno 2)"><Input type="time" value={form.work_schedule_end_2} onChange={(e) => update("work_schedule_end_2", e.target.value)} /></Field>
-              <Field label="Carga Horária (Semanal)"><Input type="number" step="0.5" value={form.weekly_hours} onChange={(e) => update("weekly_hours", e.target.value)} /></Field>
-              <Field label="Dias de trabalho"><Select value={form.work_days} onChange={(value) => update("work_days", value)} options={["", "Segunda a Sexta", "Segunda a Sábado", "Escala 12x36", "Escala 5x2", "Escala 6x1"]} /></Field>
+              <Field label="SaÃƒÂ­da (Turno 2)"><Input type="time" value={form.work_schedule_end_2} onChange={(e) => update("work_schedule_end_2", e.target.value)} /></Field>
+              <Field label="Carga HorÃƒÂ¡ria (Semanal)"><Input type="number" step="0.5" value={form.weekly_hours} onChange={(e) => update("weekly_hours", e.target.value)} /></Field>
+              <Field label="Dias de trabalho"><Select value={form.work_days} onChange={(value) => update("work_days", value)} options={["", "Segunda a Sexta", "Segunda a SÃƒÂ¡bado", "Escala 12x36", "Escala 5x2", "Escala 6x1"]} /></Field>
             </Section>
 
             <Section title="Documentos e arquivo">
               <Field label="CTPS"><Input value={form.ctps} onChange={(e) => update("ctps", e.target.value)} /></Field>
-              <Field label="Série CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
+              <Field label="SÃƒÂ©rie CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
               <Field label="PIS"><Input value={form.pis} onChange={(e) => update("pis", e.target.value)} /></Field>
               <Field label="Data do ASO"><Input type="date" value={form.aso_date} onChange={(e) => update("aso_date", e.target.value)} /></Field>
-              <Field label="Observações" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
+              <Field label="ObservaÃƒÂ§ÃƒÂµes" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
             </Section>
 
             {editingId && <RelatedRecords employeeId={editingId} />}
@@ -451,14 +460,14 @@ export default function ColaboradoresPage() {
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nome, CPF, RG ou cargo" className="pl-9" />
             </div>
-            <Button variant="outline" size="icon" onClick={() => setShowFilterModal(true)} title="Filtros avançados">
+            <Button variant="outline" size="icon" onClick={() => setShowFilterModal(true)} title="Filtros avanÃƒÂ§ados">
               <Filter className="h-4 w-4" />
             </Button>
           </div>
 
           <div className="overflow-x-auto rounded-lg border bg-card">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotação</th><th className="p-3">Status</th><th className="p-3 text-right">Ações</th></tr></thead>
+              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotaÃƒÂ§ÃƒÂ£o</th><th className="p-3">Status</th><th className="p-3 text-right">AÃƒÂ§ÃƒÂµes</th></tr></thead>
               <tbody>
                 {loading ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : employees.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum colaborador encontrado.</td></tr> : employees.map((employee) => {
                   const trialInfo = getTrialInfo(employee.admission_date as string | null);
@@ -468,20 +477,20 @@ export default function ColaboradoresPage() {
                       <div className="font-medium flex items-center gap-2">
                         {employee.name}
                         {(() => {
-                          const isActive = ["Ativo", "Férias", "Afastado"].includes(employee.status);
+                          const isActive = ["Ativo", "FÃƒÂ©rias", "Afastado"].includes(employee.status);
                           const isRed = (isActive && (!employee.admission_date || !employee.registration_number || !employee.birthday || !employee.cost_center_id || !employee.company_id || !employee.workplace_id)) || 
                                         (["Inativo", "Desligado"].includes(employee.status) && !employee.dismissed_at);
                                         
                           return (
                             <div className="flex gap-1.5 ml-1">
-                              {isRed && <span title="Cadastro Incompleto (Admissão, Matrícula, Nascimento, Centro de Custo, Empresa, Obra ou Desligamento)" className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-sm" />}
-                              {trialInfo?.isWarning && <span title="Fim de Experiência Próximo (90 Dias)" className="h-2.5 w-2.5 rounded-full bg-yellow-400 shadow-sm" />}
+                              {isRed && <span title="Cadastro Incompleto (AdmissÃƒÂ£o, MatrÃƒÂ­cula, Nascimento, Centro de Custo, Empresa, Obra ou Desligamento)" className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-sm" />}
+                              {trialInfo?.isWarning && <span title="Fim de ExperiÃƒÂªncia PrÃƒÂ³ximo (90 Dias)" className="h-2.5 w-2.5 rounded-full bg-yellow-400 shadow-sm" />}
                             </div>
                           );
                         })()}
                       </div>
                       {employee.registration_number && (
-                        <div className="text-xs text-muted-foreground mt-0.5">Matrícula: {employee.registration_number}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">MatrÃƒÂ­cula: {employee.registration_number}</div>
                       )}
                       <div className="text-xs text-muted-foreground">{String(employee.email_corporate ?? employee.email_personal ?? "")}</div>
                     </td>
@@ -490,8 +499,8 @@ export default function ColaboradoresPage() {
                       <div>{String(employee.role ?? "-")} {employee.level && <span className="text-[10px] bg-muted px-1.5 rounded-full ml-1">{employee.level}</span>}</div>
                       <div className="text-xs text-muted-foreground">
                         {employee.companies?.trading_name || employee.companies?.name ? `${employee.companies.trading_name || employee.companies.name}` : ""}
-                        {employee.workplaces?.name ? ` · ${employee.workplaces.name}` : ""}
-                        {employee.departments?.name ? ` · ${employee.departments.name}` : ""}
+                        {employee.workplaces?.name ? ` Ã‚Â· ${employee.workplaces.name}` : ""}
+                        {employee.departments?.name ? ` Ã‚Â· ${employee.departments.name}` : ""}
                         {(!employee.companies?.trading_name && !employee.companies?.name && !employee.workplaces?.name && !employee.departments?.name) && "-"}
                       </div>
                     </td>
@@ -504,7 +513,7 @@ export default function ColaboradoresPage() {
                         <Button size="sm" variant="outline" onClick={() => startEdit(employee)}>
                           <Edit3 className="mr-2 h-3.5 w-3.5" />Abrir
                         </Button>
-                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); window.location.href = `/dashboard/historico?id=${employee.id}`; }} title="Ver Histórico">
+                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); window.location.href = `/dashboard/historico?id=${employee.id}`; }} title="Ver HistÃƒÂ³rico">
                           <History className="h-3.5 w-3.5 text-primary" />
                         </Button>
                         <Button size="sm" variant="destructive" onClick={() => deleteEmployee(employee.id, String(employee.name || "Sem Nome"))} title="Excluir Colaborador">
@@ -519,8 +528,8 @@ export default function ColaboradoresPage() {
           </div>
 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
-            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button></div>
+            <span>PÃƒÂ¡gina {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
+            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>PrÃƒÂ³xima</Button></div>
           </div>
         </>
       )}
@@ -529,7 +538,7 @@ export default function ColaboradoresPage() {
         <>
           <div className="mb-4">
             <h2 className="text-lg font-semibold flex items-center gap-2"><AlertCircle className="h-5 w-5 text-primary" /> Colaboradores Inativos</h2>
-            <p className="text-sm text-muted-foreground">Estes colaboradores estão marcados como inativos, mas ainda não foram enviados para o Arquivo Morto. Revise e atualize o status quando necessário.</p>
+            <p className="text-sm text-muted-foreground">Estes colaboradores estÃƒÂ£o marcados como inativos, mas ainda nÃƒÂ£o foram enviados para o Arquivo Morto. Revise e atualize o status quando necessÃƒÂ¡rio.</p>
           </div>
 
           <div className="relative max-w-md flex items-center gap-2 mb-4">
@@ -541,14 +550,14 @@ export default function ColaboradoresPage() {
 
           <div className="overflow-x-auto rounded-lg border bg-card">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotação</th><th className="p-3">Status</th><th className="p-3 text-right">Ações</th></tr></thead>
+              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotaÃƒÂ§ÃƒÂ£o</th><th className="p-3">Status</th><th className="p-3 text-right">AÃƒÂ§ÃƒÂµes</th></tr></thead>
               <tbody>
                 {loading ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : employees.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum colaborador inativo encontrado.</td></tr> : employees.map((employee) => (
                   <tr key={employee.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => startEdit(employee)}>
                     <td className="p-3">
                       <div className="font-medium flex items-center gap-2">{employee.name}</div>
                       {employee.registration_number && (
-                        <div className="text-xs text-muted-foreground mt-0.5">Matrícula: {employee.registration_number}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">MatrÃƒÂ­cula: {employee.registration_number}</div>
                       )}
                     </td>
                     <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
@@ -573,8 +582,8 @@ export default function ColaboradoresPage() {
           </div>
 
           <div className="flex items-center justify-between text-sm text-muted-foreground mt-4">
-            <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
-            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button></div>
+            <span>PÃƒÂ¡gina {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
+            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>PrÃƒÂ³xima</Button></div>
           </div>
         </>
       )}
@@ -583,7 +592,7 @@ export default function ColaboradoresPage() {
         <div className="rounded-lg border bg-card p-6">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
             <div>
-              <h2 className="text-lg font-semibold flex items-center gap-2"><Cake className="h-5 w-5 text-primary" /> Aniversariantes do Mês</h2>
+              <h2 className="text-lg font-semibold flex items-center gap-2"><Cake className="h-5 w-5 text-primary" /> Aniversariantes do MÃƒÂªs</h2>
               <p className="text-sm text-muted-foreground">Celebre as datas especiais da sua equipe.</p>
             </div>
             <div className="flex items-center gap-2">
@@ -591,7 +600,7 @@ export default function ColaboradoresPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Exportar
               </Button>
-              <Label className="text-nowrap ml-2">Mês:</Label>
+              <Label className="text-nowrap ml-2">MÃƒÂªs:</Label>
               <select 
                 value={selectedMonth} 
                 onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -606,10 +615,10 @@ export default function ColaboradoresPage() {
 
           <div className="grid gap-8 lg:grid-cols-2">
             <div>
-              <h3 className="mb-4 text-base font-semibold flex items-center gap-2"><Cake className="h-4 w-4 text-pink-500" /> Aniversário de Vida</h3>
+              <h3 className="mb-4 text-base font-semibold flex items-center gap-2"><Cake className="h-4 w-4 text-pink-500" /> AniversÃƒÂ¡rio de Vida</h3>
               <div className="space-y-3">
                 {birthdaysThisMonth.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum aniversariante neste mês.</p>
+                  <p className="text-sm text-muted-foreground">Nenhum aniversariante neste mÃƒÂªs.</p>
                 ) : birthdaysThisMonth.map(e => {
                   const info = getBirthdayInfo(e.birthday as string | null)!;
                   const age = differenceInYears(new Date(), info.date);
@@ -632,7 +641,7 @@ export default function ColaboradoresPage() {
               <h3 className="mb-4 text-base font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-blue-500" /> Tempo de Casa</h3>
               <div className="space-y-3">
                 {workAnniversariesThisMonth.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum aniversário de casa neste mês.</p>
+                  <p className="text-sm text-muted-foreground">Nenhum aniversÃƒÂ¡rio de casa neste mÃƒÂªs.</p>
                 ) : workAnniversariesThisMonth.map(e => {
                   const info = getBirthdayInfo(e.admission_date as string | null)!;
                   const years = differenceInYears(new Date(), info.date);
@@ -658,22 +667,22 @@ export default function ColaboradoresPage() {
         <div className="rounded-lg border bg-card p-6">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
             <div>
-              <h2 className="text-lg font-semibold flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /> Fim de Experiência</h2>
-              <p className="text-sm text-muted-foreground">Colaboradores dentro dos 90 dias iniciais, ordenados por proximidade do término.</p>
+              <h2 className="text-lg font-semibold flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /> Fim de ExperiÃƒÂªncia</h2>
+              <p className="text-sm text-muted-foreground">Colaboradores dentro dos 90 dias iniciais, ordenados por proximidade do tÃƒÂ©rmino.</p>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <span className="font-medium text-primary">{inProbation.length}</span> em experiência
+              <span className="font-medium text-primary">{inProbation.length}</span> em experiÃƒÂªncia
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {inProbation.length === 0 ? (
-              <p className="text-sm text-muted-foreground col-span-full">Nenhum colaborador em período de experiência.</p>
+              <p className="text-sm text-muted-foreground col-span-full">Nenhum colaborador em perÃƒÂ­odo de experiÃƒÂªncia.</p>
             ) : inProbation.map(({ employee: e, trialInfo }) => (
               <div key={e.id} className={`flex flex-col justify-between rounded-md border p-4 shadow-sm ${trialInfo!.isWarning ? "bg-red-50/50 border-red-200" : "bg-background"}`}>
                 <div className="mb-3">
                   <div className="font-semibold text-base">{e.name}</div>
-                  <div className="text-xs text-muted-foreground">Admissão: {trialInfo!.admission.toLocaleDateString("pt-BR")}</div>
+                  <div className="text-xs text-muted-foreground">AdmissÃƒÂ£o: {trialInfo!.admission.toLocaleDateString("pt-BR")}</div>
                   <div className="text-xs text-muted-foreground mt-1">{String(e.role ?? "-")}</div>
                 </div>
                 <div className="flex items-center justify-between pt-3 border-t">
@@ -692,7 +701,7 @@ export default function ColaboradoresPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card w-full max-w-2xl rounded-lg shadow-lg border flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="font-semibold text-lg">Filtros Avançados</h2>
+              <h2 className="font-semibold text-lg">Filtros AvanÃƒÂ§ados</h2>
               <Button variant="ghost" size="icon" onClick={() => setShowFilterModal(false)}><X className="h-4 w-4" /></Button>
             </div>
             <div className="p-4 overflow-y-auto space-y-4 flex-1">
@@ -705,11 +714,11 @@ export default function ColaboradoresPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Situação</Label>
+                  <Label>SituaÃƒÂ§ÃƒÂ£o</Label>
                   <select value={advancedFilters.status} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                     <option value="">Todos (Exceto Desligados)</option>
                     <option value="Ativo">Ativo</option>
-                    <option value="Férias">Férias</option>
+                    <option value="FÃƒÂ©rias">FÃƒÂ©rias</option>
                     <option value="Afastado">Afastado</option>
                     <option value="Inativo">Inativo</option>
                     <option value="Desligado">Desligado</option>
@@ -717,7 +726,7 @@ export default function ColaboradoresPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Gênero</Label>
+                  <Label>GÃƒÂªnero</Label>
                   <select value={advancedFilters.gender} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, gender: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                     <option value="">Todos</option>
                     <option value="Masculino">Masculino</option>
@@ -732,23 +741,23 @@ export default function ColaboradoresPage() {
                     <option value="Solteiro(a)">Solteiro(a)</option>
                     <option value="Casado(a)">Casado(a)</option>
                     <option value="Divorciado(a)">Divorciado(a)</option>
-                    <option value="Viúvo(a)">Viúvo(a)</option>
+                    <option value="ViÃƒÂºvo(a)">ViÃƒÂºvo(a)</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Cargo (Contém)</Label>
+                  <Label>Cargo (ContÃƒÂ©m)</Label>
                   <Input value={advancedFilters.role} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, role: e.target.value }))} placeholder="Ex: Engenheiro" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Unidade / Obra (Contém)</Label>
+                  <Label>Unidade / Obra (ContÃƒÂ©m)</Label>
                   <Input value={advancedFilters.unit} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, unit: e.target.value }))} placeholder="Ex: Matriz" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Data de Admissão (Início)</Label>
+                  <Label>Data de AdmissÃƒÂ£o (InÃƒÂ­cio)</Label>
                   <Input type="date" value={advancedFilters.admission_start} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, admission_start: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Data de Admissão (Fim)</Label>
+                  <Label>Data de AdmissÃƒÂ£o (Fim)</Label>
                   <Input type="date" value={advancedFilters.admission_end} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, admission_end: e.target.value }))} />
                 </div>
               </div>
@@ -777,523 +786,3 @@ export default function ColaboradoresPage() {
   );
 }
 
-function RelatedRecords({ employeeId }: { employeeId: string }) {
-  const [companyBenefits, setCompanyBenefits] = useState<{id: string, name: string, level_values?: Record<string, number> | null}[]>([]);
-  const [benefits, setBenefits] = useState<RelatedRow[]>([]);
-  const [epis, setEpis] = useState<RelatedRow[]>([]);
-  const [vacations, setVacations] = useState<RelatedRow[]>([]);
-  const [exams, setExams] = useState<RelatedRow[]>([]);
-  const [promotions, setPromotions] = useState<RelatedRow[]>([]);
-  
-  const [epi, setEpi] = useState({ epi_name: "", ca_number: "", received_date: "" });
-  const [vacation, setVacation] = useState({ start_date: "", end_date: "" });
-  const [exam, setExam] = useState({ exam_type: "Admissional", exam_name: "", exam_date: "" });
-  const [promotion, setPromotion] = useState({ previous_role: "", new_role: "", previous_level: "", new_level: "", promotion_date: new Date().toISOString().split('T')[0] });
-
-  // For benefit levels selection
-  const [levelSelectBenefit, setLevelSelectBenefit] = useState<{ id: string, name: string, level_values: Record<string, number> } | null>(null);
-  const [selectedLevelForBenefit, setSelectedLevelForBenefit] = useState<string>("");
-
-  const load = useCallback(async () => {
-    const supabase = createClient();
-    const [cb, b, e, v, x, p] = await Promise.all([
-      supabase.from("company_benefits").select("*").order("name"),
-      supabase.from("employee_benefits").select("*").eq("employee_id", employeeId).order("created_at"),
-      supabase.from("employee_epis").select("*").eq("employee_id", employeeId).order("created_at"),
-      supabase.from("vacations").select("*").eq("employee_id", employeeId).order("start_date", { ascending: false }),
-      supabase.from("occupational_exams").select("*").eq("employee_id", employeeId).order("exam_date", { ascending: false }),
-      supabase.from("employee_promotions").select("*").eq("employee_id", employeeId).order("promotion_date", { ascending: false }),
-    ]);
-    setCompanyBenefits((cb.data ?? []) as any[]);
-    setBenefits((b.data ?? []) as RelatedRow[]); 
-    setEpis((e.data ?? []) as RelatedRow[]); 
-    setVacations((v.data ?? []) as RelatedRow[]); 
-    setExams((x.data ?? []) as RelatedRow[]);
-    setPromotions((p.data ?? []) as RelatedRow[]);
-  }, [employeeId]);
-
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
-
-  const add = async (table: "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams" | "employee_promotions", payload: Record<string, string | null>) => {
-    const { error } = await createClient().from(table).insert({ employee_id: employeeId, ...payload });
-    if (!error) void load();
-  };
-  const remove = async (table: "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams" | "employee_promotions", id: string) => {
-    if (!window.confirm("Excluir este registro?")) return;
-    const { error } = await createClient().from(table).delete().eq("id", id);
-    if (!error) void load();
-  };
-
-  return (
-    <div className="mt-8 space-y-4 border-t pt-6">
-      <h3 className="font-semibold text-lg text-foreground mb-4">Registros Vinculados</h3>
-      
-      {levelSelectBenefit && (
-        <Dialog open={!!levelSelectBenefit} onOpenChange={(open) => { if (!open) setLevelSelectBenefit(null); }}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Selecionar Nível - {levelSelectBenefit.name}</DialogTitle>
-              <DialogDescription>Escolha o nível para vincular o valor correto ao colaborador.</DialogDescription>
-            </DialogHeader>
-            <div className="py-4 space-y-3">
-              <Label>Nível do Benefício</Label>
-              <select 
-                value={selectedLevelForBenefit} 
-                onChange={(e) => setSelectedLevelForBenefit(e.target.value)} 
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="">Selecione...</option>
-                {Object.keys(levelSelectBenefit.level_values).map(lvl => (
-                  <option key={lvl} value={lvl}>Nível {lvl} - R$ {Number(levelSelectBenefit.level_values[lvl]).toFixed(2).replace('.', ',')}</option>
-                ))}
-              </select>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setLevelSelectBenefit(null)}>Cancelar</Button>
-              <Button type="button" disabled={!selectedLevelForBenefit} onClick={() => {
-                if (selectedLevelForBenefit && levelSelectBenefit) {
-                  const val = levelSelectBenefit.level_values[selectedLevelForBenefit];
-                  add("employee_benefits", { 
-                    benefit_name: `${levelSelectBenefit.name} - Nível ${selectedLevelForBenefit}`,
-                    value: String(val)
-                  });
-                  setLevelSelectBenefit(null);
-                }
-              }}>Confirmar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-      
-      <details className="rounded-md border p-3" open>
-        <summary className="cursor-pointer font-medium select-none">Benefícios ({benefits.length})</summary>
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
-          {companyBenefits.map(b => {
-            const hasBenefit = benefits.find(eb => String(eb.benefit_name) === b.name || String(eb.benefit_name).startsWith(b.name + " - Nível"));
-            return (
-              <div key={b.id} className="flex flex-col gap-1">
-                <Label className="flex items-center gap-2 cursor-pointer rounded border p-2 hover:bg-muted/50 transition-colors">
-                  <input 
-                    type="checkbox" 
-                    checked={!!hasBenefit} 
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        if (b.level_values && Object.keys(b.level_values).length > 0) {
-                          setSelectedLevelForBenefit("");
-                          setLevelSelectBenefit({ id: b.id, name: b.name, level_values: b.level_values });
-                        } else {
-                          add("employee_benefits", { benefit_name: b.name });
-                        }
-                      }
-                      else if (hasBenefit) remove("employee_benefits", hasBenefit.id);
-                    }}
-                    className="w-4 h-4 text-primary"
-                  /> 
-                  {b.name}
-                </Label>
-                {hasBenefit && String(hasBenefit.benefit_name).includes(" - Nível") && (
-                  <span className="text-[10px] text-muted-foreground ml-7 bg-muted px-2 py-0.5 rounded-full w-fit">
-                    {String(hasBenefit.benefit_name).replace(b.name + " - ", "")}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </details>
-      
-      <Related title="Histórico de Promoções" icon={TrendingUp} rows={promotions} render={(row) => `${new Date(row.promotion_date + "T12:00:00").toLocaleDateString('pt-BR')}: ${row.previous_role || '-'} (${row.previous_level || '-'}) ➔ ${row.new_role || '-'} (${row.new_level || '-'})`} onRemove={(id) => remove("employee_promotions", id)}>
-        <Input value={promotion.previous_role} onChange={(e) => setPromotion({ ...promotion, previous_role: e.target.value })} placeholder="Cargo anterior" />
-        <Input value={promotion.new_role} onChange={(e) => setPromotion({ ...promotion, new_role: e.target.value })} placeholder="Novo cargo" />
-        <Input value={promotion.previous_level} onChange={(e) => setPromotion({ ...promotion, previous_level: e.target.value })} placeholder="Nível anterior" />
-        <Input value={promotion.new_level} onChange={(e) => setPromotion({ ...promotion, new_level: e.target.value })} placeholder="Novo nível" />
-        <Input type="date" value={promotion.promotion_date} onChange={(e) => setPromotion({ ...promotion, promotion_date: e.target.value })} />
-        <Button type="button" variant="outline" onClick={() => { if (promotion.new_role && promotion.promotion_date) { void add("employee_promotions", promotion); setPromotion({ previous_role: "", new_role: "", previous_level: "", new_level: "", promotion_date: new Date().toISOString().split('T')[0] }); } }}>Adicionar</Button>
-      </Related>
-
-      <Related title="EPIs" rows={epis} render={(row) => `${row.epi_name} · CA ${row.ca_number || "-"} · ${row.received_date || "sem data"}`} onRemove={(id) => remove("employee_epis", id)}>
-        <Input value={epi.epi_name} onChange={(e) => setEpi({ ...epi, epi_name: e.target.value })} placeholder="EPI" /><Input value={epi.ca_number} onChange={(e) => setEpi({ ...epi, ca_number: e.target.value })} placeholder="Número CA" /><Input type="date" value={epi.received_date} onChange={(e) => setEpi({ ...epi, received_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (epi.epi_name) { void add("employee_epis", { ...epi, received_date: epi.received_date || null, status: "Ativo" }); setEpi({ epi_name: "", ca_number: "", received_date: "" }); } }}>Adicionar</Button>
-      </Related>
-      
-      <EmployeeUniforms employeeId={employeeId} />
-      <EmployeePersonality employeeId={employeeId} />
-      
-      <Related title="Férias" rows={vacations} render={(row) => `${row.start_date} até ${row.end_date} · ${row.status || "Programada"}`} onRemove={(id) => remove("vacations", id)}>
-        <Input type="date" value={vacation.start_date} onChange={(e) => setVacation({ ...vacation, start_date: e.target.value })} /><Input type="date" value={vacation.end_date} onChange={(e) => setVacation({ ...vacation, end_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (vacation.start_date && vacation.end_date) { void add("vacations", { ...vacation, status: "Programada" }); setVacation({ start_date: "", end_date: "" }); } }}>Adicionar</Button>
-      </Related>
-      
-      <Related title="Exames ocupacionais" rows={exams} render={(row) => `${row.exam_type} · ${row.exam_name} · ${row.exam_date}`} onRemove={(id) => remove("occupational_exams", id)}>
-        <Select value={exam.exam_type} onChange={(value) => setExam({ ...exam, exam_type: value })} options={["Admissional", "Periódico", "Retorno", "Mudança de risco", "Demissional"]} /><Input value={exam.exam_name} onChange={(e) => setExam({ ...exam, exam_name: e.target.value })} placeholder="Exame" /><Input type="date" value={exam.exam_date} onChange={(e) => setExam({ ...exam, exam_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (exam.exam_name && exam.exam_date) { void add("occupational_exams", { ...exam, status: "Realizado", result: "Pendente" }); setExam({ exam_type: "Admissional", exam_name: "", exam_date: "" }); } }}>Adicionar</Button>
-      </Related>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) { return <section className="mb-8 rounded-xl border bg-muted/10 p-6 shadow-sm"><h3 className="mb-5 text-base font-semibold text-foreground border-b pb-2 flex items-center gap-2">{title}</h3><div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">{children}</div></section>; }
-function Field({ label, span, children }: { label: string; span?: boolean; children: React.ReactNode }) { return <div className={span ? "space-y-1.5 md:col-span-2" : "space-y-1.5"}><Label>{label}</Label>{children}</div>; }
-function Select({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) { return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
-function Related({ title, icon: Icon, rows, render, onRemove, children }: { title: string; icon?: React.ElementType; rows: RelatedRow[]; render: (row: RelatedRow) => string; onRemove: (id: string) => void; children: React.ReactNode }) { return <details className="rounded-md border p-3"><summary className="cursor-pointer font-medium flex items-center gap-2">{Icon && <Icon className="w-4 h-4 text-muted-foreground" />} {title} ({rows.length})</summary><div className="mt-3 space-y-2">{rows.map((row) => <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm"><span>{render(row)}</span><Button type="button" size="icon" variant="ghost" onClick={() => onRemove(row.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button></div>)}<div className="grid gap-2 md:flex md:flex-wrap">{children}</div></div></details>; }
-
-function BfiBar({ label, score }: { label: string, score: number }) {
-  const percent = ((score - 1) / 4) * 100;
-  return (
-    <div className="flex items-center gap-3">
-      <span className="w-40 truncate text-xs sm:text-sm">{label}</span>
-      <div className="flex-1 h-2 sm:h-3 bg-secondary rounded-full overflow-hidden">
-        <div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}></div>
-      </div>
-      <span className="w-8 text-right font-medium text-xs sm:text-sm">{score?.toFixed(1) || '-'}</span>
-    </div>
-  );
-}
-
-function EmployeePersonality({ employeeId }: { employeeId: string }) {
-  const [history, setHistory] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedReport, setSelectedReport] = useState<any>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const supabase = createClient();
-    const { data } = await supabase.from("candidate_big_five_results").select("*").eq("employee_id", employeeId).order("created_at", { ascending: false });
-    setHistory(data || []);
-    setLoading(false);
-  }, [employeeId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const generateLink = async () => {
-    const supabase = createClient();
-    const { data, error } = await supabase.from("candidate_big_five_results").insert({ employee_id: employeeId }).select("id").single();
-    if (error) {
-      alert("Erro ao gerar link: " + error.message);
-      return;
-    }
-    const link = `${window.location.origin}/colaborador/teste-personalidade?session=${data.id}`;
-    navigator.clipboard.writeText(link);
-    alert("Link copiado para a área de transferência!\n\nEnvie este link para o colaborador preencher o teste de personalidade (BFI). O link é de uso único.");
-    load();
-  };
-
-  return (
-    <details className="rounded-md border p-3">
-      <summary className="cursor-pointer font-medium flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-muted-foreground" /> Teste de Personalidade (BFI) ({history.length})
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-7 text-xs"
-          onClick={(e) => { e.preventDefault(); generateLink(); }}
-        >
-          <Plus className="w-3 h-3 mr-1" /> Gerar Novo Link
-        </Button>
-      </summary>
-      <div className="mt-3 space-y-4">
-        {loading ? <div className="text-sm text-muted-foreground">Carregando...</div> : history.length === 0 ? <div className="text-sm italic text-muted-foreground">Nenhum teste registrado para este colaborador.</div> : history.map((row) => {
-          const isCompleted = row.raw_answers && Object.keys(row.raw_answers).length > 0;
-          return (
-            <div key={row.id} className="rounded border bg-muted/20 p-4 text-sm">
-              <div className="flex justify-between items-center mb-3">
-                <span className="font-semibold">{new Date(row.created_at).toLocaleDateString('pt-BR')}</span>
-                <span className={`px-2 py-1 text-xs rounded-full ${isCompleted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                  {isCompleted ? 'Concluído' : 'Pendente'}
-                </span>
-              </div>
-              {isCompleted ? (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <BfiBar label="Abertura (O)" score={row.openness_score} />
-                    <BfiBar label="Conscienciosidade (C)" score={row.conscientiousness_score} />
-                    <BfiBar label="Extroversão (E)" score={row.extraversion_score} />
-                    <BfiBar label="Amabilidade (A)" score={row.agreeableness_score} />
-                    <BfiBar label="Neuroticismo (N)" score={row.neuroticism_score} />
-                  </div>
-                  <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => setSelectedReport(row)}>
-                    Visualizar Relatório Detalhado
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-xs text-muted-foreground flex items-center gap-2">
-                  <span>O colaborador ainda não respondeu este teste.</span>
-                  <Button type="button" variant="link" className="h-auto p-0 text-xs" onClick={() => {
-                    const link = `${window.location.origin}/colaborador/teste-personalidade?session=${row.id}`;
-                    navigator.clipboard.writeText(link);
-                    alert("Link copiado!");
-                  }}>Copiar link novamente</Button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      
-      <Dialog open={!!selectedReport} onOpenChange={(open) => !open && setSelectedReport(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto print-report-modal">
-          <DialogHeader>
-            <DialogTitle>Relatório Analítico de Perfil (Big Five)</DialogTitle>
-          </DialogHeader>
-          
-          {selectedReport && (
-            <>
-              <div className="mb-2 bg-muted/20 p-4 rounded-md">
-                <p className="text-sm text-muted-foreground mb-4">Teste realizado em: <strong>{new Date(selectedReport.created_at).toLocaleDateString('pt-BR')}</strong></p>
-                <p className="text-sm leading-relaxed">Este relatório apresenta o mapeamento da personalidade do colaborador com base no modelo dos Cinco Grandes Fatores (Big Five). Os resultados refletem tendências comportamentais no ambiente de trabalho e não devem ser vistos como determinantes absolutos, mas como ferramentas de desenvolvimento e autoconhecimento.</p>
-              </div>
-
-              <div className="space-y-6 mt-4">
-                <div>
-                  <div className="flex justify-between items-end mb-1"><span className="font-semibold">Abertura à Experiência (O)</span><span className="font-bold text-primary">{(selectedReport.openness_score || 0).toFixed(1)} / 5.0</span></div>
-                  <div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-2"><div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, (((selectedReport.openness_score || 1) - 1) / 4) * 100))}%` }}></div></div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">Indica o grau de curiosidade, imaginação e preferência por novidades. Pessoas com pontuação alta costumam ser mais criativas e abertas a novas ideias. Pontuações baixas indicam preferência pela rotina e pelo que é familiar e tradicional.</p>
-                </div>
-                
-                <div>
-                  <div className="flex justify-between items-end mb-1"><span className="font-semibold">Conscienciosidade (C)</span><span className="font-bold text-primary">{(selectedReport.conscientiousness_score || 0).toFixed(1)} / 5.0</span></div>
-                  <div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-2"><div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, (((selectedReport.conscientiousness_score || 1) - 1) / 4) * 100))}%` }}></div></div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">Mede a organização, disciplina e foco em metas. Pontuações altas sugerem alguém metódico, confiável e orientado a resultados. Pontuações baixas indicam maior flexibilidade, espontaneidade e, às vezes, menor foco no planejamento.</p>
-                </div>
-                
-                <div>
-                  <div className="flex justify-between items-end mb-1"><span className="font-semibold">Extroversão (E)</span><span className="font-bold text-primary">{(selectedReport.extraversion_score || 0).toFixed(1)} / 5.0</span></div>
-                  <div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-2"><div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, (((selectedReport.extraversion_score || 1) - 1) / 4) * 100))}%` }}></div></div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">Reflete a energia, sociabilidade e busca por estímulos sociais. Quem pontua alto costuma ser comunicativo e ganha energia interagindo com outros. Quem pontua baixo (introvertidos) tende a ser mais reservado e foca em análises aprofundadas.</p>
-                </div>
-                
-                <div>
-                  <div className="flex justify-between items-end mb-1"><span className="font-semibold">Amabilidade (A)</span><span className="font-bold text-primary">{(selectedReport.agreeableness_score || 0).toFixed(1)} / 5.0</span></div>
-                  <div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-2"><div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, (((selectedReport.agreeableness_score || 1) - 1) / 4) * 100))}%` }}></div></div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">Avalia a tendência à cooperação, empatia e compaixão. Pontuações altas indicam pessoas amigáveis, colaborativas e que evitam conflitos. Pontuações baixas apontam para pessoas mais competitivas, críticas e questionadoras.</p>
-                </div>
-                
-                <div>
-                  <div className="flex justify-between items-end mb-1"><span className="font-semibold">Neuroticismo (N)</span><span className="font-bold text-primary">{(selectedReport.neuroticism_score || 0).toFixed(1)} / 5.0</span></div>
-                  <div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-2"><div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, (((selectedReport.neuroticism_score || 1) - 1) / 4) * 100))}%` }}></div></div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">Indica a sensibilidade ao estresse e a estabilidade emocional. Pontuações altas sugerem maior reatividade emocional, preocupação e ansiedade. Pontuações baixas indicam pessoas calmas, resilientes e emocionalmente estáveis sob pressão.</p>
-                </div>
-              </div>
-              
-              <DialogFooter className="mt-8 flex justify-end gap-3 print:hidden">
-                <Button variant="outline" onClick={() => setSelectedReport(null)}>Fechar</Button>
-                <Button onClick={() => window.print()}>Imprimir Relatório</Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-    </details>
-  );
-}
-
-function EmployeeUniforms({ employeeId }: { employeeId: string }) {
-  const [items, setItems] = useState<any[]>([]);
-  const [deliveries, setDeliveries] = useState<any[]>([]);
-  const [uniformId, setUniformId] = useState("");
-  const [qty, setQty] = useState(1);
-  const [notes, setNotes] = useState("");
-  const [deductFromStock, setDeductFromStock] = useState(true);
-
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [selectedDeliveries, setSelectedDeliveries] = useState<Set<string>>(new Set());
-  const [isFirstPiece, setIsFirstPiece] = useState(true);
-  const [applyCredit, setApplyCredit] = useState(false);
-  const [installments, setInstallments] = useState(1);
-
-  const getPrice = (name: string) => {
-    const lower = name.toLowerCase();
-    if (lower.includes("camisa social")) return 144;
-    if (lower.includes("blusão") || lower.includes("blusao")) return 208;
-    if (lower.includes("jaqueta")) return 226;
-    if (lower.includes("polo")) return 76;
-    return 0;
-  };
-
-  const calculateTotal = () => {
-    let total = 0;
-    let nonJacketTotal = 0;
-    
-    deliveries.filter(d => selectedDeliveries.has(d.id)).forEach(d => {
-      const price = getPrice(d.uniform_items?.name || "");
-      const itemTotal = price * d.quantity_delivered;
-      total += itemTotal;
-      if (!(d.uniform_items?.name || "").toLowerCase().includes("jaqueta")) {
-        nonJacketTotal += itemTotal;
-      }
-    });
-
-    if (applyCredit && nonJacketTotal > 0) {
-      const discount = Math.min(150, nonJacketTotal);
-      total -= discount;
-    }
-    
-    return Math.max(0, total);
-  };
-
-  const toggleDelivery = (id: string) => {
-    const next = new Set(selectedDeliveries);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedDeliveries(next);
-  };
-
-  const load = useCallback(async () => {
-    const supabase = createClient();
-    const [i, d] = await Promise.all([
-      supabase.from("uniform_items").select("*").order("name"),
-      supabase.from("employee_uniforms").select("*, uniform_items(name, size)").eq("employee_id", employeeId).order("delivered_at", { ascending: false }),
-    ]);
-    setItems((i.data ?? []));
-    setDeliveries((d.data ?? []));
-    if (d.data) {
-       setSelectedDeliveries(prev => {
-          if (prev.size === 0 && d.data.length > 0) return new Set(d.data.map(x => x.id));
-          return prev;
-       });
-    }
-  }, [employeeId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const add = async () => {
-    if (!uniformId || qty < 1) return;
-    const supabase = createClient();
-    const { error } = await supabase.from("employee_uniforms").insert({
-      employee_id: employeeId,
-      uniform_item_id: uniformId,
-      quantity_delivered: qty,
-      notes: notes || null,
-    });
-    
-    if (!error) {
-       if (deductFromStock) {
-         const item = items.find(i => i.id === uniformId);
-         if (item) {
-           await supabase.from("uniform_items").update({ quantity_in_stock: item.quantity_in_stock - qty }).eq("id", uniformId);
-         }
-       }
-       setUniformId(""); setQty(1); setNotes(""); setDeductFromStock(true);
-       load();
-    }
-  };
-
-  const remove = async (id: string, uniformItemId: string, qtyDelivered: number) => {
-    const returnToStock = window.confirm("Excluir este registro. Deseja DEVOLVER esta quantidade ao estoque?");
-    const supabase = createClient();
-    const { error } = await supabase.from("employee_uniforms").delete().eq("id", id);
-    if (!error) {
-       if (returnToStock) {
-         const item = items.find(i => i.id === uniformItemId);
-         if (item) {
-           await supabase.from("uniform_items").update({ quantity_in_stock: item.quantity_in_stock + qtyDelivered }).eq("id", uniformItemId);
-         }
-       }
-       load();
-    }
-  };
-
-  return (
-    <details className="rounded-md border p-3">
-      <summary className="cursor-pointer font-medium flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Package className="w-4 h-4 text-muted-foreground" /> Uniformes Entregues ({deliveries.length})
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-7 text-xs"
-          onClick={(e) => { 
-            e.preventDefault(); 
-            if (selectedDeliveries.size === 0) {
-              alert("Selecione pelo menos um item para imprimir.");
-              return;
-            }
-            setIsPrintModalOpen(true); 
-          }}
-        >
-          <Printer className="w-3 h-3 mr-1" /> Imprimir Termo
-        </Button>
-      </summary>
-      <div className="mt-3 space-y-2">
-        {deliveries.map((row) => (
-          <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm">
-            <div className="flex items-center gap-3">
-              <input type="checkbox" checked={selectedDeliveries.has(row.id)} onChange={() => toggleDelivery(row.id)} className="h-4 w-4 rounded border-gray-300" title="Incluir no termo" />
-              <span>{row.quantity_delivered}x {row.uniform_items?.name} ({row.uniform_items?.size}) &middot; {new Date(row.delivered_at).toLocaleDateString()} {row.notes ? '- ' + row.notes : ''}</span>
-            </div>
-            <Button type="button" size="icon" variant="ghost" onClick={() => remove(row.id, row.uniform_item_id, row.quantity_delivered)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button>
-          </div>
-        ))}
-        <div className="grid gap-2 md:flex md:flex-wrap items-center">
-          <select value={uniformId} onChange={(e) => setUniformId(e.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm flex-1">
-            <option value="">Selecione a peça...</option>
-            {items.map(i => <option key={i.id} value={i.id}>{i.name} (Tam: {i.size}) - Estq: {i.quantity_in_stock}</option>)}
-          </select>
-          <Input type="number" min="1" value={qty} onChange={(e) => setQty(Number(e.target.value))} placeholder="Qtd" className="w-20" />
-          <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anotações" className="flex-1" />
-          
-          <div className="flex items-center gap-2 px-2">
-            <input 
-              type="checkbox" 
-              id="deductStock" 
-              checked={deductFromStock} 
-              onChange={(e) => setDeductFromStock(e.target.checked)} 
-              className="h-4 w-4 rounded border-gray-300" 
-            />
-            <Label htmlFor="deductStock" className="text-xs font-normal cursor-pointer whitespace-nowrap">
-              Abater do estoque
-            </Label>
-          </div>
-
-          <Button type="button" variant="outline" onClick={add}>Adicionar</Button>
-        </div>
-      </div>
-      <Dialog open={isPrintModalOpen} onOpenChange={setIsPrintModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Configurar Termo de Uniforme</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="flex items-center space-x-2">
-              <input type="checkbox" id="firstPiece" checked={isFirstPiece} onChange={(e) => setIsFirstPiece(e.target.checked)} className="h-4 w-4" />
-              <Label htmlFor="firstPiece">Primeira Peça / Entrega Gratuita (Termo Padrão)</Label>
-            </div>
-
-            {!isFirstPiece && (
-              <div className="pl-6 space-y-4 border-l-2 border-muted mt-2">
-                <div className="text-sm text-muted-foreground mb-2">Configure os valores para o termo de compra. Peças sem valor mapeado não serão cobradas.</div>
-                <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="applyCredit" checked={applyCredit} onChange={(e) => setApplyCredit(e.target.checked)} className="h-4 w-4" />
-                  <Label htmlFor="applyCredit">Aplicar crédito de R$ 150,00 (Não aplicável à Jaqueta)</Label>
-                </div>
-                <div>
-                  <Label>Parcelas para desconto em folha:</Label>
-                  <select value={installments} onChange={(e) => setInstallments(Number(e.target.value))} className="h-9 w-full rounded-md border mt-1 px-3 text-sm">
-                    <option value={1}>1x</option>
-                    <option value={2}>2x</option>
-                    <option value={3}>3x</option>
-                  </select>
-                </div>
-                <div className="p-3 bg-muted rounded-md text-sm">
-                  <strong>Valor Total a Descontar: </strong> R$ {calculateTotal().toFixed(2).replace('.', ',')}
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPrintModalOpen(false)}>Cancelar</Button>
-            <Button onClick={() => {
-              const itemsParam = Array.from(selectedDeliveries).join(',');
-              const type = isFirstPiece ? 'padrao' : 'compra';
-              const price = calculateTotal();
-              window.open(`/dashboard/colaboradores/termo-uniforme?id=${employeeId}&items=${itemsParam}&type=${type}&price=${price}&installments=${installments}`, '_blank');
-              setIsPrintModalOpen(false);
-            }}>Gerar Termo</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </details>
-  );
-}
