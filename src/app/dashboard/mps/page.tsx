@@ -38,7 +38,21 @@ export default function MPGeneratorPage() {
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const availableLogos = [
+    "Connect Duque.png",
+    "Direct.png",
+    "JOY II.png",
+    "JOY.png",
+    "Life RG.png",
+    "MOOV II.png",
+    "MOOV.png",
+    "Reserva Home Club.png",
+    "SEDE.png",
+    "Solanas.png"
+  ];
+
   // Form State
+  const [selectedLogo, setSelectedLogo] = useState("MOOV.png");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -114,13 +128,32 @@ export default function MPGeneratorPage() {
       sheet.getColumn(7).width = 3;  // Margin
 
       // --- HEADER ---
-      // We will place a placeholder for the MOOV Logo (users can replace it in Excel)
       sheet.mergeCells('B2:C4');
-      const logoCell = sheet.getCell('B2');
-      logoCell.value = "[ LOGO MOOV - INSERIR IMAGEM ]";
-      logoCell.alignment = { vertical: 'middle', horizontal: 'center' };
-      logoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF333333' } };
-      logoCell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+      
+      if (selectedLogo) {
+        try {
+          const response = await fetch(`/logos/${selectedLogo}`);
+          const arrayBuffer = await response.arrayBuffer();
+          const imageId = workbook.addImage({
+            buffer: arrayBuffer,
+            extension: 'png',
+          });
+          sheet.addImage(imageId, 'B2:D5'); // Insert over B2:C4 space roughly
+        } catch (e) {
+          console.error("Erro ao carregar logo", e);
+          const logoCell = sheet.getCell('B2');
+          logoCell.value = "[ LOGO ]";
+          logoCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          logoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF333333' } };
+          logoCell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+        }
+      } else {
+        const logoCell = sheet.getCell('B2');
+        logoCell.value = "[ LOGO ]";
+        logoCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        logoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF333333' } };
+        logoCell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+      }
 
       sheet.mergeCells('E2:F2');
       const titleCell = sheet.getCell('E2');
@@ -362,6 +395,20 @@ export default function MPGeneratorPage() {
           <h2 className="text-xl font-semibold border-b pb-2">1. Dados do Colaborador</h2>
           
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Logo da Empresa/Obra na Planilha</Label>
+              <select 
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={selectedLogo}
+                onChange={(e) => setSelectedLogo(e.target.value)}
+              >
+                <option value="">Sem Logo</option>
+                {availableLogos.map(logo => (
+                  <option key={logo} value={logo}>{logo.replace('.png', '')}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-2">
               <Label>Nome do Colaborador (Candidato) *</Label>
               <select 
