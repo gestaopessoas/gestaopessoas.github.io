@@ -34,10 +34,10 @@ BEGIN
     RETURN QUERY
     SELECT 
       fsd.employee_id,
-      e.name,
-      e.registration_number,
-      c.trading_name AS company_name,
-      cc.name AS cost_center_name,
+      e.name::TEXT,
+      e.registration_number::TEXT,
+      c.trading_name::TEXT AS company_name,
+      cc.name::TEXT AS cost_center_name,
       fsd.base_salary,
       fsd.variable_salary,
       fsd.commission,
@@ -60,10 +60,10 @@ BEGIN
     RETURN QUERY
     SELECT 
       e.id AS employee_id,
-      e.name,
-      e.registration_number,
-      c.trading_name AS company_name,
-      cc.name AS cost_center_name,
+      e.name::TEXT,
+      e.registration_number::TEXT,
+      c.trading_name::TEXT AS company_name,
+      cc.name::TEXT AS cost_center_name,
       COALESCE(e.base_salary, 0) AS base_salary,
       COALESCE(e.variable_salary, 0) AS variable_salary,
       COALESCE(e.commission, 0) AS commission,
