@@ -22,7 +22,7 @@ export default function DashboardPage() {
       const supabase = createClient();
       
       const [empRes, jobsRes] = await Promise.all([
-        supabase.from("employees").select("id, status, birthday, admission_date"),
+        supabase.from("employees").select("id, status, birthday, admission_date").limit(500),
         supabase.from("jobs").select("id, status").eq("status", "Aberta")
       ]);
 

@@ -34,7 +34,7 @@ const emptyForm = {
 type EmployeeForm = typeof emptyForm;
 
 const MONTHS = [
-  "Janeiro", "Fevereiro", "MarÃƒÂ§o", "Abril", "Maio", "Junho",
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
@@ -145,7 +145,7 @@ export default function ColaboradoresPage() {
       const { data, error: loadError, count } = await request;
       setLoading(false);
       if (loadError) {
-        setError(`NÃƒÂ£o foi possÃƒÂ­vel carregar os colaboradores: ${loadError.message}`);
+        setError(`Não foi possível carregar os colaboradores: ${loadError.message}`);
         return;
       }
       setEmployees((data ?? []) as unknown as Employee[]);
@@ -216,7 +216,7 @@ export default function ColaboradoresPage() {
       const rgsTrackingEnabled = settingsData?.value?.rgs_tracking ?? true;
       
       if (rgsTrackingEnabled) {
-        const rgsType = isNew ? "ContrataÃƒÂ§ÃƒÂ£o" : isDismissed ? "Desligamento" : "AlteraÃƒÂ§ÃƒÂ£o de cargo/local";
+        const rgsType = isNew ? "Contratação" : isDismissed ? "Desligamento" : "Alteração de cargo/local";
         await supabase.from("rgs_processes").insert({
           process_type: rgsType,
           process_date: new Date().toISOString().split("T")[0],
@@ -230,7 +230,7 @@ export default function ColaboradoresPage() {
 
     setSaving(false);
     if (result.error) {
-      setError(`NÃƒÂ£o foi possÃƒÂ­vel salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
+      setError(`Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
       return;
     }
     setIsEmployeeModalOpen(false);
@@ -240,7 +240,7 @@ export default function ColaboradoresPage() {
   };
 
   const deleteEmployee = async (id: string, name: string) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o colaborador "${name}"? Esta aÃƒÂ§ÃƒÂ£o nÃƒÂ£o pode ser desfeita.`)) return;
+    if (!window.confirm(`Tem certeza que deseja excluir o colaborador "${name}"? Esta ação não pode ser desfeita.`)) return;
     
     setSaving(true);
     const supabase = createClient();
@@ -293,7 +293,7 @@ export default function ColaboradoresPage() {
 
   const exportBirthdaysCsv = () => {
     if (birthdaysThisMonth.length === 0) return;
-    const headers = ["Colaborador", "Cargo", "Departamento", "Dia do AniversÃƒÂ¡rio", "Idade Atual", "Data de Nascimento"];
+    const headers = ["Colaborador", "Cargo", "Departamento", "Dia do Aniversário", "Idade Atual", "Data de Nascimento"];
     const rows = birthdaysThisMonth.map(e => {
       const info = getBirthdayInfo(e.birthday as string | null)!;
       const age = differenceInYears(new Date(), info.date);
@@ -321,7 +321,7 @@ export default function ColaboradoresPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Colaboradores</h1>
-          <p className="text-sm text-muted-foreground">{total.toLocaleString("pt-BR")} registros ativos ou em movimentaÃƒÂ§ÃƒÂ£o.</p>
+          <p className="text-sm text-muted-foreground">{total.toLocaleString("pt-BR")} registros ativos ou em movimentação.</p>
         </div>
         <Button onClick={startNew}><Plus className="mr-2 h-4 w-4" />Novo colaborador</Button>
       </header>
@@ -335,7 +335,7 @@ export default function ColaboradoresPage() {
           <Cake className="mr-2 h-4 w-4" /> Aniversariantes
         </Button>
         <Button variant={activeTab === "experiencia" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("experiencia")}>
-          <CalendarDays className="mr-2 h-4 w-4" /> Fim de ExperiÃƒÂªncia (90d)
+          <CalendarDays className="mr-2 h-4 w-4" /> Fim de Experiência (90d)
         </Button>
         <Button variant={activeTab === "inativos" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("inativos")}>
           <AlertCircle className="mr-2 h-4 w-4" /> Inativos
@@ -367,15 +367,15 @@ export default function ColaboradoresPage() {
                       type="button" size="sm" variant="outline"
                       disabled={idx >= employees.length - 1}
                       onClick={() => idx < employees.length - 1 && startEdit(employees[idx + 1])}
-                      title="PrÃƒÂ³ximo colaborador [ ]"
+                      title="Próximo colaborador [ ]"
                     >
-                      PrÃƒÂ³ximo Ã¢â€ â€™
+                      Próximo →
                     </Button>
                   </div>
                 );
               })()}
             </div>
-            <DialogDescription>Dados pessoais, contratuais, documentos, saÃƒÂºde ocupacional e histÃƒÂ³rico.</DialogDescription>
+            <DialogDescription>Dados pessoais, contratuais, documentos, saúde ocupacional e histórico.</DialogDescription>
             {form.company_id && (
               <div className="mt-2 flex items-center gap-2">
                 <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
@@ -389,57 +389,57 @@ export default function ColaboradoresPage() {
           </DialogHeader>
           
           <form onSubmit={save} className="mt-4">
-            <Section title="IdentificaÃƒÂ§ÃƒÂ£o">
+            <Section title="Identificação">
               <Field label="Nome completo *" span><Input required value={form.name} onChange={(e) => update("name", e.target.value)} /></Field>
-              <Field label="MatrÃƒÂ­cula"><Input value={form.registration_number} onChange={(e) => update("registration_number", e.target.value)} /></Field>
-              <Field label="CÃƒÂ³digo do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} /></Field>
+              <Field label="Matrícula"><Input value={form.registration_number} onChange={(e) => update("registration_number", e.target.value)} /></Field>
+              <Field label="Código do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} /></Field>
               <Field label="CPF"><Input value={form.cpf} onChange={(e) => update("cpf", e.target.value)} /></Field>
               <Field label="RG"><Input value={form.rg} onChange={(e) => update("rg", e.target.value)} /></Field>
               <Field label="Nascimento"><Input type="date" value={form.birthday} onChange={(e) => update("birthday", e.target.value)} /></Field>
-              <Field label="GÃƒÂªnero"><Select value={form.gender} onChange={(value) => update("gender", value)} options={["", "Masculino", "Feminino", "Outro"]} /></Field>
-              <Field label="Estado civil"><Select value={form.marital_status} onChange={(value) => update("marital_status", value)} options={["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "ViÃƒÂºvo(a)", "UniÃƒÂ£o EstÃƒÂ¡vel"]} /></Field>
+              <Field label="Gênero"><Select value={form.gender} onChange={(value) => update("gender", value)} options={["", "Masculino", "Feminino", "Outro"]} /></Field>
+              <Field label="Estado civil"><Select value={form.marital_status} onChange={(value) => update("marital_status", value)} options={["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"]} /></Field>
               <Field label="Telefone"><Input value={form.phone} onChange={(e) => update("phone", e.target.value)} /></Field>
               <Field label="E-mail pessoal"><Input type="email" value={form.email_personal} onChange={(e) => update("email_personal", e.target.value)} /></Field>
               <Field label="E-mail corporativo"><Input type="email" value={form.email_corporate} onChange={(e) => update("email_corporate", e.target.value)} /></Field>
             </Section>
 
-            <Section title="VÃƒÂ­nculo e lotaÃƒÂ§ÃƒÂ£o">
-              <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "FÃƒÂ©rias", "Afastado", "Inativo", "Desligado"]} /></Field>
+            <Section title="Vínculo e lotação">
+              <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "Férias", "Afastado", "Inativo", "Desligado"]} /></Field>
               <Field label="Cargo"><Input list="roles-list" value={form.role} onChange={(e) => update("role", e.target.value)} /><datalist id="roles-list">{roles.map(r => <option key={r} value={r} />)}</datalist></Field>
-              <Field label="NÃƒÂ­vel"><Select value={form.level} onChange={(value) => update("level", value)} options={["", "NÃƒÂ­vel I", "NÃƒÂ­vel II", "NÃƒÂ­vel III", "NÃƒÂ­vel IV", "NÃƒÂ­vel V", "NÃƒÂ­vel VI", "NÃƒÂ­vel VII", "NÃƒÂ­vel VIII", "NÃƒÂ­vel IX", "NÃƒÂ­vel X", "NÃƒÂ­vel XI", "NÃƒÂ­vel XII", "NÃƒÂ­vel XIII", "NÃƒÂ­vel XIV", "NÃƒÂ­vel XV", "Diretoria"]} /></Field>
+              <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Nível VIII", "Nível IX", "Nível X", "Nível XI", "Nível XII", "Nível XIII", "Nível XIV", "Nível XV", "Diretoria"]} /></Field>
               <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.trading_name || c.name}</option>)}</select></Field>
               <Field label="Centro de Custo *"><select value={form.cost_center_id} onChange={(e) => update("cost_center_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{costCenters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
-              <Field label="Obra/Unidade"><select value={form.workplace_id} onChange={(e) => update("workplace_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">NÃƒÂ£o informado</option>{workplaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
-              <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">NÃƒÂ£o informado</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
+              <Field label="Obra/Unidade"><select value={form.workplace_id} onChange={(e) => update("workplace_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{workplaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
+              <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
               <Field label="Tipo de contrato"><Select value={form.contract_type} onChange={(value) => update("contract_type", value)} options={["", "CLT", "MEI", "PJ"]} /></Field>
-              <Field label="Data de admissÃƒÂ£o"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
+              <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
               <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
               <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} /></Field>
               <Field label="Tamanho da camisa"><Select value={form.shirt_size} onChange={(value) => update("shirt_size", value)} options={["", "PP", "P", "M", "G", "GG", "XG", "XXG"]} /></Field>
               <Field label="Tamanho da botina"><Select value={form.boot_size} onChange={(value) => update("boot_size", value)} options={["", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46"]} /></Field>
             </Section>
 
-            <Section title="RemuneraÃƒÂ§ÃƒÂ£o">
-              <Field label="SalÃƒÂ¡rio Base"><Input type="number" step="0.01" value={form.base_salary} onChange={(e) => update("base_salary", e.target.value)} /></Field>
-              <Field label="ComissÃƒÂ£o"><Input type="number" step="0.01" value={form.commission} onChange={(e) => update("commission", e.target.value)} /></Field>
-              <Field label="VariÃƒÂ¡vel"><Input type="number" step="0.01" value={form.variable_salary} onChange={(e) => update("variable_salary", e.target.value)} /></Field>
+            <Section title="Remuneração">
+              <Field label="Salário Base"><Input type="number" step="0.01" value={form.base_salary} onChange={(e) => update("base_salary", e.target.value)} /></Field>
+              <Field label="Comissão"><Input type="number" step="0.01" value={form.commission} onChange={(e) => update("commission", e.target.value)} /></Field>
+              <Field label="Variável"><Input type="number" step="0.01" value={form.variable_salary} onChange={(e) => update("variable_salary", e.target.value)} /></Field>
             </Section>
 
             <Section title="Jornada de trabalho">
               <Field label="Entrada (Turno 1)"><Input type="time" value={form.work_schedule_start_1} onChange={(e) => update("work_schedule_start_1", e.target.value)} /></Field>
-              <Field label="SaÃƒÂ­da (Turno 1)"><Input type="time" value={form.work_schedule_end_1} onChange={(e) => update("work_schedule_end_1", e.target.value)} /></Field>
+              <Field label="Saída (Turno 1)"><Input type="time" value={form.work_schedule_end_1} onChange={(e) => update("work_schedule_end_1", e.target.value)} /></Field>
               <Field label="Entrada (Turno 2)"><Input type="time" value={form.work_schedule_start_2} onChange={(e) => update("work_schedule_start_2", e.target.value)} /></Field>
-              <Field label="SaÃƒÂ­da (Turno 2)"><Input type="time" value={form.work_schedule_end_2} onChange={(e) => update("work_schedule_end_2", e.target.value)} /></Field>
-              <Field label="Carga HorÃƒÂ¡ria (Semanal)"><Input type="number" step="0.5" value={form.weekly_hours} onChange={(e) => update("weekly_hours", e.target.value)} /></Field>
-              <Field label="Dias de trabalho"><Select value={form.work_days} onChange={(value) => update("work_days", value)} options={["", "Segunda a Sexta", "Segunda a SÃƒÂ¡bado", "Escala 12x36", "Escala 5x2", "Escala 6x1"]} /></Field>
+              <Field label="Saída (Turno 2)"><Input type="time" value={form.work_schedule_end_2} onChange={(e) => update("work_schedule_end_2", e.target.value)} /></Field>
+              <Field label="Carga Horária (Semanal)"><Input type="number" step="0.5" value={form.weekly_hours} onChange={(e) => update("weekly_hours", e.target.value)} /></Field>
+              <Field label="Dias de trabalho"><Select value={form.work_days} onChange={(value) => update("work_days", value)} options={["", "Segunda a Sexta", "Segunda a Sábado", "Escala 12x36", "Escala 5x2", "Escala 6x1"]} /></Field>
             </Section>
 
             <Section title="Documentos e arquivo">
               <Field label="CTPS"><Input value={form.ctps} onChange={(e) => update("ctps", e.target.value)} /></Field>
-              <Field label="SÃƒÂ©rie CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
+              <Field label="Série CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
               <Field label="PIS"><Input value={form.pis} onChange={(e) => update("pis", e.target.value)} /></Field>
               <Field label="Data do ASO"><Input type="date" value={form.aso_date} onChange={(e) => update("aso_date", e.target.value)} /></Field>
-              <Field label="ObservaÃƒÂ§ÃƒÂµes" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
+              <Field label="Observações" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
             </Section>
 
             {editingId && <RelatedRecords employeeId={editingId} />}
@@ -460,14 +460,14 @@ export default function ColaboradoresPage() {
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nome, CPF, RG ou cargo" className="pl-9" />
             </div>
-            <Button variant="outline" size="icon" onClick={() => setShowFilterModal(true)} title="Filtros avanÃƒÂ§ados">
+            <Button variant="outline" size="icon" onClick={() => setShowFilterModal(true)} title="Filtros avançados">
               <Filter className="h-4 w-4" />
             </Button>
           </div>
 
           <div className="overflow-x-auto rounded-lg border bg-card">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotaÃƒÂ§ÃƒÂ£o</th><th className="p-3">Status</th><th className="p-3 text-right">AÃƒÂ§ÃƒÂµes</th></tr></thead>
+              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotação</th><th className="p-3">Status</th><th className="p-3 text-right">Ações</th></tr></thead>
               <tbody>
                 {loading ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : employees.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum colaborador encontrado.</td></tr> : employees.map((employee) => {
                   const trialInfo = getTrialInfo(employee.admission_date as string | null);
@@ -477,20 +477,20 @@ export default function ColaboradoresPage() {
                       <div className="font-medium flex items-center gap-2">
                         {employee.name}
                         {(() => {
-                          const isActive = ["Ativo", "FÃƒÂ©rias", "Afastado"].includes(employee.status);
+                          const isActive = ["Ativo", "Férias", "Afastado"].includes(employee.status);
                           const isRed = (isActive && (!employee.admission_date || !employee.registration_number || !employee.birthday || !employee.cost_center_id || !employee.company_id || !employee.workplace_id)) || 
                                         (["Inativo", "Desligado"].includes(employee.status) && !employee.dismissed_at);
                                         
                           return (
                             <div className="flex gap-1.5 ml-1">
-                              {isRed && <span title="Cadastro Incompleto (AdmissÃƒÂ£o, MatrÃƒÂ­cula, Nascimento, Centro de Custo, Empresa, Obra ou Desligamento)" className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-sm" />}
-                              {trialInfo?.isWarning && <span title="Fim de ExperiÃƒÂªncia PrÃƒÂ³ximo (90 Dias)" className="h-2.5 w-2.5 rounded-full bg-yellow-400 shadow-sm" />}
+                              {isRed && <span title="Cadastro Incompleto (Admissão, Matrícula, Nascimento, Centro de Custo, Empresa, Obra ou Desligamento)" className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-sm" />}
+                              {trialInfo?.isWarning && <span title="Fim de Experiência Próximo (90 Dias)" className="h-2.5 w-2.5 rounded-full bg-yellow-400 shadow-sm" />}
                             </div>
                           );
                         })()}
                       </div>
                       {employee.registration_number && (
-                        <div className="text-xs text-muted-foreground mt-0.5">MatrÃƒÂ­cula: {employee.registration_number}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">Matrícula: {employee.registration_number}</div>
                       )}
                       <div className="text-xs text-muted-foreground">{String(employee.email_corporate ?? employee.email_personal ?? "")}</div>
                     </td>
@@ -513,7 +513,7 @@ export default function ColaboradoresPage() {
                         <Button size="sm" variant="outline" onClick={() => startEdit(employee)}>
                           <Edit3 className="mr-2 h-3.5 w-3.5" />Abrir
                         </Button>
-                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); window.location.href = `/dashboard/historico?id=${employee.id}`; }} title="Ver HistÃƒÂ³rico">
+                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); window.location.href = `/dashboard/historico?id=${employee.id}`; }} title="Ver Histórico">
                           <History className="h-3.5 w-3.5 text-primary" />
                         </Button>
                         <Button size="sm" variant="destructive" onClick={() => deleteEmployee(employee.id, String(employee.name || "Sem Nome"))} title="Excluir Colaborador">
@@ -528,8 +528,8 @@ export default function ColaboradoresPage() {
           </div>
 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>PÃƒÂ¡gina {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
-            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>PrÃƒÂ³xima</Button></div>
+            <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
+            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button></div>
           </div>
         </>
       )}
@@ -538,7 +538,7 @@ export default function ColaboradoresPage() {
         <>
           <div className="mb-4">
             <h2 className="text-lg font-semibold flex items-center gap-2"><AlertCircle className="h-5 w-5 text-primary" /> Colaboradores Inativos</h2>
-            <p className="text-sm text-muted-foreground">Estes colaboradores estÃƒÂ£o marcados como inativos, mas ainda nÃƒÂ£o foram enviados para o Arquivo Morto. Revise e atualize o status quando necessÃƒÂ¡rio.</p>
+            <p className="text-sm text-muted-foreground">Estes colaboradores estão marcados como inativos, mas ainda não foram enviados para o Arquivo Morto. Revise e atualize o status quando necessário.</p>
           </div>
 
           <div className="relative max-w-md flex items-center gap-2 mb-4">
@@ -550,14 +550,14 @@ export default function ColaboradoresPage() {
 
           <div className="overflow-x-auto rounded-lg border bg-card">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotaÃƒÂ§ÃƒÂ£o</th><th className="p-3">Status</th><th className="p-3 text-right">AÃƒÂ§ÃƒÂµes</th></tr></thead>
+              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotação</th><th className="p-3">Status</th><th className="p-3 text-right">Ações</th></tr></thead>
               <tbody>
                 {loading ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : employees.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum colaborador inativo encontrado.</td></tr> : employees.map((employee) => (
                   <tr key={employee.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => startEdit(employee)}>
                     <td className="p-3">
                       <div className="font-medium flex items-center gap-2">{employee.name}</div>
                       {employee.registration_number && (
-                        <div className="text-xs text-muted-foreground mt-0.5">MatrÃƒÂ­cula: {employee.registration_number}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">Matrícula: {employee.registration_number}</div>
                       )}
                     </td>
                     <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
@@ -582,8 +582,8 @@ export default function ColaboradoresPage() {
           </div>
 
           <div className="flex items-center justify-between text-sm text-muted-foreground mt-4">
-            <span>PÃƒÂ¡gina {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
-            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>PrÃƒÂ³xima</Button></div>
+            <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
+            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button></div>
           </div>
         </>
       )}
@@ -592,7 +592,7 @@ export default function ColaboradoresPage() {
         <div className="rounded-lg border bg-card p-6">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
             <div>
-              <h2 className="text-lg font-semibold flex items-center gap-2"><Cake className="h-5 w-5 text-primary" /> Aniversariantes do MÃƒÂªs</h2>
+              <h2 className="text-lg font-semibold flex items-center gap-2"><Cake className="h-5 w-5 text-primary" /> Aniversariantes do Mês</h2>
               <p className="text-sm text-muted-foreground">Celebre as datas especiais da sua equipe.</p>
             </div>
             <div className="flex items-center gap-2">
@@ -600,7 +600,7 @@ export default function ColaboradoresPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Exportar
               </Button>
-              <Label className="text-nowrap ml-2">MÃƒÂªs:</Label>
+              <Label className="text-nowrap ml-2">Mês:</Label>
               <select 
                 value={selectedMonth} 
                 onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -615,10 +615,10 @@ export default function ColaboradoresPage() {
 
           <div className="grid gap-8 lg:grid-cols-2">
             <div>
-              <h3 className="mb-4 text-base font-semibold flex items-center gap-2"><Cake className="h-4 w-4 text-pink-500" /> AniversÃƒÂ¡rio de Vida</h3>
+              <h3 className="mb-4 text-base font-semibold flex items-center gap-2"><Cake className="h-4 w-4 text-pink-500" /> Aniversário de Vida</h3>
               <div className="space-y-3">
                 {birthdaysThisMonth.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum aniversariante neste mÃƒÂªs.</p>
+                  <p className="text-sm text-muted-foreground">Nenhum aniversariante neste mês.</p>
                 ) : birthdaysThisMonth.map(e => {
                   const info = getBirthdayInfo(e.birthday as string | null)!;
                   const age = differenceInYears(new Date(), info.date);
@@ -641,7 +641,7 @@ export default function ColaboradoresPage() {
               <h3 className="mb-4 text-base font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-blue-500" /> Tempo de Casa</h3>
               <div className="space-y-3">
                 {workAnniversariesThisMonth.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum aniversÃƒÂ¡rio de casa neste mÃƒÂªs.</p>
+                  <p className="text-sm text-muted-foreground">Nenhum aniversário de casa neste mês.</p>
                 ) : workAnniversariesThisMonth.map(e => {
                   const info = getBirthdayInfo(e.admission_date as string | null)!;
                   const years = differenceInYears(new Date(), info.date);
@@ -667,22 +667,22 @@ export default function ColaboradoresPage() {
         <div className="rounded-lg border bg-card p-6">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
             <div>
-              <h2 className="text-lg font-semibold flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /> Fim de ExperiÃƒÂªncia</h2>
-              <p className="text-sm text-muted-foreground">Colaboradores dentro dos 90 dias iniciais, ordenados por proximidade do tÃƒÂ©rmino.</p>
+              <h2 className="text-lg font-semibold flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /> Fim de Experiência</h2>
+              <p className="text-sm text-muted-foreground">Colaboradores dentro dos 90 dias iniciais, ordenados por proximidade do término.</p>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <span className="font-medium text-primary">{inProbation.length}</span> em experiÃƒÂªncia
+              <span className="font-medium text-primary">{inProbation.length}</span> em experiência
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {inProbation.length === 0 ? (
-              <p className="text-sm text-muted-foreground col-span-full">Nenhum colaborador em perÃƒÂ­odo de experiÃƒÂªncia.</p>
+              <p className="text-sm text-muted-foreground col-span-full">Nenhum colaborador em período de experiência.</p>
             ) : inProbation.map(({ employee: e, trialInfo }) => (
               <div key={e.id} className={`flex flex-col justify-between rounded-md border p-4 shadow-sm ${trialInfo!.isWarning ? "bg-red-50/50 border-red-200" : "bg-background"}`}>
                 <div className="mb-3">
                   <div className="font-semibold text-base">{e.name}</div>
-                  <div className="text-xs text-muted-foreground">AdmissÃƒÂ£o: {trialInfo!.admission.toLocaleDateString("pt-BR")}</div>
+                  <div className="text-xs text-muted-foreground">Admissão: {trialInfo!.admission.toLocaleDateString("pt-BR")}</div>
                   <div className="text-xs text-muted-foreground mt-1">{String(e.role ?? "-")}</div>
                 </div>
                 <div className="flex items-center justify-between pt-3 border-t">
@@ -701,7 +701,7 @@ export default function ColaboradoresPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card w-full max-w-2xl rounded-lg shadow-lg border flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="font-semibold text-lg">Filtros AvanÃƒÂ§ados</h2>
+              <h2 className="font-semibold text-lg">Filtros Avançados</h2>
               <Button variant="ghost" size="icon" onClick={() => setShowFilterModal(false)}><X className="h-4 w-4" /></Button>
             </div>
             <div className="p-4 overflow-y-auto space-y-4 flex-1">
@@ -714,11 +714,11 @@ export default function ColaboradoresPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>SituaÃƒÂ§ÃƒÂ£o</Label>
+                  <Label>Situação</Label>
                   <select value={advancedFilters.status} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                     <option value="">Todos (Exceto Desligados)</option>
                     <option value="Ativo">Ativo</option>
-                    <option value="FÃƒÂ©rias">FÃƒÂ©rias</option>
+                    <option value="Férias">Férias</option>
                     <option value="Afastado">Afastado</option>
                     <option value="Inativo">Inativo</option>
                     <option value="Desligado">Desligado</option>
@@ -726,7 +726,7 @@ export default function ColaboradoresPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>GÃƒÂªnero</Label>
+                  <Label>Gênero</Label>
                   <select value={advancedFilters.gender} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, gender: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                     <option value="">Todos</option>
                     <option value="Masculino">Masculino</option>
@@ -741,23 +741,23 @@ export default function ColaboradoresPage() {
                     <option value="Solteiro(a)">Solteiro(a)</option>
                     <option value="Casado(a)">Casado(a)</option>
                     <option value="Divorciado(a)">Divorciado(a)</option>
-                    <option value="ViÃƒÂºvo(a)">ViÃƒÂºvo(a)</option>
+                    <option value="Viúvo(a)">Viúvo(a)</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Cargo (ContÃƒÂ©m)</Label>
+                  <Label>Cargo (Contém)</Label>
                   <Input value={advancedFilters.role} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, role: e.target.value }))} placeholder="Ex: Engenheiro" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Unidade / Obra (ContÃƒÂ©m)</Label>
+                  <Label>Unidade / Obra (Contém)</Label>
                   <Input value={advancedFilters.unit} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, unit: e.target.value }))} placeholder="Ex: Matriz" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Data de AdmissÃƒÂ£o (InÃƒÂ­cio)</Label>
+                  <Label>Data de Admissão (Início)</Label>
                   <Input type="date" value={advancedFilters.admission_start} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, admission_start: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Data de AdmissÃƒÂ£o (Fim)</Label>
+                  <Label>Data de Admissão (Fim)</Label>
                   <Input type="date" value={advancedFilters.admission_end} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, admission_end: e.target.value }))} />
                 </div>
               </div>

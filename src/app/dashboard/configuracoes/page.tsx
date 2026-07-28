@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Save, Loader2, DownloadCloud, ShieldAlert } from "lucide-react"
+import { Save, Loader2, DownloadCloud, ShieldAlert, CalendarDays, Link as LinkIcon } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { usePermissions } from "@/hooks/usePermissions"
 import { GlobalHistoryTab } from "@/components/configuracoes/GlobalHistoryTab"
@@ -167,15 +167,16 @@ export default function ConfiguracoesPage() {
         </header>
 
         <Tabs defaultValue="modulos" className="w-full">
-          <TabsList className={`grid w-full ${can('configuracoes', 'edit') ? 'grid-cols-4 max-w-3xl' : 'grid-cols-3 max-w-xl'} h-10 p-1 bg-muted/50`}>
-            <TabsTrigger value="modulos" className="text-sm rounded-md data-[state=active]:shadow-sm">Módulos</TabsTrigger>
-            <TabsTrigger value="permissoes" className="text-sm rounded-md data-[state=active]:shadow-sm">Permissões Globais</TabsTrigger>
-            <TabsTrigger value="backup" className="text-sm rounded-md data-[state=active]:shadow-sm">Backup</TabsTrigger>
+          <TabsList className="flex flex-wrap h-auto p-1 bg-muted/50 gap-1 mb-6">
+            <TabsTrigger value="modulos" className="text-sm rounded-md flex-1">Módulos</TabsTrigger>
+            <TabsTrigger value="permissoes" className="text-sm rounded-md flex-1 min-w-[140px]">Permissões</TabsTrigger>
+            <TabsTrigger value="integracoes" className="text-sm rounded-md flex-1 min-w-[140px]">Integrações</TabsTrigger>
+            <TabsTrigger value="backup" className="text-sm rounded-md flex-1">Backup</TabsTrigger>
             {can('configuracoes', 'edit') && (
-              <TabsTrigger value="usuarios" className="text-sm rounded-md data-[state=active]:shadow-sm">Usuários & Permissões</TabsTrigger>
+              <TabsTrigger value="usuarios" className="text-sm rounded-md flex-1 min-w-[160px]">Usuários & Permissões</TabsTrigger>
             )}
             {level >= 50 && (
-              <TabsTrigger value="log" className="text-sm rounded-md data-[state=active]:shadow-sm">Log de Histórico</TabsTrigger>
+              <TabsTrigger value="log" className="text-sm rounded-md flex-1 min-w-[140px]">Log de Histórico</TabsTrigger>
             )}
           </TabsList>
           
@@ -244,6 +245,29 @@ export default function ConfiguracoesPage() {
                   Salvar Alterações
                 </Button>
               </CardFooter>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="integracoes" className="mt-6 space-y-6">
+            <Card className="border-border/60 shadow-sm">
+              <CardHeader className="pb-4 border-b border-border/40 mb-4">
+                <CardTitle className="text-lg">Integrações Pessoais</CardTitle>
+                <CardDescription>Conecte contas externas para sincronizar dados com o seu perfil.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="h-5 w-5 text-blue-600" />
+                      <Label className="text-base font-medium">Microsoft Outlook (Calendário)</Label>
+                    </div>
+                    <p className="text-sm text-muted-foreground ml-7">Sincronize suas entrevistas e agendamentos diretamente com a agenda do Outlook.</p>
+                  </div>
+                  <Button variant="outline" className="gap-2" onClick={() => alert('Em breve! É necessário configurar o App ID da Microsoft primeiro.')}>
+                    <LinkIcon className="h-4 w-4" /> Conectar Conta
+                  </Button>
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
 

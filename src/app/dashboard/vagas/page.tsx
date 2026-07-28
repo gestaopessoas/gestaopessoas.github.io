@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { createClient } from "@/utils/supabase/client";
-import { Briefcase, CheckCircle2, Clock, ExternalLink, MessageCircle, Plus, Search, Edit3, Archive, ListTodo, ArchiveRestore } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Briefcase, CheckCircle2, Clock, ExternalLink, MessageCircle, Plus, Search, Edit3, Archive, ListTodo, ArchiveRestore, User, Calendar, MapPin } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -46,8 +46,9 @@ export default function VagasAdminPage() {
   
   const [activeTab, setActiveTab] = useState<"ativas" | "historico">("ativas");
   
-  // Edit Modal State
-  const [editingJob, setEditingJob] = useState<JobRequest | null>(null);
+  // Modal State
+  const [selectedJob, setSelectedJob] = useState<JobRequest | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -110,19 +111,19 @@ export default function VagasAdminPage() {
   
   const handleSaveEdit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!editingJob) return;
+    if (!selectedJob) return;
     setIsSaving(true);
     
     const supabase = createClient();
     const { error } = await supabase.from("job_requests").update({
-      position_title: editingJob.position_title,
-      quantity: editingJob.quantity,
-      unit: editingJob.unit,
-      contract_type: editingJob.contract_type,
-      required_requirements: editingJob.required_requirements,
-      desired_requirements: editingJob.desired_requirements,
-      manager_expectations: editingJob.manager_expectations,
-    }).eq("id", editingJob.id);
+      position_title: selectedJob.position_title,
+      quantity: selectedJob.quantity,
+      unit: selectedJob.unit,
+      contract_type: selectedJob.contract_type,
+      required_requirements: selectedJob.required_requirements,
+      desired_requirements: selectedJob.desired_requirements,
+      manager_expectations: selectedJob.manager_expectations,
+    }).eq("id", selectedJob.id);
     
     setIsSaving(false);
     
@@ -131,8 +132,8 @@ export default function VagasAdminPage() {
       return;
     }
     
-    setRequests(prev => prev.map(item => item.id === editingJob.id ? editingJob : item));
-    setEditingJob(null);
+    setRequests(prev => prev.map(item => item.id === selectedJob.id ? selectedJob : item));
+    setIsEditing(false);
   };
 
   const abertas = requests.filter((request) => !["Aprovada", "Recusada", "Arquivada"].includes(request.status ?? "")).length;
@@ -203,128 +204,192 @@ export default function VagasAdminPage() {
           />
         </div>
 
-        <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left align-top">
-              <thead className="bg-muted/50 border-b border-border">
-                <tr className="text-muted-foreground font-medium">
-                  <th className="px-4 py-3">Solicitação</th>
-                  <th className="px-4 py-3">Solicitante</th>
-                  <th className="px-4 py-3">Tags</th>
-                  <th className="px-4 py-3">Requisitos</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {loading && (
-                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>Carregando solicitações...</td></tr>
-                )}
-                {!loading && filtered.length === 0 && (
-                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>Nenhuma solicitação encontrada na aba {activeTab}.</td></tr>
-                )}
-                {!loading && filtered.map((request) => (
-                  <tr key={request.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3 min-w-72">
-                      <div className="font-medium text-foreground">{request.position_title || "Sem título"}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {request.quantity ?? 1} vaga(s) · {request.contract_type || "Contrato não informado"} · {request.unit || "Unidade não informada"}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">Data: {new Date(request.created_at).toLocaleDateString("pt-BR")}</div>
-                      {request.manager_expectations && <p className="mt-2 max-w-md text-xs leading-5 text-muted-foreground">{request.manager_expectations}</p>}
-                    </td>
-                    <td className="px-4 py-3 min-w-44 text-muted-foreground">
-                      <div>{request.requester_name || "Não informado"}</div>
-                      <div className="text-xs">{request.requester_area || "Área não informada"}</div>
-                      {request.requester_whatsapp && (
-                        <a href={request.requester_whatsapp} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
-                          <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-                        </a>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 min-w-64">
-                      <TagList tags={[...(request.behavioral_tags ?? []), ...(request.search_tags ?? [])]} />
-                    </td>
-                    <td className="px-4 py-3 min-w-80 text-xs text-muted-foreground">
-                      <Requirement title="Mínimo" text={request.required_requirements} />
-                      <Requirement title="Desejável" text={request.desired_requirements} />
-                    </td>
-                    <td className="px-4 py-3 min-w-36">
-                      <select
-                        value={request.status || "Nova"}
-                        onChange={(event) => updateStatus(request, event.target.value)}
-                        className={`h-9 w-full rounded-md border bg-background px-2 text-xs font-medium ${statusStyle[request.status || "Nova"] ?? ""}`}
-                      >
-                        {nextStatus.map((status) => <option key={status}>{status}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="outline" title="Editar Solicitação" onClick={() => setEditingJob({...request})}>
-                          <Edit3 className="h-3.5 w-3.5" />
-                        </Button>
-                        {request.status !== "Arquivada" ? (
-                          <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-zinc-900 dark:hover:text-zinc-100" title="Arquivar" onClick={() => updateStatus(request, "Arquivada")}>
-                            <Archive className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : (
-                          <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-zinc-900 dark:hover:text-zinc-100" title="Desarquivar" onClick={() => updateStatus(request, "Nova")}>
-                            <ArchiveRestore className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {loading && (
+            <div className="col-span-full py-12 text-center text-muted-foreground">Carregando solicitações...</div>
+          )}
+          {!loading && filtered.length === 0 && (
+            <div className="col-span-full py-12 text-center text-muted-foreground">Nenhuma solicitação encontrada na aba {activeTab}.</div>
+          )}
+          {!loading && filtered.map((request) => (
+            <Card 
+              key={request.id} 
+              className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col"
+              onClick={() => { setSelectedJob(request); setIsEditing(false); }}
+            >
+              <CardContent className="p-5 flex flex-col gap-4 flex-1">
+                <div className="flex justify-between items-start gap-2">
+                  <div>
+                    <h3 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors">{request.position_title || "Sem título"}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {request.unit || "Unidade não informada"} • {request.quantity ?? 1} vaga(s)
+                    </p>
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusStyle[request.status || "Nova"] ?? ""}`}>
+                    {request.status || "Nova"}
+                  </span>
+                </div>
+
+                <div className="flex-1 mt-2 space-y-3 text-sm">
+                  <div className="flex items-center text-muted-foreground">
+                    <User className="w-4 h-4 mr-2 text-muted-foreground/70" />
+                    <span className="truncate">{request.requester_name || "Solicitante não informado"}</span>
+                  </div>
+                  <div className="flex items-center text-muted-foreground">
+                    <Briefcase className="w-4 h-4 mr-2 text-muted-foreground/70" />
+                    <span className="truncate">{request.requester_area || "Área não informada"}</span>
+                  </div>
+                  <div className="flex items-center text-muted-foreground">
+                    <Calendar className="w-4 h-4 mr-2 text-muted-foreground/70" />
+                    <span>{new Date(request.created_at).toLocaleDateString("pt-BR")}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
       
-      <Dialog open={!!editingJob} onOpenChange={(o) => !o && setEditingJob(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-6 md:p-8">
-          <DialogHeader className="mb-4">
-            <DialogTitle className="text-2xl">Editar Vaga</DialogTitle>
-            <DialogDescription>Altere as informações da solicitação da vaga.</DialogDescription>
-          </DialogHeader>
-          {editingJob && (
-            <form onSubmit={handleSaveEdit} className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 col-span-2">
-                  <Label>Título da Vaga</Label>
-                  <Input value={editingJob.position_title || ""} onChange={(e) => setEditingJob({...editingJob, position_title: e.target.value})} required />
+      <Dialog open={!!selectedJob} onOpenChange={(o) => { if(!o) { setSelectedJob(null); setIsEditing(false); } }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+          {selectedJob && (
+            <>
+              <div className="px-6 py-4 border-b flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur z-10">
+                <div>
+                  <DialogTitle className="text-xl">
+                    {isEditing ? "Editar Vaga" : selectedJob.position_title || "Detalhes da Vaga"}
+                  </DialogTitle>
+                  {!isEditing && (
+                    <DialogDescription className="mt-1">
+                      {selectedJob.quantity ?? 1} vaga(s) • {selectedJob.contract_type || "Contrato não informado"} • Solicitado em {new Date(selectedJob.created_at).toLocaleDateString("pt-BR")}
+                    </DialogDescription>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label>Quantidade</Label>
-                  <Input type="number" min="1" value={editingJob.quantity || 1} onChange={(e) => setEditingJob({...editingJob, quantity: parseInt(e.target.value)})} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Unidade / Obra</Label>
-                  <Input value={editingJob.unit || ""} onChange={(e) => setEditingJob({...editingJob, unit: e.target.value})} />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label>Tipo de Contrato</Label>
-                  <Input value={editingJob.contract_type || ""} onChange={(e) => setEditingJob({...editingJob, contract_type: e.target.value})} />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label>Requisitos Mínimos</Label>
-                  <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={editingJob.required_requirements || ""} onChange={(e) => setEditingJob({...editingJob, required_requirements: e.target.value})} />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label>Requisitos Desejáveis</Label>
-                  <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={editingJob.desired_requirements || ""} onChange={(e) => setEditingJob({...editingJob, desired_requirements: e.target.value})} />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label>Expectativas do Gestor</Label>
-                  <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={editingJob.manager_expectations || ""} onChange={(e) => setEditingJob({...editingJob, manager_expectations: e.target.value})} />
+                <div className="flex items-center gap-2">
+                  {!isEditing ? (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                        <Edit3 className="w-4 h-4 mr-2" /> Editar
+                      </Button>
+                      {selectedJob.status !== "Arquivada" ? (
+                        <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-zinc-900 dark:hover:text-zinc-100" title="Arquivar" onClick={() => updateStatus(selectedJob, "Arquivada")}>
+                          <Archive className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-zinc-900 dark:hover:text-zinc-100" title="Desarquivar" onClick={() => updateStatus(selectedJob, "Nova")}>
+                          <ArchiveRestore className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
+                      Cancelar
+                    </Button>
+                  )}
                 </div>
               </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setEditingJob(null)}>Cancelar</Button>
-                <Button type="submit" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar Alterações"}</Button>
-              </DialogFooter>
-            </form>
+              
+              <div className="p-6">
+                {!isEditing ? (
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                            <User className="h-4 w-4 text-primary" /> Solicitante
+                          </h4>
+                          <div className="rounded-md border bg-muted/20 p-3 text-sm">
+                            <p className="font-medium text-foreground">{selectedJob.requester_name || "Não informado"}</p>
+                            <p className="text-muted-foreground mt-0.5">{selectedJob.requester_area || "Área não informada"}</p>
+                            {selectedJob.requester_whatsapp && (
+                              <a href={selectedJob.requester_whatsapp} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 font-medium text-emerald-600 hover:text-emerald-700 transition-colors">
+                                <MessageCircle className="h-4 w-4" /> WhatsApp
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-primary" /> Unidade / Obra
+                          </h4>
+                          <div className="rounded-md border bg-muted/20 p-3 text-sm text-foreground">
+                            {selectedJob.unit || "Não informada"}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <h4 className="text-sm font-semibold text-foreground mb-2">Status da Vaga</h4>
+                          <select
+                            value={selectedJob.status || "Nova"}
+                            onChange={(event) => updateStatus(selectedJob, event.target.value)}
+                            className={`h-10 w-full rounded-md border bg-background px-3 text-sm font-medium ${statusStyle[selectedJob.status || "Nova"] ?? ""}`}
+                          >
+                            {nextStatus.map((status) => <option key={status}>{status}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <Requirement title="Requisitos Mínimos" text={selectedJob.required_requirements} />
+                        <Requirement title="Requisitos Desejáveis" text={selectedJob.desired_requirements} />
+                        
+                        {selectedJob.manager_expectations && (
+                          <div className="mb-2">
+                            <div className="font-semibold text-foreground mb-1">Expectativas do Gestor</div>
+                            <div className="whitespace-pre-line leading-5 text-sm text-muted-foreground bg-muted/20 p-3 rounded-md border">{selectedJob.manager_expectations}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {((selectedJob.behavioral_tags && selectedJob.behavioral_tags.length > 0) || (selectedJob.search_tags && selectedJob.search_tags.length > 0)) && (
+                      <div className="border-t pt-6">
+                        <h4 className="text-sm font-semibold text-foreground mb-3">Tags Relacionadas</h4>
+                        <TagList tags={[...(selectedJob.behavioral_tags ?? []), ...(selectedJob.search_tags ?? [])]} />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <form onSubmit={handleSaveEdit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2 col-span-2">
+                        <Label>Título da Vaga</Label>
+                        <Input value={selectedJob.position_title || ""} onChange={(e) => setSelectedJob({...selectedJob, position_title: e.target.value})} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Quantidade</Label>
+                        <Input type="number" min="1" value={selectedJob.quantity || 1} onChange={(e) => setSelectedJob({...selectedJob, quantity: parseInt(e.target.value)})} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Unidade / Obra</Label>
+                        <Input value={selectedJob.unit || ""} onChange={(e) => setSelectedJob({...selectedJob, unit: e.target.value})} />
+                      </div>
+                      <div className="space-y-2 col-span-2">
+                        <Label>Tipo de Contrato</Label>
+                        <Input value={selectedJob.contract_type || ""} onChange={(e) => setSelectedJob({...selectedJob, contract_type: e.target.value})} />
+                      </div>
+                      <div className="space-y-2 col-span-2">
+                        <Label>Requisitos Mínimos</Label>
+                        <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={selectedJob.required_requirements || ""} onChange={(e) => setSelectedJob({...selectedJob, required_requirements: e.target.value})} />
+                      </div>
+                      <div className="space-y-2 col-span-2">
+                        <Label>Requisitos Desejáveis</Label>
+                        <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={selectedJob.desired_requirements || ""} onChange={(e) => setSelectedJob({...selectedJob, desired_requirements: e.target.value})} />
+                      </div>
+                      <div className="space-y-2 col-span-2">
+                        <Label>Expectativas do Gestor</Label>
+                        <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={selectedJob.manager_expectations || ""} onChange={(e) => setSelectedJob({...selectedJob, manager_expectations: e.target.value})} />
+                      </div>
+                    </div>
+                    <DialogFooter className="pt-4 border-t mt-4">
+                      <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>Cancelar</Button>
+                      <Button type="submit" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar Alterações"}</Button>
+                    </DialogFooter>
+                  </form>
+                )}
+              </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
@@ -362,8 +427,8 @@ function Requirement({ title, text }: { title: string; text: string | null }) {
   if (!text) return null;
   return (
     <div className="mb-2">
-      <div className="font-semibold text-foreground">{title}</div>
-      <div className="whitespace-pre-line leading-5">{text}</div>
+      <div className="font-semibold text-foreground mb-1">{title}</div>
+      <div className="whitespace-pre-line leading-5 text-sm text-muted-foreground bg-muted/20 p-3 rounded-md border">{text}</div>
     </div>
   );
 }
