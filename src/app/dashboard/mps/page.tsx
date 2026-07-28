@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FileSpreadsheet, Download } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FileSpreadsheet } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -31,6 +33,22 @@ type SalaryRow = {
   salary: number;
 };
 
+const availableLogos = [
+  "Connect Duque.png", "Direct.png", "JOY II.png", "JOY.png",
+  "Life RG.png", "MOOV II.png", "MOOV.png", "Reserva Home Club.png",
+  "SEDE.png", "Solanas.png"
+];
+
+const availableReasons = [
+  "Substituição", "Aumento de quadro", "Promoção", "Transferência", 
+  "Enquadramento/Mérito", "Alteração de Cargo", "Outros"
+];
+
+const availableBenefits = [
+  "VT (Vale Transporte)", "VR (Vale Refeição)", "VA (Vale Alimentação)", 
+  "Plano de Saúde", "Plano Odontológico", "Seguro de Vida"
+];
+
 export default function MPGeneratorPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [salaryTable, setSalaryTable] = useState<SalaryRow[]>([]);
@@ -38,31 +56,29 @@ export default function MPGeneratorPage() {
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const availableLogos = [
-    "Connect Duque.png",
-    "Direct.png",
-    "JOY II.png",
-    "JOY.png",
-    "Life RG.png",
-    "MOOV II.png",
-    "MOOV.png",
-    "Reserva Home Club.png",
-    "SEDE.png",
-    "Solanas.png"
-  ];
-
   // Form State
+  const [mpType, setMpType] = useState<"contratacao" | "movimentacao">("contratacao");
   const [selectedLogo, setSelectedLogo] = useState("MOOV.png");
+  
+  // Contratação state
+  const [candidateName, setCandidateName] = useState("");
+  
+  // Movimentação state
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [updateProfile, setUpdateProfile] = useState(false);
+
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [location, setLocation] = useState("");
   const [sector, setSector] = useState("");
   const [costCenter, setCostCenter] = useState("");
+  
   const [requestedBy, setRequestedBy] = useState("");
   const [reason, setReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
   const [replacementOf, setReplacementOf] = useState("");
-  const [benefits, setBenefits] = useState("");
+  
+  const [selectedBenefits, setSelectedBenefits] = useState<string[]>([]);
   const [justification, setJustification] = useState("");
   
   const [selectedRoleId, setSelectedRoleId] = useState("");
@@ -93,9 +109,9 @@ export default function MPGeneratorPage() {
     fetchData();
   }, []);
 
-  // When employee changes, auto-fill some fields if possible
+  // When employee changes (in Movimentação), auto-fill some fields
   useEffect(() => {
-    if (selectedEmployeeId) {
+    if (mpType === "movimentacao" && selectedEmployeeId) {
       const emp = employees.find(e => e.id === selectedEmployeeId);
       if (emp) {
         setPhone(emp.phone || "");
@@ -104,15 +120,43 @@ export default function MPGeneratorPage() {
         setSector(emp.departments?.name || "");
         setCostCenter(emp.cost_center || "");
       }
-    } else {
+    } else if (mpType === "contratacao") {
       setPhone(""); setEmail(""); setLocation(""); setSector(""); setCostCenter("");
     }
-  }, [selectedEmployeeId, employees]);
+  }, [selectedEmployeeId, employees, mpType]);
+
+  const handleBenefitToggle = (benefit: string) => {
+    setSelectedBenefits(prev => 
+      prev.includes(benefit) ? prev.filter(b => b !== benefit) : [...prev, benefit]
+    );
+  };
 
   const generateExcel = async () => {
     setIsGenerating(true);
     try {
-      const empName = employees.find(e => e.id === selectedEmployeeId)?.name || "Nao_Selecionado";
+      const supabase = createClient();
+      
+      if (mpType === "movimentacao" && updateProfile && selectedEmployeeId) {
+        // Ask for confirmation (UI prompt requested by user - "se caso o usuario modificar pergunte se quer alterar no perfil do colaborador")
+        const confirmUpdate = window.confirm("Você escolheu atualizar os dados de contato/alocação no perfil do colaborador. Confirmar atualização no banco de dados?");
+        if (confirmUpdate) {
+          await supabase.from('employees').update({
+            phone: phone,
+            email_corporate: email,
+            unit: location,
+            cost_center: costCenter
+            // Note: Not updating department directly because it uses ID, but we only have string 'sector'
+          }).eq('id', selectedEmployeeId);
+        }
+      }
+
+      const empName = mpType === "contratacao" 
+        ? candidateName 
+        : employees.find(e => e.id === selectedEmployeeId)?.name || "Nao_Selecionado";
+        
+      const finalReason = reason === "Outros" ? customReason : reason;
+      const benefitsText = selectedBenefits.join(", ");
+
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("MP", {
         pageSetup: { paperSize: 9, orientation: 'portrait' }
@@ -138,7 +182,7 @@ export default function MPGeneratorPage() {
             buffer: arrayBuffer,
             extension: 'png',
           });
-          sheet.addImage(imageId, 'B2:D5'); // Insert over B2:C4 space roughly
+          sheet.addImage(imageId, 'B2:D5');
         } catch (e) {
           console.error("Erro ao carregar logo", e);
           const logoCell = sheet.getCell('B2');
@@ -171,17 +215,17 @@ export default function MPGeneratorPage() {
       sheet.getCell('E4').font = { color: { argb: 'FFFFFFFF' } };
       sheet.getCell('F4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
 
-      // SECTION 1: CONTRATAÇÃO DE NOVOS COLABORADORES
+      // SECTION 1: TITLE
       sheet.mergeCells('B6:F6');
       const section1 = sheet.getCell('B6');
-      section1.value = "CONTRATAÇÃO DE NOVOS COLABORADORES";
+      section1.value = mpType === "contratacao" ? "CONTRATAÇÃO DE NOVOS COLABORADORES" : "MOVIMENTAÇÃO DE PESSOAL";
       section1.alignment = { horizontal: 'center' };
       section1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
       section1.font = { bold: true };
 
       // NOME / TELEFONE / EMAIL
       sheet.mergeCells('B8:C8');
-      sheet.getCell('B8').value = "Nome do candidato";
+      sheet.getCell('B8').value = mpType === "contratacao" ? "Nome do candidato" : "Nome do colaborador";
       sheet.getCell('B8').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
       sheet.getCell('B8').alignment = { horizontal: 'center' };
       sheet.getCell('B8').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
@@ -291,7 +335,7 @@ export default function MPGeneratorPage() {
       sheet.getCell('B24').alignment = { horizontal: 'center' };
       sheet.getCell('B24').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
       sheet.mergeCells('B25:C25');
-      sheet.getCell('B25').value = reason;
+      sheet.getCell('B25').value = finalReason;
       sheet.getCell('B25').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
 
       sheet.getCell('B26').value = "Substituição de";
@@ -307,7 +351,8 @@ export default function MPGeneratorPage() {
       sheet.getCell('E24').alignment = { horizontal: 'center' };
       sheet.getCell('E24').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
       sheet.mergeCells('E25:F26');
-      sheet.getCell('E25').value = benefits;
+      sheet.getCell('E25').value = benefitsText;
+      sheet.getCell('E25').alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
       sheet.getCell('E25').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
 
       // JUSTIFICATIVA
@@ -328,7 +373,7 @@ export default function MPGeneratorPage() {
       sheet.getCell('B34').font = { color: { argb: 'FFFFFFFF' } };
       sheet.getCell('B34').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
       sheet.mergeCells('B35:C35');
-      sheet.getCell('B35').value = currentUser;
+      sheet.getCell('B35').value = currentUser || "Você";
       sheet.getCell('B35').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
 
       sheet.getCell('E34').value = "Vigência";
@@ -370,7 +415,7 @@ export default function MPGeneratorPage() {
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      saveAs(blob, `MP_${empName.replace(/\s+/g, '_')}.xlsx`);
+      saveAs(blob, `MP_${mpType}_${empName.replace(/\s+/g, '_')}.xlsx`);
 
     } catch (err) {
       console.error(err);
@@ -379,154 +424,236 @@ export default function MPGeneratorPage() {
     setIsGenerating(false);
   };
 
+  const isFormValid = () => {
+    if (mpType === "contratacao" && !candidateName) return false;
+    if (mpType === "movimentacao" && !selectedEmployeeId) return false;
+    if (!selectedRoleId) return false;
+    return true;
+  };
+
   if (loading) return <div className="p-6">Carregando gerador...</div>;
 
   return (
-    <div className="space-y-6 p-6 max-w-5xl mx-auto">
+    <div className="space-y-6 p-6 max-w-5xl mx-auto pb-24">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Criador de Movimentação de Pessoal (MP)</h1>
-          <p className="text-muted-foreground mt-1">Preencha os dados e gere a planilha automaticamente.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Criador de MP</h1>
+          <p className="text-muted-foreground mt-1">Preencha os dados para gerar a planilha (Contratação ou Movimentação).</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-6 p-6 border rounded-lg bg-card shadow-sm">
-          <h2 className="text-xl font-semibold border-b pb-2">1. Dados do Colaborador</h2>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Logo da Empresa/Obra na Planilha</Label>
-              <select 
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                value={selectedLogo}
-                onChange={(e) => setSelectedLogo(e.target.value)}
-              >
-                <option value="">Sem Logo</option>
-                {availableLogos.map(logo => (
-                  <option key={logo} value={logo}>{logo.replace('.png', '')}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Nome do Colaborador (Candidato) *</Label>
-              <select 
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={selectedEmployeeId}
-                onChange={(e) => setSelectedEmployeeId(e.target.value)}
-              >
-                <option value="">Selecione um colaborador...</option>
-                {employees.map(e => (
-                  <option key={e.id} value={e.id}>{e.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Telefone</Label>
-                <Input value={phone} onChange={e => setPhone(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>E-mail corporativo</Label>
-                <Input value={email} onChange={e => setEmail(e.target.value)} />
-              </div>
-            </div>
+      <Tabs 
+        value={mpType} 
+        onValueChange={(v) => setMpType(v as any)} 
+        className="w-full"
+      >
+        <TabsList className="grid w-full grid-cols-2 max-w-md mb-8">
+          <TabsTrigger value="contratacao">MP de Contratação</TabsTrigger>
+          <TabsTrigger value="movimentacao">MP de Movimentação</TabsTrigger>
+        </TabsList>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6 p-6 border rounded-lg bg-card shadow-sm">
+            <h2 className="text-xl font-semibold border-b pb-2">1. Dados do Colaborador/Candidato</h2>
             
-            <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Local</Label>
-                <Input value={location} onChange={e => setLocation(e.target.value)} />
+                <Label>Logo da Empresa/Obra na Planilha</Label>
+                <select 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={selectedLogo}
+                  onChange={(e) => setSelectedLogo(e.target.value)}
+                >
+                  <option value="">Sem Logo</option>
+                  {availableLogos.map(logo => (
+                    <option key={logo} value={logo}>{logo.replace('.png', '')}</option>
+                  ))}
+                </select>
               </div>
-              <div className="space-y-2">
-                <Label>Setor</Label>
-                <Input value={sector} onChange={e => setSector(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Centro de Custo</Label>
-                <Input value={costCenter} onChange={e => setCostCenter(e.target.value)} />
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <div className="space-y-6 p-6 border rounded-lg bg-card shadow-sm">
-          <h2 className="text-xl font-semibold border-b pb-2">2. Nova Função e Contrato</h2>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Selecione a Regra Salarial (Cargo/Nível) *</Label>
-              <select 
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={selectedRoleId}
-                onChange={(e) => setSelectedRoleId(e.target.value)}
-              >
-                <option value="">Selecione na Tabela Salarial...</option>
-                {salaryTable.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.role_name} - {s.level} ({s.modality})
-                  </option>
-                ))}
-              </select>
-              {selectedRoleInfo && (
-                <div className="p-3 bg-muted rounded-md text-sm mt-2 grid grid-cols-2 gap-2">
-                  <div><span className="font-semibold text-muted-foreground">Cargo:</span> {selectedRoleInfo.role_name}</div>
-                  <div><span className="font-semibold text-muted-foreground">Nível:</span> {selectedRoleInfo.level}</div>
-                  <div><span className="font-semibold text-muted-foreground">Modalidade:</span> {selectedRoleInfo.modality}</div>
-                  <div><span className="font-semibold text-muted-foreground">Cód:</span> {selectedRoleInfo.role_code || "N/A"}</div>
-                  <div className="col-span-2 text-lg font-bold text-green-600 mt-1">
-                    {formatCurrency(selectedRoleInfo.salary)}
-                  </div>
+              {mpType === "contratacao" ? (
+                <div className="space-y-2">
+                  <Label>Nome do Candidato *</Label>
+                  <Input 
+                    placeholder="Digite o nome completo"
+                    value={candidateName} 
+                    onChange={e => setCandidateName(e.target.value)} 
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Selecione o Colaborador *</Label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={selectedEmployeeId}
+                    onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                  >
+                    <option value="">Selecione...</option>
+                    {employees.map(e => (
+                      <option key={e.id} value={e.id}>{e.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Telefone</Label>
+                  <Input value={phone} onChange={e => setPhone(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>E-mail corporativo</Label>
+                  <Input value={email} onChange={e => setEmail(e.target.value)} />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Local / Obra</Label>
+                  <Input value={location} onChange={e => setLocation(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Setor</Label>
+                  <Input value={sector} onChange={e => setSector(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Centro de Custo</Label>
+                  <Input value={costCenter} onChange={e => setCostCenter(e.target.value)} />
+                </div>
+              </div>
+
+              {mpType === "movimentacao" && selectedEmployeeId && (
+                <div className="flex items-center space-x-2 pt-2 pb-2 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md border border-yellow-200 dark:border-yellow-800">
+                  <Checkbox 
+                    id="update-profile" 
+                    checked={updateProfile}
+                    onCheckedChange={(c) => setUpdateProfile(c as boolean)}
+                  />
+                  <Label htmlFor="update-profile" className="text-sm cursor-pointer leading-tight">
+                    Atualizar o perfil do colaborador no sistema com estes novos dados
+                  </Label>
                 </div>
               )}
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Req. da Vaga (Solicitado por)</Label>
-                <Input value={requestedBy} onChange={e => setRequestedBy(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Razão</Label>
-                <Input value={reason} onChange={e => setReason(e.target.value)} placeholder="Ex: Substituição, Aumento de Quadro..." />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Substituição de (Opcional)</Label>
-                <Input value={replacementOf} onChange={e => setReplacementOf(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Benefícios Adicionais</Label>
-                <Input value={benefits} onChange={e => setBenefits(e.target.value)} placeholder="Ex: VR, VT..." />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Justificativa / Observações</Label>
-              <Textarea 
-                value={justification} 
-                onChange={e => setJustification(e.target.value)} 
-                rows={3}
-                placeholder="Insira as observações da contratação/promoção..."
-              />
-            </div>
+          <div className="space-y-6 p-6 border rounded-lg bg-card shadow-sm">
+            <h2 className="text-xl font-semibold border-b pb-2">2. Nova Função e Contrato</h2>
             
-            <div className="pt-4 flex items-center justify-between text-sm text-muted-foreground border-t">
-              <div>Verificado por: <strong>{currentUser || "Você"}</strong></div>
-              <div>Data: <strong>{new Date().toLocaleDateString('pt-BR')}</strong></div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Regra Salarial (Cargo/Nível) *</Label>
+                <select 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={selectedRoleId}
+                  onChange={(e) => setSelectedRoleId(e.target.value)}
+                >
+                  <option value="">Selecione na Tabela Salarial...</option>
+                  {salaryTable.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.role_name} - {s.level} ({s.modality})
+                    </option>
+                  ))}
+                </select>
+                {selectedRoleInfo && (
+                  <div className="p-3 bg-muted rounded-md text-sm mt-2 grid grid-cols-2 gap-2">
+                    <div><span className="font-semibold text-muted-foreground">Cargo:</span> {selectedRoleInfo.role_name}</div>
+                    <div><span className="font-semibold text-muted-foreground">Nível:</span> {selectedRoleInfo.level}</div>
+                    <div><span className="font-semibold text-muted-foreground">Modo:</span> {selectedRoleInfo.modality}</div>
+                    <div><span className="font-semibold text-muted-foreground">Cód:</span> {selectedRoleInfo.role_code || "N/A"}</div>
+                    <div className="col-span-2 text-lg font-bold text-green-600 mt-1">
+                      {formatCurrency(selectedRoleInfo.salary)}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Req. da Vaga (Solicitante)</Label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={requestedBy}
+                    onChange={(e) => setRequestedBy(e.target.value)}
+                  >
+                    <option value="">Selecione o solicitante...</option>
+                    {employees.map(e => (
+                      <option key={`req-${e.id}`} value={e.name}>{e.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Razão da Movimentação</Label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  >
+                    <option value="">Selecione...</option>
+                    {availableReasons.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {reason === "Outros" && (
+                <div className="space-y-2">
+                  <Label>Especificar Razão</Label>
+                  <Input value={customReason} onChange={e => setCustomReason(e.target.value)} placeholder="Digite o motivo..." />
+                </div>
+              )}
+
+              {reason === "Substituição" && (
+                <div className="space-y-2">
+                  <Label>Substituição de quem?</Label>
+                  <Input value={replacementOf} onChange={e => setReplacementOf(e.target.value)} placeholder="Nome do substituído" />
+                </div>
+              )}
+
+              <div className="space-y-3 pt-2">
+                <Label>Benefícios Adicionais</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {availableBenefits.map(benefit => (
+                    <div key={benefit} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`benefit-${benefit}`} 
+                        checked={selectedBenefits.includes(benefit)}
+                        onCheckedChange={() => handleBenefitToggle(benefit)}
+                      />
+                      <Label htmlFor={`benefit-${benefit}`} className="text-sm font-normal cursor-pointer">
+                        {benefit}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Justificativa / Observações</Label>
+                <Textarea 
+                  value={justification} 
+                  onChange={e => setJustification(e.target.value)} 
+                  rows={2}
+                  placeholder="Insira observações ou justificativas relevantes..."
+                />
+              </div>
+              
+              <div className="pt-4 flex items-center justify-between text-sm text-muted-foreground border-t">
+                <div>Verificado por: <strong>{currentUser || "Você"}</strong></div>
+                <div>Data: <strong>{new Date().toLocaleDateString('pt-BR')}</strong></div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </Tabs>
 
-      <div className="flex justify-end pt-4">
-        <Button size="lg" onClick={generateExcel} disabled={isGenerating || !selectedEmployeeId || !selectedRoleId} className="bg-green-600 hover:bg-green-700 text-white">
-          {isGenerating ? "Gerando..." : (
+      <div className="flex justify-end pt-4 mt-8">
+        <Button size="lg" onClick={generateExcel} disabled={isGenerating || !isFormValid()} className="bg-green-600 hover:bg-green-700 text-white shadow-lg">
+          {isGenerating ? "Processando..." : (
             <>
-              <FileSpreadsheet className="mr-2 h-5 w-5" /> Gerar Planilha MP (Excel)
+              <FileSpreadsheet className="mr-2 h-5 w-5" /> 
+              Gerar Planilha ({mpType === 'contratacao' ? "Contratação" : "Movimentação"})
             </>
           )}
         </Button>
