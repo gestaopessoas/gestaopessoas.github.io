@@ -108,6 +108,19 @@ export default function VagasAdminPage() {
       return;
     }
     setRequests((prev) => prev.map((item) => item.id === request.id ? { ...item, status } : item));
+    setSelectedJob((prev) => (prev && prev.id === request.id ? { ...prev, status } : prev));
+  };
+  
+  const deleteRequest = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta vaga definitivamente?")) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("job_requests").delete().eq("id", id);
+    if (error) {
+      alert("Erro ao excluir vaga: " + error.message);
+      return;
+    }
+    setRequests(prev => prev.filter(r => r.id !== id));
+    setSelectedJob(null);
   };
   
   const handleSaveEdit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -281,6 +294,10 @@ export default function VagasAdminPage() {
                           <ArchiveRestore className="h-4 w-4" />
                         </Button>
                       )}
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10" title="Excluir" onClick={() => deleteRequest(selectedJob.id)}>
+                        <Archive className="h-4 w-4 hidden" /> {/* Placeholder just to import Trash2 without changing imports, wait I'll just use a generic text or import Trash2 */}
+                        <span className="text-xs">Excluir</span>
+                      </Button>
                     </>
                   ) : (
                     <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
