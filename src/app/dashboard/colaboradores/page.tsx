@@ -360,7 +360,7 @@ export default function ColaboradoresPage() {
                       onClick={() => idx > 0 && startEdit(employees[idx - 1])}
                       title="Colaborador anterior [ ]"
                     >
-                      Ã¢â€ Â Anterior
+                      ← Anterior
                     </Button>
                     <span className="text-xs text-muted-foreground px-1">{idx + 1}/{employees.length}</span>
                     <Button
