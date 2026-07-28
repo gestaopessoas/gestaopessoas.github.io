@@ -72,6 +72,8 @@ export function NotificationBell() {
     };
 
     fetchNotifications();
+    window.addEventListener("notificationsUpdated", fetchNotifications);
+    return () => window.removeEventListener("notificationsUpdated", fetchNotifications);
   }, []);
 
   useEffect(() => {

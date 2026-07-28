@@ -64,6 +64,11 @@ export default function BeneficiosPage() {
     setIgnores((igs || []).map(i => i.employee_id));
     setLunchLists((lunches || []) as any);
     setLoading(false);
+    
+    // Dispatch event so NotificationBell updates globally
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("notificationsUpdated"));
+    }
   };
 
   useEffect(() => {
