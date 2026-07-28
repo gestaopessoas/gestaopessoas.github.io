@@ -6,7 +6,7 @@ import { Plus, Search, Pencil, Trash2, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Modal } from "@/components/ui/modal";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 
 type SalaryRow = {
@@ -161,7 +161,11 @@ export default function SalaryTablePage() {
         </div>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingRow.id ? "Editar Faixa Salarial" : "Nova Faixa Salarial"}>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingRow.id ? "Editar Faixa Salarial" : "Nova Faixa Salarial"}</DialogTitle>
+          </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -229,9 +233,10 @@ export default function SalaryTablePage() {
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={!editingRow.role_name || editingRow.salary === undefined}>Salvar</Button>
+            </div>
           </div>
-        </div>
-      </Modal>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
