@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
-import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award, Package, CheckSquare, CircleDollarSign } from "lucide-react"
+import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award, Package, CheckSquare, CircleDollarSign, FileOutput } from "lucide-react"
 import { usePermissions } from "@/hooks/usePermissions"
 import { createClient } from "@/utils/supabase/client"
 
@@ -33,6 +33,7 @@ const sidebarGroups = [
       { name: "Holerites", href: "/dashboard/holerites", icon: Receipt, module: "holerites" },
       { name: "Arquivo Morto", href: "/dashboard/arquivo-morto", icon: Archive, module: "arquivo_morto" },
       { name: "Controle RGS", href: "/dashboard/rgs", icon: ClipboardList, module: "rgs" },
+      { name: "Movimentações (MP)", href: "/dashboard/mps", icon: FileOutput, module: "colaboradores" },
     ]
   },
   {
@@ -65,6 +66,7 @@ const sidebarGroups = [
       { name: "Centros de Custo", href: "/dashboard/centros-de-custo", icon: Briefcase, module: "centros_de_custo" },
       { name: "Departamentos", href: "/dashboard/departamentos", icon: Briefcase, module: "departamentos" },
       { name: "Cargos", href: "/dashboard/cargos", icon: Briefcase, module: "cargos" },
+      { name: "Tabela Salarial", href: "/dashboard/configuracoes/tabela-salarial", icon: CircleDollarSign, module: "configuracoes" },
       { name: "Empresas", href: "/dashboard/empresas", icon: LayoutDashboard, module: "empresas" },
       { name: "Obras", href: "/dashboard/obras", icon: LayoutDashboard, module: "obras" },
       { name: "Resumo Financeiro", href: "/dashboard/financeiro", icon: CircleDollarSign, module: "financeiro" },

@@ -27,11 +27,11 @@ export default function AnalyticsPage() {
     const load = async () => {
       const supabase = createClient();
       const [employeeResult, requestResult, candidateResult, applicationResult, openingResult] = await Promise.all([
-        supabase.from("employees").select("id,status,unit,cost_center").limit(1000),
-        supabase.from("job_requests").select("id,status,urgency,created_at").limit(1000),
-        supabase.from("candidates").select("id,created_at,role_interest").limit(1000),
-        supabase.from("job_applications").select("id,status,created_at").limit(1000),
-        supabase.from("job_openings").select("id,status").limit(1000),
+        supabase.from("employees").select("id,status,unit,cost_center").limit(10000),
+        supabase.from("job_requests").select("id,status,urgency,created_at").limit(10000),
+        supabase.from("candidates").select("id,created_at,role_interest").limit(10000),
+        supabase.from("job_applications").select("id,status,created_at").limit(10000),
+        supabase.from("job_openings").select("id,status").limit(10000),
       ]);
 
       if (!active) return;
@@ -42,11 +42,11 @@ export default function AnalyticsPage() {
       setApplications((applicationResult.data ?? []) as Application[]);
       setOpenings((openingResult.data ?? []) as JobOpening[]);
       setErrors([
-        employeeResult.error && "Colaboradores",
-        requestResult.error && "Solicitações de vaga",
-        candidateResult.error && "Banco de talentos",
-        applicationResult.error && "Candidaturas/admissão",
-        openingResult.error && "Vagas abertas",
+        employeeResult.error && `Colaboradores (${employeeResult.error.message})`,
+        requestResult.error && `Solicitações de vaga (${requestResult.error.message})`,
+        candidateResult.error && `Banco de talentos (${candidateResult.error.message})`,
+        applicationResult.error && `Candidaturas/admissão (${applicationResult.error.message})`,
+        openingResult.error && `Vagas abertas (${openingResult.error.message})`,
       ].filter(Boolean) as string[]);
     };
 
