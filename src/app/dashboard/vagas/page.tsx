@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Briefcase, CheckCircle2, Clock, ExternalLink, MessageCircle, Plus, Search, Edit3, Archive, ListTodo, ArchiveRestore, User, Calendar, MapPin } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
 
 type JobRequest = {
   id: string;
