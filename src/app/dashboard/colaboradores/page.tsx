@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -499,8 +499,8 @@ export default function ColaboradoresPage() {
                       <div>{String(employee.role ?? "-")} {employee.level && <span className="text-[10px] bg-muted px-1.5 rounded-full ml-1">{employee.level}</span>}</div>
                       <div className="text-xs text-muted-foreground">
                         {employee.companies?.trading_name || employee.companies?.name ? `${employee.companies.trading_name || employee.companies.name}` : ""}
-                        {employee.workplaces?.name ? ` Ã‚Â· ${employee.workplaces.name}` : ""}
-                        {employee.departments?.name ? ` Ã‚Â· ${employee.departments.name}` : ""}
+                        {employee.workplaces?.name ? ` · ${employee.workplaces.name}` : ""}
+                        {employee.departments?.name ? ` · ${employee.departments.name}` : ""}
                         {(!employee.companies?.trading_name && !employee.companies?.name && !employee.workplaces?.name && !employee.departments?.name) && "-"}
                       </div>
                     </td>
