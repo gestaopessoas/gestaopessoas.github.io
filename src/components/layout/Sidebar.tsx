@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
-import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award, Package, CheckSquare, CircleDollarSign, FileOutput } from "lucide-react"
+import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award, Package, CheckSquare, CircleDollarSign, FileOutput, Contact } from "lucide-react"
 import { usePermissions } from "@/hooks/usePermissions"
 import { createClient } from "@/utils/supabase/client"
 
@@ -22,6 +22,7 @@ const sidebarGroups = [
       { name: "Vagas", href: "/dashboard/vagas", icon: Briefcase, module: "vagas" },
       { name: "Entrevistas", href: "/dashboard/entrevistas", icon: Users, module: "entrevistas" },
       { name: "Talentos", href: "/dashboard/talentos", icon: Users, module: "talentos" },
+      { name: "Central do Candidato", href: "/dashboard/central-candidato", icon: Contact, module: "central_candidato" },
     ]
   },
   {
