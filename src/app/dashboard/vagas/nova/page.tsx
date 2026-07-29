@@ -43,6 +43,9 @@ export default function NovaVagaPage() {
           unit: form.location,
           contract_type: form.contractType,
           status: "Aprovada",
+          requested_role: form.title,
+          reason: "Nova Vaga",
+          urgency: "Média",
           notes: form.isTalentPool ? "Banco de talentos" : "",
         })
         .select()
@@ -64,8 +67,12 @@ export default function NovaVagaPage() {
 
       router.push("/dashboard/vagas")
       router.refresh()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError("Ocorreu um erro desconhecido.")
+      }
       setLoading(false)
     }
   }
