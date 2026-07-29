@@ -82,7 +82,7 @@ export default function AddInterviewModal({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="stage">Etapa *</Label>
-              <Select value={stage} onValueChange={setStage} required>
+              <Select value={stage} onValueChange={(val) => setStage(val || "")} required>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a etapa" />
                 </SelectTrigger>
