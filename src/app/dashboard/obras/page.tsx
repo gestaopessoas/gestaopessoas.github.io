@@ -18,10 +18,12 @@ type Workplace = {
   name: string;
   type: string | null;
   address: string | null;
+  coordinator?: string | null;
+  responsible_director?: string | null;
   companies?: { name: string | null } | { name: string | null }[] | null;
 };
 
-const emptyForm = { name: "", type: "OBRA", address: "", company_id: "" };
+const emptyForm = { name: "", type: "OBRA", address: "", company_id: "", coordinator: "", responsible_director: "" };
 
 const typeStyle: Record<string, string> = {
   OBRA: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
@@ -33,6 +35,7 @@ const typeStyle: Record<string, string> = {
 export default function ObrasPage() {
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [coordenadores, setCoordenadores] = useState<{ id: string; name: string }[]>([]);
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -45,9 +48,10 @@ export default function ObrasPage() {
 
     const loadWorkplaces = async () => {
       const supabase = createClient();
-      const [companyResult, workplaceResult] = await Promise.all([
+      const [companyResult, workplaceResult, coordResult] = await Promise.all([
         supabase.from("companies").select("id, name").order("name"),
-        supabase.from("workplaces").select("id, company_id, name, type, address, companies(name)").order("name"),
+        supabase.from("workplaces").select("id, company_id, name, type, address, coordinator, responsible_director, companies(name)").order("name"),
+        supabase.from("employees").select("id, name").eq("status", "Ativo").ilike("role", "%Coordenador%Obra%").order("name"),
       ]);
 
       if (!active) return;
@@ -58,6 +62,7 @@ export default function ObrasPage() {
       }
       setCompanies((companyResult.data ?? []) as Company[]);
       setWorkplaces((workplaceResult.data ?? []) as Workplace[]);
+      setCoordenadores((coordResult.data ?? []) as any[]);
     };
 
     loadWorkplaces();
@@ -66,6 +71,15 @@ export default function ObrasPage() {
       active = false;
     };
   }, []);
+
+  // Preenche diretor responsável automaticamente com base no tipo
+  useEffect(() => {
+    if (form.type === "SEDE" && !form.responsible_director) {
+      setForm((prev) => ({ ...prev, responsible_director: "Presidente" }));
+    } else if (form.type === "PLANTÃO DE VENDAS" && !form.responsible_director) {
+      setForm((prev) => ({ ...prev, responsible_director: "Diretor Comercial" }));
+    }
+  }, [form.type, form.responsible_director]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -91,6 +105,8 @@ export default function ObrasPage() {
       type: workplace.type ?? "OBRA",
       address: workplace.address ?? "",
       company_id: workplace.company_id ?? "",
+      coordinator: workplace.coordinator ?? "",
+      responsible_director: workplace.responsible_director ?? "",
     });
     setError("");
   };
@@ -105,12 +121,14 @@ export default function ObrasPage() {
       type: form.type,
       address: form.address.trim() || null,
       company_id: form.company_id || null,
+      coordinator: form.coordinator.trim() || null,
+      responsible_director: form.responsible_director.trim() || null,
     };
 
     const supabase = createClient();
     const result = editingId
-      ? await supabase.from("workplaces").update(payload).eq("id", editingId).select("id, company_id, name, type, address, companies(name)").single()
-      : await supabase.from("workplaces").insert(payload).select("id, company_id, name, type, address, companies(name)").single();
+      ? await supabase.from("workplaces").update(payload).eq("id", editingId).select("id, company_id, name, type, address, coordinator, responsible_director, companies(name)").single()
+      : await supabase.from("workplaces").insert(payload).select("id, company_id, name, type, address, coordinator, responsible_director, companies(name)").single();
 
     setSaving(false);
     if (result.error) {
@@ -175,7 +193,7 @@ export default function ObrasPage() {
             <h2 className="font-semibold">{editingId ? "Editar unidade" : "Adicionar unidade"}</h2>
             {editingId && <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={startNew}><X className="h-4 w-4" /></Button>}
           </div>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             <Field label="Nome *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
             <Field label="Tipo">
               <select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
@@ -188,6 +206,13 @@ export default function ObrasPage() {
                 {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
               </select>
             </Field>
+            <Field label="Coordenador">
+              <select value={form.coordinator} onChange={(event) => setForm({ ...form, coordinator: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <option value="">Selecione...</option>
+                {coordenadores.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Diretor Responsável"><Input value={form.responsible_director} onChange={(event) => setForm({ ...form, responsible_director: event.target.value })} placeholder="Ex: Maria Souza" /></Field>
             <Field label="Localização"><Input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>
           </div>
           <div className="mt-4 flex justify-end">
@@ -207,6 +232,7 @@ export default function ObrasPage() {
                 <tr className="text-muted-foreground font-medium">
                   <th className="px-4 py-3">Unidade</th>
                   <th className="px-4 py-3">Tipo</th>
+                  <th className="px-4 py-3">Responsáveis</th>
                   <th className="px-4 py-3">Localização</th>
                   <th className="px-4 py-3">Empresa vinculada</th>
                   <th className="px-4 py-3 text-right">Ações</th>
@@ -222,6 +248,11 @@ export default function ObrasPage() {
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase ${typeStyle[workplace.type || "OBRA"] ?? ""}`}>
                         {workplace.type || "OBRA"}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs whitespace-normal min-w-[150px]">
+                      {workplace.coordinator && <div className="mb-0.5"><span className="font-medium text-foreground">Coord:</span> {workplace.coordinator}</div>}
+                      {workplace.responsible_director && <div><span className="font-medium text-foreground">Dir:</span> {workplace.responsible_director}</div>}
+                      {!workplace.coordinator && !workplace.responsible_director && "-"}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
