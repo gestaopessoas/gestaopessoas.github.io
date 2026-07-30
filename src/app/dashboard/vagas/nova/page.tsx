@@ -33,6 +33,7 @@ type SalaryRow = {
 };
 
 type Department = { id: string; name: string };
+type CostCenter = { id: string; name: string; code: string };
 
 const behavioralTags = [
   "Abertura a Experiências (Alta)", "Abertura a Experiências (Média)", "Abertura a Experiências (Baixa)",
@@ -88,6 +89,7 @@ export default function NovaVagaPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [salaryTable, setSalaryTable] = useState<SalaryRow[]>([]);
   const [workSchedules, setWorkSchedules] = useState<string[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   
   const [availableLevels, setAvailableLevels] = useState<string[]>([]);
   const [availableSeniorities, setAvailableSeniorities] = useState<string[]>([]);
@@ -104,11 +106,12 @@ export default function NovaVagaPage() {
     const fetchOptions = async () => {
       const supabase = createClient();
       
-      const [profilesResult, departmentsResult, salaryResult, settingsResult] = await Promise.all([
+      const [profilesResult, departmentsResult, salaryResult, settingsResult, costCentersResult] = await Promise.all([
         supabase.from("job_profiles").select("id, profile_code, title, min_education, desired_education, min_experience, desired_experience, cnh, knowledge, competencies").order("title"),
         supabase.from("departments").select("id, name").order("name"),
         supabase.from("salary_table").select("*").order("role_name"),
         supabase.from("system_settings").select("value").eq("key", "work_schedules").single(),
+        supabase.from("cost_centers").select("id, name, code").order("name"),
       ]);
 
       if (!active) return;
@@ -122,6 +125,7 @@ export default function NovaVagaPage() {
       setProfiles((profilesResult.data ?? []) as JobProfile[]);
       setDepartments((departmentsResult.data ?? []) as Department[]);
       setSalaryTable((salaryResult.data ?? []) as SalaryRow[]);
+      setCostCenters((costCentersResult.data ?? []) as CostCenter[]);
       if (settingsResult.data) {
         setWorkSchedules(settingsResult.data.value || []);
       }
@@ -332,7 +336,14 @@ export default function NovaVagaPage() {
                   {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                 </select>
               </Field>
-              <Field label="Unidade / Centro de Custo"><Input value={form.unit} onChange={(event) => handleUnitChange(event.target.value)} placeholder="Sede, obra..." /></Field>
+              <Field label="Unidade / Centro de Custo">
+                <select value={form.unit} onChange={(event) => handleUnitChange(event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                  <option value="">Selecione...</option>
+                  {costCenters.map(cc => (
+                    <option key={cc.id} value={cc.name}>{cc.name} ({cc.code})</option>
+                  ))}
+                </select>
+              </Field>
               <Field label="Contrato *">
                 <select value={form.contract_type} onChange={(event) => set("contract_type", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   {["CLT", "Estágio", "Jovem Aprendiz", "Temporário", "Terceirizado", "PJ"].map((item) => <option key={item}>{item}</option>)}
@@ -350,22 +361,19 @@ export default function NovaVagaPage() {
               </Field>
               <Field label="Data limite"><Input type="date" value={form.target_date} onChange={(event) => set("target_date", event.target.value)} /></Field>
               
-              {availableLevels.length > 0 && (
-                <Field label="Nível *">
-                  <select required value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                    <option value="">Selecione o nível...</option>
-                    {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
-                  </select>
-                </Field>
-              )}
-              {availableSeniorities.length > 0 && (
-                <Field label="Senioridade *">
-                  <select required value={selectedSeniority} onChange={(e) => setSelectedSeniority(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                    <option value="">Selecione a senioridade...</option>
-                    {availableSeniorities.map(sen => <option key={sen} value={sen}>{sen}</option>)}
-                  </select>
-                </Field>
-              )}
+              <Field label="Nível *">
+                <select required value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                  <option value="">Selecione o nível...</option>
+                  {(availableLevels.length > 0 ? availableLevels : ["I", "II", "III", "IV", "Único"]).map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                </select>
+              </Field>
+              
+              <Field label="Senioridade *">
+                <select required value={selectedSeniority} onChange={(e) => setSelectedSeniority(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                  <option value="">Selecione a senioridade...</option>
+                  {(availableSeniorities.length > 0 ? availableSeniorities : ["Estagiário", "Jovem Aprendiz", "Assistente", "Júnior", "Pleno", "Sênior", "Especialista", "Liderança", "Única"]).map(sen => <option key={sen} value={sen}>{sen}</option>)}
+                </select>
+              </Field>
             </div>
           )}
         </section>
