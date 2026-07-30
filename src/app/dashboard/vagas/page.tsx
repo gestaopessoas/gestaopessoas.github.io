@@ -265,11 +265,11 @@ export default function VagasAdminPage() {
       </div>
       
       <Dialog open={!!selectedJob} onOpenChange={(o) => { if(!o) { setSelectedJob(null); setIsEditing(false); } }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+        <DialogContent className="w-full max-w-4xl sm:max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0">
           {selectedJob && (
             <>
-              <div className="px-6 py-4 border-b flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur z-10">
-                <div>
+              <div className="px-6 py-4 border-b flex flex-wrap items-center justify-between gap-4 sticky top-0 bg-background/95 backdrop-blur z-10">
+                <div className="min-w-0 flex-1">
                   <DialogTitle className="text-xl">
                     {isEditing ? "Editar Vaga" : selectedJob.position_title || "Detalhes da Vaga"}
                   </DialogTitle>
@@ -279,7 +279,7 @@ export default function VagasAdminPage() {
                     </DialogDescription>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {!isEditing ? (
                     <>
                       <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
