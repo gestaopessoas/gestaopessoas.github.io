@@ -9,7 +9,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/utils/supabase/client";
@@ -31,6 +30,17 @@ type AddInterviewModalProps = {
   onSuccess: () => void;
 };
 
+type Workplace = {
+  id: string;
+  name: string;
+  type: string | null;
+};
+
+type Interviewer = {
+  id: string;
+  name: string;
+};
+
 export default function AddInterviewModal({
   isOpen,
   onClose,
@@ -41,46 +51,116 @@ export default function AddInterviewModal({
 }: AddInterviewModalProps) {
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState("");
-  const [interviewerName, setInterviewerName] = useState("");
-  const [workplaceName, setWorkplaceName] = useState("");
+  const [interviewerId, setInterviewerId] = useState("");
+  const [workplaceId, setWorkplaceId] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const [notes, setNotes] = useState("");
 
+  const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
+  const [interviewers, setInterviewers] = useState<Interviewer[]>([]);
+  const [loadingWorkplaces, setLoadingWorkplaces] = useState(false);
+  const [loadingInterviewers, setLoadingInterviewers] = useState(false);
+
+  const supabase = createClient();
+
+  // Load workplaces on mount
+  useEffect(() => {
+    async function loadWorkplaces() {
+      setLoadingWorkplaces(true);
+      try {
+        const { data, error } = await supabase
+          .from("workplaces")
+          .select("id, name, type")
+          .order("name");
+        if (error) throw error;
+        setWorkplaces((data ?? []) as Workplace[]);
+      } catch (err) {
+        console.error("Error loading workplaces:", err);
+      } finally {
+        setLoadingWorkplaces(false);
+      }
+    }
+    loadWorkplaces();
+  }, []);
+
+  // Load interviewers when workplace changes
+  useEffect(() => {
+    if (!workplaceId) {
+      setInterviewers([]);
+      setInterviewerId("");
+      return;
+    }
+    async function loadInterviewers() {
+      setLoadingInterviewers(true);
+      try {
+        // Roles that can conduct interviews in obras
+        const interviewRoles = [
+          "coordenador",
+          "administrativo de obras",
+          "analista técnico",
+          "mestre de obras",
+        ];
+        const { data, error } = await supabase
+          .from("employees")
+          .select("id, name")
+          .eq("status", "Ativo")
+          .eq("workplace_id", workplaceId)
+          .in("role", interviewRoles)
+          .order("name");
+        if (error) throw error;
+        setInterviewers((data ?? []) as Interviewer[]);
+      } catch (err) {
+        console.error("Error loading interviewers:", err);
+      } finally {
+        setLoadingInterviewers(false);
+      }
+    }
+    loadInterviewers();
+  }, [workplaceId]);
+
+  // Reset form when modal opens/closes or lock changes
   useEffect(() => {
     if (isOpen) {
       if (isLocked) {
-        setWorkplaceName(currentWorkplace || "");
+        // Find workplace id by name
+        const wp = workplaces.find(
+          (w) =>
+            w.name.trim().toLowerCase() ===
+            (currentWorkplace || "").trim().toLowerCase()
+        );
+        if (wp) setWorkplaceId(wp.id);
       } else {
-        setWorkplaceName("");
+        setWorkplaceId("");
         setStage("");
-        setInterviewerName("");
+        setInterviewerId("");
         setRejectionReason("");
         setNotes("");
       }
     }
-  }, [isOpen, isLocked, currentWorkplace]);
-
-  const supabase = createClient();
+  }, [isOpen, isLocked, currentWorkplace, workplaces]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stage) return;
-    
+
     setLoading(true);
     try {
+      const selectedWorkplace = workplaces.find((w) => w.id === workplaceId);
+      const selectedInterviewer = interviewers.find((i) => i.id === interviewerId);
+
       const { error } = await supabase.from("candidate_interviews").insert([
         {
           candidate_id: candidateId,
           stage,
-          interviewer_name: interviewerName || null,
-          workplace_name: workplaceName || null,
+          interviewer_name: selectedInterviewer?.name || null,
+          workplace_name: selectedWorkplace?.name || null,
           rejection_reason: rejectionReason || null,
           notes: notes || null,
         },
       ]);
 
       if (error) throw error;
-      
+
       onSuccess();
     } catch (err: any) {
       console.error("Error inserting interview:", err);
@@ -91,9 +171,13 @@ export default function AddInterviewModal({
   };
 
   const isTryingToChangeWorkplaceWhileLocked = Boolean(
-    isLocked && 
-    workplaceName.trim().toLowerCase() !== (currentWorkplace || "").trim().toLowerCase() && 
-    (stage !== "Reprovado" && stage !== "Desistente")
+    isLocked &&
+      workplaceId &&
+      workplaces.find((w) => w.id === workplaceId)?.name
+        .trim()
+        .toLowerCase() !== (currentWorkplace || "").trim().toLowerCase() &&
+      stage !== "Reprovado" &&
+      stage !== "Desistente"
   );
 
   return (
@@ -106,7 +190,7 @@ export default function AddInterviewModal({
 
           {isLocked && (
             <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 p-3 rounded-md text-sm mt-4">
-              <strong>Atenção:</strong> Este candidato está em processo ativo na obra <strong>{currentWorkplace}</strong>. 
+              <strong>Atenção:</strong> Este candidato está em processo ativo na obra <strong>{currentWorkplace}</strong>.
               Você não pode encaminhá-lo para outra obra sem antes encerrar o processo atual (registrando-o como Reprovado ou Desistente).
             </div>
           )}
@@ -131,24 +215,62 @@ export default function AddInterviewModal({
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="workplace">Obra / Local *</Label>
+                <Select
+                  value={workplaceId}
+                  onValueChange={(val) => setWorkplaceId(val || "")}
+                  disabled={isLocked || loadingWorkplaces}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingWorkplaces ? "Carregando..." : "Selecione a obra"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workplaces.map((wp) => (
+                      <SelectItem key={wp.id} value={wp.id}>
+                        {wp.name} {wp.type && `(${wp.type})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="interviewer">Coordenador / Liderança</Label>
-                <Input
-                  id="interviewer"
-                  placeholder="Nome da Liderança"
-                  value={interviewerName}
-                  onChange={(e) => setInterviewerName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="workplace">Obra / Local</Label>
-                <Input
-                  id="workplace"
-                  placeholder="Nome da Obra"
-                  value={workplaceName}
-                  onChange={(e) => setWorkplaceName(e.target.value)}
-                />
+                <Select
+                  value={interviewerId}
+                  onValueChange={(val) => setInterviewerId(val || "")}
+                  disabled={loadingInterviewers || !workplaceId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      !workplaceId
+                        ? "Selecione a obra primeiro"
+                        : loadingInterviewers
+                        ? "Carregando..."
+                        : interviewers.length === 0
+                        ? "Nenhum colaborador elegível nesta obra"
+                        : "Selecione o entrevistador"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {interviewers.map((int) => (
+                      <SelectItem key={int.id} value={int.id}>
+                        {int.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!workplaceId && (
+                  <p className="text-xs text-muted-foreground">Selecione a obra para ver os colaboradores disponíveis.</p>
+                )}
+                {workplaceId && interviewers.length === 0 && !loadingInterviewers && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Nenhum colaborador com cargo de liderança (coordenador, administrativo de obras, analista técnico, mestre de obras) encontrado nesta obra.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -179,7 +301,10 @@ export default function AddInterviewModal({
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || !stage || isTryingToChangeWorkplaceWhileLocked}>
+            <Button
+              type="submit"
+              disabled={loading || !stage || !workplaceId || isTryingToChangeWorkplaceWhileLocked}
+            >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar
             </Button>
