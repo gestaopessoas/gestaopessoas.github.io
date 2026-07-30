@@ -242,10 +242,7 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
     
     if (!error) {
        if (deductFromStock) {
-         const item = items.find(i => i.id === uniformId);
-         if (item) {
-           await supabase.from("uniform_items").update({ quantity_in_stock: item.quantity_in_stock - qty }).eq("id", uniformId);
-         }
+         await supabase.rpc('increment_uniform_stock', { p_id: uniformId, p_qty: -qty });
        }
        setUniformId(""); setQty(1); setNotes(""); setDeductFromStock(true);
        load();
@@ -258,10 +255,7 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
     const { error } = await supabase.from("employee_uniforms").delete().eq("id", id);
     if (!error) {
        if (returnToStock) {
-         const item = items.find(i => i.id === uniformItemId);
-         if (item) {
-           await supabase.from("uniform_items").update({ quantity_in_stock: item.quantity_in_stock + qtyDelivered }).eq("id", uniformItemId);
-         }
+         await supabase.rpc('increment_uniform_stock', { p_id: uniformItemId, p_qty: qtyDelivered });
        }
        load();
     }

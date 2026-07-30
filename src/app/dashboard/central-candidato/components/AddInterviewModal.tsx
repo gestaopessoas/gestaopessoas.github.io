@@ -82,8 +82,9 @@ export default function AddInterviewModal({
       if (error) throw error;
       
       onSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error inserting interview:", err);
+      alert(err.message || "Ocorreu um erro ao salvar o registro.");
     } finally {
       setLoading(false);
     }

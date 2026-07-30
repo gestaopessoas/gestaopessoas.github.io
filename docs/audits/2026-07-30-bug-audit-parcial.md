@@ -33,13 +33,13 @@ O segundo sinal forte: **middleware está desativado** (`output: 'export'` para 
 
 ## recrutamento-vagas-kanban — Vagas e Kanban `[NÃO VERIFICADO]`
 
-1. **`params` usado como objeto síncrono, mas é `Promise` no Next 16** — `src/app/dashboard/vagas/[id]/kanban/page.tsx` lê `params.id` direto num Client Component. No Next 16.2.10 instalado, `params` é sempre `Promise<Params>` (precisa `React.use(params)`). `params.id` é `undefined` em runtime.
+1. ✅ **[CORRIGIDO]** **`params` usado como objeto síncrono, mas é `Promise` no Next 16** — `src/app/dashboard/vagas/[id]/kanban/page.tsx` lê `params.id` direto num Client Component. No Next 16.2.10 instalado, `params` é sempre `Promise<Params>` (precisa `React.use(params)`). `params.id` é `undefined` em runtime.
    - **Causa raiz**: código escrito contra a API antiga (params síncrono), sem migrar pro contrato assíncrono; único lugar do app com rota dinâmica `[id]`, então não havia precedente correto pra copiar.
 
-2. **Kanban busca candidaturas por uma coluna que não existe** — `kanbanService.ts` faz `.eq("job_request_id", jobId)` em `job_applications`, mas essa tabela só tem `job_opening_id`. Além disso o `jobId` vem de `job_requests` (aprovação interna) enquanto candidaturas reais referenciam `job_openings` (vaga publicada) — são tabelas com IDs independentes, sem FK entre si.
+2. ✅ **[CORRIGIDO]** **Kanban busca candidaturas por uma coluna que não existe** — `kanbanService.ts` faz `.eq("job_request_id", jobId)` em `job_applications`, mas essa tabela só tem `job_opening_id`. Além disso o `jobId` vem de `job_requests` (aprovação interna) enquanto candidaturas reais referenciam `job_openings` (vaga publicada) — são tabelas com IDs independentes, sem FK entre si.
    - **Causa raiz**: confusão de modelo de dados entre `job_requests` e `job_openings` — o Kanban foi implementado assumindo que são o mesmo espaço de ID.
 
-3. **Race condition gera candidatura duplicada** — `handleDrop` decide INSERT vs UPDATE olhando `candidate.application_id` do state local, que só é atualizado depois que o insert anterior resolve. Dois drops rápidos do mesmo candidato → duas linhas de `job_applications`.
+3. ✅ **[CORRIGIDO]** **Race condition gera candidatura duplicada** — `handleDrop` decide INSERT vs UPDATE olhando `candidate.application_id` do state local, que só é atualizado depois que o insert anterior resolve. Dois drops rápidos do mesmo candidato → duas linhas de `job_applications`.
 
 4. **Banco de talentos lido sem filtro de permissão/módulo** — `candidates`/`job_applications` usam policy `auth.role() = 'authenticated'` (não `can_access()`), diferente de `job_requests`/`job_openings`. Qualquer usuário logado, mesmo sem permissão de "vagas", lê nome/e-mail de todos os candidatos.
 
@@ -51,7 +51,7 @@ O segundo sinal forte: **middleware está desativado** (`output: 'export'` para 
 
 1. **`candidates`/`candidate_interviews` sem `can_access()`** — policies usam só `auth.role() = 'authenticated'`. Qualquer colaborador logado lê PII completo, currículo, histórico de entrevistas e motivos de rejeição de qualquer candidato, e pode inserir/editar/apagar entrevistas de qualquer um. A migration `enforce_can_access_on_remaining_tables.sql`, cujo nome sugere que ela fecharia exatamente essa lacuna, **está vazia** no repo.
 
-2. **"Trava de vínculo" (candidato não pode ser agendado em 2 obras) só existe no client** — `isTryingToChangeWorkplaceWhileLocked` em `AddInterviewModal.tsx` é derivado de um snapshot React possivelmente desatualizado. Não há constraint/trigger no banco. Duas sessões concorrentes (ou uma aba esquecida aberta) podem inserir entrevistas ativas pro mesmo candidato em duas obras diferentes.
+2. ✅ **[CORRIGIDO]** **"Trava de vínculo" (candidato não pode ser agendado em 2 obras) só existe no client** — `isTryingToChangeWorkplaceWhileLocked` em `AddInterviewModal.tsx` é derivado de um snapshot React possivelmente desatualizado. Não há constraint/trigger no banco. Duas sessões concorrentes (ou uma aba esquecida aberta) podem inserir entrevistas ativas pro mesmo candidato em duas obras diferentes.
 
 3. ✅ **[CORRIGIDO]** **Bug de baixa severidade**: `workplace_name = null` faz `currentWorkplace` virar string vazia, que é falsy — a trava visual silenciosamente vira no-op pra candidatos sem obra registrada.
 
@@ -99,9 +99,9 @@ O segundo sinal forte: **middleware está desativado** (`output: 'export'` para 
 
 1. **`employees` continua com SELECT `USING (true)` mesmo depois da migration "secure_employee_records"** — essa migration só protegeu as tabelas filhas (benefícios, EPIs, férias, exames, RG). A policy permissiva original na tabela-mãe nunca foi revogada, e como policies permissivas somam (OR), qualquer policy restritiva futura seria anulada por ela. Uma migration posterior (`close_anon_pii_leak...`) até documenta que decidiu **manter** essa policy "porque é o que mantém o app funcionando hoje" — ou seja, o time sabia e deixou assim. Qualquer autenticado lê CPF, RG, PIS, salário e comissão de todos os colaboradores.
 
-2. **Baixa de estoque de uniforme não-atômica** — `quantity_in_stock - qty` calculado a partir de state React em memória, duas chamadas Supabase separadas sem transação. Entregas concorrentes = lost update; falha parcial (insert ok, update falha) deixa estoque e registro de entrega dessincronizados pra sempre.
+2. ✅ **[CORRIGIDO]** **Baixa de estoque de uniforme não-atômica** — `quantity_in_stock - qty` calculado a partir de state React em memória, duas chamadas Supabase separadas sem transação. Entregas concorrentes = lost update; falha parcial (insert ok, update falha) deixa estoque e registro de entrega dessincronizados pra sempre.
 
-3. **Mesmo padrão de race condition em `armarios`** (contagem de chaves reserva) — cliques rápidos leem o mesmo valor stale, incrementos/decrementos se perdem.
+3. ✅ **[CORRIGIDO]** **Mesmo padrão de race condition em `armarios`** (contagem de chaves reserva) — cliques rápidos leem o mesmo valor stale, incrementos/decrementos se perdem.
 
 4. **Filtro "Unidade/Obra" em Colaboradores referencia coluna que não existe** — `employees` usa `workplace_id` (FK), não uma coluna de texto `unit` (que só existe em `public_job_requests`). Aplicar esse filtro quebra a listagem inteira com erro de coluna inexistente.
 
@@ -165,7 +165,7 @@ O segundo sinal forte: **middleware está desativado** (`output: 'export'` para 
 
 1. **Fix de vazamento anon pulou as tabelas de Arquivo Morto** — a migration que fechou acesso anônimo em `employees`/`contacts`/etc. nunca tocou `physical_boxes`/`employee_archives`, criadas 1 dia antes com o mesmo padrão `USING (true)` pra anon. Dado arquivado (que deveria ser tão ou mais protegido que o ativo) ficou com controle de acesso **mais fraco**.
 
-2. **`reactivate()` apaga o vínculo de arquivo mesmo se o UPDATE de reativação falhar** — os dois passos não são atômicos nem condicionais um ao outro; falha parcial deixa colaborador "Desligado" no banco mas sem registro de caixa/arquivo.
+2. ✅ **[CORRIGIDO]** **`reactivate()` apaga o vínculo de arquivo mesmo se o UPDATE de reativação falhar** — os dois passos não são atômicos nem condicionais um ao outro; falha parcial deixa colaborador "Desligado" no banco mas sem registro de caixa/arquivo.
 
 3. **Teste de `metrics.ts` não importa o módulo real** — reimplementa `countBy` localmente dentro do arquivo de teste e testa a cópia, não o código de produção. Zero cobertura de regressão de fato.
 

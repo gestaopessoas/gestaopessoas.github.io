@@ -126,9 +126,13 @@ export default function ArquivoMortoPage() {
     if (!window.confirm(`Reativar ${employee.name}?`)) return;
     const sb = createClient();
     const { error: saveError } = await sb.from("employees").update({ status: "Ativo", dismissed_at: null }).eq("id", employee.id);
-    await sb.from("employee_archives").delete().eq("employee_id", employee.id);
     
-    if (saveError) setError(saveError.message); else setRefresh((value) => value + 1);
+    if (saveError) {
+      setError(saveError.message);
+    } else {
+      await sb.from("employee_archives").delete().eq("employee_id", employee.id);
+      setRefresh((value) => value + 1);
+    }
   };
 
   const toggleBox = (box: string) => {

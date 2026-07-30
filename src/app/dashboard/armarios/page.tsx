@@ -391,8 +391,7 @@ export default function ArmariosPage() {
                         size="icon" 
                         className="h-8 w-8"
                         onClick={async () => {
-                          const val = Math.max(0, (locker.spare_keys || 0) - 1);
-                          await createClient().from("lockers").update({ spare_keys: val }).eq("id", locker.id);
+                          await createClient().rpc('increment_locker_spare_keys', { p_id: locker.id, p_qty: -1 });
                           load();
                         }}
                       >-</Button>
@@ -402,8 +401,7 @@ export default function ArmariosPage() {
                         size="icon" 
                         className="h-8 w-8"
                         onClick={async () => {
-                          const val = (locker.spare_keys || 0) + 1;
-                          await createClient().from("lockers").update({ spare_keys: val }).eq("id", locker.id);
+                          await createClient().rpc('increment_locker_spare_keys', { p_id: locker.id, p_qty: 1 });
                           load();
                         }}
                       >+</Button>

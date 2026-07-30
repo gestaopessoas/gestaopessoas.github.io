@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { fetchKanbanData, KanbanCandidate } from "./kanbanService";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 
 const COLUMNS = ["Sugestões", "Nova", "Triagem", "Entrevista", "Proposta", "Contratado"];
 
-export default function KanbanPage({ params }: { params: { id: string } }) {
+export default function KanbanPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
   const [candidates, setCandidates] = useState<KanbanCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -17,7 +18,7 @@ export default function KanbanPage({ params }: { params: { id: string } }) {
   
   useEffect(() => {
     let active = true;
-    fetchKanbanData(params.id)
+    fetchKanbanData(resolvedParams.id)
       .then(data => {
         if (!active) return;
         setCandidates(data);
@@ -29,7 +30,7 @@ export default function KanbanPage({ params }: { params: { id: string } }) {
         setLoading(false);
       });
     return () => { active = false };
-  }, [params.id]);
+  }, [resolvedParams.id]);
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData("text/plain", id);
@@ -63,15 +64,17 @@ export default function KanbanPage({ params }: { params: { id: string } }) {
           .eq("id", candidate.application_id);
       } else {
         // Create new (moving from Suggestions)
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("job_applications")
-          .insert({
-            job_request_id: params.id,
+          .upsert({
+            job_request_id: resolvedParams.id,
             candidate_id: candidate.id,
             status: targetColumn
-          })
+          }, { onConflict: 'job_request_id, candidate_id' })
           .select("id")
           .single();
+          
+        if (error) throw error;
           
         if (data) {
           setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, application_id: data.id } : c));

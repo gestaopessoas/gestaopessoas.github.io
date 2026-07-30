@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { Search, Loader2, Contact, RefreshCw } from "lucide-react";
+import { Search, Loader2, Contact, RefreshCw, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import CandidateDetailsSheet from "./components/CandidateDetailsSheet";
+import AddCandidateModal from "./components/AddCandidateModal";
 
 type CandidateRow = {
   id: string;
@@ -25,6 +26,7 @@ export default function CentralCandidatoPage() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"banco" | "processo" | "contratado">("banco");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
 
   const supabase = createClient();
 
@@ -188,6 +190,10 @@ export default function CentralCandidatoPage() {
           <Button variant="outline" size="icon" onClick={fetchCandidates}>
             <RefreshCw className="h-4 w-4" />
           </Button>
+          <Button onClick={() => setIsAddCandidateModalOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Novo Candidato</span>
+          </Button>
         </div>
       </div>
 
@@ -261,6 +267,15 @@ export default function CentralCandidatoPage() {
         candidateId={selectedCandidateId} 
         onClose={() => setSelectedCandidateId(null)} 
         onRefresh={fetchCandidates}
+      />
+
+      <AddCandidateModal
+        isOpen={isAddCandidateModalOpen}
+        onClose={() => setIsAddCandidateModalOpen(false)}
+        onSuccess={() => {
+          setIsAddCandidateModalOpen(false);
+          fetchCandidates();
+        }}
       />
     </div>
   );

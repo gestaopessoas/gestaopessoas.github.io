@@ -1,0 +1,17 @@
+[2026-07-30T11:56:07.375Z] RESULT
+============================================================
+{
+  "success": false,
+  "output": "Failed to authenticate. API Error: 401 Invalid bearer token\n",
+  "parsedOutput": {
+    "sections": [],
+    "codeBlocks": []
+  },
+  "durationMs": 44738,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "testgaps",
+  "timestamp": "2026-07-30T11:56:07.375Z",
+  "executionId": "testgaps_1785412522637_813ki3",
+  "error": "Process exited with code 1"
+}
