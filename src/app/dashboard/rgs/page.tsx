@@ -37,6 +37,7 @@ export default function RgsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [roles, setRoles] = useState<string[]>([]);
 
   // Load sort preference
   useEffect(() => {
@@ -46,7 +47,14 @@ export default function RgsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error: loadError } = await createClient()
+    const supabase = createClient();
+    
+    if (roles.length === 0) {
+      const { data: rolesData } = await supabase.from("job_profiles").select("title").order("title");
+      if (rolesData) setRoles(Array.from(new Set(rolesData.map(d => d.title))) as string[]);
+    }
+
+    const { data, error: loadError } = await supabase
       .from("rgs_processes")
       .select("*")
       .order("process_date", { ascending: sortOrder === "asc", nullsFirst: false })
@@ -54,7 +62,7 @@ export default function RgsPage() {
       .limit(1000);
     setLoading(false);
     if (loadError) setError(loadError.message); else { setRows((data ?? []) as Process[]); setError(""); }
-  }, [sortOrder]);
+  }, [sortOrder, roles.length]);
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
@@ -140,7 +148,7 @@ export default function RgsPage() {
             <Field label="Processo"><select value={form.process_type} onChange={(e) => update("process_type", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">{["Contratação", "Alteração de salário", "Alteração de cargo/local", "Alteração de cargo", "Desligamento", "Férias", "Exame", "Afastamento"].map((option) => <option key={option}>{option}</option>)}</select></Field>
             <Field label="Data do processo"><Input type="date" value={form.process_date} onChange={(e) => update("process_date", e.target.value)} /></Field>
             <Field label="Colaborador"><Input required value={form.employee_name} onChange={(e) => update("employee_name", e.target.value)} /></Field>
-            <Field label="Cargo"><Input value={form.role} onChange={(e) => update("role", e.target.value)} /></Field>
+            <Field label="Cargo *"><select required value={form.role || ""} onChange={(e) => update("role", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Selecione...</option>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
             <Field label="Contrato"><Input value={form.contract_type} onChange={(e) => update("contract_type", e.target.value)} /></Field>
             <Field label="Local"><Input value={form.location} onChange={(e) => update("location", e.target.value)} /></Field>
             <Field label="Setor"><Input value={form.sector} onChange={(e) => update("sector", e.target.value)} /></Field>

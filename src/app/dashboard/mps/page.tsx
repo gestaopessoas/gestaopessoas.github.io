@@ -117,7 +117,7 @@ export default function MPGeneratorPage() {
         supabase.from("salary_table").select("*").order("role_name"),
         supabase.from("workplaces").select("id, name").order("name"),
         supabase.from("cost_centers").select("id, name").order("name"),
-        supabase.from("system_settings").select("value").eq("key", "work_schedules").single()
+        supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle()
       ]);
 
       if (empsRes.data) setEmployees(empsRes.data as any);
