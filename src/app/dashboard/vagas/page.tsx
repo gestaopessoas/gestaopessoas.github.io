@@ -83,9 +83,9 @@ export default function VagasAdminPage() {
     let result = requests;
     
     if (activeTab === "ativas") {
-      result = result.filter(r => !["Aprovada", "Recusada", "Arquivada"].includes(r.status || ""));
+      result = result.filter(r => !["Recusada", "Arquivada"].includes(r.status || ""));
     } else {
-      result = result.filter(r => ["Aprovada", "Recusada", "Arquivada"].includes(r.status || ""));
+      result = result.filter(r => ["Recusada", "Arquivada"].includes(r.status || ""));
     }
     
     if (!term) return result;
@@ -150,8 +150,8 @@ export default function VagasAdminPage() {
     setIsEditing(false);
   };
 
-  const abertas = requests.filter((request) => !["Aprovada", "Recusada", "Arquivada"].includes(request.status ?? "")).length;
-  const urgentes = requests.filter((request) => ["Alta", "Crítica"].includes(request.urgency ?? "") && !["Aprovada", "Recusada", "Arquivada"].includes(request.status ?? "")).length;
+  const abertas = requests.filter((request) => !["Recusada", "Arquivada"].includes(request.status ?? "")).length;
+  const urgentes = requests.filter((request) => ["Alta", "Crítica"].includes(request.urgency ?? "") && !["Recusada", "Arquivada"].includes(request.status ?? "")).length;
   const aprovadas = requests.filter((request) => request.status === "Aprovada").length;
 
   return (
@@ -285,6 +285,11 @@ export default function VagasAdminPage() {
                       <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
                         <Edit3 className="w-4 h-4 mr-2" /> Editar
                       </Button>
+                      <Link href={`/dashboard/vagas/${selectedJob.id}/kanban`}>
+                        <Button variant="default" size="sm" className="bg-primary text-primary-foreground">
+                          Kanban
+                        </Button>
+                      </Link>
                       {selectedJob.status !== "Arquivada" ? (
                         <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-zinc-900 dark:hover:text-zinc-100" title="Arquivar" onClick={() => updateStatus(selectedJob, "Arquivada")}>
                           <Archive className="h-4 w-4" />

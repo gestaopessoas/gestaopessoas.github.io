@@ -1,91 +1,147 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, GripVertical, MoreHorizontal } from "lucide-react"
-import Link from "next/link"
+"use client";
 
-// Required for Next.js static export with dynamic routes
-export function generateStaticParams() {
-  return [
-    { id: "req-042" },
-    { id: "req-043" },
-    { id: "req-044" },
-    { id: "req-040" },
-    { id: "req-039" },
-  ]
-}
+import { useEffect, useState } from "react";
+import { fetchKanbanData, KanbanCandidate } from "./kanbanService";
+import { createClient } from "@/utils/supabase/client";
+import { Loader2, ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
-export default function KanbanBoardPage() {
-  const columns = [
-    { id: "triagem", title: "Triagem", count: 3 },
-    { id: "entrevista_rh", title: "Entrevista RH", count: 2 },
-    { id: "teste_tecnico", title: "Teste Técnico", count: 1 },
-    { id: "entrevista_gestor", title: "Entrevista Gestor", count: 1 },
-    { id: "proposta", title: "Proposta", count: 0 },
-  ]
+const COLUMNS = ["Sugestões", "Nova", "Triagem", "Entrevista", "Proposta", "Contratado"];
 
-  const mockCandidates = [
-    { id: 1, name: "Ana Silva", role: "Frontend Dev", col: "triagem" },
-    { id: 2, name: "Carlos Souza", role: "Frontend Dev", col: "triagem" },
-    { id: 3, name: "Mariana Costa", role: "Frontend Dev", col: "triagem" },
-    { id: 4, name: "Rafael Lima", role: "Frontend Dev", col: "entrevista_rh" },
-    { id: 5, name: "Juliana Mendes", role: "Frontend Dev", col: "entrevista_rh" },
-    { id: 6, name: "Pedro Almeida", role: "Frontend Dev", col: "teste_tecnico" },
-    { id: 7, name: "Fernanda Rocha", role: "Frontend Dev", col: "entrevista_gestor" },
-  ]
+export default function KanbanPage({ params }: { params: { id: string } }) {
+  const [candidates, setCandidates] = useState<KanbanCandidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  
+  useEffect(() => {
+    let active = true;
+    fetchKanbanData(params.id)
+      .then(data => {
+        if (!active) return;
+        setCandidates(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        if (!active) return;
+        setError(err.message);
+        setLoading(false);
+      });
+    return () => { active = false };
+  }, [params.id]);
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData("text/plain", id);
+    setDraggedId(id);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault(); // allow drop
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetColumn: string) => {
+    e.preventDefault();
+    const candidateId = e.dataTransfer.getData("text/plain");
+    setDraggedId(null);
+    
+    if (!candidateId) return;
+    
+    const candidate = candidates.find(c => c.id === candidateId);
+    if (!candidate || candidate.status === targetColumn) return;
+
+    // Optimistic UI update
+    setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, status: targetColumn } : c));
+    
+    const supabase = createClient();
+    try {
+      if (candidate.application_id) {
+        // Update existing
+        await supabase
+          .from("job_applications")
+          .update({ status: targetColumn })
+          .eq("id", candidate.application_id);
+      } else {
+        // Create new (moving from Suggestions)
+        const { data } = await supabase
+          .from("job_applications")
+          .insert({
+            job_request_id: params.id,
+            candidate_id: candidate.id,
+            status: targetColumn
+          })
+          .select("id")
+          .single();
+          
+        if (data) {
+          setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, application_id: data.id } : c));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      // Revert on error (could be improved, but sufficient for MVP)
+      setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, status: candidate.status } : c));
+      alert("Erro ao atualizar status");
+    }
+  };
+
+  if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>;
+  if (error) return <div className="p-8 text-destructive">{error}</div>;
 
   return (
-    <div className="flex h-screen flex-col bg-muted/20">
-      <header className="flex h-16 items-center justify-between border-b bg-background px-6">
-        <div className="flex items-center space-x-4">
-          <Link href="/dashboard/vagas">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold">Desenvolvedor(a) Frontend</h1>
-            <p className="text-sm text-muted-foreground">REQ-042 • Pelotas/RS</p>
-          </div>
+    <div className="flex flex-col h-full bg-background">
+      <div className="p-6 border-b flex items-center gap-4">
+        <Link href="/dashboard/vagas">
+          <Button variant="ghost" size="icon"><ArrowLeft className="w-5 h-5" /></Button>
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold">Kanban de Recrutamento</h1>
+          <p className="text-sm text-muted-foreground">Arraste os candidatos entre as colunas para atualizar seu status.</p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline">Configurar Funil</Button>
-          <Button>Adicionar Candidato</Button>
-        </div>
-      </header>
-
-      <main className="flex-1 overflow-x-auto p-6">
-        <div className="flex h-full items-start space-x-4">
-          {columns.map((col) => (
-            <div key={col.id} className="flex h-full w-80 flex-shrink-0 flex-col rounded-lg bg-muted/50 p-4">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="font-semibold text-foreground">{col.title}</h3>
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-background text-xs font-medium text-muted-foreground shadow-sm">
-                  {col.count}
-                </span>
-              </div>
-              
-              <div className="flex flex-col gap-3 overflow-y-auto pb-4">
-                {mockCandidates
-                  .filter((c) => c.col === col.id)
-                  .map((candidate) => (
-                    <Card key={candidate.id} className="cursor-grab active:cursor-grabbing hover:border-primary/50 transition-colors">
-                      <CardContent className="p-4 flex flex-row items-start space-x-3">
-                        <GripVertical className="h-5 w-5 text-muted-foreground/50 shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <h4 className="text-sm font-medium leading-none mb-1.5">{candidate.name}</h4>
-                          <p className="text-xs text-muted-foreground">{candidate.role}</p>
+      </div>
+      
+      <div className="flex-1 overflow-x-auto p-6">
+        <div className="flex gap-4 min-h-[500px] h-full items-start">
+          {COLUMNS.map(col => {
+            const colCandidates = candidates.filter(c => 
+              c.status === col || (col === "Nova" && !COLUMNS.includes(c.status) && c.status !== "Sugestões")
+            );
+            return (
+              <div 
+                key={col} 
+                className="w-80 shrink-0 bg-muted/40 rounded-lg p-3 flex flex-col gap-3 min-h-[150px] border border-border/50"
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, col)}
+              >
+                <div className="font-semibold text-sm flex justify-between items-center text-foreground/80 px-1">
+                  {col} <span className="bg-background rounded-full px-2 py-0.5 text-xs border">{colCandidates.length}</span>
+                </div>
+                
+                <div className="flex flex-col gap-2 flex-1">
+                  {colCandidates.map(c => (
+                    <div 
+                      key={c.id} 
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, c.id)}
+                      onDragEnd={() => setDraggedId(null)}
+                      className={`bg-card border p-3 rounded-md shadow-sm cursor-grab active:cursor-grabbing transition-opacity ${draggedId === c.id ? 'opacity-50' : ''} hover:border-primary/40`}
+                    >
+                      <div className="font-medium text-sm mb-1">{c.name}</div>
+                      <div className="text-xs text-muted-foreground truncate mb-2">{c.email}</div>
+                      
+                      {c.match_score > 0 && (
+                        <div className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${c.match_score >= 70 ? 'bg-emerald-500/10 text-emerald-600' : c.match_score >= 40 ? 'bg-amber-500/10 text-amber-600' : 'bg-zinc-500/10 text-zinc-600'}`}>
+                          {c.match_score}% Match
                         </div>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 -mr-2 -mt-2">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </CardContent>
-                    </Card>
+                      )}
+                    </div>
                   ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      </main>
+      </div>
     </div>
-  )
+  );
 }
