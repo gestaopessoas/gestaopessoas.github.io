@@ -78,6 +78,17 @@ export default function CandidateDetailsSheet({
     }
   }, [candidateId]);
 
+  let currentActiveWorkplace = "";
+  let isLocked = false;
+  if (candidate?.candidate_interviews?.length > 0) {
+    const sorted = [...candidate.candidate_interviews].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const latest = sorted[0];
+    if (latest.stage !== "Reprovado" && latest.stage !== "Desistente" && latest.stage !== "Banco de Talentos" && latest.stage !== "Contratado") {
+      currentActiveWorkplace = latest.workplace_name || "";
+      isLocked = true;
+    }
+  }
+
   return (
     <>
       <Sheet open={!!candidateId} onOpenChange={(open) => !open && onClose()}>
@@ -217,6 +228,8 @@ export default function CandidateDetailsSheet({
           isOpen={isAddModalOpen} 
           onClose={() => setIsAddModalOpen(false)} 
           candidateId={candidate.id}
+          currentWorkplace={currentActiveWorkplace}
+          isLocked={isLocked}
           onSuccess={() => {
             fetchDetails();
             onRefresh();

@@ -15,12 +15,15 @@ type CandidateRow = {
   escolaridade: string;
   status: string;
   ultimo_chamado: string;
+  obra_atual: string | null;
+  etapa_atual: string | null;
 };
 
 export default function CentralCandidatoPage() {
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<"banco" | "processo" | "contratado">("banco");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
 
   const supabase = createClient();
@@ -76,15 +79,24 @@ export default function CentralCandidatoPage() {
           
           let status = latestAppStatus;
           let ultimo_chamado = "Nenhum contato";
+          let obra_atual: string | null = null;
+          let etapa_atual: string | null = null;
 
           if (interviews.length > 0) {
             const latestInt = interviews[0];
-            if (latestInt.rejection_reason) {
-              status = "Reprovado";
-            } else if (latestInt.stage) {
-              status = latestInt.stage;
+            if (latestInt.rejection_reason || latestInt.stage === "Reprovado" || latestInt.stage === "Desistente" || latestInt.stage === "Banco de Talentos") {
+              status = "Banco de Talentos";
+            } else if (latestInt.stage === "Contratado") {
+              status = "Contratado";
+              obra_atual = latestInt.workplace_name || null;
+            } else {
+              status = "Em Processo";
+              etapa_atual = latestInt.stage;
+              obra_atual = latestInt.workplace_name || null;
             }
             ultimo_chamado = `${latestInt.interviewer_name || "Desconhecido"} - ${latestInt.workplace_name || "Obra não informada"}`;
+          } else {
+            status = "Banco de Talentos";
           }
 
           return {
@@ -94,7 +106,9 @@ export default function CentralCandidatoPage() {
             email: c.email,
             escolaridade: latestEdu,
             status,
-            ultimo_chamado
+            ultimo_chamado,
+            obra_atual,
+            etapa_atual
           };
         });
         setCandidates(rows);
@@ -111,15 +125,20 @@ export default function CentralCandidatoPage() {
   }, []);
 
   const filteredCandidates = useMemo(() => {
-    if (!search.trim()) return candidates;
+    let list = candidates;
+    if (activeTab === "banco") list = candidates.filter(c => c.status === "Banco de Talentos");
+    if (activeTab === "processo") list = candidates.filter(c => c.status === "Em Processo");
+    if (activeTab === "contratado") list = candidates.filter(c => c.status === "Contratado");
+
+    if (!search.trim()) return list;
     const s = search.toLowerCase();
-    return candidates.filter(
+    return list.filter(
       (c) =>
         c.full_name.toLowerCase().includes(s) ||
         c.email.toLowerCase().includes(s) ||
         (c.phone && c.phone.toLowerCase().includes(s))
     );
-  }, [candidates, search]);
+  }, [candidates, search, activeTab]);
 
   return (
     <div className="space-y-6">
@@ -133,7 +152,30 @@ export default function CentralCandidatoPage() {
             Gestão de candidatos, histórico de entrevistas e contatos.
           </p>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex bg-muted/50 p-1 rounded-md">
+            <Button 
+              variant={activeTab === "banco" ? "secondary" : "ghost"} 
+              size="sm"
+              onClick={() => setActiveTab("banco")}
+            >
+              Banco de Talentos
+            </Button>
+            <Button 
+              variant={activeTab === "processo" ? "secondary" : "ghost"} 
+              size="sm"
+              onClick={() => setActiveTab("processo")}
+            >
+              Em Processo
+            </Button>
+            <Button 
+              variant={activeTab === "contratado" ? "secondary" : "ghost"} 
+              size="sm"
+              onClick={() => setActiveTab("contratado")}
+            >
+              Contratados
+            </Button>
+          </div>
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -193,9 +235,16 @@ export default function CentralCandidatoPage() {
                     </td>
                     <td className="px-6 py-4">{candidate.escolaridade}</td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                        {candidate.status}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                          {candidate.status}
+                        </span>
+                        {candidate.status === "Em Processo" && (
+                          <span className="text-xs text-muted-foreground font-medium">
+                            {candidate.etapa_atual} - {candidate.obra_atual || "Sem obra"}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-muted-foreground text-xs">
                       {candidate.ultimo_chamado}

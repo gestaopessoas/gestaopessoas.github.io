@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,8 @@ type AddInterviewModalProps = {
   isOpen: boolean;
   onClose: () => void;
   candidateId: string;
+  currentWorkplace?: string;
+  isLocked?: boolean;
   onSuccess: () => void;
 };
 
@@ -33,6 +35,8 @@ export default function AddInterviewModal({
   isOpen,
   onClose,
   candidateId,
+  currentWorkplace,
+  isLocked,
   onSuccess,
 }: AddInterviewModalProps) {
   const [loading, setLoading] = useState(false);
@@ -41,6 +45,20 @@ export default function AddInterviewModal({
   const [workplaceName, setWorkplaceName] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      if (isLocked && currentWorkplace) {
+        setWorkplaceName(currentWorkplace);
+      } else {
+        setWorkplaceName("");
+        setStage("");
+        setInterviewerName("");
+        setRejectionReason("");
+        setNotes("");
+      }
+    }
+  }, [isOpen, isLocked, currentWorkplace]);
 
   const supabase = createClient();
 
@@ -71,6 +89,12 @@ export default function AddInterviewModal({
     }
   };
 
+  const isTryingToChangeWorkplaceWhileLocked = Boolean(
+    isLocked && 
+    workplaceName.trim().toLowerCase() !== (currentWorkplace || "").trim().toLowerCase() && 
+    (stage !== "Reprovado" && stage !== "Desistente")
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg">
@@ -78,6 +102,13 @@ export default function AddInterviewModal({
           <DialogHeader>
             <DialogTitle>Adicionar Histórico / Entrevista</DialogTitle>
           </DialogHeader>
+
+          {isLocked && (
+            <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 p-3 rounded-md text-sm mt-4">
+              <strong>Atenção:</strong> Este candidato está em processo ativo na obra <strong>{currentWorkplace}</strong>. 
+              Você não pode encaminhá-lo para outra obra sem antes encerrar o processo atual (registrando-o como Reprovado ou Desistente).
+            </div>
+          )}
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -147,7 +178,7 @@ export default function AddInterviewModal({
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || !stage}>
+            <Button type="submit" disabled={loading || !stage || isTryingToChangeWorkplaceWhileLocked}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar
             </Button>
