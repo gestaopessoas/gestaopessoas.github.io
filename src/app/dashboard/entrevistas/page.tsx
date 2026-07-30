@@ -386,6 +386,7 @@ const TEST_OPTIONS: Record<string, { table_name: string; demographic_type?: stri
 
 export default function EntrevistasPage() {
   const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [roles, setRoles] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(""); // YYYY-MM
   const [loading, setLoading] = useState(true);
@@ -402,6 +403,11 @@ export default function EntrevistasPage() {
   });
   const [assessmentForm, setAssessmentForm] = useState<Assessment>(defaultAssessment);
   const [movingToTalents, setMovingToTalents] = useState(false);
+  
+  // Resume Modal State
+  const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
+  const [resumeText, setResumeText] = useState("");
+  const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
   
   // Test generation states
   const [selectedTest, setSelectedTest] = useState("G36");
@@ -482,10 +488,10 @@ export default function EntrevistasPage() {
   const loadInterviews = async () => {
     setLoading(true);
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from("interviews")
-      .select("*")
-      .order("interview_date", { ascending: false, nullsFirst: false });
+    const [{ data, error }, { data: salaryData }] = await Promise.all([
+      supabase.from("interviews").select("*").order("interview_date", { ascending: false, nullsFirst: false }),
+      supabase.from("salary_table").select("role_name")
+    ]);
 
     setLoading(false);
     if (error) {
@@ -493,6 +499,10 @@ export default function EntrevistasPage() {
       return;
     }
     setInterviews((data ?? []) as Interview[]);
+    if (salaryData) {
+      const uniqueRoles = Array.from(new Set(salaryData.map(r => r.role_name))).sort();
+      setRoles(uniqueRoles);
+    }
   };
 
   useEffect(() => {
@@ -712,6 +722,8 @@ Resultado Final: ${form.result || "N/C"}
       updated_at: new Date().toISOString()
     };
     
+    let isSuccess = false;
+    
     if (editingId) {
       let query = supabase.from("interviews").update(payload).eq("id", editingId);
       if (currentUpdatedAt) {
@@ -721,13 +733,86 @@ Resultado Final: ${form.result || "N/C"}
       
       if (saveError) setError("Erro ao atualizar entrevista: " + saveError.message);
       else if (!data || data.length === 0) setError("Conflito: A entrevista foi modificada por outro usuário. Por favor, cancele e abra novamente.");
-      else { setIsModalOpen(false); loadInterviews(); }
+      else { isSuccess = true; }
     } else {
       const { error: saveError } = await supabase.from("interviews").insert(payload);
       if (saveError) setError("Erro ao salvar entrevista: " + saveError.message);
-      else { setIsModalOpen(false); loadInterviews(); }
+      else { isSuccess = true; }
     }
+    
+    if (isSuccess) {
+      // Se Aprovado ou Banco de Talentos, joga pra central do candidato automaticamente
+      if ((payload.result === "Aprovado" || payload.result === "Banco de Talentos") && payload.candidate_name && payload.email) {
+        const parts = payload.candidate_name.split(" ");
+        const tag = payload.result === "Aprovado" ? "Aprovado na Entrevista" : "Banco de Talentos";
+        
+        await supabase.from("candidates").insert({
+          full_name: payload.candidate_name,
+          first_name: parts[0] || "",
+          last_name: parts.slice(1).join(" ") || "",
+          email: payload.email,
+          phone: payload.phone,
+          role_interest: payload.role,
+          city: assessmentForm.worksite || "",
+          search_tags: [tag, assessmentForm.selection_stage || "Importado de Entrevistas"].filter(Boolean)
+        });
+      }
+      setIsModalOpen(false); 
+      loadInterviews();
+    }
+    
     setSaving(false);
+  };
+  
+  const analyzeResume = async () => {
+    if (!resumeText.trim()) return;
+    setIsAnalyzingResume(true);
+    
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (!apiKey) {
+      alert("Chave do Gemini não configurada.");
+      setIsAnalyzingResume(false);
+      return;
+    }
+    
+    const prompt = `Extraia os seguintes dados do currículo abaixo e retorne APENAS um JSON válido, sem crases, sem markdown, no formato:
+{
+  "name": "Nome Completo",
+  "email": "Email",
+  "phone": "Telefone ou Celular",
+  "role": "Cargo ou Objetivo Profissional"
+}
+
+Currículo:
+${resumeText}`;
+
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+        let text = data.candidates[0].content.parts[0].text;
+        text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(text);
+        
+        openNewModal();
+        setForm(prev => ({
+          ...prev,
+          candidate_name: parsed.name || "",
+          email: parsed.email || "",
+          phone: parsed.phone || "",
+          role: parsed.role || ""
+        }));
+        setIsResumeModalOpen(false);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Não foi possível extrair os dados automaticamente. Verifique se o texto do currículo é válido.");
+    }
+    setIsAnalyzingResume(false);
   };
 
   const moveToTalents = async () => {
@@ -845,6 +930,10 @@ Resultado Final: ${form.result || "N/C"}
             <Button variant="outline" onClick={exportToCsv} disabled={filtered.length === 0}>
               <Download className="mr-2 h-4 w-4" />
               Exportar Excel
+            </Button>
+            <Button variant="secondary" onClick={() => { setResumeText(""); setIsResumeModalOpen(true); }} className="gap-2">
+              <FileText className="h-4 w-4" />
+              Ler Currículo
             </Button>
             <Button onClick={openNewModal} className="gap-2">
               <Plus className="h-4 w-4" />
@@ -997,10 +1086,14 @@ Resultado Final: ${form.result || "N/C"}
                   <div className="space-y-1 col-span-2 md:col-span-1">
                     <Label>Cargo Alvo</Label>
                     <Input 
+                      list="rolesList"
                       value={form.role} 
                       onChange={e => setForm({...form, role: e.target.value})} 
-                      placeholder="Ex: Pedreiro" 
+                      placeholder="Pesquise o cargo..." 
                     />
+                    <datalist id="rolesList">
+                      {roles.map(r => <option key={r} value={r} />)}
+                    </datalist>
                   </div>
 
                   <div className="space-y-1 col-span-2 md:col-span-1">
@@ -1056,7 +1149,7 @@ Resultado Final: ${form.result || "N/C"}
                   </div>
 
                   <div className="space-y-1">
-                    <Label>Resultado Final</Label>
+                    <Label>Resultado da entrevista com a GP</Label>
                     <select 
                       value={form.result} 
                       onChange={e => setForm({...form, result: e.target.value})}
@@ -1067,7 +1160,35 @@ Resultado Final: ${form.result || "N/C"}
                       <option value="Reprovado">Reprovado</option>
                       <option value="Desistente">Desistente</option>
                       <option value="Banco de Talentos">Banco de Talentos</option>
+                      <option value="Avaliação Comportamental">Avaliação Comportamental</option>
                     </select>
+                  </div>
+                  
+                  {form.result === "Avaliação Comportamental" && (
+                    <div className="col-span-2 p-4 mt-2 border rounded-md bg-muted/50 flex flex-col space-y-2">
+                      <Label>Link para Avaliação Comportamental (Big 5)</Label>
+                      <p className="text-xs text-muted-foreground">Copie o link abaixo e envie ao candidato para a realização do teste.</p>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          readOnly 
+                          value={`https://gestaopessoas.github.io/colaborador/teste-personalidade?session=${editingId || 'novo-candidato'}`} 
+                          className="bg-background text-sm font-mono"
+                        />
+                        <Button 
+                          type="button"
+                          variant="secondary"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`https://gestaopessoas.github.io/colaborador/teste-personalidade?session=${editingId || 'novo-candidato'}`);
+                            alert("Link copiado!");
+                          }}
+                        >
+                          Copiar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="hidden">
+                  <DialogFooter>
                   </div>
                 </div>
             )}
@@ -1378,6 +1499,42 @@ Resultado Final: ${form.result || "N/C"}
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Leitura Currículo */}
+      {isResumeModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-background w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h2 className="text-lg font-semibold">Ler Currículo</h2>
+                <p className="text-sm text-muted-foreground">Cole o texto do currículo (Ex: da Sólides ou outro formato) para preencher os dados via IA.</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setIsResumeModalOpen(false)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="p-4 space-y-4">
+              <Textarea
+                className="min-h-[300px] text-sm"
+                placeholder="Cole o texto do currículo aqui..."
+                value={resumeText}
+                onChange={e => setResumeText(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end p-4 border-t gap-2 bg-muted/10">
+              <Button variant="ghost" onClick={() => setIsResumeModalOpen(false)}>Cancelar</Button>
+              <Button 
+                onClick={analyzeResume} 
+                disabled={!resumeText.trim() || isAnalyzingResume}
+                className="gap-2 text-primary border-primary hover:bg-primary/10"
+                variant="outline"
+              >
+                <span className="text-lg leading-none">🪄</span> 
+                {isAnalyzingResume ? "Analisando..." : "Analisar via IA"}
+              </Button>
+            </div>
           </div>
         </div>
       )}

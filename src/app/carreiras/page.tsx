@@ -102,22 +102,34 @@ export default function CarreirasPage() {
 
     const [firstName, ...lastParts] = candidate.full_name.trim().split(/\s+/);
     const supabase = createClient();
-    const { data: candidateData, error: candidateError } = await supabase
+    
+    // Attempt to find existing candidate by email first to avoid duplicate email constraint error
+    let { data: candidateData, error: candidateError } = await supabase
       .from("candidates")
-      .insert({
-        full_name: candidate.full_name.trim(),
-        first_name: firstName,
-        last_name: lastParts.join(" ") || firstName,
-        email: candidate.email.trim(),
-        phone: candidate.phone.trim() || null,
-        city: candidate.city.trim() || null,
-        state: candidate.state.trim() || null,
-        linkedin_url: candidate.linkedin_url.trim() || null,
-        role_interest: selectedJob.profile?.title || null,
-        search_tags: [selectedJob.profile?.title, selectedJob.department, selectedJob.cost_center].filter(Boolean),
-      })
       .select("id")
+      .eq("email", candidate.email.trim())
       .single();
+
+    if (!candidateData) {
+      const res = await supabase
+        .from("candidates")
+        .insert({
+          full_name: candidate.full_name.trim(),
+          first_name: firstName,
+          last_name: lastParts.join(" ") || firstName,
+          email: candidate.email.trim(),
+          phone: candidate.phone.trim() || null,
+          city: candidate.city.trim() || null,
+          state: candidate.state.trim() || null,
+          linkedin_url: candidate.linkedin_url.trim() || null,
+          role_interest: selectedJob.profile?.title || null,
+          search_tags: [selectedJob.profile?.title, selectedJob.department, selectedJob.cost_center].filter(Boolean),
+        })
+        .select("id")
+        .single();
+      candidateData = res.data;
+      candidateError = res.error;
+    }
 
     if (candidateError || !candidateData) {
       setSaving(false);

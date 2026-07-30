@@ -75,14 +75,15 @@ export default function BigFiveTestPage() {
     setError("");
     setSaving(true);
     
+    const candidateId = new URLSearchParams(window.location.search).get("candidate_id") || new URLSearchParams(window.location.search).get("id") || null;
+    
     const supabase = createClient();
-    // Assuming user is authenticated as candidate, or we pass a token. For now, just a direct insert.
     const { error: insertError } = await supabase
       .from("candidate_big_five_results")
       .insert([
         {
+          candidate_id: candidateId,
           raw_answers: answers,
-          // the DB trigger or edge function should calculate the actual scores based on the raw answers
         }
       ]);
       

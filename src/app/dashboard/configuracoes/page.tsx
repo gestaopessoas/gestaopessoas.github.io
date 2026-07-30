@@ -22,6 +22,10 @@ export default function ConfiguracoesPage() {
   const [modules, setModules] = useState({ ats: true, admissao: true, pdi: true, gestor: true, rgs_tracking: true, financeiro: false })
   const [permissions, setPermissions] = useState({ "2fa": true, ai_notifications: true })
   const [jobRequestCode, setJobRequestCode] = useState("")
+  const [workSchedules, setWorkSchedules] = useState<string[]>([
+    "SEG A SEX das 07:45h - 12h - 13:15 - 17:48h", 
+    "SEG A SEX das 07:30h - 12h - 13:15 - 17:33h"
+  ])
   const [pauseHistory, setPauseHistory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -63,7 +67,7 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('system_settings').select('key, value, pause_history_tracking').in('key', ['modules', 'permissions'])
+      const { data } = await supabase.from('system_settings').select('key, value, pause_history_tracking').in('key', ['modules', 'permissions', 'work_schedules'])
       if (data) {
         data.forEach(row => {
           if (row.key === 'modules') {
@@ -71,6 +75,7 @@ export default function ConfiguracoesPage() {
             setPauseHistory(row.pause_history_tracking || false)
           }
           if (row.key === 'permissions') setPermissions(row.value)
+          if (row.key === 'work_schedules' && Array.isArray(row.value)) setWorkSchedules(row.value)
         })
       }
       const { data: publicForm } = await supabase.from('public_form_settings').select('value').eq('key', 'job_request_code').single()
@@ -86,7 +91,8 @@ export default function ConfiguracoesPage() {
     try {
       const { error: settingsError } = await supabase.from('system_settings').upsert([
         { key: 'modules', value: modules, pause_history_tracking: pauseHistory },
-        { key: 'permissions', value: permissions, pause_history_tracking: pauseHistory }
+        { key: 'permissions', value: permissions, pause_history_tracking: pauseHistory },
+        { key: 'work_schedules', value: workSchedules, pause_history_tracking: pauseHistory }
       ], { onConflict: 'key' });
       
       if (settingsError) throw new Error(settingsError.message);
@@ -102,7 +108,7 @@ export default function ConfiguracoesPage() {
         entity_name: 'system_settings',
         user_identifier: 'Administrador',
         ip_address: 'browser',
-        details: { modules, permissions, pauseHistory }
+        details: { modules, permissions, pauseHistory, workSchedules }
       });
       
       alert("Configurações salvas com sucesso!");
@@ -304,6 +310,18 @@ export default function ConfiguracoesPage() {
                     className="w-48"
                     placeholder="Ex: ACPO-VAGAS" 
                   />
+                </div>
+                <div className="flex items-center justify-between border-t border-border/40 pt-4">
+                  <div className="space-y-1 w-full max-w-lg">
+                    <Label className="text-base font-medium">Horários e Escalas Padrões</Label>
+                    <p className="text-sm text-muted-foreground">Coloque um horário por linha. Eles aparecerão nos dropdowns de solicitação de vaga e MP.</p>
+                    <textarea 
+                      className="w-full h-32 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      value={workSchedules.join("\n")}
+                      onChange={(e) => setWorkSchedules(e.target.value.split("\n").map(s => s.trim()).filter(Boolean))}
+                      placeholder="Ex: SEG A SEX das 07:45h - 12h - 13:15 - 17:48h"
+                    />
+                  </div>
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/20 border-t border-border/40 pt-4 flex justify-end">

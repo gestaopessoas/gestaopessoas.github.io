@@ -1,0 +1,17 @@
+[2026-07-30T15:42:49.299Z] RESULT
+============================================================
+{
+  "success": false,
+  "output": "Failed to authenticate. API Error: 401 The socket connection was closed unexpectedly. For more information, pass `verbose: true` in the second argument to fetch()\n",
+  "parsedOutput": {
+    "parseError": true,
+    "rawOutput": "Failed to authenticate. API Error: 401 The socket connection was closed unexpectedly. For more information, pass `verbose: true` in the second argument to fetch()\n"
+  },
+  "durationMs": 6591,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-07-30T15:42:49.299Z",
+  "executionId": "audit_1785426162708_3o67b9",
+  "error": "Process exited with code 1"
+}

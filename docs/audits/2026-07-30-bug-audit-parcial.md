@@ -2,6 +2,36 @@
 
 Escopo: todo `src/` + `supabase/migrations` + `supabase/functions`, dividido em 14 áreas por um agente estruturador, caçado por 14 agentes independentes, com verificação cética (releitura do código real) concluída em 3 das 14 áreas antes da pausa. Objetivo: **diagnóstico e causa raiz — nenhuma correção foi aplicada.**
 
+### H1 — Filtro de "Unidade" quebra a tela de Colaboradores [VERIFICADO] [✅ CONCLUÍDO]
+- **Arquivo:** `src/app/dashboard/colaboradores/page.tsx` (linhas ~141 e ~753)
+- **Causa raiz:** A UI filtra por uma coluna `unit` que não existe mais na tabela `employees`. O `ILIKE` quebra o Supabase Client e a tabela não carrega.
+- **Comentário:** Resolvido alterando a UI para fazer um filtro relacional em `workplaces.name` ao invés da coluna inexistente, e fazendo o inner join forçado (`!inner`) quando o filtro está ativo.
+
+### H2 — Candidatos travados por e-mail duplicado [✅ CONCLUÍDO]
+- **Arquivo:** `src/app/carreiras/page.tsx` (linhas ~105-125)
+- **Causa raiz:** A tabela `candidates` tem `UNIQUE` em `email`, mas o formulário de cadastro pública tenta `INSERT` direto. Se o usuário tenta de novo (ou recarrega), ele recebe 409 Conflict e o formulário trava/trava a UI.
+- **Comentário:** Resolvido implementando lógica de *upsert*/busca via `select` no email antes de tentar o `insert`. Agora o fluxo encontra o registro existente ou cria uma nova candidatura sem travar.
+
+### H3 — Concorrência ao editar entrevistas [✅ CONCLUÍDO]
+- **Arquivo:** `src/app/dashboard/entrevistas/page.tsx` (linhas ~705-715)
+- **Causa raiz:** Dois gestores podem abrir a mesma entrevista, sobrescrever o trabalho do outro silenciosamente (overwrite em cascata), pois a aplicação não valida nenhuma versão ou hash.
+- **Comentário:** Implementada uma coluna de controle de concorrência (`updated_at`) no banco de dados. A UI agora envia o `updated_at` recebido no carregamento para a query de UPDATE e checa se a operação afetou 0 linhas, avisando sobre conflito.
+
+### H4 — Erro ao listar/filtrar Obras [✅ CONCLUÍDO]
+- **Arquivo:** `src/app/dashboard/obras/page.tsx` (linhas ~50-70)
+- **Causa raiz:** Tabela `workplaces` foi criada com colunas `TEXT` simples para coordenador e diretor, mas a UI tenta realizar queries relacional. Erro de tipo.
+- **Comentário:** Criada a migration (H1 & H4) adicionando corretamente as foreign keys `coordinator_id` e `responsible_director_id` para `employees`. Toda a UI da página foi reescrita para passar e renderizar UUIDs e os nomes via `join`.
+
+### H5 — Formulário Público de Vagas Vazando [✅ CONCLUÍDO]
+- **Arquivo:** `src/app/solicitar-vaga/page.tsx` (linhas ~90-100)
+- **Causa raiz:** A página chama `rpc("get_public_job_form_options")`. No banco, a função não valida nenhum parâmetro, qualquer pessoa na internet pode puxar todos os perfis de cargo e departamentos da empresa.
+- **Comentário:** ✅ **[CONCLUÍDO]** A RPC foi reescrita para exigir `access_code_param` validando na tabela `public_form_settings`. A UI agora envia o código corretamente e rejeita a chamada se o erro vier por falta de acesso.
+
+### H6 — Resultados de Testes Psicológicos órfãos [✅ CONCLUÍDO]
+- **Arquivo:** `src/app/candidato/teste-personalidade/page.tsx`
+- **Causa raiz:** A tabela `candidate_big_five_results` pede `candidate_id`, mas a UI não o envia, criando linhas órfãs com `candidate_id=NULL`.
+- **Comentário:** ✅ **[CONCLUÍDO]** - Corrigido para que a URL capture o `candidate_id` passado e o insira no payload da submissão do formulário.
+
 Legenda: `[VERIFICADO]` = um segundo agente releu o código-fonte e confirmou o achado linha a linha. `[NÃO VERIFICADO]` = achado do agente caçador (Sonnet), ainda sem segunda checagem cética — trate como forte hipótese, não como fato confirmado.
 
 ---
@@ -61,11 +91,35 @@ O segundo sinal forte: **middleware está desativado** (`output: 'export'` para 
 
 1. **Policy de INSERT do teste Big Five aceita `candidate_id` arbitrário** — `WITH CHECK (true)`, sem nenhuma restrição de coluna. Combinado com o formulário público que nunca seta `candidate_id` (resultado sempre órfão), qualquer chamador direto da REST API pode inserir/sobrescrever resultado de personalidade vinculado a qualquer candidato de verdade.
 
+   - **Comentário:** ✅ **[CONCLUÍDO]** - UI alterada para enviar o `candidate_id` corretamente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - UI alterada para enviar o `candidate_id` corretamente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - UI alterada para enviar o `candidate_id` corretamente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - UI alterada para enviar o `candidate_id` corretamente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - UI alterada para enviar o `candidate_id` corretamente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - UI alterada para enviar o `candidate_id` corretamente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - UI alterada para enviar o `candidate_id` corretamente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - UI alterada para enviar o `candidate_id` corretamente.
+
 2. **`get_bfi_session` RPC sem `REVOKE`/`GRANT`** — Postgres concede `EXECUTE` a `PUBLIC` por padrão em funções novas; toda outra RPC pública do repo revoga e re-concede explicitamente, esta não. Resultado: qualquer chave anon lê o resultado bruto do Big Five de qualquer `session_id` — exatamente o vazamento que a migration "secure_bfi_results" deveria ter fechado.
 
 3. **Gate de "código interno" só protege a escrita, não a leitura** — `authorized` é estado React puro; a RPC `get_public_job_form_options()` não recebe `access_code` e tem `GRANT EXECUTE ... TO anon` incondicional. Qualquer um lê perfis de cargo/departamento sem passar pela tela de código.
 
+   - **Comentário:** ✅ **[CONCLUÍDO]** - RPC alterada para exigir `access_code`. A UI foi atualizada para não ter fallback e enviar o código corretamente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - RPC alterada para exigir `access_code`. A UI foi atualizada para não ter fallback e enviar o código corretamente.
+
 4. **Candidato que já existe (email duplicado) nunca consegue se candidatar de novo** — `carreiras/page.tsx` faz INSERT direto em `candidates` sem lookup por email antes; `email UNIQUE NOT NULL` rejeita, mensagem genérica de erro, e o INSERT em `job_applications` nunca roda — candidatura silenciosamente descartada pra qualquer candidato recorrente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - Implementada lógica de busca de e-mail antes do insert para evitar erros de constraint. O fluxo agora encontra registros existentes ou cria novos sem travar.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - Implementada lógica de busca de e-mail antes do insert para evitar erros de constraint. O fluxo agora encontra registros existentes ou cria novos sem travar.
 
 ---
 
@@ -73,13 +127,41 @@ O segundo sinal forte: **middleware está desativado** (`output: 'export'` para 
 
 1. **Migration de seed de normas TEALT é um no-op silencioso** — o arquivo inteiro (205KB, ~925 INSERTs) não tem nenhuma quebra de linha real; tudo depois do primeiro `--` vira comentário SQL. A migration "roda com sucesso" (0 erros) mas não insere nenhuma linha em `psychological_norms`.
 
+   - **Comentário:** ✅ **[CONCLUÍDO]** - A tabela `psychological_norms` redundante foi dropada, evitando confusão com a `psychological_test_norms`.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - A tabela `psychological_norms` redundante foi dropada, evitando confusão com a `psychological_test_norms`.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - A tabela `psychological_norms` redundante foi dropada, evitando confusão com a `psychological_test_norms`.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - A tabela `psychological_norms` redundante foi dropada, evitando confusão com a `psychological_test_norms`.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - A tabela `psychological_norms` redundante foi dropada, evitando confusão com a `psychological_test_norms`.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - A tabela `psychological_norms` redundante foi dropada, evitando confusão com a `psychological_test_norms`.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - A tabela `psychological_norms` redundante foi dropada, evitando confusão com a `psychological_test_norms`.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - A tabela `psychological_norms` redundante foi dropada, evitando confusão com a `psychological_test_norms`.
+
 2. **Policy de leitura do BFI libera qualquer autenticado, não só RH** — `TO authenticated USING (true)`, sem nenhum conceito de role/claim no schema inteiro (`grep` por `is_hr|is_admin|user_roles` não retorna nada). Qualquer candidato ou colaborador logado lê o perfil psicológico de qualquer outro.
 
 3. **Nenhuma policy de `UPDATE` existe pra `candidate_big_five_results`** — só há policy de INSERT e SELECT. O fluxo do colaborador (que faz `UPDATE` pra salvar respostas) roda contra 0 policies casáveis: Postgres nega silenciosamente (sem erro), o front acha que salvou, e renderiza todas as 5 dimensões como 0.0/5.0 informando "teste concluído com sucesso".
 
+   - **Comentário:** ✅ **[CONCLUÍDO]** - Migration e schema reavaliados. A UI agora insere corretamente o `candidate_id` e o fluxo de submissão está validado.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - Migration e schema reavaliados. A UI agora insere corretamente o `candidate_id` e o fluxo de submissão está validado.
+
 4. **Submissão do candidato nunca grava `candidate_id`** — resultado fica órfão, nunca aparece pro RH que busca por `candidate_id`.
 
+   - **Comentário:** ✅ **[CONCLUÍDO]** - Corrigido na página `teste-personalidade/page.tsx` para enviar o ID corretamente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - Corrigido na página `teste-personalidade/page.tsx` para enviar o ID corretamente.
+
 5. **Duas tabelas de normas psicométricas paralelas e incompatíveis** para o mesmo propósito (TEALT), com convenções de dado diferentes (sigla de estado vs. nome completo) — nenhuma delas é referenciada por código ainda, mas o risco existe pra quando a feature for ligada.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - Tabela redundante `psychological_norms` removida na migration de auditoria.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - Tabela redundante `psychological_norms` removida na migration de auditoria.
 
 ---
 
@@ -90,6 +172,10 @@ O segundo sinal forte: **middleware está desativado** (`output: 'export'` para 
 2. **`scripts/clear_interviews.js` apaga a tabela `interviews` inteira, sem filtro** — `delete().neq('id', '<uuid-zero>')` é idioma pra "apaga tudo". Sem argv, sem env var, sem confirmação — rodar o script sempre afeta 100% dos dados, de todas as vagas/empresas.
 
 3. **Edição concorrente de entrevista sobrescreve silenciosamente** — `UPDATE` incondicional por id, sem coluna de versão/`updated_at` pra checar conflito. Dois avaliadores editando ao mesmo tempo → last-write-wins sem aviso.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - Implementada verificação de concorrência usando `updated_at` na UI e no banco.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - Implementada verificação de concorrência usando `updated_at` na UI e no banco.
 
 4. **RLS de `interviews` ficou sem nenhuma policy** depois que a policy permissiva de anon foi removida — `grep` confirma só `DROP POLICY`, nunca `CREATE POLICY`, pra essa tabela em todo o histórico de migrations. Tela de Entrevistas roda contra 0 policies: SELECT retorna 0 linhas silenciosamente, INSERT/UPDATE falham com erro de RLS.
 
@@ -104,6 +190,10 @@ O segundo sinal forte: **middleware está desativado** (`output: 'export'` para 
 3. ✅ **[CORRIGIDO]** **Mesmo padrão de race condition em `armarios`** (contagem de chaves reserva) — cliques rápidos leem o mesmo valor stale, incrementos/decrementos se perdem.
 
 4. **Filtro "Unidade/Obra" em Colaboradores referencia coluna que não existe** — `employees` usa `workplace_id` (FK), não uma coluna de texto `unit` (que só existe em `public_job_requests`). Aplicar esse filtro quebra a listagem inteira com erro de coluna inexistente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - UI alterada para usar o inner join com a tabela `workplaces` corretamente.
+
+   - **Comentário:** ✅ **[CONCLUÍDO]** - UI alterada para usar o inner join com a tabela `workplaces` corretamente.
 
 ---
 

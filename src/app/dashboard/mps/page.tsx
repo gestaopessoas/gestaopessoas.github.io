@@ -61,6 +61,7 @@ export default function MPGeneratorPage() {
   const [salaryTable, setSalaryTable] = useState<SalaryRow[]>([]);
   const [workplaces, setWorkplaces] = useState<Entity[]>([]);
   const [costCenters, setCostCenters] = useState<Entity[]>([]);
+  const [workSchedules, setWorkSchedules] = useState<string[]>([]);
   
   const [currentUser, setCurrentUser] = useState("");
   const [loading, setLoading] = useState(true);
@@ -95,6 +96,7 @@ export default function MPGeneratorPage() {
   const [justification, setJustification] = useState("");
   
   const [selectedRoleId, setSelectedRoleId] = useState("");
+  const [selectedSchedule, setSelectedSchedule] = useState("");
   
   // Computed from selected role
   const selectedRoleInfo = salaryTable.find(r => r.id === selectedRoleId);
@@ -110,17 +112,19 @@ export default function MPGeneratorPage() {
         if (profile) setCurrentUser(profile.full_name || userData.user.email);
       }
 
-      const [empsRes, salaryRes, wpRes, ccRes] = await Promise.all([
+      const [empsRes, salaryRes, wpRes, ccRes, settingsRes] = await Promise.all([
         supabase.from("employees").select("id, name, phone, email_corporate, unit, cost_center_id, departments(name), cost_centers(name), role, level, contract_type, base_salary, profile_code").order("name"),
         supabase.from("salary_table").select("*").order("role_name"),
         supabase.from("workplaces").select("id, name").order("name"),
-        supabase.from("cost_centers").select("id, name").order("name")
+        supabase.from("cost_centers").select("id, name").order("name"),
+        supabase.from("system_settings").select("value").eq("key", "work_schedules").single()
       ]);
 
       if (empsRes.data) setEmployees(empsRes.data as any);
       if (salaryRes.data) setSalaryTable(salaryRes.data as SalaryRow[]);
       if (wpRes.data) setWorkplaces(wpRes.data as Entity[]);
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
+      if (settingsRes.data) setWorkSchedules(settingsRes.data.value || []);
       
       setLoading(false);
     };
@@ -145,9 +149,16 @@ export default function MPGeneratorPage() {
         else if (wpUpper.includes("RESERVA")) setSelectedLogo("Reserva Home Club.png");
         else if (wpUpper.includes("SOLANAS")) setSelectedLogo("Solanas.png");
         else if (wpUpper.includes("DIRECT")) setSelectedLogo("Direct.png");
+        
+        // Match Schedule
+        if (wpUpper.includes("SEDE") && workSchedules.length > 0) {
+          setSelectedSchedule(workSchedules[0]);
+        } else if (wpUpper.includes("OBRA") && workSchedules.length > 1) {
+          setSelectedSchedule(workSchedules[1]);
+        }
       }
     }
-  }, [selectedWorkplaceId, workplaces]);
+  }, [selectedWorkplaceId, workplaces, workSchedules]);
 
   // Handle Employee selection in Movimentação
   useEffect(() => {
@@ -354,19 +365,25 @@ export default function MPGeneratorPage() {
         sheet.getCell('F22').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
 
         sheet.mergeCells('B24:C24');
-        sheet.getCell('B24').value = "Razão";
+        sheet.getCell('B24').value = "Horário / Escala";
         sheet.getCell('B24').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
         sheet.getCell('B24').alignment = { horizontal: 'center' };
         sheet.getCell('B24').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
         sheet.mergeCells('B25:C25');
-        sheet.getCell('B25').value = finalReason;
+        sheet.getCell('B25').value = selectedSchedule;
         sheet.getCell('B25').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('B26').value = "Substituição de";
+        
+        sheet.getCell('B26').value = "Razão";
         sheet.getCell('B26').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
         sheet.getCell('B26').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('C26').value = replacementOf;
+        sheet.getCell('C26').value = finalReason;
         sheet.getCell('C26').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        
+        sheet.getCell('B27').value = "Substituição de";
+        sheet.getCell('B27').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+        sheet.getCell('B27').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        sheet.getCell('C27').value = replacementOf;
+        sheet.getCell('C27').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
 
         sheet.mergeCells('E24:F24');
         sheet.getCell('E24').value = "Benefícios";
@@ -537,6 +554,7 @@ export default function MPGeneratorPage() {
 
         addComparison(23, "Modalidade", selectedEmployee?.contract_type || "", selectedRoleInfo?.modality || "");
         addComparison(25, "Remuneração", selectedEmployee?.base_salary ? formatCurrency(selectedEmployee.base_salary) : "", selectedRoleInfo ? formatCurrency(selectedRoleInfo.salary) : "");
+        addComparison(26, "Horário", "-", selectedSchedule);
         
         sheet.getCell('B27').value = "Benefícios";
         sheet.getCell('B27').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
@@ -763,6 +781,18 @@ export default function MPGeneratorPage() {
                   )}
                 </div>
 
+                <div className="space-y-2">
+                  <Label>Horário / Escala</Label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={selectedSchedule}
+                    onChange={(e) => setSelectedSchedule(e.target.value)}
+                  >
+                    <option value="">Selecione o horário...</option>
+                    {workSchedules.map((schedule) => <option key={schedule} value={schedule}>{schedule}</option>)}
+                  </select>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Req. da Vaga (Solicitante)</Label>
@@ -965,6 +995,18 @@ export default function MPGeneratorPage() {
                           {s.role_name} - {s.level} ({s.modality}) - {formatCurrency(s.salary)}
                         </option>
                       ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Horário / Escala</Label>
+                    <select 
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={selectedSchedule}
+                      onChange={(e) => setSelectedSchedule(e.target.value)}
+                    >
+                      <option value="">Selecione o horário...</option>
+                      {workSchedules.map((schedule) => <option key={schedule} value={schedule}>{schedule}</option>)}
                     </select>
                   </div>
                   

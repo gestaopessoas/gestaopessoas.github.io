@@ -1,0 +1,17 @@
+[2026-07-30T14:52:17.045Z] RESULT
+============================================================
+{
+  "success": false,
+  "output": "Failed to authenticate. API Error: 401 Invalid bearer token\n",
+  "parsedOutput": {
+    "parseError": true,
+    "rawOutput": "Failed to authenticate. API Error: 401 Invalid bearer token\n"
+  },
+  "durationMs": 10332,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-07-30T14:52:17.045Z",
+  "executionId": "audit_1785423126713_ulobpu",
+  "error": "Process exited with code 1"
+}

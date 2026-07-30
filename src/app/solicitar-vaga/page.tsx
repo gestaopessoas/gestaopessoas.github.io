@@ -20,6 +20,16 @@ type JobProfile = {
   competencies?: string | null;
 };
 
+type SalaryRow = {
+  id: string;
+  role_code: string;
+  role_name: string;
+  level: string;
+  seniority?: string | null;
+  modality: string;
+  salary: number;
+};
+
 type Department = { id: string; name: string };
 
 const behavioralTags = [
@@ -76,6 +86,14 @@ const initialForm = {
 export default function SolicitarVagaPage() {
   const [profiles, setProfiles] = useState<JobProfile[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [salaryTable, setSalaryTable] = useState<SalaryRow[]>([]);
+  const [workSchedules, setWorkSchedules] = useState<string[]>([]);
+  
+  const [availableLevels, setAvailableLevels] = useState<string[]>([]);
+  const [availableSeniorities, setAvailableSeniorities] = useState<string[]>([]);
+  const [selectedLevel, setSelectedLevel] = useState("");
+  const [selectedSeniority, setSelectedSeniority] = useState("");
+
   const [form, setForm] = useState(initialForm);
   const [accessCode, setAccessCode] = useState("");
   const [authorized, setAuthorized] = useState(false);
@@ -88,27 +106,51 @@ export default function SolicitarVagaPage() {
     if (!authorized) return;
 
     const supabase = createClient();
-    supabase.rpc("get_public_job_form_options").then(async ({ data, error }) => {
+    supabase.rpc("get_public_job_form_options", { access_code_param: accessCode }).then(async ({ data, error }) => {
       if (error) {
-        const [profilesResult, departmentsResult] = await Promise.all([
+        if (error.message === 'Invalid access code') {
+          setError("Código de acesso inválido. Verifique com o RH.");
+          setAuthorized(false);
+          setLoading(false);
+          return;
+        }
+        
+        // Fallback ONLY if the RPC fails for other reasons (e.g. it doesn't exist yet)
+        const [profilesResult, departmentsResult, salaryResult, settingsResult] = await Promise.all([
           supabase.from("job_profiles").select("id, profile_code, title, min_education, desired_education, min_experience, desired_experience, cnh, knowledge, competencies").order("title"),
           supabase.from("departments").select("id, name").order("name"),
+          supabase.from("salary_table").select("*").order("role_name"),
+          supabase.from("system_settings").select("value").eq("key", "work_schedules").single(),
         ]);
 
         if (profilesResult.error || departmentsResult.error) {
-          setError("Não foi possível carregar cargos e setores. Avise o RH para conferir a migração do Supabase.");
+          setError("Não foi possível carregar cargos e setores. Avise o RH.");
           setLoading(false);
           return;
         }
 
         setProfiles((profilesResult.data ?? []) as JobProfile[]);
         setDepartments((departmentsResult.data ?? []) as Department[]);
+        setSalaryTable((salaryResult.data ?? []) as SalaryRow[]);
+        if (settingsResult.data) {
+          setWorkSchedules(settingsResult.data.value || []);
+        }
         setLoading(false);
         return;
       }
 
       setProfiles((data?.profiles ?? []) as JobProfile[]);
       setDepartments((data?.departments ?? []) as Department[]);
+      
+      const [salaryResult, settingsResult] = await Promise.all([
+        supabase.from("salary_table").select("*").order("role_name"),
+        supabase.from("system_settings").select("value").eq("key", "work_schedules").single(),
+      ]);
+      setSalaryTable((salaryResult.data ?? []) as SalaryRow[]);
+      if (settingsResult.data) {
+        setWorkSchedules(settingsResult.data.value || []);
+      }
+      
       setLoading(false);
     });
   }, [authorized]);
@@ -137,6 +179,16 @@ export default function SolicitarVagaPage() {
 
   const handleProfileChange = (profileId: string) => {
     const profile = profiles.find((item) => item.id === profileId);
+    
+    const options = salaryTable.filter(s => s.role_name === profile?.title);
+    const levels = Array.from(new Set(options.map(o => o.level).filter(Boolean)));
+    const seniorities = Array.from(new Set(options.map(o => o.seniority).filter(Boolean))) as string[];
+    
+    setAvailableLevels(levels);
+    setAvailableSeniorities(seniorities);
+    setSelectedLevel("");
+    setSelectedSeniority("");
+    
     setForm((prev) => ({
       ...prev,
       profile_id: profileId,
@@ -153,6 +205,37 @@ export default function SolicitarVagaPage() {
         profile?.competencies && `Competências: ${profile.competencies}`,
       ].filter(Boolean).join("\n"),
     }));
+  };
+
+  useEffect(() => {
+    if (form.profile_id && selectedLevel) {
+      const profile = profiles.find((item) => item.id === form.profile_id);
+      let match = salaryTable.find(s => s.role_name === profile?.title && s.level === selectedLevel && s.seniority === selectedSeniority);
+      
+      if (!match && availableSeniorities.length === 0) {
+        match = salaryTable.find(s => s.role_name === profile?.title && s.level === selectedLevel);
+      }
+      
+      if (match) {
+        setForm(prev => ({
+          ...prev,
+          salary_min: match?.salary ? String(match.salary) : prev.salary_min,
+          salary_max: match?.salary ? String(match.salary) : prev.salary_max,
+          contract_type: match?.modality === "Estágio" ? "Estágio" : match?.modality === "Jovem Aprendiz" ? "Jovem Aprendiz" : "CLT"
+        }));
+      }
+    }
+  }, [selectedLevel, selectedSeniority, form.profile_id, salaryTable, profiles, availableSeniorities.length]);
+
+  const handleUnitChange = (unit: string) => {
+    let schedule = form.work_schedule;
+    const unitUpper = unit.toUpperCase();
+    if (unitUpper.includes("SEDE") && workSchedules.length > 0) {
+      schedule = workSchedules[0];
+    } else if (unitUpper.includes("OBRA") && workSchedules.length > 1) {
+      schedule = workSchedules[1];
+    }
+    setForm(prev => ({ ...prev, unit, work_schedule: schedule }));
   };
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -298,7 +381,7 @@ export default function SolicitarVagaPage() {
                   {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                 </select>
               </Field>
-              <Field label="Unidade"><Input value={form.unit} onChange={(event) => set("unit", event.target.value)} placeholder="Sede, obra..." /></Field>
+              <Field label="Unidade"><Input value={form.unit} onChange={(event) => handleUnitChange(event.target.value)} placeholder="Sede, obra..." /></Field>
               <Field label="Quantidade"><Input type="number" min="1" value={form.quantity} onChange={(event) => set("quantity", event.target.value)} /></Field>
               <Field label="Contrato *">
                 <select value={form.contract_type} onChange={(event) => set("contract_type", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
@@ -316,6 +399,23 @@ export default function SolicitarVagaPage() {
                 </select>
               </Field>
               <Field label="Data limite"><Input type="date" value={form.target_date} onChange={(event) => set("target_date", event.target.value)} /></Field>
+              
+              {availableLevels.length > 0 && (
+                <Field label="Nível *">
+                  <select required value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Selecione o nível...</option>
+                    {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                  </select>
+                </Field>
+              )}
+              {availableSeniorities.length > 0 && (
+                <Field label="Senioridade *">
+                  <select required value={selectedSeniority} onChange={(e) => setSelectedSeniority(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Selecione a senioridade...</option>
+                    {availableSeniorities.map(sen => <option key={sen} value={sen}>{sen}</option>)}
+                  </select>
+                </Field>
+              )}
             </div>
           )}
         </section>
@@ -335,7 +435,12 @@ export default function SolicitarVagaPage() {
           <div className="grid gap-4 md:grid-cols-4">
             <Field label="Salário mínimo"><Input type="number" min="0" step="0.01" value={form.salary_min} onChange={(event) => set("salary_min", event.target.value)} /></Field>
             <Field label="Salário máximo"><Input type="number" min="0" step="0.01" value={form.salary_max} onChange={(event) => set("salary_max", event.target.value)} /></Field>
-            <Field label="Horário / escala" className="md:col-span-2"><Input value={form.work_schedule} onChange={(event) => set("work_schedule", event.target.value)} placeholder="Segunda a sexta, 08h às 18h" /></Field>
+            <Field label="Horário / escala" className="md:col-span-2">
+              <select value={form.work_schedule} onChange={(event) => set("work_schedule", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <option value="">Selecione o horário...</option>
+                {workSchedules.map((schedule) => <option key={schedule} value={schedule}>{schedule}</option>)}
+              </select>
+            </Field>
             <Field label="Observação de salário" className="md:col-span-4"><Input value={form.salary_notes} onChange={(event) => set("salary_notes", event.target.value)} placeholder="Ex: combinar conforme experiência e faixa aprovada" /></Field>
           </div>
         </section>

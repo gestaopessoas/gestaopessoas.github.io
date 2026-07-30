@@ -1,0 +1,17 @@
+[2026-07-30T15:39:30.124Z] RESULT
+============================================================
+{
+  "success": false,
+  "output": "Failed to authenticate. API Error: 401 Invalid bearer token\n",
+  "parsedOutput": {
+    "sections": [],
+    "codeBlocks": []
+  },
+  "durationMs": 7435,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "optimize",
+  "timestamp": "2026-07-30T15:39:30.124Z",
+  "executionId": "optimize_1785425962689_ha6uhx",
+  "error": "Process exited with code 1"
+}
