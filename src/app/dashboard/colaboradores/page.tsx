@@ -119,7 +119,7 @@ export default function ColaboradoresPage() {
       const supabase = createClient();
       let request = supabase
         .from("employees")
-        .select(`${fields}, departments(name), companies(name, trading_name), cost_centers(name), workplaces(name)`, { count: "exact" })
+        .select(`${fields}, departments(name), companies(name, trading_name), cost_centers(name), workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)`, { count: "exact" })
         .order("name")
         .range(page * pageSize, page * pageSize + pageSize - 1);
       
@@ -138,7 +138,7 @@ export default function ColaboradoresPage() {
       if (advancedFilters.marital_status) request = request.eq("marital_status", advancedFilters.marital_status);
       if (advancedFilters.department_id) request = request.eq("department_id", advancedFilters.department_id);
       if (advancedFilters.role) request = request.ilike("role", `%${advancedFilters.role}%`);
-      if (advancedFilters.unit) request = request.ilike("unit", `%${advancedFilters.unit}%`);
+      if (advancedFilters.unit) request = request.ilike("workplaces.name", `%${advancedFilters.unit}%`);
       if (advancedFilters.admission_start) request = request.gte("admission_date", advancedFilters.admission_start);
       if (advancedFilters.admission_end) request = request.lte("admission_date", advancedFilters.admission_end);
       

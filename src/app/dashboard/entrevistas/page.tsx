@@ -36,6 +36,8 @@ type Assessment = {
   strengths: string;
   weaknesses: string;
   observations: string;
+  worksite?: string;
+  selection_stage?: string;
 };
 
 type Interview = {
@@ -50,6 +52,7 @@ type Interview = {
   result: string | null;
   assessment: Assessment | null;
   created_at: string;
+  updated_at?: string;
 };
 
 const statusStyle: Record<string, string> = {
@@ -78,6 +81,8 @@ const defaultAssessment: Assessment = {
   strengths: "",
   weaknesses: "",
   observations: "",
+  worksite: "",
+  selection_stage: "",
 };
 
 async function generateTestText(testName: string, classification: string): Promise<string> {
@@ -391,10 +396,12 @@ export default function EntrevistasPage() {
   const [activeTab, setActiveTab] = useState<"dados" | "avaliacao">("dados");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [currentUpdatedAt, setCurrentUpdatedAt] = useState<string | null>(null);
   const [form, setForm] = useState({
     candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C"
   });
   const [assessmentForm, setAssessmentForm] = useState<Assessment>(defaultAssessment);
+  const [movingToTalents, setMovingToTalents] = useState(false);
   
   // Test generation states
   const [selectedTest, setSelectedTest] = useState("G36");
@@ -701,12 +708,19 @@ Resultado Final: ${form.result || "N/C"}
       ...Object.fromEntries(
         Object.entries(form).map(([key, value]) => [key, value.trim() || null])
       ),
-      assessment: assessmentForm
+      assessment: assessmentForm,
+      updated_at: new Date().toISOString()
     };
     
     if (editingId) {
-      const { error: saveError } = await supabase.from("interviews").update(payload).eq("id", editingId);
+      let query = supabase.from("interviews").update(payload).eq("id", editingId);
+      if (currentUpdatedAt) {
+        query = query.eq("updated_at", currentUpdatedAt);
+      }
+      const { data, error: saveError } = await query.select("id");
+      
       if (saveError) setError("Erro ao atualizar entrevista: " + saveError.message);
+      else if (!data || data.length === 0) setError("Conflito: A entrevista foi modificada por outro usuário. Por favor, cancele e abra novamente.");
       else { setIsModalOpen(false); loadInterviews(); }
     } else {
       const { error: saveError } = await supabase.from("interviews").insert(payload);
@@ -716,8 +730,43 @@ Resultado Final: ${form.result || "N/C"}
     setSaving(false);
   };
 
+  const moveToTalents = async () => {
+    if (!assessmentForm.worksite || !assessmentForm.selection_stage) {
+      setError("Para mover, preencha 'Obra / Plantão / Sede' e 'Fase do Processo Seletivo'.");
+      return;
+    }
+    if (!form.candidate_name || !form.email) {
+      setError("Candidato precisa de nome e email para ir ao Banco de Talentos.");
+      return;
+    }
+    setMovingToTalents(true);
+    setError("");
+    const supabase = createClient();
+    const parts = form.candidate_name.split(" ");
+    
+    const candidateData = {
+      full_name: form.candidate_name,
+      first_name: parts[0] || "",
+      last_name: parts.slice(1).join(" ") || "",
+      email: form.email,
+      phone: form.phone,
+      role_interest: form.role,
+      city: assessmentForm.worksite,
+      search_tags: [assessmentForm.selection_stage, "Importado de Entrevistas"]
+    };
+
+    const { error: insertError } = await supabase.from("candidates").insert(candidateData);
+    if (insertError) {
+      setError("Erro ao enviar para o Banco de Talentos: " + insertError.message);
+    } else {
+      alert("Candidato movido para o Banco de Talentos com sucesso!");
+    }
+    setMovingToTalents(false);
+  };
+
   const openNewModal = () => {
     setEditingId(null);
+    setCurrentUpdatedAt(null);
     setForm({ candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C" });
     setAssessmentForm(defaultAssessment);
     setActiveTab("dados");
@@ -726,6 +775,7 @@ Resultado Final: ${form.result || "N/C"}
   
   const openEditModal = (interview: Interview) => {
     setEditingId(interview.id);
+    setCurrentUpdatedAt(interview.updated_at || null);
     setForm({
       candidate_name: interview.candidate_name || "",
       role: interview.role || "",
@@ -1020,11 +1070,45 @@ Resultado Final: ${form.result || "N/C"}
                     </select>
                   </div>
                 </div>
-              )}
+            )}
+            
+            {activeTab === "dados" && (
+              <div className="px-6 py-4 bg-muted/30 border-t flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="text-sm text-muted-foreground max-w-xl">
+                  Para mover para a Central do Candidato, preencha a Fase do Processo e a Obra/Sede.
+                </div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={moveToTalents} 
+                  disabled={movingToTalents || !assessmentForm.worksite || !assessmentForm.selection_stage}
+                  className="w-full sm:w-auto whitespace-nowrap border-primary/20 hover:bg-primary/5 text-primary"
+                >
+                  {movingToTalents ? "Movendo..." : "Mover p/ Central do Candidato"}
+                </Button>
+              </div>
+            )}
 
-              {activeTab === "avaliacao" && (
+            {activeTab === "avaliacao" && (
                 <div className="space-y-5 flex-1">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label>Obra / Sede</Label>
+                      <Input value={assessmentForm.worksite || ''} onChange={e => setAssessmentForm({...assessmentForm, worksite: e.target.value})} placeholder="Ex: Obra A" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Fase do Processo</Label>
+                      <select value={assessmentForm.selection_stage || ''} onChange={e => setAssessmentForm({...assessmentForm, selection_stage: e.target.value})} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm">
+                        <option value="">Selecione...</option>
+                        <option value="Em Entrevista com a gestão de pessoas">Em Entrevista com a gestão de pessoas</option>
+                        <option value="Em testagem psicológica">Em testagem psicológica</option>
+                        <option value="Em espera para a contratação">Em espera para a contratação</option>
+                        <option value="Em coleta de documento">Em coleta de documento</option>
+                        <option value="Em espera para realizar o Exame admissional">Em espera para realizar o Exame admissional</option>
+                        <option value="Em espera do resultado do Exame admissional">Em espera do resultado do Exame admissional</option>
+                        <option value="Outros">Outros</option>
+                      </select>
+                    </div>
                     <div className="space-y-1">
                       <Label>Teste Psicológico Realizado?</Label>
                       <select 
