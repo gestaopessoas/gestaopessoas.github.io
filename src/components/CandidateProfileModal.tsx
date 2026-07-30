@@ -111,6 +111,21 @@ export function CandidateProfileModal({ candidateId, employeeId, onClose }: Cand
                       <span className="text-xs text-muted-foreground">Nenhuma tag de busca</span>
                     )}
                   </div>
+                  {candidateId && !person.search_tags?.includes("Central do Candidato") && !person.search_tags?.includes("Aprovado na Entrevista") && (
+                    <Button 
+                      variant="outline" 
+                      className="w-full mt-2" 
+                      onClick={async () => {
+                        const supabase = createClient();
+                        const newTags = [...(person.search_tags || []), "Central do Candidato"];
+                        await supabase.from("candidates").update({ search_tags: newTags }).eq("id", candidateId);
+                        setPerson({ ...person, search_tags: newTags });
+                        alert("Candidato movido para Em Processo na Central do Candidato!");
+                      }}
+                    >
+                      Mover p/ Central do Candidato
+                    </Button>
+                  )}
                 </div>
                 
                 <div className="space-y-3">

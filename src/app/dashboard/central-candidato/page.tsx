@@ -41,22 +41,10 @@ export default function CentralCandidatoPage() {
           full_name,
           phone,
           email,
-          candidate_educations (
-            degree,
-            institution_name,
-            end_date
-          ),
-          job_applications (
-            status,
-            created_at
-          ),
-          candidate_interviews (
-            stage,
-            interviewer_name,
-            workplace_name,
-            rejection_reason,
-            created_at
-          )
+          role_interest,
+          city,
+          search_tags,
+          created_at
         `)
         .order('created_at', { ascending: false });
 
@@ -67,38 +55,14 @@ export default function CentralCandidatoPage() {
 
       if (data) {
         const rows: CandidateRow[] = data.map((c: any) => {
-          // Get latest education
-          const educations = c.candidate_educations || [];
-          const latestEdu = educations.length > 0 ? educations[0].degree : "Não informado";
-
-          // Get latest application status or interview stage
-          const apps = c.job_applications || [];
-          const latestAppStatus = apps.length > 0 ? apps[0].status : "Novo";
-
-          const interviews = c.candidate_interviews || [];
-          // Sort interviews by created_at desc
-          interviews.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          
-          let status = latestAppStatus;
+          let status = "Banco de Talentos";
           let ultimo_chamado = "Nenhum contato";
-          let obra_atual: string | null = null;
+          let obra_atual: string | null = c.city || null;
           let etapa_atual: string | null = null;
-
-          if (interviews.length > 0) {
-            const latestInt = interviews[0];
-            if (latestInt.rejection_reason || latestInt.stage === "Reprovado" || latestInt.stage === "Desistente" || latestInt.stage === "Banco de Talentos") {
-              status = "Banco de Talentos";
-            } else if (latestInt.stage === "Contratado") {
-              status = "Contratado";
-              obra_atual = latestInt.workplace_name || null;
-            } else {
+          
+          if (c.search_tags && (c.search_tags.includes("Aprovado na Entrevista") || c.search_tags.includes("Central do Candidato"))) {
               status = "Em Processo";
-              etapa_atual = latestInt.stage;
-              obra_atual = latestInt.workplace_name || null;
-            }
-            ultimo_chamado = `${latestInt.interviewer_name || "Desconhecido"} - ${latestInt.workplace_name || "Obra não informada"}`;
-          } else {
-            status = "Banco de Talentos";
+              etapa_atual = c.search_tags.includes("Aprovado na Entrevista") ? "Aprovado na Entrevista" : "Em Processo (Importado)";
           }
 
           return {
@@ -106,7 +70,7 @@ export default function CentralCandidatoPage() {
             full_name: c.full_name,
             phone: c.phone || "Não informado",
             email: c.email,
-            escolaridade: latestEdu,
+            escolaridade: "Não informado",
             status,
             ultimo_chamado,
             obra_atual,

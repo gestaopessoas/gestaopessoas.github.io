@@ -34,30 +34,7 @@ export default function CandidateDetailsSheet({
     try {
       const { data, error } = await supabase
         .from("candidates")
-        .select(`
-          *,
-          candidate_educations (*),
-          candidate_experiences (*),
-          job_applications (
-            id,
-            status,
-            notes,
-            created_at,
-            job_openings (
-              title,
-              department
-            )
-          ),
-          candidate_interviews (
-            id,
-            interviewer_name,
-            workplace_name,
-            stage,
-            rejection_reason,
-            notes,
-            created_at
-          )
-        `)
+        .select(`*`)
         .eq("id", candidateId)
         .single();
 
