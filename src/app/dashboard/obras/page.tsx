@@ -18,12 +18,14 @@ type Workplace = {
   name: string;
   type: string | null;
   address: string | null;
-  coordinator?: string | null;
-  responsible_director?: string | null;
+  coordinator_id?: string | null;
+  responsible_director_id?: string | null;
   companies?: { name: string | null } | { name: string | null }[] | null;
+  coordinator?: { name: string | null } | null;
+  responsible_director?: { name: string | null } | null;
 };
 
-const emptyForm = { name: "", type: "OBRA", address: "", company_id: "", coordinator: "", responsible_director: "" };
+const emptyForm = { name: "", type: "OBRA", address: "", company_id: "", coordinator_id: "", responsible_director_id: "" };
 
 const typeStyle: Record<string, string> = {
   OBRA: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
@@ -35,7 +37,7 @@ const typeStyle: Record<string, string> = {
 export default function ObrasPage() {
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [coordenadores, setCoordenadores] = useState<{ id: string; name: string }[]>([]);
+  const [employeesList, setEmployeesList] = useState<{ id: string; name: string }[]>([]);
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -50,8 +52,8 @@ export default function ObrasPage() {
       const supabase = createClient();
       const [companyResult, workplaceResult, coordResult] = await Promise.all([
         supabase.from("companies").select("id, name").order("name"),
-        supabase.from("workplaces").select("id, company_id, name, type, address, coordinator, responsible_director, companies(name)").order("name"),
-        supabase.from("employees").select("id, name").eq("status", "Ativo").ilike("role", "%Coordenador%Obra%").order("name"),
+        supabase.from("workplaces").select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").order("name"),
+        supabase.from("employees").select("id, name").eq("status", "Ativo").order("name"),
       ]);
 
       if (!active) return;
@@ -61,8 +63,8 @@ export default function ObrasPage() {
         return;
       }
       setCompanies((companyResult.data ?? []) as Company[]);
-      setWorkplaces((workplaceResult.data ?? []) as Workplace[]);
-      setCoordenadores((coordResult.data ?? []) as any[]);
+      setWorkplaces((workplaceResult.data ?? []) as unknown as Workplace[]);
+      setEmployeesList((coordResult.data ?? []) as any[]);
     };
 
     loadWorkplaces();
@@ -74,12 +76,15 @@ export default function ObrasPage() {
 
   // Preenche diretor responsável automaticamente com base no tipo
   useEffect(() => {
-    if (form.type === "SEDE" && !form.responsible_director) {
-      setForm((prev) => ({ ...prev, responsible_director: "Presidente" }));
-    } else if (form.type === "PLANTÃO DE VENDAS" && !form.responsible_director) {
-      setForm((prev) => ({ ...prev, responsible_director: "Diretor Comercial" }));
+    if (form.type === "SEDE" && !form.responsible_director_id) {
+      // Find a president ID in employeesList if needed, but since it's an ID, we can't reliably auto-fill text. We just skip auto-fill or find the ID.
+      const pres = employeesList.find(e => e.name.toLowerCase().includes("presidente"));
+      if (pres) setForm((prev) => ({ ...prev, responsible_director_id: pres.id }));
+    } else if (form.type === "PLANTÃO DE VENDAS" && !form.responsible_director_id) {
+      const dir = employeesList.find(e => e.name.toLowerCase().includes("diretor comercial"));
+      if (dir) setForm((prev) => ({ ...prev, responsible_director_id: dir.id }));
     }
-  }, [form.type, form.responsible_director]);
+  }, [form.type, form.responsible_director_id, employeesList]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -105,8 +110,8 @@ export default function ObrasPage() {
       type: workplace.type ?? "OBRA",
       address: workplace.address ?? "",
       company_id: workplace.company_id ?? "",
-      coordinator: workplace.coordinator ?? "",
-      responsible_director: workplace.responsible_director ?? "",
+      coordinator_id: workplace.coordinator_id ?? "",
+      responsible_director_id: workplace.responsible_director_id ?? "",
     });
     setError("");
   };
@@ -121,14 +126,14 @@ export default function ObrasPage() {
       type: form.type,
       address: form.address.trim() || null,
       company_id: form.company_id || null,
-      coordinator: form.coordinator.trim() || null,
-      responsible_director: form.responsible_director.trim() || null,
+      coordinator_id: form.coordinator_id || null,
+      responsible_director_id: form.responsible_director_id || null,
     };
 
     const supabase = createClient();
     const result = editingId
-      ? await supabase.from("workplaces").update(payload).eq("id", editingId).select("id, company_id, name, type, address, coordinator, responsible_director, companies(name)").single()
-      : await supabase.from("workplaces").insert(payload).select("id, company_id, name, type, address, coordinator, responsible_director, companies(name)").single();
+      ? await supabase.from("workplaces").update(payload).eq("id", editingId).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single()
+      : await supabase.from("workplaces").insert(payload).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single();
 
     setSaving(false);
     if (result.error) {
@@ -136,7 +141,7 @@ export default function ObrasPage() {
       return;
     }
 
-    const saved = result.data as Workplace;
+    const saved = result.data as unknown as Workplace;
     setWorkplaces((prev) => editingId ? prev.map((item) => item.id === editingId ? saved : item) : [...prev, saved].sort((a, b) => a.name.localeCompare(b.name)));
     startNew();
   };
@@ -207,12 +212,17 @@ export default function ObrasPage() {
               </select>
             </Field>
             <Field label="Coordenador">
-              <select value={form.coordinator} onChange={(event) => setForm({ ...form, coordinator: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+              <select value={form.coordinator_id} onChange={(event) => setForm({ ...form, coordinator_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                 <option value="">Selecione...</option>
-                {coordenadores.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                {employeesList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </Field>
-            <Field label="Diretor Responsável"><Input value={form.responsible_director} onChange={(event) => setForm({ ...form, responsible_director: event.target.value })} placeholder="Ex: Maria Souza" /></Field>
+            <Field label="Diretor Responsável">
+              <select value={form.responsible_director_id} onChange={(event) => setForm({ ...form, responsible_director_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <option value="">Selecione...</option>
+                {employeesList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
             <Field label="Localização"><Input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>
           </div>
           <div className="mt-4 flex justify-end">
@@ -250,9 +260,9 @@ export default function ObrasPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs whitespace-normal min-w-[150px]">
-                      {workplace.coordinator && <div className="mb-0.5"><span className="font-medium text-foreground">Coord:</span> {workplace.coordinator}</div>}
-                      {workplace.responsible_director && <div><span className="font-medium text-foreground">Dir:</span> {workplace.responsible_director}</div>}
-                      {!workplace.coordinator && !workplace.responsible_director && "-"}
+                      {workplace.coordinator?.name && <div className="mb-0.5"><span className="font-medium text-foreground">Coord:</span> {workplace.coordinator.name}</div>}
+                      {workplace.responsible_director?.name && <div><span className="font-medium text-foreground">Dir:</span> {workplace.responsible_director.name}</div>}
+                      {!workplace.coordinator?.name && !workplace.responsible_director?.name && "-"}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
