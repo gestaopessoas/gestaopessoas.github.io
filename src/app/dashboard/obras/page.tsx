@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 type Company = {
   id: string;
   name: string;
+  trading_name?: string | null;
 };
 
 type Workplace = {
@@ -20,7 +21,7 @@ type Workplace = {
   address: string | null;
   coordinator_id?: string | null;
   responsible_director_id?: string | null;
-  companies?: { name: string | null } | { name: string | null }[] | null;
+  companies?: { name: string | null; trading_name?: string | null } | { name: string | null; trading_name?: string | null }[] | null;
   coordinator?: { name: string | null } | null;
   responsible_director?: { name: string | null } | null;
 };
@@ -37,7 +38,8 @@ const typeStyle: Record<string, string> = {
 export default function ObrasPage() {
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [employeesList, setEmployeesList] = useState<{ id: string; name: string }[]>([]);
+  const [coordinatorsList, setCoordinatorsList] = useState<{ id: string; name: string }[]>([]);
+  const [directorsList, setDirectorsList] = useState<{ id: string; name: string }[]>([]);
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -48,12 +50,14 @@ export default function ObrasPage() {
   useEffect(() => {
     let active = true;
 
-    const loadWorkplaces = async () => {
+    async function loadWorkplaces() {
       const supabase = createClient();
-      const [companyResult, workplaceResult, coordResult] = await Promise.all([
-        supabase.from("companies").select("id, name").order("name"),
-        supabase.from("workplaces").select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").order("name"),
-        supabase.from("employees").select("id, name").eq("status", "Ativo").order("name"),
+      // ponytail: ilike para pegar "Diretor", "Diretor Comercial", "Diretor de Engenharia", etc. — exclui "Direto" pq não termina com "diretor"
+      const [companyResult, workplaceResult, coordResult, dirResult] = await Promise.all([
+        supabase.from("companies").select("id, name, trading_name").order("name"),
+        supabase.from("workplaces").select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").order("name"),
+        supabase.from("employees").select("id, name").eq("status", "Ativo").ilike("role", "coordenador").order("name"),
+        supabase.from("employees").select("id, name").eq("status", "Ativo").ilike("role", "%diretor%").order("name"),
       ]);
 
       if (!active) return;
@@ -64,8 +68,9 @@ export default function ObrasPage() {
       }
       setCompanies((companyResult.data ?? []) as Company[]);
       setWorkplaces((workplaceResult.data ?? []) as unknown as Workplace[]);
-      setEmployeesList((coordResult.data ?? []) as any[]);
-    };
+      setCoordinatorsList((coordResult.data ?? []) as any[]);
+      setDirectorsList((dirResult.data ?? []) as any[]);
+    }
 
     loadWorkplaces();
 
@@ -77,14 +82,13 @@ export default function ObrasPage() {
   // Preenche diretor responsável automaticamente com base no tipo
   useEffect(() => {
     if (form.type === "SEDE" && !form.responsible_director_id) {
-      // Find a president ID in employeesList if needed, but since it's an ID, we can't reliably auto-fill text. We just skip auto-fill or find the ID.
-      const pres = employeesList.find(e => e.name.toLowerCase().includes("presidente"));
+      const pres = directorsList.find(e => e.name.toLowerCase().includes("presidente"));
       if (pres) setForm((prev) => ({ ...prev, responsible_director_id: pres.id }));
     } else if (form.type === "PLANTÃO DE VENDAS" && !form.responsible_director_id) {
-      const dir = employeesList.find(e => e.name.toLowerCase().includes("diretor comercial"));
+      const dir = directorsList.find(e => e.name.toLowerCase().includes("diretor comercial"));
       if (dir) setForm((prev) => ({ ...prev, responsible_director_id: dir.id }));
     }
-  }, [form.type, form.responsible_director_id, employeesList]);
+  }, [form.type, form.responsible_director_id, directorsList]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -132,8 +136,8 @@ export default function ObrasPage() {
 
     const supabase = createClient();
     const result = editingId
-      ? await supabase.from("workplaces").update(payload).eq("id", editingId).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single()
-      : await supabase.from("workplaces").insert(payload).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single();
+      ? await supabase.from("workplaces").update(payload).eq("id", editingId).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single()
+      : await supabase.from("workplaces").insert(payload).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single();
 
     setSaving(false);
     if (result.error) {
@@ -208,19 +212,19 @@ export default function ObrasPage() {
             <Field label="Empresa vinculada">
               <select value={form.company_id} onChange={(event) => setForm({ ...form, company_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                 <option value="">Sem vínculo</option>
-                {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+                {companies.map((company) => <option key={company.id} value={company.id}>{company.trading_name || company.name}</option>)}
               </select>
             </Field>
             <Field label="Coordenador">
               <select value={form.coordinator_id} onChange={(event) => setForm({ ...form, coordinator_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                 <option value="">Selecione...</option>
-                {employeesList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {coordinatorsList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </Field>
             <Field label="Diretor Responsável">
               <select value={form.responsible_director_id} onChange={(event) => setForm({ ...form, responsible_director_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                 <option value="">Selecione...</option>
-                {employeesList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {directorsList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </Field>
             <Field label="Localização"><Input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>
@@ -315,6 +319,6 @@ function Metric({ label, value }: { label: string; value: number }) {
 }
 
 function companyName(workplace: Workplace) {
-  const company = Array.isArray(workplace.companies) ? workplace.companies[0] : workplace.companies;
-  return company?.name ?? "";
+  const company = (Array.isArray(workplace.companies) ? workplace.companies[0] : workplace.companies) as { trading_name?: string; name?: string } | undefined;
+  return company?.trading_name || company?.name || "";
 }

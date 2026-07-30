@@ -22,6 +22,7 @@ export function NotificationBell() {
   const [rgsNotifications, setRgsNotifications] = useState<RgsNotification[]>([]);
   const [benefitNotifications, setBenefitNotifications] = useState<BenefitNotification[]>([]);
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfileNotification[]>([]);
+  const [securityAlerts, setSecurityAlerts] = useState<{id: string, title: string, message: string}[]>([]);
   const [preferences, setPreferences] = useState<UserPreferences>({ trial: true, rgs: true, benefits: true, profile: true });
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -35,6 +36,15 @@ export function NotificationBell() {
       let userPrefs = { trial: true, rgs: true, benefits: true, profile: true };
       
       if (authData.user?.id) {
+        if (authData.user.email === 'bruno.goncalves@acpo.com.br') {
+          // Hardcoded security alert based on current DB state check
+          setSecurityAlerts([{
+            id: 'rls-alert-costs',
+            title: 'Alerta Crítico: RLS Desativado',
+            message: 'A tabela employee_costs está sem proteção RLS. Qualquer pessoa pode ver/editar salários. Acesse o painel Supabase para corrigir!'
+          }]);
+        }
+
         const { data: prof } = await supabase.from('profiles').select('permissions').eq('id', authData.user.id).single();
         if (prof?.permissions?._preferences) {
           userPrefs = { ...userPrefs, ...prof.permissions._preferences };
@@ -86,7 +96,7 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const totalCount = trialNotifications.length + rgsNotifications.length + benefitNotifications.length + pendingProfiles.length;
+  const totalCount = trialNotifications.length + rgsNotifications.length + benefitNotifications.length + pendingProfiles.length + securityAlerts.length;
   
   const cutsCount = benefitNotifications.filter(b => b.type === "CORTE").length;
   const inclusionsCount = benefitNotifications.filter(b => b.type === "INCLUSAO").length;
@@ -113,6 +123,30 @@ export function NotificationBell() {
           ) : (
             <div className="flex flex-col">
               
+              {/* Alertas de Segurança */}
+              {securityAlerts.length > 0 && (
+                <div className="border-b last:border-b-0 pb-2">
+                  <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
+                    <h3 className="text-xs font-bold text-red-600 uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Segurança Crítica
+                    </h3>
+                    <span className="bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{securityAlerts.length}</span>
+                  </div>
+                  <div className="px-2 pt-2 flex flex-col gap-1 max-h-[160px] overflow-y-auto">
+                    {securityAlerts.map(n => (
+                      <div key={n.id} className="flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-left w-full">
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold text-red-800 dark:text-red-400">{n.title}</span>
+                        </div>
+                        <div className="text-xs text-red-700 dark:text-red-300 font-medium mt-1">
+                          {n.message}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Pendências de Cadastro */}
               {pendingProfiles.length > 0 && (
                 <div className="border-b last:border-b-0 pb-2">
