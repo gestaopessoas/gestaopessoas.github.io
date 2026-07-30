@@ -48,8 +48,8 @@ export default function AddInterviewModal({
 
   useEffect(() => {
     if (isOpen) {
-      if (isLocked && currentWorkplace) {
-        setWorkplaceName(currentWorkplace);
+      if (isLocked) {
+        setWorkplaceName(currentWorkplace || "");
       } else {
         setWorkplaceName("");
         setStage("");

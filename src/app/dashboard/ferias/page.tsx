@@ -5,7 +5,7 @@ import { createClient } from "@/utils/supabase/client";
 import { calcularFerias, FeriasInfo } from "@/lib/ferias";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, CheckCircle2, Clock } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 type EmployeeVacation = {
@@ -31,7 +31,7 @@ export default function FeriasPage() {
           admission_date,
           departments (name)
         `)
-        .eq("status", "ACTIVE")
+        .eq("status", "Ativo")
         .not("admission_date", "is", null);
 
       if (error) {
@@ -129,7 +129,7 @@ export default function FeriasPage() {
                       <td className="px-4 py-3 font-medium">{emp.name}</td>
                       <td className="px-4 py-3">{emp.department}</td>
                       <td className="px-4 py-3 tabular-nums">
-                        {format(new Date(emp.admission_date), "dd/MM/yyyy")}
+                        {format(parseISO(emp.admission_date), "dd/MM/yyyy")}
                       </td>
                       <td className="px-4 py-3 text-center tabular-nums">{emp.vacationInfo.diasDireito}</td>
                       <td className="px-4 py-3 text-center tabular-nums">{emp.vacationInfo.diasGozados}</td>

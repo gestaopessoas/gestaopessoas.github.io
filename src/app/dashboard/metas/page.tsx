@@ -49,10 +49,10 @@ export default function MetasPage() {
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Progresso</span>
-                      <span className="font-medium">{Math.round((goal.current / goal.target) * 100)}%</span>
+                      <span className="font-medium">{goal.target > 0 ? Math.round((goal.current / goal.target) * 100) : 0}%</span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
-                      <div className="bg-primary h-2 rounded-full" style={{ width: `${Math.min((goal.current / goal.target) * 100, 100)}%` }}></div>
+                      <div className="bg-primary h-2 rounded-full" style={{ width: `${goal.target > 0 ? Math.min((goal.current / goal.target) * 100, 100) : 0}%` }}></div>
                     </div>
                     <p className="text-xs text-muted-foreground pt-1">
                       Atual: {goal.current} / Alvo: {goal.target} {goal.metric}

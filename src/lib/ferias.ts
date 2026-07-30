@@ -1,4 +1,4 @@
-import { addMonths, differenceInDays } from 'date-fns';
+import { addMonths, differenceInDays, parseISO } from 'date-fns';
 
 export interface FeriasInfo {
   admissao: Date;
@@ -16,7 +16,7 @@ export function calcularFerias(
   admissaoDate: string | Date,
   diasGozadosHistorico: number = 0
 ): FeriasInfo {
-  const admissao = new Date(admissaoDate);
+  const admissao = typeof admissaoDate === 'string' ? parseISO(admissaoDate) : admissaoDate;
   const hoje = new Date();
 
   // O período aquisitivo atual fecha a cada 12 meses.
@@ -32,8 +32,14 @@ export function calcularFerias(
   const diasDireitoTotal = periodosCompletos * 30;
   const saldo = Math.max(0, diasDireitoTotal - diasGozadosHistorico);
 
-  // O período aquisitivo mais recente que fechou
-  const inicioAquisitivo = addMonths(admissao, (periodosCompletos > 0 ? periodosCompletos - 1 : 0) * 12);
+  // Determinar o período mais antigo ainda não gozado integralmente
+  const periodosGozadosCompletamente = Math.floor(diasGozadosHistorico / 30);
+  const periodoAvaliado = periodosGozadosCompletamente < periodosCompletos 
+    ? periodosGozadosCompletamente 
+    : Math.max(0, periodosCompletos - 1);
+
+  // O período aquisitivo avaliado
+  const inicioAquisitivo = addMonths(admissao, periodoAvaliado * 12);
   const fimAquisitivo = addMonths(inicioAquisitivo, 12);
   
   // Limite concessivo: a empresa tem 11 meses após o fim do período aquisitivo para conceder as férias

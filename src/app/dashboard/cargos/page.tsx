@@ -177,7 +177,7 @@ export default function CargosPage() {
           <div className="grid gap-3 md:grid-cols-3 mb-4">
             <Field label="Nome do Cargo *"><Input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
             <Field label="CBO"><Input value={form.cbo} onChange={(event) => setForm({ ...form, cbo: event.target.value })} /></Field>
-            <Field label="Código do Perfil"><Input value={form.profile_code} onChange={(event) => setForm({ ...form, profile_code: event.target.value })} /></Field>
+            <Field label="Código do Perfil *"><Input required value={form.profile_code} onChange={(event) => setForm({ ...form, profile_code: event.target.value })} /></Field>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 mb-4">
