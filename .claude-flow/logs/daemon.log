@@ -421,3 +421,16 @@
 [2026-07-30T17:45:15.732Z] [INFO] Worker audit completed in 6628ms
 [2026-07-30T17:51:53.897Z] [INFO] Starting worker: map (1/2 concurrent)
 [2026-07-30T17:51:53.899Z] [INFO] Worker map completed in 4ms
+[2026-07-30T17:55:15.750Z] [INFO] Starting worker: audit (1/2 concurrent)
+[2026-07-30T17:55:15.752Z] [INFO] Running audit in headless mode (Claude Code AI)
+[2026-07-30T17:55:22.456Z] [WARN] Headless audit returned success=false (Process exited with code 1); falling back to local mode
+[2026-07-30T17:55:22.458Z] [INFO] Worker audit completed in 6714ms
+[2026-07-30T17:56:48.863Z] [INFO] Starting worker: optimize (1/2 concurrent)
+[2026-07-30T17:56:48.863Z] [INFO] Running optimize in headless mode (Claude Code AI)
+[2026-07-30T17:56:56.064Z] [WARN] Headless optimize returned success=false (Process exited with code 1); falling back to local mode
+[2026-07-30T17:56:56.065Z] [INFO] Worker optimize completed in 7204ms
+[2026-07-30T17:57:53.851Z] [INFO] Starting worker: consolidate (1/2 concurrent)
+[2026-07-30T17:57:53.852Z] [INFO] Consolidate worker: distillation skipped (no-db)
+[2026-07-30T17:57:53.853Z] [INFO] Worker consolidate completed in 6ms
+[2026-07-30T17:59:22.484Z] [INFO] Starting worker: harness (1/2 concurrent)
+[2026-07-30T17:59:22.570Z] [INFO] Worker harness completed in 89ms

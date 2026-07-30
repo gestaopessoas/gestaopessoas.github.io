@@ -742,17 +742,18 @@ Resultado Final: ${form.result || "N/C"}
     
     if (isSuccess) {
       // Se Aprovado ou Banco de Talentos, joga pra central do candidato automaticamente
-      if ((payload.result === "Aprovado" || payload.result === "Banco de Talentos") && payload.candidate_name) {
-        const parts = payload.candidate_name.split(" ");
-        const tag = payload.result === "Aprovado" ? "Aprovado na Entrevista" : "Banco de Talentos";
+      const payloadAny = payload as any;
+      if ((payloadAny.result === "Aprovado" || payloadAny.result === "Banco de Talentos") && payloadAny.candidate_name) {
+        const parts = payloadAny.candidate_name.split(" ");
+        const tag = payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : "Banco de Talentos";
         
         const { error: insertError } = await supabase.from("candidates").insert({
-          full_name: payload.candidate_name,
+          full_name: payloadAny.candidate_name,
           first_name: parts[0] || "",
           last_name: parts.slice(1).join(" ") || "",
-          email: payload.email || `${parts[0]?.toLowerCase() || 'candidato'}@sememail.com`,
-          phone: payload.phone,
-          role_interest: payload.role,
+          email: payloadAny.email || `${parts[0]?.toLowerCase() || 'candidato'}@sememail.com`,
+          phone: payloadAny.phone,
+          role_interest: payloadAny.role,
           city: assessmentForm.worksite || "",
           search_tags: [tag, assessmentForm.selection_stage || "Importado de Entrevistas"].filter(Boolean)
         });
@@ -760,7 +761,7 @@ Resultado Final: ${form.result || "N/C"}
         if (insertError) {
           console.error("Erro ao enviar para candidatos:", insertError);
         } else {
-          alert(`Candidato Movido para a Central do Candidato como ${payload.result}!`);
+          alert(`Candidato Movido para a Central do Candidato como ${payloadAny.result}!`);
         }
       }
       setIsModalOpen(false); 
