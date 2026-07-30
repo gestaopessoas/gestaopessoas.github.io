@@ -2,11 +2,19 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { Search, Loader2, Contact, RefreshCw, Plus } from "lucide-react";
+import { Search, Loader2, Contact, RefreshCw, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import CandidateDetailsSheet from "./components/CandidateDetailsSheet";
 import AddCandidateModal from "./components/AddCandidateModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 type CandidateRow = {
   id: string;
@@ -27,6 +35,9 @@ export default function CentralCandidatoPage() {
   const [activeTab, setActiveTab] = useState<"banco" | "processo" | "contratado">("banco");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const supabase = createClient();
 
@@ -106,6 +117,45 @@ export default function CentralCandidatoPage() {
     );
   }, [candidates, search, activeTab]);
 
+  const handleDeleteCandidate = (candidateId: string, candidateName: string) => {
+    setCandidateToDelete({ id: candidateId, name: candidateName });
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!candidateToDelete) return;
+
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("candidates")
+        .delete()
+        .eq("id", candidateToDelete.id);
+
+      if (error) {
+        console.error("Error deleting candidate:", error);
+        alert("Erro ao excluir candidato: " + error.message);
+        return;
+      }
+
+      // Remove from local state
+      setCandidates(candidates.filter(c => c.id !== candidateToDelete.id));
+      setIsDeleteModalOpen(false);
+      setCandidateToDelete(null);
+
+    } catch (err: any) {
+      console.error("Delete error:", err);
+      alert("Erro inesperado ao excluir candidato.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setIsDeleteModalOpen(false);
+    setCandidateToDelete(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -171,19 +221,20 @@ export default function CentralCandidatoPage() {
                 <th className="px-6 py-4 font-medium">Escolaridade</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Último Chamado</th>
+                <th className="px-6 py-4 font-medium text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mb-2" />
                     <p className="text-muted-foreground">Carregando candidatos...</p>
                   </td>
                 </tr>
               ) : filteredCandidates.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                     Nenhum candidato encontrado.
                   </td>
                 </tr>
@@ -219,6 +270,20 @@ export default function CentralCandidatoPage() {
                     <td className="px-6 py-4 text-muted-foreground text-xs">
                       {candidate.ultimo_chamado}
                     </td>
+                    <td className="px-6 py-4 text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCandidate(candidate.id, candidate.full_name);
+                        }}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Excluir candidato"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -241,6 +306,39 @@ export default function CentralCandidatoPage() {
           fetchCandidates();
         }}
       />
+
+      <Dialog open={isDeleteModalOpen} onOpenChange={(open) => !open && cancelDelete()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir o candidato{" "}
+              <strong>{candidateToDelete?.name}</strong>?
+              <br />
+              Esta ação não pode ser desfeita e também removerá todo o histórico de entrevistas relacionado.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={cancelDelete}
+              disabled={deleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleting}
+            >
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
