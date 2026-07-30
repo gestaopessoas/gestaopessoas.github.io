@@ -1,0 +1,2 @@
+-- This migration was intentionally left empty or reverted, 
+-- but kept to preserve migration history sync with the remote database.
