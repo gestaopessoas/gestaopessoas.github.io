@@ -1091,15 +1091,14 @@ ${resumeText}`;
                   
                   <div className="space-y-1 col-span-2 md:col-span-1">
                     <Label>Cargo Alvo</Label>
-                    <Input 
-                      list="rolesList"
+                    <select 
                       value={form.role} 
-                      onChange={e => setForm({...form, role: e.target.value})} 
-                      placeholder="Pesquise o cargo..." 
-                    />
-                    <datalist id="rolesList">
-                      {roles.map(r => <option key={r} value={r} />)}
-                    </datalist>
+                      onChange={e => setForm({...form, role: e.target.value})}
+                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">Selecione um cargo...</option>
+                      {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
                   </div>
 
                   <div className="space-y-1 col-span-2 md:col-span-1">
@@ -1193,9 +1192,6 @@ ${resumeText}`;
                       </div>
                     </div>
                   )}
-                  <div className="hidden">
-                  <DialogFooter>
-                  </div>
                 </div>
             )}
             

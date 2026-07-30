@@ -8,15 +8,20 @@ Este documento substitui e completa o [parecer parcial](2026-07-30-bug-audit-par
 
 ## 0. Verificação das correções marcadas "✅ CONCLUÍDO" no parecer parcial
 
-Antes de continuar a auditoria, os 5 arquivos que o parecer parcial marcou como corrigidos foram comparados com o diff real (`git diff`). Resultado:
+Reverificado duas vezes: primeiro por um agente do processo de auditoria, depois manualmente (`git log`, `git diff`, leitura direta de código e migrations) para confirmar que o veredito do agente batia com o repositório real, não só com o texto do relatório. As duas verificações convergem. Evidência de cada item:
 
-| Achado | Arquivo | Veredito |
-|---|---|---|
-| H1 — filtro Unidade | `colaboradores/page.tsx` | ✅ Correção real e correta (inner join relacional em `workplaces.name`) |
-| H2 — email duplicado | `carreiras/page.tsx` | ✅ Correção real (lookup por email antes do insert) |
-| H3 — concorrência entrevistas | `entrevistas/page.tsx` | ✅ Correção real, mas só protege registros que já têm `updated_at` — linhas legadas sem esse campo ainda sofrem last-write-wins silencioso |
-| **H5 — vazamento solicitar-vaga** | `solicitar-vaga/page.tsx` | ⚠️ **Correção incompleta.** O gate só trata o erro exato `'Invalid access code'`. Qualquer outra falha do RPC (rede, RPC ausente no ambiente, exceção inesperada) cai no fallback antigo que consulta `job_profiles`/`departments` sem filtro — **reabre exatamente o vazamento que o fix disse ter fechado** |
-| **H6 — teste órfão** | `teste-personalidade/page.tsx` | ⚠️ **Correção cosmética, causa raiz intacta.** UI agora envia `candidate_id` da URL, mas a policy de INSERT em `candidate_big_five_results` continua `WITH CHECK (true)` — confirmado de novo nesta rodada (ver §2). Qualquer chamada direta à API REST ainda grava/sobrescreve resultado de qualquer candidato |
+| Achado | Arquivo(s) | Veredito | Evidência direta |
+|---|---|---|---|
+| H1 — filtro Unidade | `colaboradores/page.tsx` | ✅ **Real, commitado** | Commit `832bf7d`. Linhas 122/141: join relacional `workplaces!workplace_id${...'!inner'...}(name)` + `.ilike("workplaces.name", ...)` — não usa mais a coluna `unit` inexistente. |
+| H2 — email duplicado | `carreiras/page.tsx` | ✅ **Real** (não commitado — working tree) | Diff confirma: `select("id").eq("email", ...)` roda antes; só insere se `!candidateData`. Elimina o 409/UNIQUE-violation que travava reenvio. |
+| H3 — concorrência entrevistas | `entrevistas/page.tsx` + migration | ✅ **Real, commitado** | Migration `20260802000000_audit_fixes_high_med.sql` adiciona coluna `interviews.updated_at`. Código (`entrevistas/page.tsx:722,729-730,735`) compara `currentUpdatedAt` no `WHERE`, checa `data.length === 0` e mostra "Conflito: A entrevista foi modificada...". Optimistic locking real, não só cosmético. |
+| H4 — obras coordinator FK | `obras/page.tsx` + migration | ✅ **Real, commitado** | Mesma migration adiciona `workplaces.coordinator_id`/`responsible_director_id` como FK de verdade pra `employees` (`ON DELETE SET NULL`) e **dropa** as colunas de texto solto antigas (schema drift eliminado). Commit `8e9dfc9` + migration batem; código usa `coordinator:employees!coordinator_id(name)`. |
+| **H5 — vazamento solicitar-vaga** | `solicitar-vaga/page.tsx` + migration | ⚠️ **Parcial — backend corrigido, front reabre o buraco em qualquer erro não previsto** | Migration recria `get_public_job_form_options(access_code_param text)` validando contra `public_form_settings.access_code` e faz `RAISE EXCEPTION 'Invalid access code'` se inválido (real, bom fix no banco). Mas `solicitar-vaga/page.tsx` só trata esse erro **exato** (`error.message === 'Invalid access code'`); qualquer outro erro (RPC ainda não propagada, timeout de rede, RLS) cai no bloco `else` que faz `supabase.from("job_profiles").select(...)` e `.from("departments").select(...)` **direto, sem código nenhum** — mesmo vazamento de antes, só que agora condicionado a "a RPC falhar de um jeito que não seja código inválido" em vez de sempre. |
+| **H6 — teste órfão** | `teste-personalidade/page.tsx` | ❌ **Cosmético — causa raiz intacta** | Front agora lê `candidate_id` da query string e envia no insert (real). Mas `grep -rl candidate_big_five_results supabase/migrations/` só retorna 4 arquivos, o mais recente sendo `20260720144000_secure_bfi_results.sql` — **nenhuma migration depois disso** toca essa tabela. A policy de INSERT (`WITH CHECK (true)`, de `20260714155800_big_five_schema.sql`) nunca foi revisitada. Qualquer chamada direta à REST API (bypassando o front) ainda grava/sobrescreve resultado de qualquer candidato com um `candidate_id` arbitrário. |
+
+**Bônus encontrado nesta verificação** (não estava nas 6 marcações do parcial, mas está na mesma migration `20260802000000`): a duplicidade de tabelas de normas psicométricas (achado de `testes-psicologicos-bfi`, §2) foi resolvida — `DROP TABLE IF EXISTS public.psychological_norms CASCADE;` remove a tabela redundante, mantendo só `psychological_test_norms`.
+
+**Resumo**: 4 de 6 correções são reais e resolvem a causa raiz (H1, H2, H3, H4). 2 têm gap real ainda explorável (H5 — client não cobre todo caminho de erro do RPC; H6 — policy de banco nunca foi corrigida, só a UI).
 
 ---
 
