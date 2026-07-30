@@ -742,20 +742,26 @@ Resultado Final: ${form.result || "N/C"}
     
     if (isSuccess) {
       // Se Aprovado ou Banco de Talentos, joga pra central do candidato automaticamente
-      if ((payload.result === "Aprovado" || payload.result === "Banco de Talentos") && payload.candidate_name && payload.email) {
+      if ((payload.result === "Aprovado" || payload.result === "Banco de Talentos") && payload.candidate_name) {
         const parts = payload.candidate_name.split(" ");
         const tag = payload.result === "Aprovado" ? "Aprovado na Entrevista" : "Banco de Talentos";
         
-        await supabase.from("candidates").insert({
+        const { error: insertError } = await supabase.from("candidates").insert({
           full_name: payload.candidate_name,
           first_name: parts[0] || "",
           last_name: parts.slice(1).join(" ") || "",
-          email: payload.email,
+          email: payload.email || `${parts[0]?.toLowerCase() || 'candidato'}@sememail.com`,
           phone: payload.phone,
           role_interest: payload.role,
           city: assessmentForm.worksite || "",
           search_tags: [tag, assessmentForm.selection_stage || "Importado de Entrevistas"].filter(Boolean)
         });
+        
+        if (insertError) {
+          console.error("Erro ao enviar para candidatos:", insertError);
+        } else {
+          alert(`Candidato Movido para a Central do Candidato como ${payload.result}!`);
+        }
       }
       setIsModalOpen(false); 
       loadInterviews();
