@@ -7,7 +7,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { createClient } from "@/utils/supabase/client";
-import { Loader2, Calendar, User, Phone, Mail, Building, FileText, Briefcase, Plus, AlertCircle } from "lucide-react";
+import { Loader2, Calendar, User, Phone, Mail, FileText, Briefcase, Plus, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AddInterviewModal from "./AddInterviewModal";
 import { latestInterview, isLockedByInterview } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
@@ -43,7 +43,7 @@ export default function CandidateDetailsSheet({
       try {
         const { data, error } = await supabase
           .from("candidates")
-          .select(`*, candidate_interviews(*), candidate_educations(*)`)
+          .select(`*, candidate_interviews(*)`)
           .eq("id", candidateId)
           .single();
 
@@ -129,25 +129,7 @@ export default function CandidateDetailsSheet({
                 </div>
               </section>
 
-              {/* Education Section */}
-              <section className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
-                  <Building className="h-5 w-5 text-muted-foreground" />
-                  Formação Acadêmica
-                </h3>
-                {candidate.candidate_educations && candidate.candidate_educations.length > 0 ? (
-                  <ul className="space-y-3">
-                    {candidate.candidate_educations.map((edu: any) => (
-                      <li key={edu.id} className="bg-muted/30 p-3 rounded-lg">
-                        <p className="font-medium">{edu.degree}</p>
-                        <p className="text-sm text-muted-foreground">{edu.institution_name}</p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Nenhuma formação registrada.</p>
-                )}
-              </section>
+              {/* ponytail: Formação Acadêmica removida - candidate_educations nao existe no banco de producao (drift de schema). Reativar quando corrigido. */}
 
               {/* Interview History */}
               <section className="space-y-4">

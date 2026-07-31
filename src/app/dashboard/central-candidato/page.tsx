@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import CandidateDetailsSheet from "./components/CandidateDetailsSheet";
 import AddCandidateModal from "./components/AddCandidateModal";
-import { deriveCandidateStatus, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { deriveCandidateStatus } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import {
   Dialog,
   DialogContent,
@@ -60,8 +60,7 @@ export default function CentralCandidatoPage() {
           role_interest,
           city,
           created_at,
-          candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, created_at),
-          candidate_educations(candidate_id, degree, start_date, end_date)
+          candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, created_at)
         `)
         .order('created_at', { ascending: false });
 
@@ -76,7 +75,9 @@ export default function CentralCandidatoPage() {
             full_name: c.full_name,
             phone: c.phone || "Não informado",
             email: c.email,
-            escolaridade: latestEducationDegree(c.candidate_educations) || "Não informado",
+            // ponytail: candidate_educations nao existe no banco de producao (drift de schema);
+            // reativar latestEducationDegree quando o schema for corrigido.
+            escolaridade: "Não informado",
             status: derived.status,
             ultimo_chamado: derived.ultimo_chamado,
             obra_atual: derived.obra_atual || c.city || null,
