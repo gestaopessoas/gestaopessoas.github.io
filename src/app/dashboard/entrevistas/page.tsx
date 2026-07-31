@@ -85,20 +85,6 @@ const defaultAssessment: Assessment = {
   selection_stage: "",
 };
 
-const WORKSITES = [
-  "Sede (Pelotas)",
-  "Obra - Acqua (Pelotas)",
-  "Obra - Art (Pelotas)",
-  "Obra - Vanguarda (Pelotas)",
-  "Obra - Duque (Pelotas)",
-  "Obra - Smart (Pelotas)",
-  "Obra - Vitta (Pelotas)",
-  "Obra - High (Pelotas)",
-  "Obra - Carlos Gomes (Porto Alegre)",
-  "Obra - Iguaçu (Porto Alegre)",
-  "Obra - GO (Rio Grande)"
-];
-
 async function generateTestText(testName: string, classification: string): Promise<string> {
   const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
   const prompt = `Escreva um parágrafo curto e profissional de parecer psicológico para um candidato de emprego. O teste realizado foi '${testName}' e o resultado obtido foi '${classification}'. Não invente características adicionais, apenas explique o que esse resultado significa nesse teste específico em 2 a 3 linhas de forma objetiva.`;
@@ -401,6 +387,7 @@ const TEST_OPTIONS: Record<string, { table_name: string; demographic_type?: stri
 export default function EntrevistasPage() {
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
+  const [worksites, setWorksites] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(""); // YYYY-MM
   const [loading, setLoading] = useState(true);
@@ -502,9 +489,10 @@ export default function EntrevistasPage() {
   const loadInterviews = async () => {
     setLoading(true);
     const supabase = createClient();
-    const [{ data, error }, { data: profilesData }] = await Promise.all([
+    const [{ data, error }, { data: profilesData }, { data: workplacesData }] = await Promise.all([
       supabase.from("interviews").select("*").order("interview_date", { ascending: false, nullsFirst: false }),
-      supabase.from("job_profiles").select("title")
+      supabase.from("job_profiles").select("title"),
+      supabase.from("workplaces").select("name").order("name")
     ]);
 
     setLoading(false);
@@ -516,6 +504,9 @@ export default function EntrevistasPage() {
     if (profilesData) {
       const uniqueRoles = Array.from(new Set(profilesData.map(r => r.title))).sort();
       setRoles(uniqueRoles);
+    }
+    if (workplacesData) {
+      setWorksites(workplacesData.map((w: { name: string }) => w.name));
     }
   };
 
@@ -1213,13 +1204,16 @@ ${resumeText}`;
             {activeTab === "dados" && (form.result === "Aprovado" || form.result === "Banco de Talentos") && (
               <div className="px-6 py-4 bg-muted/30 border-t space-y-2">
                 <Label>Obra / Sede para envio à Central do Candidato</Label>
-                <select 
-                  value={assessmentForm.worksite || ''} 
+                <select
+                  value={assessmentForm.worksite || ''}
                   onChange={e => setAssessmentForm({...assessmentForm, worksite: e.target.value})}
                   className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="">Selecione a Obra...</option>
-                  {WORKSITES.map(w => <option key={w} value={w}>{w}</option>)}
+                  {worksites.map(w => <option key={w} value={w}>{w}</option>)}
+                  {assessmentForm.worksite && !worksites.includes(assessmentForm.worksite) && (
+                    <option value={assessmentForm.worksite}>{assessmentForm.worksite} (obra atual)</option>
+                  )}
                 </select>
               </div>
             )}
