@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { fetchKanbanData, KanbanCandidate } from "./kanbanService";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -9,8 +10,9 @@ import { Button } from "@/components/ui/button";
 
 const COLUMNS = ["Sugestões", "Nova", "Triagem", "Entrevista", "Proposta", "Contratado"];
 
-export default function KanbanPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
+function KanbanContent() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id") || "";
   const [candidates, setCandidates] = useState<KanbanCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -18,7 +20,12 @@ export default function KanbanPage({ params }: { params: Promise<{ id: string }>
   
   useEffect(() => {
     let active = true;
-    fetchKanbanData(resolvedParams.id)
+    if (!id) {
+      setError("ID da vaga não fornecido");
+      setLoading(false);
+      return;
+    }
+    fetchKanbanData(id)
       .then(data => {
         if (!active) return;
         setCandidates(data);
@@ -30,11 +37,11 @@ export default function KanbanPage({ params }: { params: Promise<{ id: string }>
         setLoading(false);
       });
     return () => { active = false };
-  }, [resolvedParams.id]);
+  }, [id]);
 
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData("text/plain", id);
-    setDraggedId(id);
+  const handleDragStart = (e: React.DragEvent, dragId: string) => {
+    e.dataTransfer.setData("text/plain", dragId);
+    setDraggedId(dragId);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -67,7 +74,7 @@ export default function KanbanPage({ params }: { params: Promise<{ id: string }>
         const { data, error } = await supabase
           .from("job_applications")
           .upsert({
-            job_request_id: resolvedParams.id,
+            job_request_id: id,
             candidate_id: candidate.id,
             status: targetColumn
           }, { onConflict: 'job_request_id, candidate_id' })
@@ -146,5 +153,13 @@ export default function KanbanPage({ params }: { params: Promise<{ id: string }>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function KanbanPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>}>
+      <KanbanContent />
+    </Suspense>
   );
 }

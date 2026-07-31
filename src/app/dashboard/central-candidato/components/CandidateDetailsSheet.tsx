@@ -7,9 +7,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { createClient } from "@/utils/supabase/client";
-import { Loader2, Calendar, User, Phone, Mail, Building, FileText, Briefcase, Plus } from "lucide-react";
+import { Loader2, Calendar, User, Phone, Mail, Building, FileText, Briefcase, Plus, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AddInterviewModal from "./AddInterviewModal";
+import { latestInterview, isLockedByInterview } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 
 type CandidateDetailsSheetProps = {
   candidateId: string | null;
@@ -24,47 +25,50 @@ export default function CandidateDetailsSheet({
 }: CandidateDetailsSheetProps) {
   const [loading, setLoading] = useState(false);
   const [candidate, setCandidate] = useState<any>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const supabase = createClient();
 
-  const fetchDetails = async () => {
-    if (!candidateId) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("candidates")
-        .select(`*`)
-        .eq("id", candidateId)
-        .single();
-
-      if (error) throw error;
-      setCandidate(data);
-    } catch (err) {
-      console.error("Error fetching candidate details:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (candidateId) {
-      fetchDetails();
-    } else {
-      setCandidate(null);
-    }
-  }, [candidateId]);
+    if (!candidateId) return;
 
-  let currentActiveWorkplace = "";
-  let isLocked = false;
-  if (candidate?.candidate_interviews?.length > 0) {
-    const sorted = [...candidate.candidate_interviews].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    const latest = sorted[0];
-    if (latest.stage !== "Reprovado" && latest.stage !== "Desistente" && latest.stage !== "Banco de Talentos" && latest.stage !== "Contratado") {
-      currentActiveWorkplace = latest.workplace_name || "";
-      isLocked = true;
-    }
-  }
+    const controller = new AbortController();
+    let stale = false;
+    setLoading(true);
+    setLoadError(null);
+
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("candidates")
+          .select(`*, candidate_interviews(*), candidate_educations(*)`)
+          .eq("id", candidateId)
+          .single();
+
+        if (controller.signal.aborted || stale) return;
+        if (error) throw error;
+        setCandidate(data);
+      } catch (err: any) {
+        if (controller.signal.aborted || stale) return;
+        console.error("Error fetching candidate details:", err);
+        setCandidate(null);
+        setLoadError(err?.message || "Falha ao carregar detalhes do candidato.");
+      } finally {
+        if (!stale) setLoading(false);
+      }
+    })();
+
+    return () => {
+      stale = true;
+      controller.abort();
+    };
+  }, [candidateId, retryTick]);
+
+  const latest = latestInterview(candidate?.candidate_interviews);
+  const isLocked = isLockedByInterview(latest);
+  const currentActiveWorkplace = isLocked && latest ? latest.workplace_name || "" : "";
 
   return (
     <>
@@ -80,6 +84,14 @@ export default function CandidateDetailsSheet({
           {loading ? (
             <div className="flex justify-center items-center h-48">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : loadError ? (
+            <div className="text-center py-12">
+              <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
+              <p className="text-destructive mb-4">Erro ao carregar detalhes: {loadError}</p>
+              <Button variant="outline" onClick={() => setRetryTick((t) => t + 1)}>
+                Tentar novamente
+              </Button>
             </div>
           ) : candidate ? (
             <div className="space-y-8">
@@ -208,7 +220,7 @@ export default function CandidateDetailsSheet({
           currentWorkplace={currentActiveWorkplace}
           isLocked={isLocked}
           onSuccess={() => {
-            fetchDetails();
+            setRetryTick((t) => t + 1);
             onRefresh();
             setIsAddModalOpen(false);
           }}

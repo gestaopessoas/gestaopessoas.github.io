@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { usePermissions } from "@/hooks/usePermissions";
 import { createClient } from "@/utils/supabase/client";
-import { Search, Loader2, Contact, RefreshCw, Plus, Trash2 } from "lucide-react";
+import { Search, Loader2, Contact, RefreshCw, Plus, Trash2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import CandidateDetailsSheet from "./components/CandidateDetailsSheet";
 import AddCandidateModal from "./components/AddCandidateModal";
+import { deriveCandidateStatus, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import {
   Dialog,
   DialogContent,
@@ -38,13 +40,16 @@ export default function CentralCandidatoPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+  const { can } = usePermissions();
+  const canDelete = can("central_candidato", "delete");
 
   const supabase = createClient();
 
   const fetchCandidates = async () => {
     setLoading(true);
+    setError("");
     try {
-      // We fetch candidates, their educations (for escolaridade), and candidate_interviews (for status/ultimo chamado)
       const { data, error } = await supabase
         .from("candidates")
         .select(`
@@ -54,44 +59,35 @@ export default function CentralCandidatoPage() {
           email,
           role_interest,
           city,
-          search_tags,
-          created_at
+          created_at,
+          candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, created_at),
+          candidate_educations(candidate_id, degree, start_date, end_date)
         `)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("Error fetching candidates:", error);
-        return;
-      }
+      if (error) throw error;
 
       if (data) {
         const rows: CandidateRow[] = data.map((c: any) => {
-          let status = "Banco de Talentos";
-          let ultimo_chamado = "Nenhum contato";
-          let obra_atual: string | null = c.city || null;
-          let etapa_atual: string | null = null;
-          
-          if (c.search_tags && (c.search_tags.includes("Aprovado na Entrevista") || c.search_tags.includes("Central do Candidato"))) {
-              status = "Em Processo";
-              etapa_atual = c.search_tags.includes("Aprovado na Entrevista") ? "Aprovado na Entrevista" : "Em Processo (Importado)";
-          }
+          const derived = deriveCandidateStatus(c.candidate_interviews);
 
           return {
             id: c.id,
             full_name: c.full_name,
             phone: c.phone || "Não informado",
             email: c.email,
-            escolaridade: "Não informado",
-            status,
-            ultimo_chamado,
-            obra_atual,
-            etapa_atual
+            escolaridade: latestEducationDegree(c.candidate_educations) || "Não informado",
+            status: derived.status,
+            ultimo_chamado: derived.ultimo_chamado,
+            obra_atual: derived.obra_atual || c.city || null,
+            etapa_atual: derived.etapa_atual,
           };
         });
         setCandidates(rows);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Fetch error:", err);
+      setError(err?.message || "Falha ao carregar candidatos.");
     } finally {
       setLoading(false);
     }
@@ -140,6 +136,8 @@ export default function CentralCandidatoPage() {
 
       // Remove from local state
       setCandidates(candidates.filter(c => c.id !== candidateToDelete.id));
+      // Fecha o Sheet de detalhes se o candidato excluído estiver aberto
+      setSelectedCandidateId((cur) => (cur === candidateToDelete.id ? null : cur));
       setIsDeleteModalOpen(false);
       setCandidateToDelete(null);
 
@@ -211,6 +209,16 @@ export default function CentralCandidatoPage() {
         </div>
       </div>
 
+      {error && (
+        <div className="flex items-center gap-2 bg-destructive/10 text-destructive p-3 rounded-md text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>Não foi possível carregar os candidatos: {error}</span>
+          <Button variant="outline" size="sm" className="ml-auto" onClick={fetchCandidates}>
+            Tentar novamente
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-xl border border-border/50 bg-background overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -221,20 +229,20 @@ export default function CentralCandidatoPage() {
                 <th className="px-6 py-4 font-medium">Escolaridade</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Último Chamado</th>
-                <th className="px-6 py-4 font-medium text-right">Ações</th>
+                {canDelete && <th className="px-6 py-4 font-medium text-right">Ações</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={canDelete ? 6 : 5} className="px-6 py-12 text-center">
                     <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mb-2" />
                     <p className="text-muted-foreground">Carregando candidatos...</p>
                   </td>
                 </tr>
               ) : filteredCandidates.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={canDelete ? 6 : 5} className="px-6 py-12 text-center text-muted-foreground">
                     Nenhum candidato encontrado.
                   </td>
                 </tr>
@@ -270,20 +278,22 @@ export default function CentralCandidatoPage() {
                     <td className="px-6 py-4 text-muted-foreground text-xs">
                       {candidate.ultimo_chamado}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteCandidate(candidate.id, candidate.full_name);
-                        }}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Excluir candidato"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </td>
+                    {canDelete && (
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCandidate(candidate.id, candidate.full_name);
+                          }}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Excluir candidato"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

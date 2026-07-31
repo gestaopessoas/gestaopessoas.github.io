@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { UNLOCK_STAGES } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 
 type AddInterviewModalProps = {
   isOpen: boolean;
@@ -79,13 +80,32 @@ export default function AddInterviewModal({
   const [interviewers, setInterviewers] = useState<Interviewer[]>([]);
   const [loadingWorkplaces, setLoadingWorkplaces] = useState(false);
   const [loadingInterviewers, setLoadingInterviewers] = useState(false);
+  const [workplacesError, setWorkplacesError] = useState(false);
+  const [interviewersError, setInterviewersError] = useState(false);
+  const [error, setError] = useState("");
 
   const supabase = createClient();
+
+  // Roles that can conduct interviews in obras
+  const interviewRoles = [
+    "coordenador de obras",
+    "mestre de obras",
+    "analista técnico",
+    "analista técnico(a) - obras",
+    "encarregado",
+    "supervisor(a) administrativo(a)",
+    "diretor operacional",
+    "gestor",
+    "gerente",
+    "coordenador",
+    "administrativo de obras",
+  ];
 
   // Load workplaces on mount
   useEffect(() => {
     async function loadWorkplaces() {
       setLoadingWorkplaces(true);
+      setWorkplacesError(false);
       try {
         const { data, error } = await supabase
           .from("workplaces")
@@ -95,6 +115,7 @@ export default function AddInterviewModal({
         setWorkplaces((data ?? []) as Workplace[]);
       } catch (err) {
         console.error("Error loading workplaces:", err);
+        setWorkplacesError(true);
       } finally {
         setLoadingWorkplaces(false);
       }
@@ -111,32 +132,22 @@ export default function AddInterviewModal({
     }
     async function loadInterviewers() {
       setLoadingInterviewers(true);
+      setInterviewersError(false);
       try {
-        // Roles that can conduct interviews in obras
-        const interviewRoles = [
-          "coordenador de obras",
-          "mestre de obras",
-          "analista técnico",
-          "analista técnico(a) - obras",
-          "encarregado",
-          "supervisor(a) administrativo(a)",
-          "diretor operacional",
-          "gestor",
-          "gerente",
-          "coordenador",
-          "administrativo de obras",
-        ];
+        // Match flexible: tolera variação de grafia/acento no texto livre de employees.role
+        const roleFilters = interviewRoles.map((r) => `role.ilike.%${r}%`).join(",");
         const { data, error } = await supabase
           .from("employees")
           .select("id, name")
           .eq("status", "Ativo")
           .eq("workplace_id", workplaceId)
-          .in("role", interviewRoles)
+          .or(roleFilters)
           .order("name");
         if (error) throw error;
         setInterviewers((data ?? []) as Interviewer[]);
       } catch (err) {
         console.error("Error loading interviewers:", err);
+        setInterviewersError(true);
       } finally {
         setLoadingInterviewers(false);
       }
@@ -167,6 +178,7 @@ export default function AddInterviewModal({
         setWeaknesses("");
         setCandidateFuture([]);
         setNotes("");
+        setError("");
       }
     }
   }, [isOpen, isLocked, currentWorkplace, workplaces]);
@@ -176,8 +188,14 @@ export default function AddInterviewModal({
     if (!stage) return;
 
     setLoading(true);
+    setError("");
     try {
       const selectedWorkplace = workplaces.find((w) => w.id === workplaceId);
+      // Dead-end #2.3: se a obra atual (string) não bate com nenhum workplaces.name (renomeada),
+      // usa o nome da própria string em vez de travar o Salvar num campo obrigatório vazio.
+      const finalWorkplaceName =
+        (selectedWorkplace?.name || null) ??
+        (isLocked && currentWorkplace ? currentWorkplace : null);
       const selectedInterviewer = interviewers.find((i) => i.id === interviewerId);
 
       let finalNotes = "";
@@ -194,7 +212,7 @@ export default function AddInterviewModal({
           candidate_id: candidateId,
           stage,
           interviewer_name: selectedInterviewer?.name || null,
-          workplace_name: selectedWorkplace?.name || null,
+          workplace_name: finalWorkplaceName,
           rejection_reason: rejectionReason || null,
           notes: finalNotes.trim() || null,
         },
@@ -205,7 +223,7 @@ export default function AddInterviewModal({
       onSuccess();
     } catch (err: any) {
       console.error("Error inserting interview:", err);
-      alert(err.message || "Ocorreu um erro ao salvar o registro.");
+      setError(err?.message || "Ocorreu um erro ao salvar o registro.");
     } finally {
       setLoading(false);
     }
@@ -217,8 +235,7 @@ export default function AddInterviewModal({
       workplaces.find((w) => w.id === workplaceId)?.name
         .trim()
         .toLowerCase() !== (currentWorkplace || "").trim().toLowerCase() &&
-      stage !== "Reprovado" &&
-      stage !== "Desistente"
+      !UNLOCK_STAGES.includes(stage)
   );
 
   return (
@@ -228,6 +245,12 @@ export default function AddInterviewModal({
           <DialogHeader>
             <DialogTitle>Adicionar Histórico / Entrevista</DialogTitle>
           </DialogHeader>
+
+          {error && (
+            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm mt-4">
+              {error}
+            </div>
+          )}
 
           {isLocked && (
             <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 p-3 rounded-md text-sm mt-4">
@@ -262,7 +285,7 @@ export default function AddInterviewModal({
                 <Select
                   value={workplaceId}
                   onValueChange={(val) => setWorkplaceId(val || "")}
-                  disabled={isLocked || loadingWorkplaces}
+                  disabled={(isLocked && !UNLOCK_STAGES.includes(stage)) || loadingWorkplaces}
                   required
                 >
                   <SelectTrigger>
@@ -276,6 +299,11 @@ export default function AddInterviewModal({
                     ))}
                   </SelectContent>
                 </Select>
+                {workplacesError && !loadingWorkplaces && (
+                  <p className="text-xs text-destructive">
+                    Falha ao carregar as obras. Verifique a conexão e tente novamente.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -307,7 +335,12 @@ export default function AddInterviewModal({
                 {!workplaceId && (
                   <p className="text-xs text-muted-foreground">Selecione a obra para ver os colaboradores disponíveis.</p>
                 )}
-                {workplaceId && interviewers.length === 0 && !loadingInterviewers && (
+                {interviewersError && !loadingInterviewers && (
+                  <p className="text-xs text-destructive">
+                    Falha ao carregar os colaboradores desta obra. Tente novamente.
+                  </p>
+                )}
+                {!interviewersError && workplaceId && interviewers.length === 0 && !loadingInterviewers && (
                   <p className="text-xs text-amber-600 dark:text-amber-400">
                     Nenhum colaborador com cargo de liderança (coordenador, administrativo de obras, analista técnico, mestre de obras) encontrado nesta obra.
                   </p>
@@ -429,7 +462,7 @@ export default function AddInterviewModal({
             </Button>
             <Button
               type="submit"
-              disabled={loading || !stage || !workplaceId || isTryingToChangeWorkplaceWhileLocked}
+              disabled={loading || !stage || (!isLocked && !workplaceId) || isTryingToChangeWorkplaceWhileLocked}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar
