@@ -94,8 +94,8 @@ export default function DashboardLayout({
         {/* Sidebar - fixed on desktop */}
         <Sidebar />
 
-        {/* Main Content Area */}
-        <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible print:block">
+        {/* Main Content Area - md:pl-64 compensa a sidebar fixed (C1) */}
+        <div className="flex flex-1 flex-col overflow-hidden md:pl-64 print:overflow-visible print:block">
           {/* Sticky Header */}
           <header className="print:hidden sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-6 backdrop-blur">
             {/* Breadcrumbs Placeholder */}

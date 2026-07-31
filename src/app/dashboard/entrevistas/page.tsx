@@ -525,6 +525,18 @@ export default function EntrevistasPage() {
     loadInterviews();
   }, []);
 
+  // B1: fecha modais com ESC (modais handrolled sem handler)
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setIsModalOpen(false);
+        setIsResumeModalOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const filtered = useMemo(() => {
     let result = interviews;
     if (selectedMonth) {

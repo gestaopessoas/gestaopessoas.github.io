@@ -52,6 +52,11 @@ export default function AddInterviewModal({
   onSuccess,
 }: AddInterviewModalProps) {
   const [loading, setLoading] = useState(false);
+  // M2: controla abertura dos popups de Etapa e Obra para que nunca fiquem
+  // abertos ao mesmo tempo (Base UI renderiza popups no body - ambos vazavam
+  // etapas e obras no mesmo [role=option]).
+  const [stageOpen, setStageOpen] = useState(false);
+  const [workplaceOpen, setWorkplaceOpen] = useState(false);
   const [stage, setStage] = useState("");
   const [interviewerId, setInterviewerId] = useState("");
   const [workplaceId, setWorkplaceId] = useState("");
@@ -262,7 +267,13 @@ export default function AddInterviewModal({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="stage">Etapa *</Label>
-              <Select value={stage} onValueChange={(val) => setStage(val || "")} required>
+              <Select
+                value={stage}
+                onValueChange={(val) => setStage(val || "")}
+                open={stageOpen}
+                onOpenChange={(open) => { setStageOpen(open); if (open) setWorkplaceOpen(false); }}
+                required
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a etapa" />
                 </SelectTrigger>
@@ -285,6 +296,8 @@ export default function AddInterviewModal({
                 <Select
                   value={workplaceId}
                   onValueChange={(val) => setWorkplaceId(val || "")}
+                  open={workplaceOpen}
+                  onOpenChange={(open) => { setWorkplaceOpen(open); if (open) setStageOpen(false); }}
                   disabled={(isLocked && !UNLOCK_STAGES.includes(stage)) || loadingWorkplaces}
                   required
                 >

@@ -14,7 +14,7 @@ export default function PontoPage() {
   useEffect(() => {
     async function fetchData() {
       // For now, fetch all. In a real app, HR sees all, user sees own.
-      const { data } = await supabase.from('time_logs').select('*, employees(name)').order('timestamp', { ascending: false }).limit(50);
+      const { data } = await supabase.from('time_logs').select('*, employees(name)').order('created_at', { ascending: false }).limit(50);
       setLogs(data || []);
       setLoading(false);
     }

@@ -34,7 +34,7 @@ export default function HoleritesPage() {
 
       // Fetch my payslips (from my folder)
       // First find my employee record
-      const { data: me } = await supabase.from('employees').select('id').eq('user_id', userData.user.id).single();
+      const { data: me } = await supabase.from('employees').select('id').eq('user_id', userData.user.id).maybeSingle();
       if (me) {
         const { data: files } = await supabase.storage.from('payslips').list(me.id);
         if (files) {

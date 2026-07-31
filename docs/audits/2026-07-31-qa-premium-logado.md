@@ -7,7 +7,7 @@
 
 ---
 
-## CRÍTICO — C1. Sidebar fixa cobre o conteúdo (todas as páginas)
+## CRÍTICO — C1. Sidebar fixa cobre o conteúdo (todas as páginas) ✅ RESOLVIDO
 
 **Arquivo:** `src/app/dashboard/layout.tsx:93-98`
 **Severidade:** Crítico
@@ -40,7 +40,7 @@
 
 ---
 
-## ALTO — A1. `time_logs`: query usa coluna inexistente `timestamp` → página Ponto quebra (400)
+## ALTO — A1. `time_logs`: query usa coluna inexistente `timestamp` → página Ponto quebra (400) ✅ RESOLVIDO
 
 **Arquivo:** `src/app/dashboard/ponto/page.tsx:17`
 **Severidade:** Alto
@@ -63,7 +63,7 @@ GET /rest/v1/time_logs?select=*&order=created_at.desc → 200  (created_at funci
 
 ---
 
-## ALTO — A2. Holerites: `.single()` sem linha → 406, página quebra
+## ALTO — A2. Holerites: `.single()` sem linha → 406, página quebra ✅ RESOLVIDO
 
 **Arquivo:** `src/app/dashboard/holerites/page.tsx:37`
 **Severidade:** Alto
@@ -87,7 +87,7 @@ GET /rest/v1/employees?select=id&user_id=eq.<uuid do usuario logado> → 406
 
 ---
 
-## ALTO — A3. `evaluation_cycles` e `goals` não existem → páginas Avaliações e Metas quebram (404)
+## ALTO — A3. `evaluation_cycles` e `goals` não existem → páginas Avaliações e Metas quebram (404) ✅ RESOLVIDO
 
 **Arquivos:** `src/app/dashboard/avaliacoes/page.tsx:20`, `src/app/dashboard/metas/page.tsx:18`
 **Severidade:** Alto
@@ -109,7 +109,7 @@ GET /rest/v1/goals → 404 "Could not find the table 'public.goals'"
 
 ---
 
-## MÉDIO — M1. StatsCards: "ASO Vencendo (30d)" mostra 264/264 (falso positivo)
+## MÉDIO — M1. StatsCards: "ASO Vencendo (30d)" mostra 264/264 (falso positivo) ✅ RESOLVIDO
 
 **Arquivo:** `src/app/dashboard/colaboradores/components/StatsCards.tsx:34-38`
 **Severidade:** Médio
@@ -132,7 +132,7 @@ Card renderizado: "ASO Vencendo (30d) | 264"
 
 ---
 
-## MÉDIO — M2. Dropdown de Obra na Central mistura etapas e obras
+## MÉDIO — M2. Dropdown de Obra na Central mistura etapas e obras ✅ RESOLVIDO
 
 **Arquivo:** `src/app/dashboard/central-candidato/components/AddInterviewModal.tsx`
 **Severidade:** Médio
@@ -154,7 +154,7 @@ Opções capturadas ao abrir Obra: ["Triagem","Entrevista RH","Entrevista Gestor
 
 ---
 
-## BAIXO — B1. Modal de edição de Entrevista não fecha com ESC
+## BAIXO — B1. Modal de edição de Entrevista não fecha com ESC ✅ RESOLVIDO
 
 **Arquivo:** `src/app/dashboard/entrevistas/page.tsx` (modais handrolled)
 **Severidade:** Baixo
@@ -173,7 +173,7 @@ Escape após abrir modal de edição → overlayVisible: 1 (não fechou)
 
 ---
 
-## SEGURANÇA — S1. Policies RLS `USING (true)` em tabelas sensíveis
+## SEGURANÇA — S1. Policies RLS `USING (true)` em tabelas sensíveis ✅ RESOLVIDO
 
 **Arquivo:** `supabase/migrations/20240101000000_init.sql:367-371`
 **Severidade:** Alto (segurança)

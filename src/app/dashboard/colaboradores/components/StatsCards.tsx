@@ -1,21 +1,8 @@
-"use client";
+﻿"use client";
 
 import { Users, Cake, Activity, AlertCircle, AlertTriangle } from "lucide-react";
+import { Employee, MONTHS } from "./types";
 import { differenceInDays, differenceInYears, isValid } from "date-fns";
-
-type Employee = Record<string, string | null | any> & {
-  id: string;
-  name: string;
-  status?: string | null;
-  birthday?: string | null;
-  admission_date?: string | null;
-  aso_date?: string | null;
-};
-
-const MONTHS = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-];
 
 interface StatsCardsProps {
   employees: Employee[];
@@ -39,17 +26,18 @@ export function StatsCards({ employees }: StatsCardsProps) {
       return isValid(adm) && differenceInYears(today, adm) >= 10;
     }).length,
     alerts: employees.filter((e) => {
-      if (!e.aso_date) return true;
+      // Sem aso_date = "não informado", não conta como vencendo (M1)
+      if (!e.aso_date) return false;
       const aso = new Date(e.aso_date + "T12:00:00");
-      return !isValid(aso) || differenceInDays(aso, today) <= 30;
+      return isValid(aso) && differenceInDays(aso, today) <= 30;
     }).length,
   };
 
   const cards = [
     { label: "Total", value: stats.total, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
     { label: "Ativos", value: stats.active, icon: Activity, color: "text-emerald-600", bg: "bg-emerald-100" },
-    { label: `Aniversariantes (${MONTHS[currentMonth]})`, value: stats.birthdays, icon: Cake, color: "text-amber-600", bg: "bg-amber-100" },
-    { label: "Experiência 10+ anos", value: stats.experience, icon: AlertTriangle, color: "text-purple-600", bg: "bg-purple-100" },
+    { label: "Aniversariantes (" + MONTHS[currentMonth] + ")", value: stats.birthdays, icon: Cake, color: "text-amber-600", bg: "bg-amber-100" },
+    { label: "Experiencia 10+ anos", value: stats.experience, icon: AlertTriangle, color: "text-purple-600", bg: "bg-purple-100" },
     { label: "ASO Vencendo (30d)", value: stats.alerts, icon: AlertCircle, color: "text-red-600", bg: "bg-red-100" },
   ];
 
@@ -62,7 +50,7 @@ export function StatsCards({ employees }: StatsCardsProps) {
               <p className="text-sm text-muted-foreground">{card.label}</p>
               <p className="text-2xl font-bold">{card.value}</p>
             </div>
-            <div className={`${card.bg} ${card.color} p-3 rounded-lg`}>
+            <div className={card.bg + " " + card.color + " p-3 rounded-lg"}>
               <card.icon className="w-5 h-5" />
             </div>
           </div>
