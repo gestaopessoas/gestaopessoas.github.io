@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2 } from "lucide-react";
 import {
@@ -54,7 +55,25 @@ export default function AddInterviewModal({
   const [interviewerId, setInterviewerId] = useState("");
   const [workplaceId, setWorkplaceId] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
+  
+  // New Evaluation Fields
+  const [technical, setTechnical] = useState("");
+  const [communication, setCommunication] = useState("");
+  const [culturalFit, setCulturalFit] = useState("");
+  const [strengths, setStrengths] = useState("");
+  const [weaknesses, setWeaknesses] = useState("");
+  const [candidateFuture, setCandidateFuture] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+
+  const futureOptions = [
+    "Aprovado para Banco de Talentos",
+    "Potencial para Liderança",
+    "Recomendado para Promoção Futura",
+    "Perfil Técnico Forte",
+    "Requer Treinamento Específico",
+    "Pode assumir cargo de confiança",
+    "Transferência entre Obras"
+  ];
 
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [interviewers, setInterviewers] = useState<Interviewer[]>([]);
@@ -95,10 +114,17 @@ export default function AddInterviewModal({
       try {
         // Roles that can conduct interviews in obras
         const interviewRoles = [
+          "coordenador de obras",
+          "mestre de obras",
+          "analista técnico",
+          "analista técnico(a) - obras",
+          "encarregado",
+          "supervisor(a) administrativo(a)",
+          "diretor operacional",
+          "gestor",
+          "gerente",
           "coordenador",
           "administrativo de obras",
-          "analista técnico",
-          "mestre de obras",
         ];
         const { data, error } = await supabase
           .from("employees")
@@ -134,6 +160,12 @@ export default function AddInterviewModal({
         setStage("");
         setInterviewerId("");
         setRejectionReason("");
+        setTechnical("");
+        setCommunication("");
+        setCulturalFit("");
+        setStrengths("");
+        setWeaknesses("");
+        setCandidateFuture([]);
         setNotes("");
       }
     }
@@ -148,6 +180,15 @@ export default function AddInterviewModal({
       const selectedWorkplace = workplaces.find((w) => w.id === workplaceId);
       const selectedInterviewer = interviewers.find((i) => i.id === interviewerId);
 
+      let finalNotes = "";
+      if (technical) finalNotes += `[Avaliação Técnica]\n${technical}\n\n`;
+      if (communication) finalNotes += `[Comunicação]\n${communication}\n\n`;
+      if (culturalFit) finalNotes += `[Fit Cultural]\n${culturalFit}\n\n`;
+      if (strengths) finalNotes += `[Pontos Fortes]\n${strengths}\n\n`;
+      if (weaknesses) finalNotes += `[Pontos a Desenvolver]\n${weaknesses}\n\n`;
+      if (candidateFuture.length > 0) finalNotes += `[Futuro do Candidato]\n${candidateFuture.join(", ")}\n\n`;
+      if (notes) finalNotes += `[Observações Gerais]\n${notes}\n\n`;
+
       const { error } = await supabase.from("candidate_interviews").insert([
         {
           candidate_id: candidateId,
@@ -155,7 +196,7 @@ export default function AddInterviewModal({
           interviewer_name: selectedInterviewer?.name || null,
           workplace_name: selectedWorkplace?.name || null,
           rejection_reason: rejectionReason || null,
-          notes: notes || null,
+          notes: finalNotes.trim() || null,
         },
       ]);
 
@@ -182,7 +223,7 @@ export default function AddInterviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Adicionar Histórico / Entrevista</DialogTitle>
@@ -286,14 +327,99 @@ export default function AddInterviewModal({
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Observações</Label>
-              <Textarea
-                id="notes"
-                placeholder="Anotações gerais da entrevista ou contato"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
+            <div className="space-y-4 pt-2 border-t mt-4">
+              <h4 className="text-sm font-semibold text-muted-foreground">Avaliação (Opcional)</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="technical">Avaliação Técnica</Label>
+                  <Textarea
+                    id="technical"
+                    placeholder="Conhecimentos técnicos, experiência..."
+                    value={technical}
+                    onChange={(e) => setTechnical(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="communication">Comunicação</Label>
+                  <Textarea
+                    id="communication"
+                    placeholder="Clareza, articulação, postura..."
+                    value={communication}
+                    onChange={(e) => setCommunication(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="culturalFit">Fit Cultural</Label>
+                  <Textarea
+                    id="culturalFit"
+                    placeholder="Alinhamento com os valores da empresa..."
+                    value={culturalFit}
+                    onChange={(e) => setCulturalFit(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="strengths">Pontos Fortes</Label>
+                  <Textarea
+                    id="strengths"
+                    placeholder="Principais qualidades do candidato..."
+                    value={strengths}
+                    onChange={(e) => setStrengths(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="weaknesses">Pontos a Desenvolver</Label>
+                  <Textarea
+                    id="weaknesses"
+                    placeholder="Pontos de melhoria, atenção..."
+                    value={weaknesses}
+                    onChange={(e) => setWeaknesses(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <Label>Futuro do Candidato</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border p-3 rounded-md bg-muted/20">
+                  {futureOptions.map((option) => (
+                    <div key={option} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`future-${option}`}
+                        checked={candidateFuture.includes(option)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setCandidateFuture([...candidateFuture, option]);
+                          } else {
+                            setCandidateFuture(candidateFuture.filter((item) => item !== option));
+                          }
+                        }}
+                      />
+                      <Label
+                        htmlFor={`future-${option}`}
+                        className="text-sm font-normal cursor-pointer leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <Label htmlFor="notes">Observações Gerais</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Anotações gerais da entrevista ou contato"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="min-h-[100px]"
+                />
+              </div>
             </div>
           </div>
 

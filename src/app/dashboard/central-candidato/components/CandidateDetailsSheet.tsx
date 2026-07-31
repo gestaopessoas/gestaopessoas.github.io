@@ -171,7 +171,7 @@ export default function CandidateDetailsSheet({
                               <strong>Obra:</strong> {interview.workplace_name || "N/A"}
                             </div>
                             {interview.notes && (
-                              <p className="text-sm text-muted-foreground bg-muted/20 p-2 rounded mb-2">
+                              <p className="text-sm text-muted-foreground bg-muted/20 p-2 rounded mb-2 whitespace-pre-wrap">
                                 {interview.notes}
                               </p>
                             )}
