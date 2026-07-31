@@ -11,6 +11,7 @@ import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { RelatedRecords } from "./components/RelatedRecords";
 import { Section, Field, Select } from "./components/FormHelpers";
+import { StatsCards } from "./components/StatsCards";
 
 type Department = { id: string; name: string };
 type Entity = { id: string; name: string; trading_name?: string | null; tax_rate_clt?: number; tax_rate_prolabore?: number; };
@@ -325,6 +326,9 @@ export default function ColaboradoresPage() {
         </div>
         <Button onClick={startNew}><Plus className="mr-2 h-4 w-4" />Novo colaborador</Button>
       </header>
+
+      {/* Stats */}
+      <StatsCards employees={employees} />
 
       {/* Tabs */}
       <div className="flex w-full flex-wrap gap-2 rounded-md bg-muted p-1 sm:w-fit">

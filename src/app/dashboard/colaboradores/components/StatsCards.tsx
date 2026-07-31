@@ -1,8 +1,16 @@
 "use client";
 
 import { Users, Cake, Activity, AlertCircle, AlertTriangle } from "lucide-react";
-import { Employee } from "../page";
 import { differenceInDays, differenceInYears, isValid } from "date-fns";
+
+type Employee = Record<string, string | null | any> & {
+  id: string;
+  name: string;
+  status?: string | null;
+  birthday?: string | null;
+  admission_date?: string | null;
+  aso_date?: string | null;
+};
 
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -11,10 +19,9 @@ const MONTHS = [
 
 interface StatsCardsProps {
   employees: Employee[];
-  activeTab: string;
 }
 
-export function StatsCards({ employees, activeTab }: StatsCardsProps) {
+export function StatsCards({ employees }: StatsCardsProps) {
   const today = new Date();
   const currentMonth = today.getMonth();
 
