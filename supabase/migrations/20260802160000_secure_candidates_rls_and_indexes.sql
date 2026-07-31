@@ -25,6 +25,8 @@ CREATE POLICY "candidates_update_hr_or_owner"
 -- ---------- candidate_educations / candidate_experiences ----------
 DROP POLICY IF EXISTS "Authenticated users can select educations" ON public.candidate_educations;
 DROP POLICY IF EXISTS "Authenticated users can select experiences" ON public.candidate_experiences;
+DROP POLICY IF EXISTS "candidate_educations_select" ON public.candidate_educations;
+DROP POLICY IF EXISTS "candidate_experiences_select" ON public.candidate_experiences;
 
 CREATE POLICY "candidate_educations_select"
   ON public.candidate_educations FOR SELECT TO authenticated
