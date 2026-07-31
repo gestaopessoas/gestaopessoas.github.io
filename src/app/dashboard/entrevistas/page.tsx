@@ -85,17 +85,24 @@ const defaultAssessment: Assessment = {
   selection_stage: "",
 };
 
+// gemini-1.5-flash foi descontinuado na API; 2.5-flash e estavel.
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
 async function generateTestText(testName: string, classification: string): Promise<string> {
   const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
   const prompt = `Escreva um parágrafo curto e profissional de parecer psicológico para um candidato de emprego. O teste realizado foi '${testName}' e o resultado obtido foi '${classification}'. Não invente características adicionais, apenas explique o que esse resultado significa nesse teste específico em 2 a 3 linhas de forma objetiva.`;
 
   if (apiKey) {
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
+      if (!res.ok) {
+        console.error("Gemini error:", res.status, await res.text());
+        return "";
+      }
       const data = await res.json();
       if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
         return data.candidates[0].content.parts[0].text;
@@ -467,15 +474,19 @@ export default function EntrevistasPage() {
     if (apiKey && combinedResults.trim() !== "") {
       const prompt = `O candidato de ${assessmentForm.age || 'idade não informada'} anos, escolaridade ${assessmentForm.education || 'não informada'}, realizou os seguintes testes psicológicos:\n${combinedResults}\nEscreva um parecer psicológico consolidado e profissional, em um parágrafo objetivo, explicando as características do candidato com base nessas classificações. O parecer deve focar estritamente nas classificações (inferior, médio, superior, etc) e no que elas significam.`;
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
-        const data = await res.json();
-        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-          const text = data.candidates[0].content.parts[0].text;
-          setAssessmentForm({ ...assessmentForm, tests_details: "RESULTADOS DA AVALIAÇÃO:\n" + combinedResults + "\nPARECER INTEGRADO DA IA:\n" + text });
+        if (!res.ok) {
+          setAssessmentForm({ ...assessmentForm, tests_details: "Erro ao comunicar com IA. Resultados brutos:\n" + combinedResults });
+        } else {
+          const data = await res.json();
+          if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+            const text = data.candidates[0].content.parts[0].text;
+            setAssessmentForm({ ...assessmentForm, tests_details: "RESULTADOS DA AVALIAÇÃO:\n" + combinedResults + "\nPARECER INTEGRADO DA IA:\n" + text });
+          }
         }
       } catch (e) {
         setAssessmentForm({ ...assessmentForm, tests_details: "Erro ao comunicar com IA. Resultados brutos:\n" + combinedResults });
@@ -799,17 +810,24 @@ Currículo:
 ${resumeText}`;
 
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("Gemini analyzeResume error:", res.status, errText);
+        alert(`Erro ao analisar currículo (${res.status}). Verifique a chave do Gemini ou tente novamente.`);
+        setIsAnalyzingResume(false);
+        return;
+      }
       const data = await res.json();
       if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
         let text = data.candidates[0].content.parts[0].text;
         text = text.replace(/```json/g, "").replace(/```/g, "").trim();
         const parsed = JSON.parse(text);
-        
+
         openNewModal();
         setForm(prev => ({
           ...prev,

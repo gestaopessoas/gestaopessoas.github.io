@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award, Package, CheckSquare, CircleDollarSign, FileOutput, Contact } from "lucide-react"
 import { usePermissions } from "@/hooks/usePermissions"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { createClient } from "@/utils/supabase/client"
 
 const sidebarGroups = [
@@ -75,11 +76,12 @@ const sidebarGroups = [
       { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings, module: "configuracoes" },
     ]
   }
-];
+]
 
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const isMobile = useMediaQuery("(max-width: 767px)")
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {}
@@ -89,42 +91,63 @@ export function Sidebar() {
       return {}
     }
   })
-  const { loading, can } = usePermissions()
+  const [loading, setLoading] = useState(true)
+  const { can } = usePermissions()
+
+  // Auto-collapse on mobile (audit design 2026-08-01 §0)
+  useEffect(() => {
+    setIsCollapsed(isMobile)
+  }, [isMobile])
 
   useEffect(() => {
-    localStorage.setItem("sidebar-collapsed-groups", JSON.stringify(collapsedGroups))
-  }, [collapsedGroups])
+    if (typeof window === "undefined") return
+    const saved = localStorage.getItem("sidebar-collapsed")
+    if (saved !== null) {
+      setIsCollapsed(JSON.parse(saved))
+    }
+    setLoading(false)
+  }, [])
 
-  const toggleGroup = (name: string) =>
-    setCollapsedGroups((prev) => ({ ...prev, [name]: !prev[name] }))
+  useEffect(() => {
+    localStorage.setItem("sidebar-collapsed", JSON.stringify(isCollapsed))
+  }, [isCollapsed])
+
+  const toggleGroup = (groupName: string) => {
+    setCollapsedGroups((prev) => {
+      const next = { ...prev, [groupName]: !prev[groupName] }
+      localStorage.setItem("sidebar-collapsed-groups", JSON.stringify(next))
+      return next
+    })
+  }
 
   const handleSignOut = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.push("/login")
+    router.replace("/login")
   }
 
   return (
-    <aside 
+    <aside
       className={cn(
-        "h-screen border-r border-border/50 bg-background/60 backdrop-blur-xl flex flex-col transition-all duration-300 relative z-20 shrink-0 print:hidden",
+        "fixed left-0 top-0 z-40 h-screen flex flex-col transition-all duration-300 bg-sidebar border-r border-sidebar-border",
         isCollapsed ? "w-[72px]" : "w-64"
       )}
+      data-collapsed={isCollapsed}
     >
-      <div className={cn("h-16 flex items-center border-b border-border/50 shrink-0 transition-all duration-300", isCollapsed ? "justify-center px-0" : "px-6")}>
-        <span className="text-lg font-bold tracking-tight text-foreground flex items-center whitespace-nowrap overflow-hidden">
+      <div className="flex h-16 shrink-0 items-center justify-between px-4 border-b border-sidebar-border">
+        <div className="flex items-center gap-2">
           <span className="text-primary mr-1">//</span>
           <span className={cn("transition-opacity duration-300", isCollapsed ? "opacity-0 w-0" : "opacity-100")}>
             Gente & Gestão
           </span>
-        </span>
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-6 scrollbar-hide">
         {sidebarGroups.map((group, groupIdx) => {
           const groupVisibleItems = group.items.filter((item) => loading || !item.module || can(item.module, "view"))
-          
-          if (groupVisibleItems.length === 0) return null;
+
+          if (groupVisibleItems.length === 0) return null
 
           const isGroupCollapsed = !isCollapsed && !!collapsedGroups[group.name]
 
@@ -145,7 +168,7 @@ export function Sidebar() {
                 </button>
               )}
               {isCollapsed && groupIdx > 0 && <div className="h-px bg-border/50 mx-4 my-4" />}
-              
+
               {!isGroupCollapsed && groupVisibleItems.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
                 return (
@@ -180,7 +203,6 @@ export function Sidebar() {
       </nav>
 
       <div className="p-3 border-t border-border/50 shrink-0 space-y-1 relative">
-        {/* Floating Collapse Toggle */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="absolute -right-3 top-1/2 -translate-y-1/2 bg-background border border-border/50 rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 shadow-sm transition-all duration-200 z-50"
