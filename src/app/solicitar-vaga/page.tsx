@@ -31,6 +31,8 @@ type SalaryRow = {
 };
 
 type Department = { id: string; name: string };
+type Workplace = { id: string; name: string; type: string };
+type Employee = { id: string; name: string; role: string };
 
 const behavioralTags = [
   "Adaptabilidade", "Aprendizado técnico", "Autonomia", "Comprometimento",
@@ -88,6 +90,8 @@ const initialForm = {
 export default function SolicitarVagaPage() {
   const [profiles, setProfiles] = useState<JobProfile[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
+  const [requesters, setRequesters] = useState<Employee[]>([]);
   const [salaryTable, setSalaryTable] = useState<SalaryRow[]>([]);
   const [workSchedules, setWorkSchedules] = useState<string[]>([]);
   const [companyBenefits, setCompanyBenefits] = useState<{name: string}[]>([]);
@@ -120,12 +124,14 @@ export default function SolicitarVagaPage() {
         }
         
         // Fallback ONLY if the RPC fails for other reasons (e.g. it doesn't exist yet)
-        const [profilesResult, departmentsResult, salaryResult, settingsResult, benefitsResult] = await Promise.all([
+        const [profilesResult, departmentsResult, salaryResult, settingsResult, benefitsResult, workplacesResult, employeesResult] = await Promise.all([
           supabase.from("job_profiles").select("id, profile_code, title, min_education, desired_education, min_experience, desired_experience, cnh, knowledge, competencies").order("title"),
           supabase.from("departments").select("id, name").order("name"),
           supabase.from("salary_table").select("*").order("role_name"),
           supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle(),
           supabase.from("company_benefits").select("name").order("name"),
+          supabase.from("workplaces").select("id, name, type").order("name"),
+          supabase.from("employees").select("id, name, role").eq("status", "Ativo").or("role.ilike.%coordenador%,role.ilike.%diretor%,role.ilike.%analista%").order("name"),
         ]);
 
         if (profilesResult.error || departmentsResult.error) {
@@ -138,6 +144,8 @@ export default function SolicitarVagaPage() {
         setDepartments((departmentsResult.data ?? []) as Department[]);
         setSalaryTable((salaryResult.data ?? []) as SalaryRow[]);
         setCompanyBenefits((benefitsResult.data ?? []) as {name: string}[]);
+        setWorkplaces((workplacesResult.data ?? []) as Workplace[]);
+        setRequesters((employeesResult.data ?? []) as Employee[]);
         if (settingsResult.data) {
           setWorkSchedules(settingsResult.data.value || []);
         }
@@ -147,6 +155,9 @@ export default function SolicitarVagaPage() {
 
       setProfiles((data?.profiles ?? []) as JobProfile[]);
       setDepartments((data?.departments ?? []) as Department[]);
+      setWorkplaces((data?.workplaces ?? []) as Workplace[]);
+      setRequesters((data?.employees ?? []) as Employee[]);
+      setCompanyBenefits((data?.benefits ?? []) as {name: string}[]);
       
       const [salaryResult, settingsResult] = await Promise.all([
         supabase.from("salary_table").select("*").order("role_name"),
@@ -198,7 +209,7 @@ export default function SolicitarVagaPage() {
     
     const suggestedTags = profile?.competencies 
       ? behavioralTags.filter(tag => 
-          profile.competencies!.toLowerCase().includes(tag.toLowerCase()) || 
+          profile.competencies!.toLowerCase().includes(tag.toLowerCase()) ||
           profile.competencies!.toLowerCase().includes(tag.split(' ')[0].toLowerCase())
         )
       : [];
@@ -302,7 +313,10 @@ export default function SolicitarVagaPage() {
       salary_min: form.salary_min ? Number(form.salary_min) : null,
       salary_max: form.salary_max ? Number(form.salary_max) : null,
       target_date: form.target_date || null,
-      behavioral_tags: expandedBehavioralTags
+      behavioral_tags: expandedBehavioralTags,
+      level_min: selectedLevelMin || null,
+      level_max: selectedLevelMax || null,
+      seniority: selectedSeniority || null,
     };
 
     const { error } = await supabase.rpc("submit_job_request", {
@@ -397,8 +411,22 @@ export default function SolicitarVagaPage() {
         <section className="rounded-lg border bg-card p-5">
           <h2 className="mb-4 text-lg font-semibold">Solicitante</h2>
           <div className="grid gap-4 md:grid-cols-3">
-            <Field label="Nome *"><Input required value={form.requester_name} onChange={(event) => set("requester_name", event.target.value)} /></Field>
-            <Field label="Área"><Input value={form.requester_area} onChange={(event) => set("requester_area", event.target.value)} /></Field>
+            <Field label="Nome *">
+              <select required value={form.requester_name} onChange={(event) => set("requester_name", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <option value="">Selecione o solicitante...</option>
+                {requesters.map((r) => (
+                  <option key={r.id} value={r.name}>{r.name} — {r.role}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Área">
+              <select value={form.requester_area} onChange={(event) => set("requester_area", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <option value="">Selecione a área...</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
+                ))}
+              </select>
+            </Field>
             <Field label="WhatsApp *">
               <div className="flex gap-2">
                 <Input required type="tel" value={form.requester_phone} onChange={(event) => set("requester_phone", event.target.value)} placeholder="(47) 99999-9999" />
@@ -427,7 +455,14 @@ export default function SolicitarVagaPage() {
                   {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                 </select>
               </Field>
-              <Field label="Unidade"><Input value={form.unit} onChange={(event) => handleUnitChange(event.target.value)} placeholder="Sede, obra..." /></Field>
+              <Field label="Unidade">
+                <select value={form.unit} onChange={(event) => handleUnitChange(event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                  <option value="">Selecione a unidade...</option>
+                  {workplaces.map((w) => (
+                    <option key={w.id} value={w.name}>{w.name} ({w.type})</option>
+                  ))}
+                </select>
+              </Field>
               <Field label="Quantidade"><Input type="number" min="1" value={form.quantity} onChange={(event) => set("quantity", event.target.value)} /></Field>
               <Field label="Contrato *">
                 <select value={form.contract_type} onChange={(event) => set("contract_type", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
@@ -446,30 +481,24 @@ export default function SolicitarVagaPage() {
               </Field>
               <Field label="Data limite"><Input type="date" value={form.target_date} onChange={(event) => set("target_date", event.target.value)} /></Field>
               
-              {availableLevels.length > 0 && (
-                <>
-                  <Field label="Nível mínimo *">
-                    <select required value={selectedLevelMin} onChange={(e) => setSelectedLevelMin(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                      <option value="">Selecione...</option>
-                      {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Nível máximo">
-                    <select value={selectedLevelMax} onChange={(e) => setSelectedLevelMax(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                      <option value="">Selecione (Opcional)...</option>
-                      {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
-                    </select>
-                  </Field>
-                </>
-              )}
-              {availableSeniorities.length > 0 && (
-                <Field label="Senioridade *">
-                  <select required value={selectedSeniority} onChange={(e) => setSelectedSeniority(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                    <option value="">Selecione a senioridade...</option>
-                    {availableSeniorities.map(sen => <option key={sen} value={sen}>{sen}</option>)}
-                  </select>
-                </Field>
-              )}
+              <Field label="Nível mínimo">
+                <select value={selectedLevelMin} onChange={(e) => setSelectedLevelMin(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                  <option value="">{availableLevels.length > 0 ? "Selecione..." : "Selecione um cargo primeiro"}</option>
+                  {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                </select>
+              </Field>
+              <Field label="Nível máximo">
+                <select value={selectedLevelMax} onChange={(e) => setSelectedLevelMax(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                  <option value="">{availableLevels.length > 0 ? "Selecione (Opcional)..." : "Selecione um cargo primeiro"}</option>
+                  {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                </select>
+              </Field>
+              <Field label="Senioridade">
+                <select value={selectedSeniority} onChange={(e) => setSelectedSeniority(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                  <option value="">{availableSeniorities.length > 0 ? "Selecione..." : "Selecione um cargo primeiro"}</option>
+                  {availableSeniorities.map(sen => <option key={sen} value={sen}>{sen}</option>)}
+                </select>
+              </Field>
             </div>
           )}
         </section>
