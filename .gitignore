@@ -55,3 +55,6 @@ next-env.d.ts
 # temp test scripts
 test-*.mjs
 verify-permissions.mjs
+
+# stray files
+/types.ts

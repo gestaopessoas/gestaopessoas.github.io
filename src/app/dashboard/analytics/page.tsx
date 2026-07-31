@@ -6,7 +6,7 @@ import { countBy } from "@/lib/metrics";
 import { BarChart3, Briefcase, Clock, TrendingUp, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-type Employee = { id: string; status: string | null; unit: string | null; cost_center: string | null };
+type Employee = { id: string; status: string | null; workplaces: { name: string }[]; cost_centers: { name: string }[] };
 type JobRequest = { id: string; status: string | null; urgency: string | null; created_at: string | null };
 type Candidate = { id: string; created_at: string | null; role_interest: string | null };
 type Application = { id: string; status: string | null; created_at: string | null };
@@ -27,7 +27,7 @@ export default function AnalyticsPage() {
     const load = async () => {
       const supabase = createClient();
       const [employeeResult, requestResult, candidateResult, applicationResult, openingResult] = await Promise.all([
-        supabase.from("employees").select("id,status,unit,cost_center").limit(10000),
+        supabase.from("employees").select("id,status,workplaces(name),cost_centers(name)").limit(10000),
         supabase.from("job_requests").select("id,status,urgency,created_at").limit(10000),
         supabase.from("candidates").select("id,created_at,role_interest").limit(10000),
         supabase.from("job_applications").select("id,status,created_at").limit(10000),
@@ -57,8 +57,8 @@ export default function AnalyticsPage() {
   }, []);
 
   const metrics = useMemo(() => {
-    const activeEmployees = employees.filter((item) => (item.status ?? "Ativo") === "Ativo").length;
-    const openRequests = requests.filter((item) => !["Aprovada", "Recusada", "Cancelada", "Fechada"].includes(item.status ?? "")).length;
+    const activeEmployees = employees.filter((item) => ["Ativo", "Férias", "Afastado"].includes(item.status ?? "")).length;
+    const openRequests = requests.filter((item) => !["Aprovada", "Recusada", "Cancelada", "Fechada", "Arquivada"].includes(item.status ?? "")).length;
     const hired = applications.filter((item) => item.status === "Contratado").length;
     const conversion = applications.length ? Math.round((hired / applications.length) * 100) : 0;
 
@@ -75,8 +75,8 @@ export default function AnalyticsPage() {
   const requestStatus = countBy(requests.map((item) => item.status || "Sem status"));
   const applicationStatus = countBy(applications.map((item) => item.status || "Sem status"));
   
-  const activeForUnits = employees.filter((item) => item.status !== "Inativo" && item.status !== "Desligado");
-  const units = countBy(activeForUnits.map((item) => item.unit || item.cost_center || "Sem alocação"));
+  const activeForUnits = employees.filter((item) => !["Inativo", "Desligado", "Arquivo Morto", "inactive"].includes(item.status ?? ""));
+  const units = countBy(activeForUnits.map((item) => item.workplaces?.[0]?.name || item.cost_centers?.[0]?.name || "Sem alocação"));
 
   return (
     <div className="flex h-full flex-col bg-background">

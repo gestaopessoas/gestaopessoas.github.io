@@ -22,12 +22,12 @@ export default function DashboardPage() {
       const supabase = createClient();
       
       const [empRes, jobsRes] = await Promise.all([
-        supabase.from("employees").select("id, status, birthday, admission_date").limit(500),
-        supabase.from("jobs").select("id, status").eq("status", "Aberta")
+        supabase.from("employees").select("id, status, birthday, admission_date").range(0, 9999),
+        supabase.from("job_requests").select("id", { count: "exact", head: true }).neq("status", "Recusada").neq("status", "Arquivada")
       ]);
 
       const employees = empRes.data || [];
-      const activeEmployees = employees.filter(e => e.status !== "Desligado" && e.status !== "Arquivo Morto");
+      const activeEmployees = employees.filter(e => e.status !== "Desligado" && e.status !== "Arquivo Morto" && e.status !== "inactive");
       
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
@@ -71,7 +71,7 @@ export default function DashboardPage() {
 
       setMetrics({
         headcount: activeEmployees.length,
-        openJobs: jobsRes.data?.length || 0,
+        openJobs: jobsRes.count || 0,
         birthdays: birthdaysThisMonth,
         probation: inProbation
       });
