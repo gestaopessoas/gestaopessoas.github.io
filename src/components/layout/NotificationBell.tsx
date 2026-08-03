@@ -61,9 +61,10 @@ export function NotificationBell() {
       ]);
 
       if (!empError && empData) {
+        const ignoredIds = (igs || []).map(i => (i as { employee_id: string }).employee_id);
         setPendingProfiles(generatePendingProfileNotifications(empData as any[], userPrefs));
         setTrialNotifications(generateTrialNotifications(empData as any[], userPrefs));
-        setBenefitNotifications(generateBenefitNotifications(empData as any[], bens as any[] || [], userPrefs));
+        setBenefitNotifications(generateBenefitNotifications(empData as any[], (bens || []) as any[], userPrefs, ignoredIds));
       }
 
       if (!rgsError && rgsData) {

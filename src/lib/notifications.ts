@@ -152,19 +152,44 @@ export function generateRgsNotifications(
 export function generateBenefitNotifications(
   employees: EmployeeData[],
   benefits: BenefitData[],
-  prefs: UserPreferences
+  prefs: UserPreferences,
+  ignoredIds: string[] = [],
+  today: Date = new Date()
 ): BenefitNotification[] {
   if (!prefs.benefits) return [];
   const list: BenefitNotification[] = [];
-  
+
+  const hasBenefitType = (empId: string, needle: string) =>
+    benefits.some(b => b.employee_id === empId && (b.benefit_name || "").toLowerCase().includes(needle));
+
   for (const emp of employees) {
+    // INCLUSAO: ativo/férias/afastado, >90 dias, sem saude/odonto/farmacia, não ignorado
+    if (["Ativo", "Férias", "Afastado"].includes(emp.status)) {
+      if (ignoredIds.includes(emp.id)) continue;
+      if (!emp.admission_date) continue;
+      const admission = parseISO(emp.admission_date);
+      if (!isValid(admission)) continue;
+      if (differenceInDays(today, admission) <= 90) continue;
+
+      const hasSaude = hasBenefitType(emp.id, "saúde") || hasBenefitType(emp.id, "saude");
+      const hasOdonto = hasBenefitType(emp.id, "odonto");
+      const hasFarmacia = hasBenefitType(emp.id, "farmácia") || hasBenefitType(emp.id, "farmacia");
+
+      if (!hasSaude || !hasOdonto || !hasFarmacia) {
+        list.push({ id: emp.id, name: emp.name, type: "INCLUSAO" });
+      }
+      continue;
+    }
+
+    // CORTE: desligado com benefício ativo, não ignorado
     if (emp.status === "Desligado") {
+      if (ignoredIds.includes(emp.id)) continue;
       const hasBenefits = benefits.some(b => b.employee_id === emp.id);
       if (hasBenefits) {
         list.push({ id: emp.id, name: emp.name, type: "CORTE" });
       }
     }
   }
-  
+
   return list;
 }
