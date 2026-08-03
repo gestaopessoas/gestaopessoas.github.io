@@ -100,6 +100,9 @@ export default function NovaVagaPage() {
   const [selectedLevelMax, setSelectedLevelMax] = useState("");
   const [selectedSeniority, setSelectedSeniority] = useState("");
 
+  const [requesterName, setRequesterName] = useState("");
+  const [requesterContact, setRequesterContact] = useState("");
+
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -135,6 +138,26 @@ export default function NovaVagaPage() {
       if (settingsResult.data) {
         setWorkSchedules(settingsResult.data.value || []);
       }
+
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData.user) {
+        const userEmail = authData.user.email || "";
+        let name = "RH (Via Dashboard)";
+        let contact = userEmail;
+
+        const { data: prof } = await supabase.from('profiles').select('name').eq('id', authData.user.id).maybeSingle();
+        if (prof?.name) name = prof.name;
+        
+        const { data: emp } = await supabase.from('employees').select('name, email, phone').eq('email', userEmail).maybeSingle();
+        if (emp) {
+          if (emp.name) name = emp.name;
+          if (emp.phone) contact = `${userEmail} ${emp.phone ? `(${emp.phone})` : ""}`.trim();
+        }
+
+        setRequesterName(name);
+        setRequesterContact(contact);
+      }
+
       setLoading(false);
     };
 
@@ -284,9 +307,9 @@ export default function NovaVagaPage() {
       const { error: requestError } = await supabase
         .from("job_requests")
         .insert({
-          requester_name: "RH (Via Dashboard)",
+          requester_name: requesterName || "RH (Via Dashboard)",
           requester_area: "Recursos Humanos",
-          requester_phone: "-",
+          requester_phone: requesterContact || "-",
           profile_id: form.profile_id || null,
           department_id: form.department_id || null,
           position_title: form.position_title,
@@ -386,6 +409,12 @@ export default function NovaVagaPage() {
           <h2 className="mb-4 text-lg font-semibold">Vaga</h2>
           {loading ? <p className="text-muted-foreground">Carregando dados...</p> : (
             <div className="grid gap-4 md:grid-cols-3">
+              <Field label="Solicitante (Responsável)">
+                <Input value={requesterName || "Carregando..."} disabled readOnly className="bg-muted text-muted-foreground cursor-not-allowed" />
+              </Field>
+              <Field label="Contato do Solicitante" className="md:col-span-2">
+                <Input value={requesterContact || "Carregando..."} disabled readOnly className="bg-muted text-muted-foreground cursor-not-allowed" />
+              </Field>
               <Field label="Cargo do perfil de competência *" className="md:col-span-3">
                 <select required value={form.profile_id} onChange={(event) => handleProfileChange(event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   <option value="">Selecione...</option>
@@ -425,31 +454,47 @@ export default function NovaVagaPage() {
               </Field>
               <Field label="Data limite"><Input type="date" value={form.target_date} onChange={(event) => set("target_date", event.target.value)} /></Field>
               
-              {availableLevels.length > 0 && (
-                <>
-                  <Field label="Nível mínimo *">
-                    <select required value={selectedLevelMin} onChange={(e) => setSelectedLevelMin(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                      <option value="">Selecione...</option>
-                      {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Nível máximo">
-                    <select value={selectedLevelMax} onChange={(e) => setSelectedLevelMax(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                      <option value="">Selecione (Opcional)...</option>
-                      {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
-                    </select>
-                  </Field>
-                </>
-              )}
-              
-              {availableSeniorities.length > 0 && (
-                <Field label="Senioridade *">
-                  <select required value={selectedSeniority} onChange={(e) => setSelectedSeniority(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                    <option value="">Selecione a senioridade...</option>
-                    {availableSeniorities.map(sen => <option key={sen} value={sen}>{sen}</option>)}
-                  </select>
-                </Field>
-              )}
+              <Field label="Nível mínimo">
+                <select 
+                  required={availableLevels.length > 0} 
+                  value={selectedLevelMin} 
+                  onChange={(e) => setSelectedLevelMin(e.target.value)} 
+                  disabled={!form.profile_id || availableLevels.length === 0}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">
+                    {!form.profile_id ? "Selecione o perfil acima para liberar..." : availableLevels.length === 0 ? "Sem níveis no perfil de competência" : "Selecione..."}
+                  </option>
+                  {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                </select>
+              </Field>
+              <Field label="Nível máximo">
+                <select 
+                  value={selectedLevelMax} 
+                  onChange={(e) => setSelectedLevelMax(e.target.value)} 
+                  disabled={!form.profile_id || availableLevels.length === 0}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">
+                    {!form.profile_id ? "Selecione o perfil acima para liberar..." : availableLevels.length === 0 ? "Sem níveis no perfil de competência" : "Selecione (Opcional)..."}
+                  </option>
+                  {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                </select>
+              </Field>
+              <Field label="Senioridade">
+                <select 
+                  required={availableSeniorities.length > 0} 
+                  value={selectedSeniority} 
+                  onChange={(e) => setSelectedSeniority(e.target.value)} 
+                  disabled={!form.profile_id || availableSeniorities.length === 0}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">
+                    {!form.profile_id ? "Selecione o perfil acima para liberar..." : availableSeniorities.length === 0 ? "Sem senioridades no perfil" : "Selecione a senioridade..."}
+                  </option>
+                  {availableSeniorities.map(sen => <option key={sen} value={sen}>{sen}</option>)}
+                </select>
+              </Field>
             </div>
           )}
         </section>

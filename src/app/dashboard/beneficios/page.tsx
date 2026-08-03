@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { differenceInDays, format } from "date-fns";
+import { hasBenefitKind } from "@/lib/benefitClassification";
 import { Download, Utensils, CreditCard, HeartPulse, UserMinus, EyeOff, CheckCircle2 } from "lucide-react";
 
 type Employee = { id: string; name: string; status: string; admission_date: string; cost_center?: string; department?: string };
@@ -83,9 +84,9 @@ export default function BeneficiosPage() {
     const days = differenceInDays(new Date(), new Date(emp.admission_date));
     if (days <= 90) return false;
     
-    const hasSaude = benefits.some(b => b.employee_id === emp.id && b.benefit_type.toLowerCase().includes('saúde') || b.benefit_type.toLowerCase().includes('saude'));
-    const hasOdonto = benefits.some(b => b.employee_id === emp.id && b.benefit_type.toLowerCase().includes('odonto'));
-    const hasFarmacia = benefits.some(b => b.employee_id === emp.id && b.benefit_type.toLowerCase().includes('farmácia') || b.benefit_type.toLowerCase().includes('farmacia'));
+    const hasSaude = hasBenefitKind(benefits, emp.id, "saude");
+    const hasOdonto = hasBenefitKind(benefits, emp.id, "odonto");
+    const hasFarmacia = hasBenefitKind(benefits, emp.id, "farmacia");
     
     return !hasSaude || !hasOdonto || !hasFarmacia; // Must lack at least one to show up as "needs inclusion"
   });

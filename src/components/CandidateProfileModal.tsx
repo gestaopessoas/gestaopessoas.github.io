@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
-import { X, Briefcase, MapPin, Mail, Phone, Calendar } from "lucide-react";
+import { X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2 } from "lucide-react";
 
 type BigFiveResult = {
   id: string;
@@ -25,9 +25,23 @@ export function CandidateProfileModal({ candidateId, employeeId, onClose }: Cand
   const [person, setPerson] = useState<any>(null);
   const [results, setResults] = useState<BigFiveResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openingResume, setOpeningResume] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
+
+  const openResume = async () => {
+    if (!person?.resume_url) return;
+    setOpeningResume(true);
+    const supabase = createClient();
+    const { data, error } = await supabase.storage.from("resumes").createSignedUrl(person.resume_url, 60);
+    setOpeningResume(false);
+    if (error || !data) {
+      alert("Não foi possível abrir o currículo. Tente novamente.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank");
+  };
 
   // Fecha com ESC (padrão §A1.3, mesmo handler de entrevistas/page.tsx)
   useEffect(() => {
@@ -133,6 +147,12 @@ export function CandidateProfileModal({ candidateId, employeeId, onClose }: Cand
                       <div className="flex items-center gap-2"><Phone className="h-4 w-4" /> {person.phone}</div>
                     )}
                   </div>
+                  {person.resume_url && (
+                    <Button variant="outline" size="sm" className="mt-3 w-full" onClick={openResume} disabled={openingResume}>
+                      {openingResume ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Paperclip className="h-4 w-4 mr-2" />}
+                      Ver Currículo
+                    </Button>
+                  )}
                 </div>
 
                 <div className="space-y-3">

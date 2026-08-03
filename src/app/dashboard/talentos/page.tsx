@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, MapPin, Search, Sparkles } from "lucide-react";
+import { Briefcase, MapPin, Paperclip, Search, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 
@@ -20,6 +20,7 @@ type Candidate = {
   role_interest: string | null;
   behavioral_tags: string[] | null;
   search_tags: string[] | null;
+  resume_url: string | null;
   created_at: string | null;
 };
 
@@ -35,13 +36,13 @@ export default function BancoDeTalentosPage() {
 
     const loadCandidates = async () => {
       const supabase = createClient();
-      const fullSelect = "id, full_name, first_name, last_name, email, phone, city, state, role_interest, behavioral_tags, search_tags, created_at";
+      const fullSelect = "id, full_name, first_name, last_name, email, phone, city, state, role_interest, behavioral_tags, search_tags, resume_url, created_at";
       const fullResult = await supabase.from("candidates").select(fullSelect).order("created_at", { ascending: false }).limit(200);
       let data = fullResult.data as Candidate[] | null;
       let error = fullResult.error;
 
       if (error) {
-        const minimalResult = await supabase.from("candidates").select("id, first_name, last_name, email, phone, created_at").order("created_at", { ascending: false }).limit(200);
+        const minimalResult = await supabase.from("candidates").select("id, first_name, last_name, email, phone, resume_url, created_at").order("created_at", { ascending: false }).limit(200);
         data = minimalResult.data as Candidate[] | null;
         error = minimalResult.error;
       }
@@ -143,6 +144,27 @@ export default function BancoDeTalentosPage() {
                     <span key={tag} className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">{tag}</span>
                   ))}
                 </div>
+                {candidate.resume_url && (
+                  <div className="pt-2 border-t mt-3 flex justify-end" onClick={(e) => e.stopPropagation()}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={async () => {
+                        const supabase = createClient();
+                        const { data, error } = await supabase.storage.from("resumes").createSignedUrl(candidate.resume_url!, 60);
+                        if (error || !data) {
+                          alert("Não foi possível abrir o currículo. Tente novamente.");
+                        } else {
+                          window.open(data.signedUrl, "_blank");
+                        }
+                      }}
+                      className="h-8 px-3 text-xs font-medium text-primary hover:bg-primary/5"
+                    >
+                      <Paperclip className="mr-1.5 h-3.5 w-3.5" />
+                      Ver Currículo
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );

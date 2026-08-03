@@ -38,6 +38,10 @@ type Assessment = {
   observations: string;
   worksite?: string;
   selection_stage?: string;
+  is_internal?: boolean;
+  location?: string;
+  professional_summary?: string;
+  experience_summary?: string;
 };
 
 type Interview = {
@@ -83,6 +87,10 @@ const defaultAssessment: Assessment = {
   observations: "",
   worksite: "",
   selection_stage: "",
+  is_internal: false,
+  location: "",
+  professional_summary: "",
+  experience_summary: "",
 };
 
 // gemini-1.5-flash foi descontinuado na API; 2.5-flash e estavel.
@@ -402,7 +410,7 @@ export default function EntrevistasPage() {
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dados" | "avaliacao">("dados");
+  const [activeTab, setActiveTab] = useState<"dados" | "avaliacao" | "curriculo">("dados");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [currentUpdatedAt, setCurrentUpdatedAt] = useState<string | null>(null);
@@ -513,7 +521,8 @@ export default function EntrevistasPage() {
     }
     setInterviews((data ?? []) as Interview[]);
     if (profilesData) {
-      const uniqueRoles = Array.from(new Set(profilesData.map(r => r.title))).sort();
+      const allRoles = [...profilesData.map(r => r.title), ...((data ?? []).map((i: any) => i.role))].filter(Boolean);
+      const uniqueRoles = Array.from(new Set(allRoles)).sort();
       setRoles(uniqueRoles);
     }
     if (workplacesData) {
@@ -686,6 +695,13 @@ Resultado Final: ${form.result || "N/C"}
       <div class="info-item"><label>E-mail</label><span>${form.email || '—'}</span></div>
     </div>
 
+    ${(assessmentForm.professional_summary || assessmentForm.experience_summary) ? `
+    <div class="section">
+      <div class="section-title">Resumo Curricular / Experiência</div>
+      ${assessmentForm.professional_summary ? `<div style="margin-bottom:8px"><b>Resumo Profissional:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.professional_summary}</p></div>` : ''}
+      ${assessmentForm.experience_summary ? `<div><b>Experiência:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.experience_summary}</p></div>` : ''}
+    </div>` : ''}
+
     <div class="section">
       <div class="section-title">Avaliação</div>
       <div class="eval-grid">
@@ -815,7 +831,13 @@ Resultado Final: ${form.result || "N/C"}
   "name": "Nome Completo",
   "email": "Email",
   "phone": "Telefone ou Celular",
-  "role": "Cargo ou Objetivo Profissional"
+  "role": "Cargo ou Objetivo Profissional",
+  "age": "Idade (ex: 33 anos) ou Data de Nascimento",
+  "location": "Cidade / Estado (ex: Pelotas - RS)",
+  "is_internal": false,
+  "education": "Escolaridade / Formação Principal",
+  "professional_summary": "Resumo profissional completo",
+  "experience_summary": "Histórico de experiência profissional"
 }
 
 Currículo:
@@ -847,6 +869,15 @@ ${resumeText}`;
           email: parsed.email || "",
           phone: parsed.phone || "",
           role: parsed.role || ""
+        }));
+        setAssessmentForm(prev => ({
+          ...prev,
+          age: parsed.age || prev.age,
+          location: parsed.location || prev.location,
+          is_internal: typeof parsed.is_internal === "boolean" ? parsed.is_internal : prev.is_internal,
+          education: parsed.education || prev.education,
+          professional_summary: parsed.professional_summary || prev.professional_summary,
+          experience_summary: parsed.experience_summary || prev.experience_summary
         }));
         setIsResumeModalOpen(false);
       }
@@ -1105,10 +1136,18 @@ ${resumeText}`;
                 Dados Básicos
               </button>
               <button 
+                type="button"
                 onClick={() => setActiveTab("avaliacao")}
                 className={`py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${activeTab === "avaliacao" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
               >
                 Parecer / Avaliação
+              </button>
+              <button 
+                type="button"
+                onClick={() => setActiveTab("curriculo")}
+                className={`py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${activeTab === "curriculo" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                Currículo / Perfil
               </button>
             </div>
 
@@ -1133,7 +1172,9 @@ ${resumeText}`;
                       className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option value="">Selecione um cargo...</option>
-                      {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                      {Array.from(new Set([...roles, form.role].filter(Boolean))).map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -1512,6 +1553,68 @@ ${resumeText}`;
                       onChange={e => setAssessmentForm({...assessmentForm, observations: e.target.value})}
                       placeholder="O texto gerado aparecerá aqui. Você também pode digitar manualmente..."
                       className="resize-none min-h-[100px]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "curriculo" && (
+                <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label>Idade / Nascimento</Label>
+                      <Input 
+                        value={assessmentForm.age || ''} 
+                        onChange={e => setAssessmentForm({...assessmentForm, age: e.target.value})} 
+                        placeholder="Ex: 33 anos" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Cidade / Estado</Label>
+                      <Input 
+                        value={assessmentForm.location || ''} 
+                        onChange={e => setAssessmentForm({...assessmentForm, location: e.target.value})} 
+                        placeholder="Ex: Pelotas - RS" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Tipo de Candidato</Label>
+                      <select 
+                        value={assessmentForm.is_internal ? "interno" : "externo"} 
+                        onChange={e => setAssessmentForm({...assessmentForm, is_internal: e.target.value === "interno"})}
+                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="externo">Candidato Externo</option>
+                        <option value="interno">Candidato Interno</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Formação / Escolaridade</Label>
+                      <Input 
+                        value={assessmentForm.education || ''} 
+                        onChange={e => setAssessmentForm({...assessmentForm, education: e.target.value})} 
+                        placeholder="Ex: Formado em Psicologia" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-sm font-medium">Resumo Profissional</Label>
+                    <Textarea 
+                      value={assessmentForm.professional_summary || ''} 
+                      onChange={e => setAssessmentForm({...assessmentForm, professional_summary: e.target.value})}
+                      placeholder="Resumo das principais qualificações e objetivos teóricos ou de carreira..."
+                      className="resize-none min-h-[100px]"
+                    />
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-sm font-medium">Experiências Profissionais</Label>
+                    <Textarea 
+                      value={assessmentForm.experience_summary || ''} 
+                      onChange={e => setAssessmentForm({...assessmentForm, experience_summary: e.target.value})}
+                      placeholder="Descreva os cargos, empresas, períodos e principais atividades desenvolvidas..."
+                      className="resize-none min-h-[120px]"
                     />
                   </div>
                 </div>

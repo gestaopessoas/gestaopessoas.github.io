@@ -1,4 +1,5 @@
 import { differenceInDays, isValid, parseISO } from "date-fns";
+import { hasBenefitKind } from "./benefitClassification";
 
 export type TrialNotification = {
   id: string;
@@ -159,9 +160,6 @@ export function generateBenefitNotifications(
   if (!prefs.benefits) return [];
   const list: BenefitNotification[] = [];
 
-  const hasBenefitType = (empId: string, needle: string) =>
-    benefits.some(b => b.employee_id === empId && (b.benefit_name || "").toLowerCase().includes(needle));
-
   for (const emp of employees) {
     // INCLUSAO: ativo/férias/afastado, >90 dias, sem saude/odonto/farmacia, não ignorado
     if (["Ativo", "Férias", "Afastado"].includes(emp.status)) {
@@ -171,9 +169,9 @@ export function generateBenefitNotifications(
       if (!isValid(admission)) continue;
       if (differenceInDays(today, admission) <= 90) continue;
 
-      const hasSaude = hasBenefitType(emp.id, "saúde") || hasBenefitType(emp.id, "saude");
-      const hasOdonto = hasBenefitType(emp.id, "odonto");
-      const hasFarmacia = hasBenefitType(emp.id, "farmácia") || hasBenefitType(emp.id, "farmacia");
+      const hasSaude = hasBenefitKind(benefits, emp.id, "saude");
+      const hasOdonto = hasBenefitKind(benefits, emp.id, "odonto");
+      const hasFarmacia = hasBenefitKind(benefits, emp.id, "farmacia");
 
       if (!hasSaude || !hasOdonto || !hasFarmacia) {
         list.push({ id: emp.id, name: emp.name, type: "INCLUSAO" });

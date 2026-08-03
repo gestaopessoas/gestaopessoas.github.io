@@ -7,10 +7,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Loader2, Calendar, User, Phone, Mail, Building, FileText, Briefcase, Plus, AlertCircle, Paperclip } from "lucide-react";
+import { Loader2, Calendar, User, Phone, Mail, Building, FileText, Briefcase, Plus, AlertCircle, Paperclip, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AddInterviewModal from "./AddInterviewModal";
 import { latestInterview, isLockedByInterview } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 
 type CandidateDetailsSheetProps = {
   candidateId: string | null;
@@ -29,6 +30,7 @@ export default function CandidateDetailsSheet({
   const [retryTick, setRetryTick] = useState(0);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [openingResume, setOpeningResume] = useState(false);
+  const [showBehavioralTest, setShowBehavioralTest] = useState(false);
 
   const supabase = createClient();
 
@@ -140,14 +142,20 @@ export default function CandidateDetailsSheet({
                     </p>
                   </div>
                 </div>
-                {candidate.resume_url ? (
-                  <Button variant="outline" size="sm" onClick={openResume} disabled={openingResume}>
-                    {openingResume ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Paperclip className="h-4 w-4 mr-2" />}
-                    Ver Currículo
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  {candidate.resume_url ? (
+                    <Button variant="outline" size="sm" onClick={openResume} disabled={openingResume}>
+                      {openingResume ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Paperclip className="h-4 w-4 mr-2" />}
+                      Ver Currículo
+                    </Button>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Currículo não anexado.</span>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setShowBehavioralTest(true)}>
+                    <Sparkles className="h-4 w-4 mr-2 text-primary" />
+                    Ver Teste Comportamental
                   </Button>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Currículo não anexado.</p>
-                )}
+                </div>
               </section>
 
               {/* Education Section */}
@@ -245,6 +253,13 @@ export default function CandidateDetailsSheet({
             onRefresh();
             setIsAddModalOpen(false);
           }}
+        />
+      )}
+
+      {showBehavioralTest && candidate && (
+        <CandidateProfileModal 
+          candidateId={candidate.id}
+          onClose={() => setShowBehavioralTest(false)} 
         />
       )}
     </>
