@@ -58,7 +58,7 @@ Legenda: ✅ corrigido e verificado · 🟡 parcial · 🔴 aberto/novo · — n
 |---|---|---|---|---|
 | §0 | Sidebar não responsiva — dashboard inutilizável em mobile | Crítico | ✅ **Confirmado ao vivo (rodada 2)** | Mobile 375px: `aside`=72px, `padding-left`=72px, sem sobreposição, título e botões 100% visíveis |
 | novo | Regressão: colapso manual da sidebar no desktop não reduz `padding-left` | — | 🟡 **Virou outro bug (rodada 2)** | O `padding-left` agora acompanha corretamente (72px). Mas o `<aside>` em si não anima visualmente pra 72px no teste automatizado (className/data-attribute corretos, `computedWidth` travado em 256px) — ver §0 da rodada 2 acima, precisa confirmação em navegador comum |
-| §A1.1 | Sheet vs modal centralizado (Central do Candidato) | Médio | 🟡 **Decisão tomada (2026-08-03)** | Usuário confirmou ao vivo no navegador interno: o padrão "certinho" são os modais centralizados (`AddCandidateModal.tsx`, `AddInterviewModal.tsx`, `DialogContent`). `CandidateDetailsSheet.tsx` deve ser convertido de `Sheet` (lateral) pra `Dialog` (centralizado) pra igualar o resto do módulo. Ainda não implementado — plano de conversão abaixo. |
+| §A1.1 | Sheet vs modal centralizado (Central do Candidato) | Médio | ✅ **Implementado e confirmado ao vivo (2026-08-03, commit `89249ad`)** | `CandidateDetailsSheet.tsx` convertido de `Sheet`/`SheetContent` pra `Dialog`/`DialogContent` (plano §4.1). Testado em produção: `border-radius: 11.2px` (igual `AddCandidateModal`), centralizado em X/Y, ESC fecha. `sheet.tsx` ficou órfão (zero consumidores, grep confirma) — não removido, decisão de limpeza futura. |
 | §A1.2 | Bug de CSS: `sm:max-w-2xl` não aplicado no sheet (computava 384px) | Alto | ✅ | `sheet.tsx` teve `data-[side=right]:sm:max-w-sm` removido da classe base — só resta `data-[side=left]:sm:max-w-sm`. Conflito resolvido. |
 | §A1.3 | 7 modais handrolled sem role/foco/ESC/click-outside | Crítico | ✅ **(rodada 2)** | `entrevistas` (2) já tinha ESC; rodada 2 adicionou `role`/`aria-modal`/click-outside/foco/ESC em mais 4 (`armarios` ×2 confirmado no código; `mesas`/`CandidateProfileModal` mesmo padrão de diff, não relidos individualmente) — commit alega "0 restantes" |
 | §A1.4 | Divergência visual handrolled vs primitivo (backdrop, blur, radius) | Médio | ✅ **(rodada 2)** | `armarios` confirmado com backdrop `bg-black/10 backdrop-blur-xs`, igual ao primitivo — resolvido de brinde junto com §A1.3 |
@@ -74,7 +74,7 @@ Legenda: ✅ corrigido e verificado · 🟡 parcial · 🔴 aberto/novo · — n
 | §A8 | 3 rotas sem link de entrada (`vagas/metricas`, `vagas/provas`, `talentos/matriz`) | Baixo | 🔴 | Não tocado |
 | §A9 | 9 páginas sem classe responsiva; 23 só com `md:` | Médio | — | Não reverificado |
 
-**Resumo (após rodada 2):** dos ~19 achados do design audit, **10 corrigidos e verificados**, 1 virou um novo bug menor (sidebar desktop, inconclusivo), 8 seguem abertos: sheet vs modal (decisão de produto), 3 larguras de container, tipografia de `<h1>`, dark mode morto, empty/loading states, breadcrumb incompleto, 3 rotas órfãs, e a aplicação individual dos 452 usos de cor aos tokens novos (token existe, uso ainda não migrado).
+**Resumo (após rodada 3, 2026-08-03):** dos ~19 achados do design audit, **11 corrigidos e verificados** (sheet→modal entrou nesta rodada), 1 virou um novo bug menor (sidebar desktop, inconclusivo), 7 seguem abertos: 3 larguras de container, tipografia de `<h1>`, dark mode morto, empty/loading states, breadcrumb incompleto, 3 rotas órfãs, e a aplicação individual dos 452 usos de cor aos tokens novos (token existe, uso ainda não migrado).
 
 ---
 
@@ -121,9 +121,11 @@ Avaliação arquitetural: a camada de formulários do projeto não usa `React Ho
 
 ---
 
-## 4.1 Plano — converter `CandidateDetailsSheet` de Sheet pra Dialog centralizado
+## 4.1 [✅ IMPLEMENTADO — commit `89249ad`] Converter `CandidateDetailsSheet` de Sheet pra Dialog centralizado
 
-Decisão do usuário (2026-08-03, confirmada ao vivo no navegador interno): o padrão "certinho" do projeto são os modais centralizados (`Dialog`/`DialogContent`, usados por 14 dos 22 overlays, incluindo os dois irmãos deste mesmo módulo — `AddCandidateModal.tsx` e `AddInterviewModal.tsx`). `CandidateDetailsSheet.tsx` é o único painel lateral do projeto todo e deve virar modal centralizado igual aos outros dois.
+Decisão do usuário (2026-08-03, confirmada ao vivo no navegador interno): o padrão "certinho" do projeto são os modais centralizados (`Dialog`/`DialogContent`, usados por 14 dos 22 overlays, incluindo os dois irmãos deste mesmo módulo — `AddCandidateModal.tsx` e `AddInterviewModal.tsx`). `CandidateDetailsSheet.tsx` era o único painel lateral do projeto todo e virou modal centralizado igual aos outros dois.
+
+**Implementado e confirmado ao vivo em produção** (deploy `0245c97`): `border-radius: 11.2px`, centralizado em X/Y, título/descrição corretos, ESC fecha. `sheet.tsx` ficou sem consumidor (grep confirma) — não removido, decisão de limpeza futura.
 
 **Arquivo:** `src/app/dashboard/central-candidato/components/CandidateDetailsSheet.tsx` (231 linhas, só este arquivo — nenhum consumidor externo além de `page.tsx`, que só passa `candidateId`/`onClose`/`onRefresh`, sem depender do tipo de overlay).
 
