@@ -7,7 +7,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { createClient } from "@/utils/supabase/client";
-import { Loader2, Calendar, User, Phone, Mail, Building, FileText, Briefcase, Plus, AlertCircle } from "lucide-react";
+import { Loader2, Calendar, User, Phone, Mail, Building, FileText, Briefcase, Plus, AlertCircle, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AddInterviewModal from "./AddInterviewModal";
 import { latestInterview, isLockedByInterview } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
@@ -28,6 +28,7 @@ export default function CandidateDetailsSheet({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [openingResume, setOpeningResume] = useState(false);
 
   const supabase = createClient();
 
@@ -69,6 +70,18 @@ export default function CandidateDetailsSheet({
   const latest = latestInterview(candidate?.candidate_interviews);
   const isLocked = isLockedByInterview(latest);
   const currentActiveWorkplace = isLocked && latest ? latest.workplace_name || "" : "";
+
+  const openResume = async () => {
+    if (!candidate?.resume_url) return;
+    setOpeningResume(true);
+    const { data, error } = await supabase.storage.from("resumes").createSignedUrl(candidate.resume_url, 60);
+    setOpeningResume(false);
+    if (error || !data) {
+      alert("Não foi possível abrir o currículo. Tente novamente.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank");
+  };
 
   return (
     <>
@@ -127,6 +140,14 @@ export default function CandidateDetailsSheet({
                     </p>
                   </div>
                 </div>
+                {candidate.resume_url ? (
+                  <Button variant="outline" size="sm" onClick={openResume} disabled={openingResume}>
+                    {openingResume ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Paperclip className="h-4 w-4 mr-2" />}
+                    Ver Currículo
+                  </Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Currículo não anexado.</p>
+                )}
               </section>
 
               {/* Education Section */}

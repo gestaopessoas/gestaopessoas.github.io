@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, CheckCircle2, MapPin, Send } from "lucide-react";
+import { Briefcase, CheckCircle2, MapPin, Send, Paperclip } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type Career = {
@@ -44,10 +44,12 @@ export default function CarreirasPage() {
   const [query, setQuery] = useState("");
   const [selectedJob, setSelectedJob] = useState<Career | null>(null);
   const [candidate, setCandidate] = useState(emptyCandidate);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const [resumeWarning, setResumeWarning] = useState("");
 
   useEffect(() => {
     const supabase = createClient();
@@ -137,6 +139,18 @@ export default function CarreirasPage() {
       return;
     }
 
+    setResumeWarning("");
+    if (resumeFile) {
+      const safeName = resumeFile.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+      const path = `${candidateData.id}/${Date.now()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage.from("resumes").upload(path, resumeFile);
+      if (uploadError) {
+        setResumeWarning("Não foi possível anexar o currículo, mas sua candidatura foi enviada. Você pode reenviar o currículo depois com o RH.");
+      } else {
+        await supabase.from("candidates").update({ resume_url: path }).eq("id", candidateData.id);
+      }
+    }
+
     const { error: applicationError } = await supabase
       .from("job_applications")
       .insert({ candidate_id: candidateData.id, job_opening_id: selectedJob.id, status: "Nova Aplicação" });
@@ -149,6 +163,7 @@ export default function CarreirasPage() {
 
     setSent(true);
     setCandidate(emptyCandidate);
+    setResumeFile(null);
   };
 
   return (
@@ -208,6 +223,9 @@ export default function CarreirasPage() {
               <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-emerald-500" />
               <h2 className="text-lg font-semibold">Candidatura enviada</h2>
               <p className="mt-2 text-sm text-muted-foreground">Recebemos seus dados. O RH vai avaliar a aderência ao perfil.</p>
+              {resumeWarning && (
+                <p className="mt-3 rounded-md bg-warning/10 p-2 text-xs text-warning">{resumeWarning}</p>
+              )}
             </div>
           ) : (
             <form onSubmit={submit} className="space-y-4">
@@ -223,6 +241,18 @@ export default function CarreirasPage() {
                 <Field label="UF"><Input disabled={!selectedJob} value={candidate.state} onChange={(event) => setCandidate({ ...candidate, state: event.target.value })} /></Field>
               </div>
               <Field label="LinkedIn"><Input disabled={!selectedJob} value={candidate.linkedin_url} onChange={(event) => setCandidate({ ...candidate, linkedin_url: event.target.value })} /></Field>
+              <Field label="Currículo (PDF ou Word)">
+                <div className="flex items-center gap-2">
+                  <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <Input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    disabled={!selectedJob}
+                    onChange={(event) => setResumeFile(event.target.files?.[0] || null)}
+                  />
+                </div>
+                {resumeFile && <p className="text-xs text-muted-foreground">{resumeFile.name}</p>}
+              </Field>
               <Button type="submit" className="w-full" disabled={!selectedJob || saving}>
                 <Send className="mr-2 h-4 w-4" />
                 {saving ? "Enviando..." : "Enviar candidatura"}
