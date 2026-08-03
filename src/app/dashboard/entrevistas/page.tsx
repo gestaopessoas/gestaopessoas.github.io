@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, Calendar, CheckCircle2, Clock, Download, Search, User, Plus, X, FileText } from "lucide-react";
+import { Briefcase, Calendar, CheckCircle2, Clock, Download, Search, User, Plus, X, FileText, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,10 +24,31 @@ type PsychologicalTestInput = {
   }
 };
 
+type AcademicRecord = {
+  id: string;
+  course: string;
+  institution: string;
+  start_date: string;
+  end_date: string;
+  in_progress: boolean;
+};
+
+type ProfessionalExperienceRecord = {
+  id: string;
+  role: string;
+  company: string;
+  start_date: string;
+  end_date: string;
+  is_current: boolean;
+  description: string;
+};
+
 type Assessment = {
   psychological_test: string;
   tests_details?: string;
   tests_list?: PsychologicalTestInput[];
+  academic_list?: AcademicRecord[];
+  experience_list?: ProfessionalExperienceRecord[];
   age?: string | number;
   education?: string;
   technical: string;
@@ -77,6 +98,8 @@ const defaultAssessment: Assessment = {
   psychological_test: "Não",
   tests_details: "",
   tests_list: [],
+  academic_list: [],
+  experience_list: [],
   age: "",
   education: "Ensino Médio",
   technical: "",
@@ -695,11 +718,37 @@ Resultado Final: ${form.result || "N/C"}
       <div class="info-item"><label>E-mail</label><span>${form.email || '—'}</span></div>
     </div>
 
-    ${(assessmentForm.professional_summary || assessmentForm.experience_summary) ? `
+    ${(assessmentForm.professional_summary || assessmentForm.experience_summary || (assessmentForm.academic_list && assessmentForm.academic_list.length > 0) || (assessmentForm.experience_list && assessmentForm.experience_list.length > 0)) ? `
     <div class="section">
-      <div class="section-title">Resumo Curricular / Experiência</div>
-      ${assessmentForm.professional_summary ? `<div style="margin-bottom:8px"><b>Resumo Profissional:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.professional_summary}</p></div>` : ''}
-      ${assessmentForm.experience_summary ? `<div><b>Experiência:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.experience_summary}</p></div>` : ''}
+      <div class="section-title">Resumo Curricular / Formação & Experiências</div>
+      ${assessmentForm.professional_summary ? `<div style="margin-bottom:12px"><b>Resumo Profissional:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.professional_summary}</p></div>` : ''}
+      ${assessmentForm.academic_list && assessmentForm.academic_list.length > 0 ? `
+      <div style="margin-bottom:14px">
+        <b style="font-size:13px;color:#334155">Formação Acadêmica & Cursos:</b>
+        <div style="margin-top:6px;display:flex;flex-direction:column;gap:8px">
+          ${assessmentForm.academic_list.map(ac => `
+            <div style="padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">
+              <div style="font-weight:600;font-size:13px;color:#1e293b">${ac.course || 'Curso não informado'} — <span style="color:#64748b;font-weight:500">${ac.institution || 'Instituição não informada'}</span></div>
+              <div style="font-size:12px;color:#64748b;margin-top:2px">Período: ${ac.start_date || 'N/I'} até ${ac.in_progress ? 'Em andamento' : (ac.end_date || 'N/I')}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
+      ${assessmentForm.experience_list && assessmentForm.experience_list.length > 0 ? `
+      <div style="margin-bottom:12px">
+        <b style="font-size:13px;color:#334155">Histórico Profissional & Experiências:</b>
+        <div style="margin-top:6px;display:flex;flex-direction:column;gap:10px">
+          ${assessmentForm.experience_list.map(ex => `
+            <div style="padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline">
+                <span style="font-weight:600;font-size:13px;color:#1e293b">${ex.role || 'Cargo não informado'} <span style="color:#64748b;font-weight:500">em ${ex.company || 'Empresa não informada'}</span></span>
+                <span style="font-size:11px;color:#475569;background:#e2e8f0;padding:2px 8px;border-radius:4px">${ex.start_date || 'N/I'} - ${ex.is_current ? 'Atual / Até o momento' : (ex.end_date || 'N/I')}</span>
+              </div>
+              ${ex.description ? `<p style="font-size:12px;margin:6px 0 0 0;white-space:pre-wrap;color:#475569;line-height:1.4">${ex.description}</p>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>` : (assessmentForm.experience_summary ? `<div><b>Experiência:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.experience_summary}</p></div>` : '')}
     </div>` : ''}
 
     <div class="section">
@@ -837,7 +886,28 @@ Resultado Final: ${form.result || "N/C"}
   "is_internal": false,
   "education": "Escolaridade / Formação Principal",
   "professional_summary": "Resumo profissional completo",
-  "experience_summary": "Histórico de experiência profissional"
+  "academic_list": [
+    {
+      "id": "1",
+      "course": "Nome do Curso ou Graduação",
+      "institution": "Nome da Instituição ou Universidade",
+      "start_date": "Mês/Ano de Início (ex: 2011 ou 03/2011)",
+      "end_date": "Mês/Ano de Conclusão (ex: 2015 ou 12/2015)",
+      "in_progress": false
+    }
+  ],
+  "experience_list": [
+    {
+      "id": "1",
+      "role": "Nome do Cargo (ex: Psicólogo Clínico)",
+      "company": "Nome da Empresa ou Clínica",
+      "start_date": "Mês/Ano Início (ex: 08/2022)",
+      "end_date": "Mês/Ano Fim (ex: 05/2024)",
+      "is_current": false,
+      "description": "Descrição detalhada das atividades e realizações no cargo"
+    }
+  ],
+  "experience_summary": "Histórico de experiência em formato de texto resumido"
 }
 
 Currículo:
@@ -877,7 +947,24 @@ ${resumeText}`;
           is_internal: typeof parsed.is_internal === "boolean" ? parsed.is_internal : prev.is_internal,
           education: parsed.education || prev.education,
           professional_summary: parsed.professional_summary || prev.professional_summary,
-          experience_summary: parsed.experience_summary || prev.experience_summary
+          experience_summary: parsed.experience_summary || prev.experience_summary,
+          academic_list: Array.isArray(parsed.academic_list) ? parsed.academic_list.map((item: any, idx: number) => ({
+            id: String(Date.now() + idx),
+            course: item.course || "",
+            institution: item.institution || "",
+            start_date: item.start_date || "",
+            end_date: item.end_date || "",
+            in_progress: Boolean(item.in_progress)
+          })) : prev.academic_list || [],
+          experience_list: Array.isArray(parsed.experience_list) ? parsed.experience_list.map((item: any, idx: number) => ({
+            id: String(Date.now() + 100 + idx),
+            role: item.role || "",
+            company: item.company || "",
+            start_date: item.start_date || "",
+            end_date: item.end_date || "",
+            is_current: Boolean(item.is_current),
+            description: item.description || ""
+          })) : prev.experience_list || []
         }));
         setIsResumeModalOpen(false);
       }
@@ -1559,7 +1646,7 @@ ${resumeText}`;
               )}
 
               {activeTab === "curriculo" && (
-                <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+                <div className="space-y-5 flex-1 overflow-y-auto pr-1">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <Label>Idade / Nascimento</Label>
@@ -1589,7 +1676,7 @@ ${resumeText}`;
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <Label>Formação / Escolaridade</Label>
+                      <Label>Escolaridade / Resumo Formação</Label>
                       <Input 
                         value={assessmentForm.education || ''} 
                         onChange={e => setAssessmentForm({...assessmentForm, education: e.target.value})} 
@@ -1604,18 +1691,276 @@ ${resumeText}`;
                       value={assessmentForm.professional_summary || ''} 
                       onChange={e => setAssessmentForm({...assessmentForm, professional_summary: e.target.value})}
                       placeholder="Resumo das principais qualificações e objetivos teóricos ou de carreira..."
-                      className="resize-none min-h-[100px]"
+                      className="resize-none min-h-[90px]"
                     />
                   </div>
 
-                  <div className="space-y-2 pt-2">
-                    <Label className="text-sm font-medium">Experiências Profissionais</Label>
-                    <Textarea 
-                      value={assessmentForm.experience_summary || ''} 
-                      onChange={e => setAssessmentForm({...assessmentForm, experience_summary: e.target.value})}
-                      placeholder="Descreva os cargos, empresas, períodos e principais atividades desenvolvidas..."
-                      className="resize-none min-h-[120px]"
-                    />
+                  {/* FORMAÇÃO ACADÊMICA E CURSOS */}
+                  <div className="space-y-3 pt-3 border-t">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-sm font-semibold text-foreground">Formação Acadêmica & Cursos</Label>
+                      <Button 
+                        type="button" 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => setAssessmentForm(p => ({
+                          ...p, 
+                          academic_list: [
+                            ...(p.academic_list || []), 
+                            { id: String(Date.now()), course: "", institution: "", start_date: "", end_date: "", in_progress: false }
+                          ]
+                        }))}
+                        className="h-8 gap-1.5 text-xs font-medium border-primary/30 text-primary hover:bg-primary/10"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Adicionar Formação
+                      </Button>
+                    </div>
+
+                    {(assessmentForm.academic_list || []).length === 0 ? (
+                      <div className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg bg-muted/10">
+                        Nenhuma formação cadastrada. Clique em "+ Adicionar Formação" para registrar cursos e graduações do candidato.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {(assessmentForm.academic_list || []).map((ac, idx) => (
+                          <div key={ac.id || idx} className="p-3.5 border rounded-lg bg-muted/20 space-y-3 relative group">
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1 space-y-1">
+                                <Label className="text-xs text-muted-foreground">Graduação / Curso</Label>
+                                <Input 
+                                  value={ac.course || ""} 
+                                  onChange={e => {
+                                    const list = [...(assessmentForm.academic_list || [])];
+                                    list[idx] = { ...list[idx], course: e.target.value };
+                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
+                                  }}
+                                  placeholder="Ex: Psicologia Clínica e Organizacional"
+                                  className="h-9 font-medium"
+                                />
+                              </div>
+                              <div className="flex-1 space-y-1">
+                                <Label className="text-xs text-muted-foreground">Instituição</Label>
+                                <Input 
+                                  value={ac.institution || ""} 
+                                  onChange={e => {
+                                    const list = [...(assessmentForm.academic_list || [])];
+                                    list[idx] = { ...list[idx], institution: e.target.value };
+                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
+                                  }}
+                                  placeholder="Ex: UFPEL / PUCRS"
+                                  className="h-9"
+                                />
+                              </div>
+                              <div className="pt-5">
+                                <Button 
+                                  type="button" 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  onClick={() => {
+                                    const list = (assessmentForm.academic_list || []).filter((_, i) => i !== idx);
+                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
+                                  }}
+                                  className="h-9 w-9 text-destructive hover:bg-destructive/10 shrink-0"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="w-1/3 space-y-1">
+                                <Label className="text-xs text-muted-foreground">Data de Início</Label>
+                                <Input 
+                                  value={ac.start_date || ""} 
+                                  onChange={e => {
+                                    const list = [...(assessmentForm.academic_list || [])];
+                                    list[idx] = { ...list[idx], start_date: e.target.value };
+                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
+                                  }}
+                                  placeholder="Ex: 2011 ou 03/2011"
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                              <div className="w-1/3 space-y-1">
+                                <Label className="text-xs text-muted-foreground">Data de Finalização</Label>
+                                <Input 
+                                  value={ac.end_date || ""} 
+                                  disabled={ac.in_progress}
+                                  onChange={e => {
+                                    const list = [...(assessmentForm.academic_list || [])];
+                                    list[idx] = { ...list[idx], end_date: e.target.value };
+                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
+                                  }}
+                                  placeholder={ac.in_progress ? "Em andamento" : "Ex: 2015 ou 12/2015"}
+                                  className="h-8 text-xs disabled:opacity-50"
+                                />
+                              </div>
+                              <div className="flex items-center space-x-2 pt-5">
+                                <Checkbox 
+                                  id={`in-progress-${idx}`} 
+                                  checked={Boolean(ac.in_progress)}
+                                  onCheckedChange={(checked) => {
+                                    const list = [...(assessmentForm.academic_list || [])];
+                                    list[idx] = { ...list[idx], in_progress: Boolean(checked), end_date: checked ? "" : list[idx].end_date };
+                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
+                                  }}
+                                />
+                                <Label htmlFor={`in-progress-${idx}`} className="text-xs cursor-pointer font-normal text-muted-foreground">
+                                  Em andamento
+                                </Label>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* HISTÓRICO PROFISSIONAL E EXPERIÊNCIAS */}
+                  <div className="space-y-3 pt-3 border-t">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-sm font-semibold text-foreground">Histórico Profissional / Experiências</Label>
+                      <Button 
+                        type="button" 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => setAssessmentForm(p => ({
+                          ...p, 
+                          experience_list: [
+                            ...(p.experience_list || []), 
+                            { id: String(Date.now()), role: "", company: "", start_date: "", end_date: "", is_current: false, description: "" }
+                          ]
+                        }))}
+                        className="h-8 gap-1.5 text-xs font-medium border-primary/30 text-primary hover:bg-primary/10"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Adicionar Experiência
+                      </Button>
+                    </div>
+
+                    {(assessmentForm.experience_list || []).length === 0 ? (
+                      <div className="space-y-3">
+                        <div className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg bg-muted/10">
+                          Nenhum histórico profissional estruturado. Clique em "+ Adicionar Experiência" para incluir cargos, empresas e períodos.
+                        </div>
+                        {assessmentForm.experience_summary && (
+                          <div className="space-y-1 pt-1">
+                            <Label className="text-xs text-muted-foreground">Resumo Legado / Anotações Gerais de Experiência</Label>
+                            <Textarea 
+                              value={assessmentForm.experience_summary || ""} 
+                              onChange={e => setAssessmentForm({...assessmentForm, experience_summary: e.target.value})}
+                              placeholder="Descreva os cargos, empresas, períodos e principais atividades desenvolvidas..."
+                              className="resize-none min-h-[90px] text-xs"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {(assessmentForm.experience_list || []).map((ex, idx) => (
+                          <div key={ex.id || idx} className="p-4 border rounded-lg bg-muted/20 space-y-3 relative group">
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1 space-y-1">
+                                <Label className="text-xs text-muted-foreground">Cargo / Função</Label>
+                                <Input 
+                                  value={ex.role || ""} 
+                                  onChange={e => {
+                                    const list = [...(assessmentForm.experience_list || [])];
+                                    list[idx] = { ...list[idx], role: e.target.value };
+                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
+                                  }}
+                                  placeholder="Ex: Psicólogo Clínico / Responsável Técnico"
+                                  className="h-9 font-medium"
+                                />
+                              </div>
+                              <div className="flex-1 space-y-1">
+                                <Label className="text-xs text-muted-foreground">Empresa / Instituição</Label>
+                                <Input 
+                                  value={ex.company || ""} 
+                                  onChange={e => {
+                                    const list = [...(assessmentForm.experience_list || [])];
+                                    list[idx] = { ...list[idx], company: e.target.value };
+                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
+                                  }}
+                                  placeholder="Ex: Vínculos Centro Especializado de Saúde"
+                                  className="h-9"
+                                />
+                              </div>
+                              <div className="pt-5">
+                                <Button 
+                                  type="button" 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  onClick={() => {
+                                    const list = (assessmentForm.experience_list || []).filter((_, i) => i !== idx);
+                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
+                                  }}
+                                  className="h-9 w-9 text-destructive hover:bg-destructive/10 shrink-0"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="w-1/3 space-y-1">
+                                <Label className="text-xs text-muted-foreground">Data de Início (Mês/Ano)</Label>
+                                <Input 
+                                  value={ex.start_date || ""} 
+                                  onChange={e => {
+                                    const list = [...(assessmentForm.experience_list || [])];
+                                    list[idx] = { ...list[idx], start_date: e.target.value };
+                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
+                                  }}
+                                  placeholder="Ex: 08/2022"
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                              <div className="w-1/3 space-y-1">
+                                <Label className="text-xs text-muted-foreground">Data de Saída / Conclusão</Label>
+                                <Input 
+                                  value={ex.end_date || ""} 
+                                  disabled={ex.is_current}
+                                  onChange={e => {
+                                    const list = [...(assessmentForm.experience_list || [])];
+                                    list[idx] = { ...list[idx], end_date: e.target.value };
+                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
+                                  }}
+                                  placeholder={ex.is_current ? "Atualmente no cargo" : "Ex: 05/2024"}
+                                  className="h-8 text-xs disabled:opacity-50"
+                                />
+                              </div>
+                              <div className="flex items-center space-x-2 pt-5">
+                                <Checkbox 
+                                  id={`is-current-${idx}`} 
+                                  checked={Boolean(ex.is_current)}
+                                  onCheckedChange={(checked) => {
+                                    const list = [...(assessmentForm.experience_list || [])];
+                                    list[idx] = { ...list[idx], is_current: Boolean(checked), end_date: checked ? "" : list[idx].end_date };
+                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
+                                  }}
+                                />
+                                <Label htmlFor={`is-current-${idx}`} className="text-xs cursor-pointer font-normal text-muted-foreground">
+                                  Atual / Até o momento
+                                </Label>
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Descrição das Atividades & Conquistas</Label>
+                              <Textarea 
+                                value={ex.description || ""}
+                                onChange={e => {
+                                  const list = [...(assessmentForm.experience_list || [])];
+                                  list[idx] = { ...list[idx], description: e.target.value };
+                                  setAssessmentForm(p => ({ ...p, experience_list: list }));
+                                }}
+                                placeholder="Descreva as responsabilidades e atividades no cargo (ex: Psicoterapia de orientação analítica, gestão do quadro...)"
+                                className="resize-none min-h-[70px] text-xs"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
