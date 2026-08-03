@@ -30,10 +30,10 @@ export function NotificationBell() {
   useEffect(() => {
     const fetchNotifications = async () => {
       const supabase = createClient();
-      
+
       const { data: authData } = await supabase.auth.getUser();
       let userPrefs = { trial: true, rgs: true, benefits: true, profile: true };
-      
+
       if (authData.user?.id) {
         const { data: prof } = await supabase.from('profiles').select('permissions').eq('id', authData.user.id).single();
         if (prof?.permissions?._preferences) {
@@ -42,16 +42,29 @@ export function NotificationBell() {
         }
       }
 
+      // employees tem ~4.8k registros; o PostgREST limita a 1000 por query.
+      // Paginamos via .range() para nao perder colaboradores (bug do badge estatico).
+      const EMP_PAGE = 1000;
+      let empData: any[] = [];
+      let empError: { message: string } | null = null;
+      try {
+        for (let from = 0; from < 10000; from += EMP_PAGE) {
+          const { data, error } = await supabase
+            .from("employees")
+            .select("id, name, admission_date, contract_type, status, registration_number, birthday, cost_center_id, company_id, workplace_id, dismissed_at")
+            .neq("status", "Arquivo Morto")
+            .range(from, from + EMP_PAGE - 1);
+          if (error) { empError = error; break; }
+          empData = empData.concat(data || []);
+          if ((data || []).length < EMP_PAGE) break; // última página
+        }
+      } catch (e: any) { empError = e; }
+
       const [
-        { data: empData, error: empError },
         { data: rgsData, error: rgsError },
         { data: bens },
         { data: igs }
       ] = await Promise.all([
-        supabase
-          .from("employees")
-          .select("id, name, admission_date, contract_type, status, registration_number, birthday, cost_center_id, company_id, workplace_id, dismissed_at")
-          .neq("status", "Arquivo Morto"),
         supabase
           .from("rgs_processes")
           .select("id, employee_name, process_type, created_at, status")
