@@ -78,11 +78,19 @@ const sidebarGroups = [
   }
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean
+  onToggle: () => void
+}
+
+export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const isMobile = useMediaQuery("(max-width: 767px)")
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  // Derivação pura (sem setState/efeito): em mobile o colapso automático sempre
+  // vence; em desktop vale a preferência persistida. Elimina a corrida
+  // localStorage vs auto-collapse mobile (fix QA §0/C1).
+  const isCollapsed = collapsed || isMobile
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {}
     try {
@@ -94,23 +102,9 @@ export function Sidebar() {
   const [loading, setLoading] = useState(true)
   const { can } = usePermissions()
 
-  // Auto-collapse on mobile (audit design 2026-08-01 §0)
   useEffect(() => {
-    setIsCollapsed(isMobile)
-  }, [isMobile])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const saved = localStorage.getItem("sidebar-collapsed")
-    if (saved !== null) {
-      setIsCollapsed(JSON.parse(saved))
-    }
     setLoading(false)
   }, [])
-
-  useEffect(() => {
-    localStorage.setItem("sidebar-collapsed", JSON.stringify(isCollapsed))
-  }, [isCollapsed])
 
   const toggleGroup = (groupName: string) => {
     setCollapsedGroups((prev) => {
@@ -204,8 +198,8 @@ export function Sidebar() {
 
       <div className="p-3 border-t border-border/50 shrink-0 space-y-1 relative">
         <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 bg-background border border-border/50 rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 shadow-sm transition-all duration-200 z-50"
+          onClick={onToggle}
+          className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 bg-background border border-border/50 rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 shadow-sm transition-all duration-200 z-50"
           title={isCollapsed ? "Expandir menu" : "Retrair menu"}
         >
           {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}

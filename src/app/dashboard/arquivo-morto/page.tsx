@@ -2,6 +2,14 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
 import { Archive, RotateCcw, Search, Package, ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -36,6 +44,7 @@ export default function ArquivoMortoPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expandedBoxes, setExpandedBoxes] = useState<string[]>([]);
+  const [reactivateTarget, setReactivateTarget] = useState<Employee | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(async () => {
@@ -122,11 +131,15 @@ export default function ArquivoMortoPage() {
     if (saveError) setError(saveError.message); else setRefresh((value) => value + 1);
   };
 
-  const reactivate = async (employee: Employee) => {
-    if (!window.confirm(`Reativar ${employee.name}?`)) return;
+  const reactivate = (employee: Employee) => {
+    setReactivateTarget(employee);
+  };
+
+  const confirmReactivate = async (employee: Employee) => {
+    setReactivateTarget(null);
     const sb = createClient();
     const { error: saveError } = await sb.from("employees").update({ status: "Ativo", dismissed_at: null }).eq("id", employee.id);
-    
+
     if (saveError) {
       setError(saveError.message);
     } else {
@@ -170,7 +183,7 @@ export default function ArquivoMortoPage() {
     
     <div className="relative max-w-md">
       <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-      <Input value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} placeholder="Buscar por nome, CPF ou RG" className="pl-9 bg-surface" />
+      <Input value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} placeholder="Buscar por nome, CPF ou RG" className="pl-9 bg-background" />
     </div>
 
     {loading ? (
@@ -241,6 +254,23 @@ export default function ArquivoMortoPage() {
         <Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button>
       </div>
     </div>
+
+    <Dialog open={reactivateTarget !== null} onOpenChange={(open) => { if (!open) setReactivateTarget(null); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Reativar colaborador</DialogTitle>
+          <DialogDescription>
+            Deseja reativar <strong>{reactivateTarget?.name}</strong>? O colaborador voltará ao status "Ativo" e será removido do arquivo morto.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setReactivateTarget(null)}>Cancelar</Button>
+          <Button onClick={() => { if (reactivateTarget) confirmReactivate(reactivateTarget); }}>
+            <RotateCcw className="mr-2 h-4 w-4" />Reativar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>;
 }
 

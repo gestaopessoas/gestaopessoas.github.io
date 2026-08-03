@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FileSpreadsheet, ArrowRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import ExcelJS from "exceljs";
@@ -66,6 +67,7 @@ export default function MPGeneratorPage() {
   const [currentUser, setCurrentUser] = useState("");
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
 
   // Form State
   const [mpType, setMpType] = useState<"contratacao" | "movimentacao">("contratacao");
@@ -187,26 +189,31 @@ export default function MPGeneratorPage() {
     setArray(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]);
   };
 
+  const onGenerate = () => {
+    if (mpType === "movimentacao" && updateProfile && selectedEmployeeId) {
+      setIsUpdateConfirmOpen(true);
+      return;
+    }
+    void generateExcel();
+  };
+
   const generateExcel = async () => {
     setIsGenerating(true);
     try {
       const supabase = createClient();
-      
+
       if (mpType === "movimentacao" && updateProfile && selectedEmployeeId) {
-        const confirmUpdate = window.confirm("Você marcou para atualizar os dados de contato/alocação e contratuais no perfil do colaborador. Confirmar atualização no banco de dados?");
-        if (confirmUpdate) {
-          await supabase.from('employees').update({
-            phone: phone,
-            email_corporate: email,
-            unit: location,
-            cost_center_id: costCenterId || null,
-            role: selectedRoleInfo?.role_name,
-            level: selectedRoleInfo?.level,
-            profile_code: selectedRoleInfo?.role_code,
-            base_salary: selectedRoleInfo?.salary,
-            contract_type: selectedRoleInfo?.modality
-          }).eq('id', selectedEmployeeId);
-        }
+        await supabase.from('employees').update({
+          phone: phone,
+          email_corporate: email,
+          unit: location,
+          cost_center_id: costCenterId || null,
+          role: selectedRoleInfo?.role_name,
+          level: selectedRoleInfo?.level,
+          profile_code: selectedRoleInfo?.role_code,
+          base_salary: selectedRoleInfo?.salary,
+          contract_type: selectedRoleInfo?.modality
+        }).eq('id', selectedEmployeeId);
       }
 
       const empName = mpType === "contratacao" ? candidateName : selectedEmployee?.name || "Nao_Selecionado";
@@ -1075,7 +1082,7 @@ export default function MPGeneratorPage() {
       </Tabs>
 
       <div className="flex justify-end pt-4 mt-8">
-        <Button size="lg" onClick={generateExcel} disabled={isGenerating || !isFormValid()} className="bg-green-600 hover:bg-green-700 text-white shadow-lg">
+        <Button size="lg" onClick={onGenerate} disabled={isGenerating || !isFormValid()} className="bg-green-600 hover:bg-green-700 text-white shadow-lg">
           {isGenerating ? "Processando..." : (
             <>
               <FileSpreadsheet className="mr-2 h-5 w-5" /> 
@@ -1084,6 +1091,21 @@ export default function MPGeneratorPage() {
           )}
         </Button>
       </div>
+
+      <Dialog open={isUpdateConfirmOpen} onOpenChange={setIsUpdateConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Atualizar perfil do colaborador?</DialogTitle>
+            <DialogDescription>
+              Você marcou para atualizar os dados de contato/alocação e contratuais no perfil do colaborador após gerar a MP. Confirmar atualização no banco de dados?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsUpdateConfirmOpen(false)}>Cancelar</Button>
+            <Button onClick={() => { setIsUpdateConfirmOpen(false); void generateExcel(); }}>Confirmar e Gerar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

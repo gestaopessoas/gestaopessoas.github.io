@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { X, Briefcase, MapPin, Mail, Phone, Calendar } from "lucide-react";
@@ -25,6 +25,30 @@ export function CandidateProfileModal({ candidateId, employeeId, onClose }: Cand
   const [person, setPerson] = useState<any>(null);
   const [results, setResults] = useState<BigFiveResult[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  const restoreRef = useRef<HTMLElement | null>(null);
+
+  // Fecha com ESC (padrão §A1.3, mesmo handler de entrevistas/page.tsx)
+  useEffect(() => {
+    if (!candidateId && !employeeId) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [candidateId, employeeId, onClose]);
+
+  // Foco no abrir, restaura no fechar
+  useEffect(() => {
+    if (!candidateId && !employeeId) return;
+    restoreRef.current = document.activeElement as HTMLElement | null;
+    const t = window.setTimeout(() => panelRef.current?.focus(), 0);
+    return () => {
+      window.clearTimeout(t);
+      restoreRef.current?.focus?.();
+    };
+  }, [candidateId, employeeId]);
 
   useEffect(() => {
     if (!candidateId && !employeeId) return;
@@ -61,8 +85,18 @@ export function CandidateProfileModal({ candidateId, employeeId, onClose }: Cand
   if (!candidateId && !employeeId) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-background shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 p-4 backdrop-blur-xs"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Perfil do Candidato"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-background shadow-2xl outline-none"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-xl font-bold">Perfil do Candidato</h2>

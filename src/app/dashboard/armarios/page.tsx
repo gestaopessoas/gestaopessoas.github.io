@@ -5,13 +5,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { KeyRound, Search, X, AlertTriangle, Download } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 
 type Locker = { id: string; number: string; employee_id: string | null; location: string | null; has_key: boolean; spare_keys: number; employees: { name: string } | null };
 type Employee = { id: string; name: string };
 
 const LOCATIONS = ["Lado Oeste", "Lado Leste", "Corredor"];
+
+// Foco no abrir / restaura no fechar (§A1.3)
+function useDialogFocus(open: boolean, ref: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.activeElement as HTMLElement | null;
+    const t = window.setTimeout(() => ref.current?.focus(), 0);
+    return () => {
+      window.clearTimeout(t);
+      prev?.focus?.();
+    };
+  }, [open, ref]);
+}
 
 export default function ArmariosPage() {
   const [lockers, setLockers] = useState<Locker[]>([]);
@@ -26,6 +39,11 @@ export default function ArmariosPage() {
   const [lockerNumberStr, setLockerNumberStr] = useState("");
   const [spareKeys, setSpareKeys] = useState(0);
   const [error, setError] = useState("");
+
+  const editDialogRef = useRef<HTMLDivElement>(null);
+  const spareDialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(!!selected, editDialogRef);
+  useDialogFocus(showSpareKeys, spareDialogRef);
 
   const load = useCallback(async () => {
     const { data, error: loadError } = await createClient().from("lockers").select("id, number, employee_id, location, has_key, spare_keys, employees(name)").order("number");
@@ -42,6 +60,18 @@ export default function ArmariosPage() {
     }, 250);
     return () => window.clearTimeout(timer);
   }, [query, selected]);
+
+  // Fecha modais com ESC (§A1.3)
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setSelected(null);
+        setShowSpareKeys(false);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const grouped = useMemo(() => {
     const groups: Record<string, Locker[]> = {};
@@ -235,8 +265,18 @@ export default function ArmariosPage() {
 
       {/* Modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl bg-background p-6 shadow-2xl">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/10 p-4 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Editar Armário"
+          onClick={(e) => { if (e.target === e.currentTarget) setSelected(null); }}
+        >
+          <div
+            ref={editDialogRef}
+            tabIndex={-1}
+            className="w-full max-w-md rounded-xl bg-background p-6 shadow-2xl outline-none"
+          >
             <div className="mb-4 flex items-start justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Editar Armário</h2>
@@ -365,8 +405,18 @@ export default function ArmariosPage() {
 
       {/* Modal Chaves Reservas */}
       {showSpareKeys && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl bg-background shadow-2xl">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/10 p-4 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Chaves Reservas"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowSpareKeys(false); }}
+        >
+          <div
+            ref={spareDialogRef}
+            tabIndex={-1}
+            className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl bg-background shadow-2xl outline-none"
+          >
             <div className="flex items-center justify-between border-b p-4">
               <div>
                 <h2 className="text-lg font-semibold">Chaves Reservas</h2>

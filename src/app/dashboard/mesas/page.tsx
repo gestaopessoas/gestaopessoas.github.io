@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
 import { Armchair, Search, UserRound, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Position = { id: string; name: string; sector: string | null; position_index: number | null; employee_id: string | null; employees: { name: string } | null };
 type Employee = { id: string; name: string };
@@ -28,6 +28,19 @@ const SECTORS_LAYOUT = [
   { name: "Direção", rows: 1, cols: 1, total: 1, shape: "executive" },
 ];
 
+// Foco no abrir / restaura no fechar (§A1.3)
+function useDialogFocus(open: boolean, ref: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.activeElement as HTMLElement | null;
+    const t = window.setTimeout(() => ref.current?.focus(), 0);
+    return () => {
+      window.clearTimeout(t);
+      prev?.focus?.();
+    };
+  }, [open, ref]);
+}
+
 export default function MesasPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [selected, setSelected] = useState<{sector: string, index: number, pos: Position | null} | null>(null);
@@ -35,6 +48,9 @@ export default function MesasPage() {
   const [matches, setMatches] = useState<Employee[]>([]);
   const [employeeId, setEmployeeId] = useState("");
   const [error, setError] = useState("");
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(!!selected, dialogRef);
 
   const load = useCallback(async () => {
     const { data, error: loadError } = await createClient().from("islands").select("id, name, sector, position_index, employee_id, employees(name)").order("sector").order("position_index");
@@ -52,7 +68,16 @@ export default function MesasPage() {
     return () => window.clearTimeout(timer);
   }, [query, selected]);
 
-  const open = (sector: string, index: number, pos: Position | undefined) => { 
+  // Fecha modal com ESC (§A1.3)
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setSelected(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const open = (sector: string, index: number, pos: Position | undefined) => {
     setSelected({sector, index, pos: pos || null}); 
     setEmployeeId(pos?.employee_id ?? ""); 
     setQuery(""); 
@@ -230,8 +255,18 @@ export default function MesasPage() {
 
       {/* Modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl bg-background p-6 shadow-2xl">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/10 p-4 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Mesa ${selected.index} - ${selected.sector}`}
+          onClick={(e) => { if (e.target === e.currentTarget) setSelected(null); }}
+        >
+          <div
+            ref={dialogRef}
+            tabIndex={-1}
+            className="w-full max-w-md rounded-xl bg-background p-6 shadow-2xl outline-none"
+          >
             <div className="mb-4 flex items-start justify-between">
               <div>
                 <h2 className="text-lg font-semibold">{selected.sector}</h2>

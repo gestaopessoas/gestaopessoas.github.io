@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Save, Loader2, DownloadCloud, ShieldAlert, CalendarDays, Link as LinkIcon } from "lucide-react"
+import { Save, Loader2, DownloadCloud, ShieldAlert, CalendarDays, Link as LinkIcon, Eye, EyeOff } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { usePermissions } from "@/hooks/usePermissions"
 import { GlobalHistoryTab } from "@/components/configuracoes/GlobalHistoryTab"
@@ -22,6 +22,7 @@ export default function ConfiguracoesPage() {
   const [modules, setModules] = useState({ ats: true, admissao: true, pdi: true, gestor: true, rgs_tracking: true, financeiro: false })
   const [permissions, setPermissions] = useState({ "2fa": true, ai_notifications: true })
   const [jobRequestCode, setJobRequestCode] = useState("")
+  const [showJobCode, setShowJobCode] = useState(false)
   const [workSchedules, setWorkSchedules] = useState<string[]>([
     "SEG A SEX das 07:45h - 12h - 13:15 - 17:48h", 
     "SEG A SEX das 07:30h - 12h - 13:15 - 17:33h"
@@ -304,23 +305,39 @@ export default function ConfiguracoesPage() {
                     <Label className="text-base font-medium">Código do Formulário Público de Vagas</Label>
                     <p className="text-sm text-muted-foreground">Senha que os gestores usarão para solicitar abertura de novas vagas.</p>
                   </div>
-                  <Input 
-                    value={jobRequestCode} 
-                    onChange={(e) => setJobRequestCode(e.target.value)} 
-                    className="w-48"
-                    placeholder="Ex: ACPO-VAGAS" 
-                  />
+                  <div className="relative w-48">
+                    <Input
+                      type={showJobCode ? "text" : "password"}
+                      value={jobRequestCode}
+                      onChange={(e) => setJobRequestCode(e.target.value)}
+                      className="pr-9"
+                      placeholder="Ex: ACPO-VAGAS"
+                      autoComplete="new-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="absolute right-0.5 top-1/2 -translate-y-1/2"
+                      onClick={() => setShowJobCode((v) => !v)}
+                      title={showJobCode ? "Ocultar código" : "Mostrar código"}
+                    >
+                      {showJobCode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between border-t border-border/40 pt-4">
                   <div className="space-y-1 w-full max-w-lg">
                     <Label className="text-base font-medium">Horários e Escalas Padrões</Label>
                     <p className="text-sm text-muted-foreground">Coloque um horário por linha. Eles aparecerão nos dropdowns de solicitação de vaga e MP.</p>
-                    <textarea 
-                      className="w-full h-32 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    <textarea
+                      className="w-full min-h-32 max-h-48 resize-none overflow-y-auto rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      maxLength={2000}
                       value={workSchedules.join("\n")}
                       onChange={(e) => setWorkSchedules(e.target.value.split("\n").map(s => s.trim()).filter(Boolean))}
                       placeholder="Ex: SEG A SEX das 07:45h - 12h - 13:15 - 17:48h"
                     />
+                    <div className="text-right text-xs text-muted-foreground">{workSchedules.join("\n").length}/2000</div>
                   </div>
                 </div>
               </CardContent>

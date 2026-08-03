@@ -232,6 +232,26 @@ export default function NovaVagaPage() {
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    const quantity = Number(form.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      setError("Quantidade deve ser um número inteiro positivo.");
+      return;
+    }
+    const salaryMin = form.salary_min ? Number(form.salary_min) : null;
+    const salaryMax = form.salary_max ? Number(form.salary_max) : null;
+    if ((salaryMin !== null && !Number.isFinite(salaryMin)) || (salaryMin !== null && salaryMin < 0)) {
+      setError("Salário mínimo deve ser um número maior ou igual a zero.");
+      return;
+    }
+    if ((salaryMax !== null && !Number.isFinite(salaryMax)) || (salaryMax !== null && salaryMax < 0)) {
+      setError("Salário máximo deve ser um número maior ou igual a zero.");
+      return;
+    }
+    if (salaryMin !== null && salaryMax !== null && salaryMin > salaryMax) {
+      setError("Salário mínimo não pode ser maior que o máximo.");
+      return;
+    }
     setSaving(true);
 
     try {
@@ -373,7 +393,7 @@ export default function NovaVagaPage() {
                 </select>
               </Field>
               <Field label="Título da vaga *" className="md:col-span-2"><Input required value={form.position_title} onChange={(event) => set("position_title", event.target.value)} /></Field>
-              <Field label="Quantidade"><Input type="number" min="1" value={form.quantity} onChange={(event) => set("quantity", event.target.value)} /></Field>
+              <Field label="Quantidade"><Input type="number" min="1" step="1" value={form.quantity} onChange={(event) => set("quantity", event.target.value.replace(/\D/g, "").slice(0, 4))} /></Field>
               <Field label="Departamento">
                 <select value={form.department_id} onChange={(event) => set("department_id", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   <option value="">Selecione...</option>
@@ -438,8 +458,14 @@ export default function NovaVagaPage() {
           <section className="rounded-lg border bg-card p-5 shadow-sm">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><Sparkles className="h-5 w-5 text-primary" /> Requisitos do perfil de competência</h2>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Mínimo para a vaga"><textarea rows={6} value={form.required_requirements} onChange={(event) => set("required_requirements", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" /></Field>
-              <Field label="Desejável para a vaga"><textarea rows={6} value={form.desired_requirements} onChange={(event) => set("desired_requirements", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" /></Field>
+              <Field label="Mínimo para a vaga">
+                <textarea rows={6} maxLength={3000} value={form.required_requirements} onChange={(event) => set("required_requirements", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm resize-none max-h-56 overflow-y-auto" />
+                <div className="text-right text-xs text-muted-foreground">{form.required_requirements.length}/3000</div>
+              </Field>
+              <Field label="Desejável para a vaga">
+                <textarea rows={6} maxLength={3000} value={form.desired_requirements} onChange={(event) => set("desired_requirements", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm resize-none max-h-56 overflow-y-auto" />
+                <div className="text-right text-xs text-muted-foreground">{form.desired_requirements.length}/3000</div>
+              </Field>
             </div>
           </section>
         )}
@@ -484,8 +510,14 @@ export default function NovaVagaPage() {
         <section className="rounded-lg border bg-card p-5">
           <h2 className="mb-4 text-lg font-semibold">Observações e Expectativas</h2>
           <div className="grid gap-4">
-            <Field label="O que o RH espera deste perfil?"><textarea rows={4} value={form.manager_expectations} onChange={(event) => set("manager_expectations", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" /></Field>
-            <Field label="Observações adicionais (exclusivas do Portal)"><textarea rows={3} value={form.notes} onChange={(event) => set("notes", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm" placeholder="Aparecerá nos detalhes da vaga se não houver um perfil estruturado" /></Field>
+            <Field label="O que o RH espera deste perfil?">
+              <textarea rows={4} maxLength={1000} value={form.manager_expectations} onChange={(event) => set("manager_expectations", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm resize-none max-h-56 overflow-y-auto" />
+              <div className="text-right text-xs text-muted-foreground">{form.manager_expectations.length}/1000</div>
+            </Field>
+            <Field label="Observações adicionais (exclusivas do Portal)">
+              <textarea rows={3} maxLength={1000} value={form.notes} onChange={(event) => set("notes", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm resize-none max-h-56 overflow-y-auto" placeholder="Aparecerá nos detalhes da vaga se não houver um perfil estruturado" />
+              <div className="text-right text-xs text-muted-foreground">{form.notes.length}/1000</div>
+            </Field>
           </div>
         </section>
 

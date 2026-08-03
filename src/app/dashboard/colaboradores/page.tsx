@@ -39,6 +39,35 @@ const MONTHS = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
+const onlyDigits = (value: string) => value.replace(/\D/g, "");
+
+const maskCpf = (value: string) => {
+  const digits = onlyDigits(value).slice(0, 11);
+  return digits
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+};
+
+const maskRg = (value: string) => {
+  const digits = onlyDigits(value).slice(0, 9);
+  return digits
+    .replace(/(\d{2})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1})$/, "$1-$2");
+};
+
+const maskPhone = (value: string) => {
+  const digits = onlyDigits(value).slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
+
+const MIN_AGE_YEARS = 14;
+const todayIso = new Date().toISOString().split("T")[0];
+
 export default function ColaboradoresPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Entity[]>([]);
@@ -48,6 +77,8 @@ export default function ColaboradoresPage() {
   const [roles, setRoles] = useState<string[]>([]);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [birthdayError, setBirthdayError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
   
   // Modals state
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
@@ -166,6 +197,7 @@ export default function ColaboradoresPage() {
   const startNew = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setBirthdayError("");
     setIsEmployeeModalOpen(true);
   };
 
@@ -174,6 +206,7 @@ export default function ColaboradoresPage() {
     for (const key of Object.keys(next) as (keyof EmployeeForm)[]) next[key] = String(employee[key] ?? "");
     setEditingId(employee.id);
     setForm(next);
+    setBirthdayError("");
     setIsEmployeeModalOpen(true);
   };
 
@@ -196,6 +229,25 @@ export default function ColaboradoresPage() {
     event.preventDefault();
     setSaving(true);
     setError("");
+    if (form.birthday) {
+      const birth = parseISO(form.birthday);
+      if (!isValid(birth)) {
+        setBirthdayError("Data de nascimento inválida.");
+        setSaving(false);
+        return;
+      }
+      if (birth.getTime() > Date.now()) {
+        setBirthdayError("A data de nascimento não pode estar no futuro.");
+        setSaving(false);
+        return;
+      }
+      if (differenceInYears(new Date(), birth) < MIN_AGE_YEARS) {
+        setBirthdayError(`Idade mínima permitida é ${MIN_AGE_YEARS} anos.`);
+        setSaving(false);
+        return;
+      }
+      setBirthdayError("");
+    }
     const nullableDates = new Set(["birthday", "dismissed_at", "admission_date", "aso_date"]);
     const nullableUuids = new Set(["department_id", "company_id", "cost_center_id", "workplace_id"]);
     const payload = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || nullableUuids.has(key) ? value || null : (value as string).trim() || null]));
@@ -237,20 +289,21 @@ export default function ColaboradoresPage() {
     setIsEmployeeModalOpen(false);
     setEditingId(null);
     setForm(emptyForm);
+    setBirthdayError("");
+    setConfirmDelete(null);
     setRefresh((value) => value + 1);
   };
 
   const deleteEmployee = async (id: string, name: string) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o colaborador "${name}"? Esta ação não pode ser desfeita.`)) return;
-    
     setSaving(true);
     const supabase = createClient();
     const { error } = await supabase.from("employees").delete().eq("id", id);
     setSaving(false);
-    
+
     if (error) {
       alert(`Erro ao excluir colaborador: ${error.message}`);
     } else {
+      setConfirmDelete(null);
       setRefresh(v => v + 1);
     }
   };
@@ -350,7 +403,7 @@ export default function ColaboradoresPage() {
 
       {/* Colaborador Edit/Create Modal */}
       <Dialog open={isEmployeeModalOpen} onOpenChange={setIsEmployeeModalOpen}>
-        <DialogContent className="max-w-[95vw] lg:max-w-6xl max-h-[95vh] overflow-y-auto p-6 md:p-8">
+        <DialogContent className="max-w-[95vw] lg:max-w-4xl max-h-[95vh] overflow-y-auto p-6 md:p-8">
           <DialogHeader className="mb-4">
             <div className="flex items-center justify-between gap-2">
               <DialogTitle className="text-2xl">{editingId ? "Registro completo do colaborador" : "Novo colaborador"}</DialogTitle>
@@ -397,12 +450,12 @@ export default function ColaboradoresPage() {
               <Field label="Nome completo *" span><Input required value={form.name} onChange={(e) => update("name", e.target.value)} /></Field>
               <Field label="Matrícula"><Input value={form.registration_number} onChange={(e) => update("registration_number", e.target.value)} /></Field>
               <Field label="Código do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} /></Field>
-              <Field label="CPF"><Input value={form.cpf} onChange={(e) => update("cpf", e.target.value)} /></Field>
-              <Field label="RG"><Input value={form.rg} onChange={(e) => update("rg", e.target.value)} /></Field>
-              <Field label="Nascimento"><Input type="date" value={form.birthday} onChange={(e) => update("birthday", e.target.value)} /></Field>
+              <Field label="CPF"><Input inputMode="numeric" value={form.cpf} onChange={(e) => update("cpf", maskCpf(e.target.value))} placeholder="000.000.000-00" /></Field>
+              <Field label="RG"><Input inputMode="numeric" value={form.rg} onChange={(e) => update("rg", maskRg(e.target.value))} placeholder="00.000.000-0" /></Field>
+              <Field label="Nascimento"><Input type="date" max={todayIso} value={form.birthday} onChange={(e) => { setBirthdayError(""); update("birthday", e.target.value); }} />{birthdayError && <p className="text-xs text-red-600">{birthdayError}</p>}</Field>
               <Field label="Gênero"><Select value={form.gender} onChange={(value) => update("gender", value)} options={["", "Masculino", "Feminino", "Outro"]} /></Field>
               <Field label="Estado civil"><Select value={form.marital_status} onChange={(value) => update("marital_status", value)} options={["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"]} /></Field>
-              <Field label="Telefone"><Input value={form.phone} onChange={(e) => update("phone", e.target.value)} /></Field>
+              <Field label="Telefone"><Input inputMode="numeric" value={form.phone} onChange={(e) => update("phone", maskPhone(e.target.value))} placeholder="(00) 00000-0000" /></Field>
               <Field label="E-mail pessoal"><Input type="email" value={form.email_personal} onChange={(e) => update("email_personal", e.target.value)} /></Field>
               <Field label="E-mail corporativo"><Input type="email" value={form.email_corporate} onChange={(e) => update("email_corporate", e.target.value)} /></Field>
             </Section>
@@ -520,7 +573,7 @@ export default function ColaboradoresPage() {
                         <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); window.location.href = `/dashboard/historico?id=${employee.id}`; }} title="Ver Histórico">
                           <History className="h-3.5 w-3.5 text-primary" />
                         </Button>
-                        <Button size="sm" variant="destructive" onClick={() => deleteEmployee(employee.id, String(employee.name || "Sem Nome"))} title="Excluir Colaborador">
+                        <Button size="sm" variant="destructive" onClick={() => setConfirmDelete({ id: employee.id, name: String(employee.name || "Sem Nome") })} title="Excluir Colaborador">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -701,11 +754,10 @@ export default function ColaboradoresPage() {
         </div>
       )}
 
-      {showFilterModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-card w-full max-w-2xl rounded-lg shadow-lg border flex flex-col max-h-[90vh]">
+      <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
+        <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden" showCloseButton={false}>
             <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="font-semibold text-lg">Filtros Avançados</h2>
+              <DialogTitle className="font-semibold text-lg">Filtros Avançados</DialogTitle>
               <Button variant="ghost" size="icon" onClick={() => setShowFilterModal(false)}><X className="h-4 w-4" /></Button>
             </div>
             <div className="p-4 overflow-y-auto space-y-4 flex-1">
@@ -776,9 +828,23 @@ export default function ColaboradoresPage() {
                 <Button onClick={() => { setPage(0); setShowFilterModal(false); }}>Aplicar Filtros</Button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmDelete !== null} onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}>
+        <DialogContent className="max-w-md sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir colaborador</DialogTitle>
+            <DialogDescription>Tem certeza que deseja excluir o colaborador "{confirmDelete?.name}"? Esta ação não pode ser desfeita.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirmDelete(null)} disabled={saving}>Cancelar</Button>
+            <Button type="button" variant="destructive" disabled={saving} onClick={() => confirmDelete && deleteEmployee(confirmDelete.id, confirmDelete.name)}>
+              {saving ? "Excluindo..." : "Excluir"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {selectedEmployeeId && (
         <CandidateProfileModal 

@@ -5,7 +5,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Download, Save, Undo2, Lock } from "lucide-react";
 
 type FinancialRecord = {
@@ -44,6 +44,7 @@ export default function FinanceiroPage() {
   const [reverting, setReverting] = useState(false);
 
   const [saving, setSaving] = useState(false);
+  const [isSaveConfirmOpen, setIsSaveConfirmOpen] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -72,7 +73,6 @@ export default function FinanceiroPage() {
   }, [month, year]);
 
   const handleSaveSnapshot = async () => {
-    if (!window.confirm("Deseja realizar o fechamento deste mês? Os valores serão congelados no histórico.")) return;
     setSaving(true);
     const supabase = createClient();
     const { data: user } = await supabase.auth.getUser();
@@ -219,7 +219,7 @@ export default function FinanceiroPage() {
               <Undo2 className="mr-2 h-4 w-4" /> Reverter Fechamento
             </Button>
           ) : (
-            <Button onClick={handleSaveSnapshot} disabled={saving || data.length === 0}>
+            <Button onClick={() => setIsSaveConfirmOpen(true)} disabled={saving || data.length === 0}>
               <Save className="mr-2 h-4 w-4" /> {saving ? "Salvando..." : "Salvar Fechamento"}
             </Button>
           )}
@@ -356,6 +356,19 @@ export default function FinanceiroPage() {
             <Button type="submit" form="revert-form" variant="destructive" disabled={reverting}>
               {reverting ? "Autenticando..." : "Confirmar e Reverter"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSaveConfirmOpen} onOpenChange={setIsSaveConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Realizar fechamento do mês?</DialogTitle>
+            <DialogDescription>Deseja realizar o fechamento deste mês? Os valores serão congelados no histórico.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSaveConfirmOpen(false)}>Cancelar</Button>
+            <Button onClick={() => { setIsSaveConfirmOpen(false); void handleSaveSnapshot(); }}>Confirmar Fechamento</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

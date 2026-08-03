@@ -8,6 +8,8 @@ import { useCallback, useEffect, useState } from "react";
 
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
+type DeleteTable = "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams" | "employee_promotions";
+
 function BfiBar({ label, score }: { label: string, score: number }) {
   const percent = ((score - 1) / 4) * 100;
   return (
@@ -175,6 +177,9 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
   const [applyCredit, setApplyCredit] = useState(false);
   const [installments, setInstallments] = useState(1);
 
+  const [pendingRemove, setPendingRemove] = useState<{ id: string; name: string; uniformItemId: string; qtyDelivered: number } | null>(null);
+  const [returnToStock, setReturnToStock] = useState(true);
+
   const getPrice = (name: string) => {
     const lower = name.toLowerCase();
     if (lower.includes("camisa social")) return 144;
@@ -249,8 +254,14 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
     }
   };
 
-  const remove = async (id: string, uniformItemId: string, qtyDelivered: number) => {
-    const returnToStock = window.confirm("Excluir este registro. Deseja DEVOLVER esta quantidade ao estoque?");
+  const askRemove = (id: string, name: string, uniformItemId: string, qtyDelivered: number) => {
+    setReturnToStock(true);
+    setPendingRemove({ id, name, uniformItemId, qtyDelivered });
+  };
+
+  const confirmRemove = async () => {
+    if (!pendingRemove) return;
+    const { id, uniformItemId, qtyDelivered } = pendingRemove;
     const supabase = createClient();
     const { error } = await supabase.from("employee_uniforms").delete().eq("id", id);
     if (!error) {
@@ -259,6 +270,7 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
        }
        load();
     }
+    setPendingRemove(null);
   };
 
   return (
@@ -291,7 +303,7 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
               <input type="checkbox" checked={selectedDeliveries.has(row.id)} onChange={() => toggleDelivery(row.id)} className="h-4 w-4 rounded border-gray-300" title="Incluir no termo" />
               <span>{row.quantity_delivered}x {row.uniform_items?.name} ({row.uniform_items?.size}) &middot; {new Date(row.delivered_at).toLocaleDateString()} {row.notes ? '- ' + row.notes : ''}</span>
             </div>
-            <Button type="button" size="icon" variant="ghost" onClick={() => remove(row.id, row.uniform_item_id, row.quantity_delivered)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button>
+            <Button type="button" size="icon" variant="ghost" onClick={() => askRemove(row.id, row.uniform_items?.name || "item", row.uniform_item_id, row.quantity_delivered)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button>
           </div>
         ))}
         <div className="grid gap-2 md:flex md:flex-wrap items-center">
@@ -362,6 +374,23 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!pendingRemove} onOpenChange={(open) => !open && setPendingRemove(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir registro de uniforme?</DialogTitle>
+            <DialogDescription>Remover {pendingRemove?.qtyDelivered}x {pendingRemove?.name}. Esta ação não pode ser desfeita.</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2">
+            <input type="checkbox" id="returnStock" checked={returnToStock} onChange={(e) => setReturnToStock(e.target.checked)} className="h-4 w-4" />
+            <Label htmlFor="returnStock">Devolver {pendingRemove?.qtyDelivered} item(ns) ao estoque</Label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingRemove(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => void confirmRemove()}>Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </details>
   );
 }
@@ -406,14 +435,19 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
-  const add = async (table: "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams" | "employee_promotions", payload: Record<string, string | null>) => {
+  const add = async (table: DeleteTable, payload: Record<string, string | null>) => {
     const { error } = await createClient().from(table).insert({ employee_id: employeeId, ...payload });
     if (!error) void load();
   };
-  const remove = async (table: "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams" | "employee_promotions", id: string) => {
-    if (!window.confirm("Excluir este registro?")) return;
+  const [pendingDelete, setPendingDelete] = useState<{ table: DeleteTable; id: string } | null>(null);
+  const remove = (table: DeleteTable, id: string) => setPendingDelete({ table, id });
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const { table, id } = pendingDelete;
     const { error } = await createClient().from(table).delete().eq("id", id);
     if (!error) void load();
+    setPendingDelete(null);
   };
 
   return (
@@ -517,6 +551,19 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
       <Related title="Exames ocupacionais" rows={exams} render={(row) => `${row.exam_type} · ${row.exam_name} · ${row.exam_date}`} onRemove={(id) => remove("occupational_exams", id)}>
         <Select value={exam.exam_type} onChange={(value) => setExam({ ...exam, exam_type: value })} options={["Admissional", "Periódico", "Retorno", "Mudança de risco", "Demissional"]} /><Input value={exam.exam_name} onChange={(e) => setExam({ ...exam, exam_name: e.target.value })} placeholder="Exame" /><Input type="date" value={exam.exam_date} onChange={(e) => setExam({ ...exam, exam_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (exam.exam_name && exam.exam_date) { void add("occupational_exams", { ...exam, status: "Realizado", result: "Pendente" }); setExam({ exam_type: "Admissional", exam_name: "", exam_date: "" }); } }}>Adicionar</Button>
       </Related>
+
+      <Dialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir registro?</DialogTitle>
+            <DialogDescription>Esta ação não pode ser desfeita. O registro será removido permanentemente.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingDelete(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => void confirmDelete()}>Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

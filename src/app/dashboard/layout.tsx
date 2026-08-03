@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
@@ -9,6 +9,7 @@ import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { Search, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
+import { cn } from "@/lib/utils";
 
 const breadcrumbMap: Record<string, string> = {
   "/dashboard": "Visão Geral",
@@ -80,6 +81,33 @@ export default function DashboardLayout({
     return () => sub.subscription.unsubscribe();
   }, [router]);
 
+  // Sidebar collapse: estado elevado do Sidebar para o layout (fix QA §0/C1).
+  // isCollapsed = preferência persistida (desktop). Em <768px o Sidebar deriva
+  // colapsado via isMobile, então o padding nunca deixa a sidebar cobrir conteúdo.
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const isFirstRender = useRef(true)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const saved = localStorage.getItem("sidebar-collapsed")
+      if (saved !== null) {
+        const v = JSON.parse(saved)
+        if (typeof v === "boolean") setIsCollapsed(v)
+      }
+    } catch {
+      // storage corrompido -> mantém default expandido
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    localStorage.setItem("sidebar-collapsed", JSON.stringify(isCollapsed))
+  }, [isCollapsed])
+
   if (checking) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -92,10 +120,15 @@ export default function DashboardLayout({
     <PermissionsProvider>
       <div className="flex h-screen overflow-hidden bg-background print:h-auto print:block print:bg-transparent">
         {/* Sidebar - fixed on desktop */}
-        <Sidebar />
+        <Sidebar collapsed={isCollapsed} onToggle={() => setIsCollapsed((c) => !c)} />
 
-        {/* Main Content Area - md:pl-64 compensa a sidebar fixed (C1) */}
-        <div className="flex flex-1 flex-col overflow-hidden md:pl-64 print:overflow-visible print:block">
+        {/* Main Content Area - padding acompanha o estado real da sidebar (fix C1) */}
+        <div
+          className={cn(
+            "flex flex-1 flex-col overflow-hidden print:overflow-visible print:block",
+            isCollapsed ? "pl-[72px]" : "pl-[72px] md:pl-64"
+          )}
+        >
           {/* Sticky Header */}
           <header className="print:hidden sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-6 backdrop-blur">
             {/* Breadcrumbs Placeholder */}
