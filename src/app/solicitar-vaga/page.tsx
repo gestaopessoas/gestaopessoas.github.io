@@ -116,39 +116,15 @@ export default function SolicitarVagaPage() {
     const supabase = createClient();
     supabase.rpc("get_public_job_form_options", { access_code_param: accessCode }).then(async ({ data, error }) => {
       if (error) {
-        if (error.message === 'Invalid access code') {
+        if (error.message === 'Invalid access code' || error.message === 'job_request_code_not_configured') {
           setError("Código de acesso inválido. Verifique com o RH.");
           setAuthorized(false);
           setLoading(false);
           return;
         }
-        
-        // Fallback ONLY if the RPC fails for other reasons (e.g. it doesn't exist yet)
-        const [profilesResult, departmentsResult, salaryResult, settingsResult, benefitsResult, workplacesResult, employeesResult] = await Promise.all([
-          supabase.from("job_profiles").select("id, profile_code, title, min_education, desired_education, min_experience, desired_experience, cnh, knowledge, competencies").order("title"),
-          supabase.from("departments").select("id, name").order("name"),
-          supabase.from("salary_table").select("*").order("role_name"),
-          supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle(),
-          supabase.from("company_benefits").select("name").order("name"),
-          supabase.from("workplaces").select("id, name, type").order("name"),
-          supabase.from("employees").select("id, name, role").eq("status", "Ativo").or("role.ilike.%coordenador%,role.ilike.%diretor%,role.ilike.%analista%").order("name"),
-        ]);
 
-        if (profilesResult.error || departmentsResult.error) {
-          setError("Não foi possível carregar cargos e setores. Avise o RH.");
-          setLoading(false);
-          return;
-        }
-
-        setProfiles((profilesResult.data ?? []) as JobProfile[]);
-        setDepartments((departmentsResult.data ?? []) as Department[]);
-        setSalaryTable((salaryResult.data ?? []) as SalaryRow[]);
-        setCompanyBenefits((benefitsResult.data ?? []) as {name: string}[]);
-        setWorkplaces((workplacesResult.data ?? []) as Workplace[]);
-        setRequesters((employeesResult.data ?? []) as Employee[]);
-        if (settingsResult.data) {
-          setWorkSchedules(settingsResult.data.value || []);
-        }
+        // A RPC é a única fonte (SECURITY DEFINER). Falha aqui = não carrega o form.
+        setError("Não foi possível carregar o formulário. Avise o RH.");
         setLoading(false);
         return;
       }
@@ -158,16 +134,9 @@ export default function SolicitarVagaPage() {
       setWorkplaces((data?.workplaces ?? []) as Workplace[]);
       setRequesters((data?.employees ?? []) as Employee[]);
       setCompanyBenefits((data?.benefits ?? []) as {name: string}[]);
-      
-      const [salaryResult, settingsResult] = await Promise.all([
-        supabase.from("salary_table").select("*").order("role_name"),
-        supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle(),
-      ]);
-      setSalaryTable((salaryResult.data ?? []) as SalaryRow[]);
-      if (settingsResult.data) {
-        setWorkSchedules(settingsResult.data.value || []);
-      }
-      
+      setWorkSchedules((data?.work_schedules ?? []) as string[]);
+      setSalaryTable((data?.salary_table ?? []) as SalaryRow[]);
+
       setLoading(false);
     });
   }, [authorized]);
