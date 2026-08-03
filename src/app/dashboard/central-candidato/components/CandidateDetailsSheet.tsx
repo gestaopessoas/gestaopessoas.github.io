@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2, Calendar, User, Phone, Mail, Building, FileText, Briefcase, Plus, AlertCircle, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -85,14 +85,14 @@ export default function CandidateDetailsSheet({
 
   return (
     <>
-      <Sheet open={!!candidateId} onOpenChange={(open) => !open && onClose()}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader className="mb-6">
-            <SheetTitle className="text-2xl">Detalhes do Candidato</SheetTitle>
-            <SheetDescription>
+      <Dialog open={!!candidateId} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="mb-6">
+            <DialogTitle className="text-2xl">Detalhes do Candidato</DialogTitle>
+            <DialogDescription>
               Visualize o histórico completo e interações do candidato.
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
           {loading ? (
             <div className="flex justify-center items-center h-48">
@@ -230,8 +230,8 @@ export default function CandidateDetailsSheet({
               Candidato não encontrado.
             </div>
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {candidate && (
         <AddInterviewModal 
