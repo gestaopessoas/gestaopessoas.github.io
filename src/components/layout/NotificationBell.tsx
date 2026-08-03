@@ -74,8 +74,13 @@ export function NotificationBell() {
 
     fetchNotifications();
     window.addEventListener("notificationsUpdated", fetchNotifications);
-    
-    // Configura Supabase Realtime para notificações dinâmicas
+
+    // Polling periódico (60s): atualiza o sino mesmo sem Realtime ativo.
+    // O canal postgres_changes abaixo depende da extensão realtime instalada
+    // (hoje ausente no projeto) — o interval é o mecanismo garantido de refresh.
+    const pollId = window.setInterval(fetchNotifications, 60_000);
+
+    // Supabase Realtime (redundante quando a extensão estiver ativa)
     const supabase = createClient();
     const channel = supabase
       .channel('notifications-db-changes')
@@ -86,6 +91,7 @@ export function NotificationBell() {
 
     return () => {
       window.removeEventListener("notificationsUpdated", fetchNotifications);
+      window.clearInterval(pollId);
       supabase.removeChannel(channel);
     };
   }, []);
