@@ -32,7 +32,20 @@ type SalaryRow = {
 
 type Department = { id: string; name: string };
 type Workplace = { id: string; name: string; type: string };
-type Employee = { id: string; name: string; role: string };
+type Employee = { id: string; name: string; role: string; status?: string };
+
+const ANALYST_AND_ABOVE_ROLES = [
+  "analista", "coordenador", "gerente", "diretor", "supervisor",
+  "engenheiro", "mestre", "encarregado", "encarregada",
+  "especialista", "consultor", "chefe", "arquiteto", "lead", "tech lead",
+  "head", "chief", "vp", "vice-presidente", "presidente"
+];
+
+function isAnalystOrAbove(role: string | undefined): boolean {
+  if (!role) return false;
+  const r = role.toLowerCase();
+  return ANALYST_AND_ABOVE_ROLES.some(k => r.includes(k));
+}
 
 const behavioralTags = [
   "Adaptabilidade", "Aprendizado técnico", "Autonomia", "Comprometimento",
@@ -134,7 +147,15 @@ export default function SolicitarVagaPage() {
       setWorkplaces((data?.workplaces ?? []) as Workplace[]);
       setRequesters((data?.employees ?? []) as Employee[]);
       setCompanyBenefits((data?.benefits ?? []) as {name: string}[]);
-      setWorkSchedules((data?.work_schedules ?? []) as string[]);
+      const scheds = (data?.work_schedules ?? []) as string[];
+      setWorkSchedules(scheds.length > 0 ? scheds : [
+        "Administrativo (Seg-Sex 08:00-17:48)",
+        "Obra (Seg-Sex 07:00-16:48 / Sáb 07:00-11:00)",
+        "Turno 12x36 Revezamento",
+        "Estágio (30h semanais)",
+        "Jovem Aprendiz (20h semanais)",
+        "Flexível / Remoto"
+      ]);
       setSalaryTable((data?.salary_table ?? []) as SalaryRow[]);
 
       setLoading(false);
@@ -383,7 +404,7 @@ export default function SolicitarVagaPage() {
             <Field label="Nome *">
               <select required value={form.requester_name} onChange={(event) => set("requester_name", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                 <option value="">Selecione o solicitante...</option>
-                {requesters.map((r) => (
+                {requesters.filter(r => (!r.status || r.status === 'Ativo') && isAnalystOrAbove(r.role)).map((r) => (
                   <option key={r.id} value={r.name}>{r.name} — {r.role}</option>
                 ))}
               </select>

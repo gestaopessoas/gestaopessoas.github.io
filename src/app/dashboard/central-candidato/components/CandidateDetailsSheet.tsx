@@ -30,7 +30,7 @@ export default function CandidateDetailsSheet({
   const [retryTick, setRetryTick] = useState(0);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [openingResume, setOpeningResume] = useState(false);
-  const [showBehavioralTest, setShowBehavioralTest] = useState(false);
+  const [activeModalTab, setActiveModalTab] = useState<null | "curriculum" | "behavioral">(null);
 
   const supabase = createClient();
 
@@ -143,16 +143,18 @@ export default function CandidateDetailsSheet({
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 pt-2">
-                  {candidate.resume_url ? (
-                    <Button variant="outline" size="sm" onClick={openResume} disabled={openingResume}>
-                      {openingResume ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Paperclip className="h-4 w-4 mr-2" />}
-                      Ver Currículo
+                  <Button variant="outline" size="sm" onClick={() => setActiveModalTab("curriculum")} className="gap-2 font-medium">
+                    <FileText className="h-4 w-4 text-primary" />
+                    Ver Dossiê / Currículo
+                  </Button>
+                  {candidate.resume_url && (
+                    <Button variant="ghost" size="sm" onClick={openResume} disabled={openingResume} className="gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                      {openingResume ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5 text-primary" />}
+                      Anexo PDF
                     </Button>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">Currículo não anexado.</span>
                   )}
-                  <Button variant="outline" size="sm" onClick={() => setShowBehavioralTest(true)}>
-                    <Sparkles className="h-4 w-4 mr-2 text-primary" />
+                  <Button variant="outline" size="sm" onClick={() => setActiveModalTab("behavioral")} className="gap-2 font-medium">
+                    <Sparkles className="h-4 w-4 text-primary" />
                     Ver Teste Comportamental
                   </Button>
                 </div>
@@ -256,10 +258,11 @@ export default function CandidateDetailsSheet({
         />
       )}
 
-      {showBehavioralTest && candidate && (
+      {activeModalTab && candidate && (
         <CandidateProfileModal 
           candidateId={candidate.id}
-          onClose={() => setShowBehavioralTest(false)} 
+          initialTab={activeModalTab}
+          onClose={() => setActiveModalTab(null)} 
         />
       )}
     </>

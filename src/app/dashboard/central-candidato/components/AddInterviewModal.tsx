@@ -279,13 +279,16 @@ export default function AddInterviewModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Triagem">Triagem</SelectItem>
-                  <SelectItem value="Entrevista RH">Entrevista RH</SelectItem>
+                  <SelectItem value="Entrevista RH">Entrevista RH (Gestão de Pessoas)</SelectItem>
                   <SelectItem value="Entrevista Gestor">Entrevista Gestor</SelectItem>
-                  <SelectItem value="Proposta">Proposta</SelectItem>
+                  <SelectItem value="Testagem Psicológica">Testagem Psicológica</SelectItem>
+                  <SelectItem value="Coleta de Documentos & Exames">Coleta de Documentos & Exames</SelectItem>
+                  <SelectItem value="Proposta">Proposta / Aguardando Contratação</SelectItem>
                   <SelectItem value="Contratado">Contratado</SelectItem>
+                  <SelectItem value="Banco de Talentos">Banco de Talentos</SelectItem>
                   <SelectItem value="Reprovado">Reprovado</SelectItem>
                   <SelectItem value="Desistente">Desistente</SelectItem>
-                  <SelectItem value="Banco de Talentos">Banco de Talentos</SelectItem>
+                  <SelectItem value="Outros">Outros</SelectItem>
                 </SelectContent>
               </Select>
             </div>

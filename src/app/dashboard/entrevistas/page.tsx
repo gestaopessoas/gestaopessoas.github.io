@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 
 type PsychologicalTestInput = {
   test_name: string;
@@ -447,6 +448,7 @@ export default function EntrevistasPage() {
   const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
   const [resumeText, setResumeText] = useState("");
   const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
+  const [viewingCandidateProfile, setViewingCandidateProfile] = useState<{ interviewId?: string | null; email?: string | null; name?: string | null } | null>(null);
   
   // Test generation states
   const [selectedTest, setSelectedTest] = useState("G36");
@@ -1210,9 +1212,23 @@ ${resumeText}`;
                   {editingId ? "Altere dados do candidato ou adicione o parecer da entrevista." : "Preencha os dados do candidato e da entrevista."}
                 </p>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
-                <X className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center gap-2">
+                {editingId && (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setViewingCandidateProfile({ interviewId: editingId, email: form.email, name: form.candidate_name })}
+                    className="gap-1.5 text-xs text-primary border-primary/20 hover:bg-primary/5 shadow-xs"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Ver Dossiê / Currículo Completo
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
             
             <div className="border-b px-6 flex gap-6 shrink-0">
@@ -1386,13 +1402,17 @@ ${resumeText}`;
                     <div className="space-y-1">
                       <Label>Fase do Processo</Label>
                       <select value={assessmentForm.selection_stage || ''} onChange={e => setAssessmentForm({...assessmentForm, selection_stage: e.target.value})} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm">
-                        <option value="">Selecione...</option>
-                        <option value="Em Entrevista com a gestão de pessoas">Em Entrevista com a gestão de pessoas</option>
-                        <option value="Em testagem psicológica">Em testagem psicológica</option>
-                        <option value="Em espera para a contratação">Em espera para a contratação</option>
-                        <option value="Em coleta de documento">Em coleta de documento</option>
-                        <option value="Em espera para realizar o Exame admissional">Em espera para realizar o Exame admissional</option>
-                        <option value="Em espera do resultado do Exame admissional">Em espera do resultado do Exame admissional</option>
+                        <option value="">Selecione a fase unificada...</option>
+                        <option value="Triagem">Triagem</option>
+                        <option value="Entrevista RH">Entrevista RH (Gestão de Pessoas)</option>
+                        <option value="Entrevista Gestor">Entrevista Gestor</option>
+                        <option value="Testagem Psicológica">Testagem Psicológica</option>
+                        <option value="Coleta de Documentos & Exames">Coleta de Documentos & Exames</option>
+                        <option value="Proposta / Aguardando Contratação">Proposta / Aguardando Contratação</option>
+                        <option value="Contratado">Contratado</option>
+                        <option value="Banco de Talentos">Banco de Talentos</option>
+                        <option value="Reprovado">Reprovado</option>
+                        <option value="Desistente">Desistente</option>
                         <option value="Outros">Outros</option>
                       </select>
                     </div>
@@ -2023,6 +2043,15 @@ ${resumeText}`;
             </div>
           </div>
         </div>
+      )}
+
+      {viewingCandidateProfile && (
+        <CandidateProfileModal 
+          interviewId={viewingCandidateProfile.interviewId}
+          email={viewingCandidateProfile.email}
+          candidateName={viewingCandidateProfile.name}
+          onClose={() => setViewingCandidateProfile(null)}
+        />
       )}
     </div>
   );

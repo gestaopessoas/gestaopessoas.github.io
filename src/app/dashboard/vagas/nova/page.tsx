@@ -135,9 +135,20 @@ export default function NovaVagaPage() {
       setSalaryTable((salaryResult.data ?? []) as SalaryRow[]);
       setCostCenters((costCentersResult.data ?? []) as CostCenter[]);
       setCompanyBenefits((benefitsResult.data ?? []) as {name: string}[]);
-      if (settingsResult.data) {
-        setWorkSchedules(settingsResult.data.value || []);
+      let scheds: string[] = [];
+      if (Array.isArray(settingsResult.data?.value)) scheds = settingsResult.data.value;
+      else if (typeof settingsResult.data?.value === "string") { try { scheds = JSON.parse(settingsResult.data.value); } catch {} }
+      if (!scheds || !scheds.length) {
+        scheds = [
+          "Administrativo (Seg-Sex 08:00-17:48)",
+          "Obra (Seg-Sex 07:00-16:48 / Sáb 07:00-11:00)",
+          "Turno 12x36 Revezamento",
+          "Estágio (30h semanais)",
+          "Jovem Aprendiz (20h semanais)",
+          "Flexível / Remoto"
+        ];
       }
+      setWorkSchedules(scheds);
 
       const { data: authData } = await supabase.auth.getUser();
       if (authData.user) {

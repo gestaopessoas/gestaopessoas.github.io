@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, MapPin, Paperclip, Search, Sparkles } from "lucide-react";
+import { Briefcase, MapPin, Paperclip, Search, Sparkles, FileText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 
@@ -30,6 +30,7 @@ export default function BancoDeTalentosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [modalTab, setModalTab] = useState<"curriculum" | "behavioral">("curriculum");
 
   useEffect(() => {
     let active = true;
@@ -144,10 +145,19 @@ export default function BancoDeTalentosPage() {
                     <span key={tag} className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">{tag}</span>
                   ))}
                 </div>
-                {candidate.resume_url && (
-                  <div className="pt-2 border-t mt-3 flex justify-end" onClick={(e) => e.stopPropagation()}>
+                <div className="pt-3 border-t mt-3 flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => { setModalTab("curriculum"); setSelectedCandidateId(candidate.id); }}
+                    className="h-8 px-3 text-xs font-medium text-primary hover:bg-primary/5 gap-1.5"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Ver Dossiê / Currículo
+                  </Button>
+                  {candidate.resume_url && (
                     <Button 
-                      variant="outline" 
+                      variant="ghost" 
                       size="sm" 
                       onClick={async () => {
                         const supabase = createClient();
@@ -158,13 +168,13 @@ export default function BancoDeTalentosPage() {
                           window.open(data.signedUrl, "_blank");
                         }
                       }}
-                      className="h-8 px-3 text-xs font-medium text-primary hover:bg-primary/5"
+                      className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
                     >
-                      <Paperclip className="mr-1.5 h-3.5 w-3.5" />
-                      Ver Currículo
+                      <Paperclip className="h-3.5 w-3.5 mr-1" />
+                      Anexo PDF
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
           );
@@ -173,7 +183,8 @@ export default function BancoDeTalentosPage() {
       
       {selectedCandidateId && (
         <CandidateProfileModal 
-          candidateId={selectedCandidateId} 
+          candidateId={selectedCandidateId}
+          initialTab={modalTab}
           onClose={() => setSelectedCandidateId(null)} 
         />
       )}
