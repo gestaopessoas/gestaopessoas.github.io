@@ -13,7 +13,7 @@ export default function MatrizTalentosPage() {
   useEffect(() => {
     async function fetchData() {
       // For demonstration: fetches employees and mocks their scores
-      const { data: emps } = await supabase.from('employees').select('id, name, departments(name)').eq('status', 'ACTIVE');
+      const { data: emps } = await supabase.from('employees').select('id, name, departments(name)').in('status', ['Ativo', 'Férias', 'Afastado']);
       
       const mockedTalents = (emps || []).map((e: any) => ({
         id: e.id,

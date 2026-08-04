@@ -22,12 +22,12 @@ export default function DashboardPage() {
       const supabase = createClient();
       
       const [empRes, jobsRes] = await Promise.all([
-        supabase.from("employees").select("id, status, birthday, admission_date").range(0, 9999),
+        supabase.from("employees").select("id, status, birthday, admission_date").in("status", ["Ativo", "Férias", "Afastado"]),
         supabase.from("job_requests").select("id", { count: "exact", head: true }).neq("status", "Recusada").neq("status", "Arquivada")
       ]);
 
       const employees = empRes.data || [];
-      const activeEmployees = employees.filter(e => e.status !== "Desligado" && e.status !== "Arquivo Morto" && e.status !== "inactive");
+      const activeEmployees = employees; // já filtrado no banco
       
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();

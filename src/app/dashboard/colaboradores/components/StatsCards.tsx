@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Users, Cake, Activity, AlertCircle, AlertTriangle } from "lucide-react";
 import { Employee, MONTHS } from "./types";
@@ -14,7 +14,7 @@ export function StatsCards({ employees }: StatsCardsProps) {
 
   const stats = {
     total: employees.length,
-    active: employees.filter((e) => e.status === "Ativo").length,
+    active: employees.filter((e) => ["Ativo", "Férias", "Afastado"].includes(e.status ?? "")).length,
     birthdays: employees.filter((e) => {
       if (!e.birthday) return false;
       const bday = new Date(e.birthday + "T12:00:00");

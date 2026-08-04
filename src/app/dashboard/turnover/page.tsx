@@ -19,7 +19,7 @@ export default function TurnoverPage() {
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-      const ativos = emps?.filter(e => e.status !== 'Desligado' && e.status !== 'Inativo') || [];
+      const ativos = emps?.filter(e => ['Ativo', 'Férias', 'Afastado'].includes(e.status ?? '')) || [];
       const desligados = emps?.filter(e => e.status === 'Desligado' || e.dismissed_at) || [];
       
       // Filtrar para usar apenas desligamentos do último ano

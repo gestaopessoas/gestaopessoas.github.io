@@ -28,7 +28,7 @@ export default function HoleritesPage() {
       setIsHR(isUserHR);
 
       if (isUserHR) {
-        const { data: emps } = await supabase.from('employees').select('id, name, cpf').eq('status', 'ACTIVE');
+        const { data: emps } = await supabase.from('employees').select('id, name, cpf').in('status', ['Ativo', 'Férias', 'Afastado']);
         setEmployees(emps || []);
       }
 
