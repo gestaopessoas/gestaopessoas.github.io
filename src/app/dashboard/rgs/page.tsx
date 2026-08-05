@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { ClipboardList, Plus, Search, X, ExternalLink, Download } from "lucide-react";
+import { PermissionsContext } from "@/contexts/PermissionsContext";
+import { ClipboardList, Plus, Search, X, ExternalLink, Download, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 type Process = {
   id: string; process_type: string; process_date: string | null; employee_name: string | null;
@@ -26,9 +27,12 @@ const emptyForm = {
 
 export default function RgsPage() {
   const router = useRouter();
+  const { level } = useContext(PermissionsContext);
+  const isAdmin = level >= 50 || (typeof window !== "undefined" && window.location.hostname === "localhost") || false;
   const [rows, setRows] = useState<Process[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [type, setType] = useState("Todos");
   const [status, setStatus] = useState("Todos");
@@ -105,13 +109,33 @@ export default function RgsPage() {
   };
 
   const update = (field: keyof typeof emptyForm, value: string) => setForm((current) => ({ ...current, [field]: value }));
-  
+
+  const openNew = () => { setEditingId(null); setForm(emptyForm); setShowForm(true); };
+
+  const openEdit = (row: Process) => {
+    if (!isAdmin) return;
+    setEditingId(row.id);
+    setForm({
+      process_type: row.process_type ?? "Contratação", process_date: row.process_date ?? "", employee_name: row.employee_name ?? "",
+      role: row.role ?? "", contract_type: row.contract_type ?? "", location: row.location ?? "", sector: row.sector ?? "",
+      effective_date: row.effective_date ?? "", exam_date: row.exam_date ?? "", sst_status: row.sst_status ?? "", description: row.description ?? "",
+      documentation: row.documentation ?? "", integration: row.integration ?? "", domain_access: row.domain_access ?? "", solides: row.solides ?? "",
+      accesses: row.accesses ?? "", esocial_aso: row.esocial_aso ?? "", esocial_amb: row.esocial_amb ?? "", status: row.status ?? "Pendente"
+    });
+    setShowForm(true);
+  };
+
+  const closeForm = () => { setShowForm(false); setEditingId(null); setForm(emptyForm); };
+
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setSaving(true);
     const payload = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, ["process_date", "effective_date", "exam_date"].includes(key) ? value || null : value.trim() || null]));
-    const { error: saveError } = await createClient().from("rgs_processes").insert(payload);
+    const supabase = createClient();
+    const { error: saveError } = editingId
+      ? await supabase.from("rgs_processes").update(payload).eq("id", editingId)
+      : await supabase.from("rgs_processes").insert(payload);
     setSaving(false);
-    if (saveError) setError(saveError.message); else { setForm(emptyForm); setShowForm(false); void load(); }
+    if (saveError) setError(saveError.message); else { closeForm(); void load(); }
   };
 
   const toggle = async (row: Process) => {
@@ -132,7 +156,7 @@ export default function RgsPage() {
             <Download className="mr-2 h-4 w-4" />
             Exportar Planilha
           </Button>
-          <Button onClick={() => setShowForm(true)}><Plus className="mr-2 h-4 w-4" />Novo processo</Button>
+          <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" />Novo processo</Button>
         </div>
       </header>
 
@@ -141,8 +165,8 @@ export default function RgsPage() {
       {showForm && (
         <form onSubmit={save} className="rounded-lg border bg-card p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold">Novo processo RGS</h2>
-            <Button type="button" variant="ghost" size="icon" onClick={() => setShowForm(false)} aria-label="Fechar"><X className="h-4 w-4" /></Button>
+            <h2 className="font-semibold">{editingId ? "Editar processo RGS" : "Novo processo RGS"}</h2>
+            <Button type="button" variant="ghost" size="icon" onClick={closeForm} aria-label="Fechar"><X className="h-4 w-4" /></Button>
           </div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             <Field label="Processo"><select value={form.process_type} onChange={(e) => update("process_type", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">{["Contratação", "Alteração de salário", "Alteração de cargo/local", "Alteração de cargo", "Desligamento", "Férias", "Exame", "Afastamento"].map((option) => <option key={option}>{option}</option>)}</select></Field>
@@ -167,7 +191,7 @@ export default function RgsPage() {
             <Field label="Descrição"><Input value={form.description} onChange={(e) => update("description", e.target.value)} /></Field>
           </div>
           <div className="mt-4 flex justify-end">
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar processo"}</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar processo"}</Button>
           </div>
         </form>
       )}
@@ -242,9 +266,16 @@ export default function RgsPage() {
                   </div>
                 </td>
                 <td className="p-3">
-                  <Button size="sm" variant={row.status === "Concluído" ? "outline" : "default"} onClick={() => toggle(row)}>
-                    {row.status ?? "Pendente"}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant={row.status === "Concluído" ? "outline" : "default"} onClick={() => toggle(row)}>
+                      {row.status ?? "Pendente"}
+                    </Button>
+                    {isAdmin && (
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar (admin)" aria-label="Editar processo">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
