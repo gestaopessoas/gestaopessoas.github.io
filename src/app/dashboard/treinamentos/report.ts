@@ -1,7 +1,21 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-export const generateTrainingReport = (monthLabel: string, sessions: any[]) => {
+type ReportSession = {
+  theme: string;
+  training_date: string;
+  training_time?: string | null;
+  participant_count?: number | null;
+  satisfaction_metrics?: {
+    average_score: number;
+    weighted_utilization_score?: number;
+    respondents?: number;
+    feedback_likes: string[];
+    feedback_improvements: string[];
+  } | null;
+};
+
+export const generateTrainingReport = (monthLabel: string, sessions: ReportSession[]) => {
   const doc = new jsPDF("landscape");
   
   // Header
@@ -17,11 +31,14 @@ export const generateTrainingReport = (monthLabel: string, sessions: any[]) => {
   }, 0);
   
   const indicator = totalParticipants > 0 ? (totalHours / (totalParticipants * 193.6)).toFixed(4) : "0.0000";
+  const totalUtilization = sessions.reduce((acc, s) => acc + (s.satisfaction_metrics?.weighted_utilization_score ?? s.satisfaction_metrics?.average_score ?? 0), 0);
+  const avgUtilization = sessions.length > 0 ? (totalUtilization / sessions.length).toFixed(2) : "0.00";
   
   doc.setFontSize(12);
   doc.text(`Total de Participações: ${totalParticipants}`, 14, 30);
   doc.text(`Total de Horas: ${totalHours.toFixed(1)}h`, 14, 38);
   doc.text(`Indicador de Treinamento (Horas / (Part * 193.6)): ${indicator}`, 14, 46);
+  doc.text(`Percepção Geral de Aproveitamento (Ponderada): ${avgUtilization} / 10`, 14, 54);
   
   // Table Data
   const tableData = sessions.map((s) => {
@@ -41,7 +58,7 @@ export const generateTrainingReport = (monthLabel: string, sessions: any[]) => {
   });
   
   autoTable(doc, {
-    startY: 55,
+    startY: 62,
     head: [["Tema", "Data", "Duração", "Participantes", "Nota (0-10)", "Avaliações"]],
     body: tableData,
     theme: "striped",
@@ -49,7 +66,7 @@ export const generateTrainingReport = (monthLabel: string, sessions: any[]) => {
   });
   
   // Additional Feedback Section
-  let finalY = (doc as any).lastAutoTable.finalY + 15;
+  let finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
   doc.setFontSize(14);
   doc.text("Destaques das Avaliações Qualitativas", 14, finalY);
   finalY += 10;

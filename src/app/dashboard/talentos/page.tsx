@@ -129,7 +129,7 @@ export default function BancoDeTalentosPage() {
                   <CardTitle className="text-xl">{candidateName(candidate)}</CardTitle>
                   <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-sm">
                     <span className="inline-flex items-center"><Briefcase className="mr-1.5 h-3.5 w-3.5" />{candidate.role_interest || "Interesse não informado"}</span>
-                    <span className="inline-flex items-center"><MapPin className="mr-1.5 h-3.5 w-3.5" />{[candidate.city, candidate.state].filter(Boolean).join(", ") || "Local não informado"}</span>
+                    <span className="inline-flex items-center"><MapPin className="mr-1.5 h-3.5 w-3.5" />{[candidate.city, candidate.state].filter(Boolean).join(", ") || (candidate.search_tags?.filter(t => t !== candidate.role_interest).join(" / ")) || "Setor/Obra não informado"}</span>
                   </CardDescription>
                 </div>
                 <div className="flex flex-col items-center justify-center bg-primary/10 rounded-full h-12 w-12 border border-primary/20 shrink-0">

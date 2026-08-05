@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { calculateCleanAverage, calculateWeightedUtilization } from "@/utils/trainingMath.mjs";
 
 export type SatisfactionMetrics = {
   respondents: number;
@@ -6,6 +7,10 @@ export type SatisfactionMetrics = {
   expectations: Record<string, number>;
   feedback_likes: string[];
   feedback_improvements: string[];
+  content_score?: number;
+  management_support_score?: number;
+  engagement_score?: number;
+  weighted_utilization_score?: number;
 };
 
 export const parseSatisfactionExcel = async (file: File): Promise<SatisfactionMetrics> => {
@@ -18,41 +23,49 @@ export const parseSatisfactionExcel = async (file: File): Promise<SatisfactionMe
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         
-        // Converte para array de arrays (linhas e colunas)
-        const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1 });
         
         if (rows.length < 2) {
           throw new Error("O arquivo Excel está vazio ou não possui formato válido.");
         }
 
-        const headers = rows[0].map(h => String(h || "").trim());
+        const headers = (rows[0] as unknown[]).map(h => String(h || "").trim());
         
         let idxScore = -1;
         let idxLiked = -1;
         let idxImprove = -1;
         let idxExpectations = -1;
+        let idxContent = -1;
+        let idxManagement = -1;
+        let idxEngagement = -1;
         
         headers.forEach((h, i) => {
-          if (h.includes("De 0 a 10")) idxScore = i;
-          if (h.includes("O que você mais gostou")) idxLiked = i;
-          if (h.includes("O que pode ser melhorado")) idxImprove = i;
-          if (h.includes("atendeu minhas expectativas")) idxExpectations = i;
+          const lower = h.toLowerCase();
+          if (lower.includes("de 0 a 10") || lower.includes("nota geral")) idxScore = i;
+          if (lower.includes("mais gostou")) idxLiked = i;
+          if (lower.includes("pode ser melhorado")) idxImprove = i;
+          if (lower.includes("expectativas")) idxExpectations = i;
+          if (lower.includes("conteúdo") || lower.includes("aplicabilidade")) idxContent = i;
+          if (lower.includes("gestão") || lower.includes("suporte")) idxManagement = i;
+          if (lower.includes("engajamento") || lower.includes("feedback")) idxEngagement = i;
         });
 
-        const scores: number[] = [];
+        const scores: (string | number)[] = [];
+        const contentScores: (string | number)[] = [];
+        const managementScores: (string | number)[] = [];
+        const engagementScores: (string | number)[] = [];
         const likes: string[] = [];
         const improvements: string[] = [];
         const expectations: Record<string, number> = {};
 
-        // Ignora o cabeçalho (linha 0)
         for (let i = 1; i < rows.length; i++) {
-          const row = rows[i];
+          const row = rows[i] as unknown[];
           if (!row || row.length === 0) continue;
 
-          if (idxScore !== -1 && row[idxScore] != null) {
-            const val = parseFloat(row[idxScore]);
-            if (!isNaN(val)) scores.push(val);
-          }
+          if (idxScore !== -1 && row[idxScore] != null) scores.push(row[idxScore] as string | number);
+          if (idxContent !== -1 && row[idxContent] != null) contentScores.push(row[idxContent] as string | number);
+          if (idxManagement !== -1 && row[idxManagement] != null) managementScores.push(row[idxManagement] as string | number);
+          if (idxEngagement !== -1 && row[idxEngagement] != null) engagementScores.push(row[idxEngagement] as string | number);
 
           if (idxLiked !== -1 && row[idxLiked]) {
             const val = String(row[idxLiked]).trim();
@@ -76,16 +89,22 @@ export const parseSatisfactionExcel = async (file: File): Promise<SatisfactionMe
           }
         }
 
-        const avgScore = scores.length > 0 
-          ? scores.reduce((a, b) => a + b, 0) / scores.length 
-          : 0;
+        const avgScore = calculateCleanAverage(scores);
+        const contentScore = contentScores.length > 0 ? calculateCleanAverage(contentScores) : avgScore;
+        const managementScore = managementScores.length > 0 ? calculateCleanAverage(managementScores) : avgScore;
+        const engagementScore = engagementScores.length > 0 ? calculateCleanAverage(engagementScores) : avgScore;
+        const weightedUtilization = calculateWeightedUtilization(contentScore, managementScore, engagementScore);
 
         const metrics: SatisfactionMetrics = {
-          respondents: scores.length,
-          average_score: Number(avgScore.toFixed(1)),
+          respondents: scores.length || rows.length - 1,
+          average_score: avgScore,
           expectations,
-          feedback_likes: likes.slice(0, 5), // pega as 5 primeiras
+          feedback_likes: likes.slice(0, 5),
           feedback_improvements: improvements.slice(0, 5),
+          content_score: contentScore,
+          management_support_score: managementScore,
+          engagement_score: engagementScore,
+          weighted_utilization_score: weightedUtilization,
         };
 
         resolve(metrics);
