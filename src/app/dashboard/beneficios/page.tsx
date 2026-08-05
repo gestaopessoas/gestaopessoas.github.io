@@ -238,7 +238,7 @@ export default function BeneficiosPage() {
       benefit_details: `Elegibilidade de inclusão de plano ignorada no painel (${emp?.name || "Colaborador"})`,
       previous_payload: { employee_id: employeeId, employee_name: emp?.name, employee_department: emp?.department },
     };
-    await supabase.from("benefit_audit_logs").insert(auditPayload).catch(() => {});
+    await supabase.from("benefit_audit_logs").insert(auditPayload);
     await supabase.from("benefit_ignores").insert({ employee_id: employeeId });
     await fetchData();
   };
@@ -256,7 +256,7 @@ export default function BeneficiosPage() {
       benefit_details: `Corte Pós-Demissão: excluídos ${empBens.length} benefício(s) de ${emp?.name || "Ex-colaborador"}`,
       previous_payload: empBens,
     };
-    await supabase.from("benefit_audit_logs").insert(auditPayload).catch(() => {});
+    await supabase.from("benefit_audit_logs").insert(auditPayload);
     await supabase.from("employee_benefits").delete().eq("employee_id", employeeId);
     await fetchData();
   };
@@ -278,7 +278,7 @@ export default function BeneficiosPage() {
       previous_payload: { employee_id: emp.id, employee_name: emp.name, employee_department: emp.department },
     }));
 
-    await supabase.from("benefit_audit_logs").insert(auditInserts).catch(() => {});
+    await supabase.from("benefit_audit_logs").insert(auditInserts);
     await supabase.from("benefit_ignores").insert(inserts);
     await fetchData();
   };
@@ -304,7 +304,7 @@ export default function BeneficiosPage() {
       };
     });
 
-    await supabase.from("benefit_audit_logs").insert(auditInserts).catch(() => {});
+    await supabase.from("benefit_audit_logs").insert(auditInserts);
     await supabase.from("employee_benefits").delete().in("employee_id", ids);
     await fetchData();
   };

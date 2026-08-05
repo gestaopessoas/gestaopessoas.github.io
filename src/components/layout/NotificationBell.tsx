@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Bell, UserX, AlertTriangle, Briefcase, ChevronRight, HeartPulse } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
   TrialNotification, 
@@ -22,7 +21,8 @@ export function NotificationBell() {
   const [rgsNotifications, setRgsNotifications] = useState<RgsNotification[]>([]);
   const [benefitNotifications, setBenefitNotifications] = useState<BenefitNotification[]>([]);
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfileNotification[]>([]);
-  const [preferences, setPreferences] = useState<UserPreferences>({ trial: true, rgs: true, benefits: true, profile: true });
+  const [pendingLeads, setPendingLeads] = useState<number>(0);
+  const [_preferences, setPreferences] = useState<UserPreferences>({ trial: true, rgs: true, benefits: true, profile: true });
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -63,15 +63,19 @@ export function NotificationBell() {
       const [
         { data: rgsData, error: rgsError },
         { data: bens },
-        { data: igs }
+        { data: igs },
+        { data: leadsData }
       ] = await Promise.all([
         supabase
           .from("rgs_processes")
           .select("id, employee_name, process_type, created_at, status")
           .eq("status", "Pendente"),
         supabase.from("employee_benefits").select("employee_id, benefit_name"),
-        supabase.from("benefit_ignores").select("employee_id")
+        supabase.from("benefit_ignores").select("employee_id"),
+        supabase.from("partner_leads").select("id").neq("status", "atendido")
       ]);
+
+      setPendingLeads(leadsData ? leadsData.length : 0);
 
       if (!empError && empData) {
         const ignoredIds = (igs || []).map(i => (i as { employee_id: string }).employee_id);
@@ -100,6 +104,7 @@ export function NotificationBell() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => fetchNotifications())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rgs_processes' }, () => fetchNotifications())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_benefits' }, () => fetchNotifications())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'partner_leads' }, () => fetchNotifications())
       .subscribe();
 
     return () => {
@@ -119,7 +124,7 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const totalCount = trialNotifications.length + rgsNotifications.length + benefitNotifications.length + pendingProfiles.length;
+  const totalCount = trialNotifications.length + rgsNotifications.length + benefitNotifications.length + pendingProfiles.length + pendingLeads;
   
   const cutsCount = benefitNotifications.filter(b => b.type === "CORTE").length;
   const inclusionsCount = benefitNotifications.filter(b => b.type === "INCLUSAO").length;
@@ -172,6 +177,32 @@ export function NotificationBell() {
                         </div>
                       </button>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Novos Parceiros / Resgates no Clube de Descontos */}
+              {pendingLeads > 0 && (
+                <div className="border-b last:border-b-0 pb-2">
+                  <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🤝</span> Novos Parceiros &amp; Resgates
+                    </h3>
+                    <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">{pendingLeads}</span>
+                  </div>
+                  <div className="px-2 pt-2 flex flex-col gap-1">
+                    <button 
+                      onClick={() => { setIsOpen(false); router.push("/dashboard/parceiros?tab=leads"); }}
+                      className="flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted text-left w-full group bg-emerald-50/40 dark:bg-emerald-950/20"
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium text-foreground">Resgates Pendentes no Clube</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <div className="text-xs mt-0.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+                        {pendingLeads} {pendingLeads === 1 ? 'novo resgate ou candidato' : 'novos resgates ou candidatos'} aguardando avaliação
+                      </div>
+                    </button>
                   </div>
                 </div>
               )}

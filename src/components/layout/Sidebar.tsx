@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
-import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award, Package, CheckSquare, CircleDollarSign, FileOutput, Contact } from "lucide-react"
+import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award, Package, CheckSquare, CircleDollarSign, FileOutput, Contact, BadgePercent } from "lucide-react"
 import { usePermissions } from "@/hooks/usePermissions"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { createClient } from "@/utils/supabase/client"
@@ -57,6 +57,7 @@ const sidebarGroups = [
     items: [
       { name: "Benefícios", href: "/dashboard/beneficios", icon: Gift, module: "beneficios" },
       { name: "Tipos de Benefício", href: "/dashboard/tipos-beneficios", icon: Gift, module: "beneficios" },
+      { name: "Parceiros & Descontos", href: "/dashboard/parceiros", icon: BadgePercent, module: "beneficios" },
       { name: "Armários", href: "/dashboard/armarios", icon: LockKeyhole, module: "armarios" },
       { name: "Mesas & Ilhas", href: "/dashboard/mesas", icon: Armchair, module: "ilhas" },
       { name: "Uniformes & EPIs", href: "/dashboard/uniformes", icon: Package, module: "uniformes" },
