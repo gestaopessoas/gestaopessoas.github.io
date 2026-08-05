@@ -5,7 +5,8 @@ export interface DiscountPartner {
   name: string;
   category: string;
   discount_rules: string;
-  promocodes: string[];
+  contact_info: string;
+  how_to_use: string;
   logo_url: string;
   is_active: boolean;
   created_at?: string;

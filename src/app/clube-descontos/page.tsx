@@ -16,73 +16,6 @@ const CATEGORIES: BenefitCategory[] = [
   "Serviços"
 ];
 
-// Dados de fallback para garantir funcionalidade e demonstração visual premium no Portal
-const FALLBACK_PARTNERS: DiscountPartner[] = [
-  {
-    id: "d1111111-1111-4111-8111-111111111111",
-    name: "Smart Fit & Gyms",
-    category: "Saúde & Bem-Estar",
-    discount_rules: "Desconto exclusivo de até 30% nas mensalidades do plano Black para colaboradores da Clínica BS e seus dependentes elegíveis.",
-    promocodes: ["SMARTHR30", "FITBS2026", "GYMBS30"],
-    logo_url: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=300&q=80",
-    is_active: true
-  },
-  {
-    id: "d2222222-2222-4222-8222-222222222222",
-    name: "Faculdade Descomplica",
-    category: "Educação",
-    discount_rules: "Bolsa corporativa de 45% de desconto em qualquer curso de Pós-Graduação, MBA EaD ou extensão universitária.",
-    promocodes: ["DESCOMPLICABS45", "POS2026BS"],
-    logo_url: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=300&q=80",
-    is_active: true
-  },
-  {
-    id: "d3333333-3333-4333-8333-333333333333",
-    name: "Restaurante Sabor & Prosa",
-    category: "Alimentação",
-    discount_rules: "15% de desconto no buffet executivo e menu à la carte de segunda a sexta-feira, mediante comprovação de vínculo.",
-    promocodes: ["SABORBS15"],
-    logo_url: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=300&q=80",
-    is_active: true
-  },
-  {
-    id: "d4444444-4444-4444-8444-444444444444",
-    name: "Drogaria São Paulo / Pacheco",
-    category: "Saúde & Bem-Estar",
-    discount_rules: "Até 35% de desconto em medicamentos genéricos e tarja preta, e 15% em itens de higiene e perfumaria em todas as lojas.",
-    promocodes: ["DROGABS35", "FARMABS2026"],
-    logo_url: "https://images.unsplash.com/photo-1585435557343-3b092031a831?auto=format&fit=crop&w=300&q=80",
-    is_active: true
-  },
-  {
-    id: "d5555555-5555-4555-8555-555555555555",
-    name: "Cinemark & Lazer Prime",
-    category: "Lazer & Cultura",
-    discount_rules: "Ingressos corporativos com 50% de desconto (Meia Entrada Corporativa) em salas 2D, 3D e XD de segunda a domingo.",
-    promocodes: ["CINEBS50", "PIPOCABS50"],
-    logo_url: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=300&q=80",
-    is_active: true
-  },
-  {
-    id: "d6666666-6666-4666-8666-666666666666",
-    name: "ParkBS - Estacionamento & Ducha",
-    category: "Serviços",
-    discount_rules: "20% de desconto em planos mensais de estacionamento e lavagem ecológica com cera para veículos de colaboradores.",
-    promocodes: ["PARKBS20", "CARWASHBS"],
-    logo_url: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=300&q=80",
-    is_active: true
-  },
-  {
-    id: "d7777777-7777-4777-8777-777777777777",
-    name: "EnglishTown & WiseUp Corporativo",
-    category: "Educação",
-    discount_rules: "Até 40% de abatimento nas mensalidades e material grátis no primeiro semestre para dependentes diretos do colaborador.",
-    promocodes: ["ENGLISHBS40"],
-    logo_url: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=300&q=80",
-    is_active: true
-  }
-];
-
 export default function ClubeDescontosPage() {
   const [partners, setPartners] = useState<DiscountPartner[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -111,15 +44,15 @@ export default function ClubeDescontosPage() {
         .eq("is_active", true)
         .order("name");
 
-      if (error || !data || data.length === 0) {
-        // Usa fallback se a tabela no banco ainda não contiver dados migrados
-        setPartners(FALLBACK_PARTNERS);
+      if (error) {
+        console.error("Erro ao carregar parceiros:", error);
+        setPartners([]);
       } else {
-        setPartners(data as DiscountPartner[]);
+        setPartners((data as DiscountPartner[]) || []);
       }
     } catch (e: unknown) {
-      console.warn("Utilizando catálogo fallback offline para o Clube de Descontos:", e);
-      setPartners(FALLBACK_PARTNERS);
+      console.error("Erro ao carregar Clube de Descontos:", e);
+      setPartners([]);
     } finally {
       setLoading(false);
     }
@@ -165,7 +98,7 @@ export default function ClubeDescontosPage() {
               Clube de Descontos & Parceiros
             </h1>
             <p className="mt-3 text-base text-zinc-600 dark:text-zinc-300 leading-relaxed">
-              Aproveite acordos comerciais exclusivos negociados para nossa equipe. Filtre por categoria ou busque seu estabelecimento favorito para gerar e utilizar vouchers em tempo real.
+              Aproveite acordos comerciais exclusivos negociados para nossa equipe. Filtre por categoria ou busque seu estabelecimento favorito e veja como utilizar cada benefício.
             </p>
           </div>
 

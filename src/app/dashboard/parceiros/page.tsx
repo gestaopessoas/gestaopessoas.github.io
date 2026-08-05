@@ -24,61 +24,6 @@ import { DiscountPartner, PartnerLead } from "@/types/benefits";
 
 type Partner = DiscountPartner;
 
-// Fallback de demonstração para quando a tabela ainda está sendo provisionada em produção
-const FALLBACK_PARTNERS: Partner[] = [
-  {
-    id: "d1111111-1111-4111-8111-111111111111",
-    name: "Smart Fit & Gyms",
-    category: "Saúde & Bem-Estar",
-    discount_rules: "Desconto de até 30% nas mensalidades do plano Black para colaboradores e dependentes.",
-    promocodes: ["SMARTHR30", "FITBS2026"],
-    logo_url: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=150&q=80",
-    is_active: true,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: "d2222222-2222-4222-8222-222222222222",
-    name: "Faculdade Descomplica",
-    category: "Educação",
-    discount_rules: "Bolsa de 45% em cursos de Pós-Graduação e MBA EaD para todo o quadro da Clínica BS.",
-    promocodes: ["DESCOMPLICABS45", "POS2026BS"],
-    logo_url: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=150&q=80",
-    is_active: true,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: "d3333333-3333-4333-8333-333333333333",
-    name: "Restaurante Sabor & Prosa",
-    category: "Alimentação",
-    discount_rules: "15% de desconto no buffet executivo presencial apresentando o crachá ou voucher online.",
-    promocodes: ["SABORBS15"],
-    logo_url: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=150&q=80",
-    is_active: false,
-    created_at: new Date().toISOString()
-  }
-];
-
-const FALLBACK_LEADS: (PartnerLead & { partner_name?: string; employee_name?: string })[] = [
-  {
-    id: "lead-demo-1",
-    partner_id: "d1111111-1111-4111-8111-111111111111",
-    employee_id: "emp-demo-101",
-    status: "resgatado",
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-    partner_name: "Smart Fit & Gyms",
-    employee_name: "Ana Carolina Santos"
-  },
-  {
-    id: "lead-demo-2",
-    partner_id: "d2222222-2222-4222-8222-222222222222",
-    employee_id: "emp-demo-102",
-    status: "atendido",
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-    partner_name: "Faculdade Descomplica",
-    employee_name: "Rafael Oliveira Souza"
-  }
-];
-
 const CATEGORIES = [
   "Saúde & Bem-Estar",
   "Educação",
@@ -91,7 +36,8 @@ const emptyPartnerForm: Omit<Partner, "id" | "created_at" | "updated_at"> = {
   name: "",
   category: "Saúde & Bem-Estar",
   discount_rules: "",
-  promocodes: [""],
+  contact_info: "",
+  how_to_use: "",
   logo_url: "",
   is_active: true
 };
@@ -127,21 +73,23 @@ export default function ParceirosAdminPage() {
       .from("employees")
       .select("id, name");
 
-    if (pErr || !pData || pData.length === 0) {
-      setPartners(FALLBACK_PARTNERS);
+    if (pErr) {
+      console.error("Erro ao carregar parceiros:", pErr);
+      setPartners([]);
     } else {
-      setPartners(pData as Partner[]);
+      setPartners((pData as Partner[]) || []);
     }
 
-    const effectivePartners = pErr || !pData || pData.length === 0 ? FALLBACK_PARTNERS : (pData as Partner[]);
+    const effectivePartners = (pData as Partner[]) || [];
 
-    if (lErr || !lData || lData.length === 0) {
-      setLeads(FALLBACK_LEADS);
+    if (lErr) {
+      console.error("Erro ao carregar leads:", lErr);
+      setLeads([]);
     } else {
       const empsMap = new Map((emps || []).map((e: { id: string; name: string }) => [String(e.id), String(e.name)]));
       const partnersMap = new Map(effectivePartners.map(p => [String(p.id), String(p.name)]));
 
-      const enrichedLeads = (lData as PartnerLead[]).map(lead => ({
+      const enrichedLeads = ((lData as PartnerLead[]) || []).map(lead => ({
         ...lead,
         partner_name: partnersMap.get(String(lead.partner_id)) || "Convênio Excluído",
         employee_name: empsMap.get(String(lead.employee_id)) || `Colaborador (${String(lead.employee_id).slice(0, 8)})`
@@ -169,7 +117,8 @@ export default function ParceirosAdminPage() {
       name: p.name,
       category: p.category,
       discount_rules: p.discount_rules,
-      promocodes: p.promocodes && p.promocodes.length > 0 ? p.promocodes : [""],
+      contact_info: p.contact_info || "",
+      how_to_use: p.how_to_use || "",
       logo_url: p.logo_url || "",
       is_active: p.is_active
     });
@@ -184,14 +133,14 @@ export default function ParceirosAdminPage() {
     }
 
     setSaving(true);
-    const cleanedPromos = form.promocodes.map((s: string) => s.trim()).filter(Boolean);
 
     const payload = {
       name: form.name.trim(),
       category: form.category,
       discount_rules: form.discount_rules.trim(),
-      promocodes: cleanedPromos,
-      logo_url: form.logo_url?.trim() || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=150&q=80",
+      contact_info: form.contact_info.trim(),
+      how_to_use: form.how_to_use.trim(),
+      logo_url: form.logo_url?.trim() || "",
       is_active: form.is_active,
       updated_at: new Date().toISOString()
     };
@@ -253,7 +202,7 @@ export default function ParceirosAdminPage() {
             <span>Gestão de Parceiros &amp; Clube de Descontos</span>
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Administre a vitrine ativa de convênios da Clínica BS, valide regras e monitore em tempo real os resgates solicitados pelos colaboradores.
+            Administre a vitrine ativa de convênios ACPO, valide regras e monitore em tempo real o interesse dos colaboradores.
           </p>
         </div>
         <div className="flex gap-2.5 shrink-0">
@@ -288,7 +237,7 @@ export default function ParceirosAdminPage() {
           </TabsTrigger>
           <TabsTrigger value="leads" className="flex gap-2 relative">
             <Users className="w-4 h-4 text-amber-500" />
-            <span>Fila de Resgates &amp; Leads</span>
+            <span>Fila de Interessados</span>
             {leads.length > 0 && (
               <span className="ml-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-bold">
                 {leads.filter(l => l.status === "resgatado").length || leads.length}
@@ -304,7 +253,7 @@ export default function ParceirosAdminPage() {
               <div>
                 <CardTitle>Catálogo Oficial de Vantagens</CardTitle>
                 <CardDescription>
-                  Configure categorias, percentuais de desconto e cupons de verificação liberados no portal do colaborador.
+                  Configure categorias, percentuais de desconto e o contato do parceiro exibido no portal do colaborador.
                 </CardDescription>
               </div>
               <div className="relative w-full sm:w-72">
@@ -366,17 +315,10 @@ export default function ParceirosAdminPage() {
                           {p.discount_rules}
                         </p>
 
-                        {p.promocodes && p.promocodes.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5 mb-4">
-                            <Tag className="h-3 w-3 text-emerald-500 shrink-0 mr-0.5" />
-                            {p.promocodes.map((code: string, i: number) => (
-                              <span
-                                key={i}
-                                className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-zinc-100 dark:bg-zinc-800/80 border text-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700"
-                              >
-                                {code}
-                              </span>
-                            ))}
+                        {p.contact_info && (
+                          <div className="flex items-start gap-1.5 mb-4 text-xs text-zinc-600 dark:text-zinc-300">
+                            <Tag className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
+                            <span className="whitespace-pre-line">{p.contact_info}</span>
                           </div>
                         )}
                       </div>
@@ -419,9 +361,9 @@ export default function ParceirosAdminPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Fila de Cupons &amp; Resgates dos Colaboradores</CardTitle>
+                  <CardTitle>Fila de Interessados nos Convênios</CardTitle>
                   <CardDescription>
-                    Monitore quem solicitou cupons corporativos ou demonstrou interesse nos convênios em tempo real.
+                    Monitore quem demonstrou interesse nos convênios em tempo real.
                   </CardDescription>
                 </div>
               </div>
@@ -579,17 +521,31 @@ export default function ParceirosAdminPage() {
 
               <div>
                 <label className="block text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-400 mb-1">
-                  Cupons ou Códigos Promocionais (Separados por vírgula)
+                  Como Utilizar
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Apresente seu crachá na recepção para liberar o desconto."
+                  value={form.how_to_use}
+                  onChange={(e) => setForm({ ...form, how_to_use: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-background text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-hidden resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-400 mb-1">
+                  Contato do Parceiro *
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: CLINICABS30, DESCONTO2026"
-                  value={(form.promocodes || []).join(", ")}
-                  onChange={(e) => setForm({ ...form, promocodes: e.target.value.split(",").map(c => c.trim()) })}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-background font-mono text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  required
+                  placeholder="Ex: (51) 99999-9999 / Rua X, 123 - Centro"
+                  value={form.contact_info}
+                  onChange={(e) => setForm({ ...form, contact_info: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-background text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 />
                 <p className="text-[11px] text-zinc-500 mt-1">
-                  Estes códigos serão exibidos em destaque quando o funcionário abrir os detalhes na vitrine.
+                  Telefone, WhatsApp ou endereço exibido pro colaborador entrar em contato direto com o parceiro.
                 </p>
               </div>
 
