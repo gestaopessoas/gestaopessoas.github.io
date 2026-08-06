@@ -1,0 +1,2 @@
+-- Migration already applied to production through the Supabase dashboard.
+-- Intentionally not replayed: this production data correction is not preview seed data.

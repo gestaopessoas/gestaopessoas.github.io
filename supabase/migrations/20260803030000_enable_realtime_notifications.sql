@@ -1,0 +1,3 @@
+-- Migration already applied to production through the Supabase dashboard.
+-- This file restores the authoritative remote version in Git history.
+-- The idempotent SQL is also preserved in 20260803040000.
