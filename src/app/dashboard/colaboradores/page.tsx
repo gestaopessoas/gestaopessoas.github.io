@@ -12,15 +12,17 @@ import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { RelatedRecords } from "./components/RelatedRecords";
 import { Section, Field, Select } from "./components/FormHelpers";
 import { StatsCards } from "./components/StatsCards";
+import { normalizeRole } from "./lib/normalizeRole.mjs";
+import { canonicalizeOption, criticalFieldsMatch, getScheduleForWorkplaceType } from "./lib/employeeFormRules.mjs";
 
 type Department = { id: string; name: string };
-type Entity = { id: string; name: string; trading_name?: string | null; tax_rate_clt?: number; tax_rate_prolabore?: number; };
+type Entity = { id: string; name: string; type?: string | null; trading_name?: string | null; tax_rate_clt?: number; tax_rate_prolabore?: number; };
 type Employee = Record<string, string | null | any> & { id: string; name: string; departments?: Entity | null; level?: string | null; companies?: Entity | null; cost_centers?: Entity | null; workplaces?: Entity | null; };
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
 const pageSize = 1000;
 const fields = [
-  "id", "name", "registration_number", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
+  "id", "name", "registration_number", "profile_code", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
 ].join(", ");
 
 const emptyForm = {
@@ -67,6 +69,16 @@ const maskPhone = (value: string) => {
 
 const MIN_AGE_YEARS = 14;
 const todayIso = new Date().toISOString().split("T")[0];
+const maritalStatusOptions = ["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"];
+const statusOptions = ["Ativo", "Férias", "Afastado", "Inativo", "Desligado"];
+
+const canonicalizeEmployeeForm = (employee: Employee) => {
+  const next = { ...emptyForm };
+  for (const key of Object.keys(next) as (keyof EmployeeForm)[]) next[key] = String(employee[key] ?? "");
+  next.marital_status = canonicalizeOption(next.marital_status, maritalStatusOptions);
+  next.status = canonicalizeOption(next.status, statusOptions);
+  return next;
+};
 
 export default function ColaboradoresPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -114,14 +126,16 @@ export default function ColaboradoresPage() {
       supabase.from("departments").select("id, name").order("name"),
       supabase.from("companies").select("id, name, trading_name, tax_rate_clt, tax_rate_prolabore").order("name"),
       supabase.from("cost_centers").select("id, name").order("name"),
-      supabase.from("workplaces").select("id, name").order("name"),
+      supabase.from("workplaces").select("id, name, type").order("name"),
       supabase.from("job_profiles").select("title")
     ]).then(([depsRes, compsRes, ccRes, wpRes, rolesRes]) => {
       if (depsRes.data) setDepartments(depsRes.data as Entity[]);
       if (compsRes.data) setCompanies(compsRes.data as Entity[]);
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
       if (wpRes.data) setWorkplaces(wpRes.data as Entity[]);
-      if (rolesRes.data) setRoles(Array.from(new Set(rolesRes.data.map((d: any) => d.title))).sort() as string[]);
+      if (rolesRes.data) {
+        setRoles(Array.from(new Set(rolesRes.data.map((d: any) => normalizeRole(d.title)))).sort() as string[]);
+      }
     });
 
     const params = new URLSearchParams(window.location.search);
@@ -133,10 +147,8 @@ export default function ColaboradoresPage() {
       supabase.from("employees").select("*").eq("id", editId).single().then(({ data }) => {
         if (data) {
           const emp = data as Employee;
-          const next = { ...emptyForm };
-          for (const key of Object.keys(next) as (keyof EmployeeForm)[]) next[key] = String(emp[key] ?? "");
           setEditingId(emp.id);
-          setForm(next);
+          setForm(canonicalizeEmployeeForm(emp));
           setIsEmployeeModalOpen(true);
           window.history.replaceState({}, document.title, window.location.pathname);
         }
@@ -202,10 +214,8 @@ export default function ColaboradoresPage() {
   };
 
   const startEdit = (employee: Employee) => {
-    const next = { ...emptyForm };
-    for (const key of Object.keys(next) as (keyof EmployeeForm)[]) next[key] = String(employee[key] ?? "");
     setEditingId(employee.id);
-    setForm(next);
+    setForm(canonicalizeEmployeeForm(employee));
     setBirthdayError("");
     setIsEmployeeModalOpen(true);
   };
@@ -252,7 +262,9 @@ export default function ColaboradoresPage() {
     const nullableUuids = new Set(["department_id", "company_id", "cost_center_id", "workplace_id"]);
     const payload = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || nullableUuids.has(key) ? value || null : (value as string).trim() || null]));
     payload.name = form.name.trim();
-    payload.status = form.status;
+    payload.role = normalizeRole(form.role);
+    payload.marital_status = canonicalizeOption(form.marital_status, maritalStatusOptions) || null;
+    payload.status = canonicalizeOption(form.status, statusOptions);
     const supabase = createClient();
     
     const isNew = !editingId;
@@ -261,10 +273,22 @@ export default function ColaboradoresPage() {
     const isPromoted = !isNew && !isDismissed && (form.role !== original?.role || form.level !== original?.level || form.department_id !== original?.department_id || form.workplace_id !== original?.workplace_id);
 
     const result = editingId
-      ? await supabase.from("employees").update(payload).eq("id", editingId)
-      : await supabase.from("employees").insert(payload);
+      ? await supabase.from("employees").update(payload).eq("id", editingId).select("id, role, profile_code, company_id, workplace_id, marital_status, status").single()
+      : await supabase.from("employees").insert(payload).select("id, role, profile_code, company_id, workplace_id, marital_status, status").single();
+
+    if (result.error) {
+      setSaving(false);
+      setError(`Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
+      return;
+    }
+
+    if (!criticalFieldsMatch(payload, result.data)) {
+      setSaving(false);
+      setError("O banco não confirmou todos os campos alterados. Revise Cargo, Código do Perfil, Empresa, Obra/Unidade, Estado civil e Status.");
+      return;
+    }
       
-    if (!result.error && (isNew || isDismissed || isPromoted)) {
+    if (isNew || isDismissed || isPromoted) {
       const { data: settingsData } = await supabase.from("system_settings").select("value").eq("key", "modules").single();
       const rgsTrackingEnabled = settingsData?.value?.rgs_tracking ?? true;
       
@@ -282,10 +306,6 @@ export default function ColaboradoresPage() {
     }
 
     setSaving(false);
-    if (result.error) {
-      setError(`Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
-      return;
-    }
     setIsEmployeeModalOpen(false);
     setEditingId(null);
     setForm(emptyForm);
@@ -454,19 +474,23 @@ export default function ColaboradoresPage() {
               <Field label="RG"><Input inputMode="numeric" value={form.rg} onChange={(e) => update("rg", maskRg(e.target.value))} placeholder="00.000.000-0" /></Field>
               <Field label="Nascimento"><Input type="date" max={todayIso} value={form.birthday} onChange={(e) => { setBirthdayError(""); update("birthday", e.target.value); }} />{birthdayError && <p className="text-xs text-red-600">{birthdayError}</p>}</Field>
               <Field label="Gênero"><Select value={form.gender} onChange={(value) => update("gender", value)} options={["", "Masculino", "Feminino", "Outro"]} /></Field>
-              <Field label="Estado civil"><Select value={form.marital_status} onChange={(value) => update("marital_status", value)} options={["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"]} /></Field>
+              <Field label="Estado civil"><Select value={form.marital_status} onChange={(value) => update("marital_status", value)} options={maritalStatusOptions} /></Field>
               <Field label="Telefone"><Input inputMode="numeric" value={form.phone} onChange={(e) => update("phone", maskPhone(e.target.value))} placeholder="(00) 00000-0000" /></Field>
               <Field label="E-mail pessoal"><Input type="email" value={form.email_personal} onChange={(e) => update("email_personal", e.target.value)} /></Field>
               <Field label="E-mail corporativo"><Input type="email" value={form.email_corporate} onChange={(e) => update("email_corporate", e.target.value)} /></Field>
             </Section>
 
             <Section title="Vínculo e lotação">
-              <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={["Ativo", "Férias", "Afastado", "Inativo", "Desligado"]} /></Field>
+              <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={statusOptions} /></Field>
               <Field label="Cargo *"><select required value={form.role} onChange={(e) => update("role", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Selecione...</option>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
               <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Nível VIII", "Nível IX", "Nível X", "Nível XI", "Nível XII", "Nível XIII", "Nível XIV", "Nível XV", "Diretoria"]} /></Field>
               <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.trading_name || c.name}</option>)}</select></Field>
               <Field label="Centro de Custo *"><select value={form.cost_center_id} onChange={(e) => update("cost_center_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{costCenters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
-              <Field label="Obra/Unidade"><select value={form.workplace_id} onChange={(e) => update("workplace_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{workplaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
+              <Field label="Obra/Unidade"><select value={form.workplace_id} onChange={(e) => {
+                const workplaceId = e.target.value;
+                const schedule = getScheduleForWorkplaceType(workplaces.find((workplace) => workplace.id === workplaceId)?.type);
+                setForm((current) => ({ ...current, workplace_id: workplaceId, ...(schedule ?? {}) }));
+              }} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{workplaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
               <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
               <Field label="Tipo de contrato"><Select value={form.contract_type} onChange={(value) => update("contract_type", value)} options={["", "CLT", "MEI", "PJ"]} /></Field>
               <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
@@ -495,7 +519,6 @@ export default function ColaboradoresPage() {
               <Field label="CTPS"><Input value={form.ctps} onChange={(e) => update("ctps", e.target.value)} /></Field>
               <Field label="Série CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
               <Field label="PIS"><Input value={form.pis} onChange={(e) => update("pis", e.target.value)} /></Field>
-              <Field label="Data do ASO"><Input type="date" value={form.aso_date} onChange={(e) => update("aso_date", e.target.value)} /></Field>
               <Field label="Observações" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
             </Section>
 
