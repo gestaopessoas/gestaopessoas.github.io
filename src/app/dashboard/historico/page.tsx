@@ -67,6 +67,10 @@ function HistoricoContent() {
       case 'RECONTRATACAO': return <Activity className="w-4 h-4 text-green-500" />
       case 'VINCULO': return <Activity className="w-4 h-4 text-purple-500" />
       case 'BENEFICIOS': return <Activity className="w-4 h-4 text-pink-500" />
+      case 'FECHAMENTO_PONTO':
+      case 'PONTO_RHID':
+      case 'HORARIOS_RHID':
+        return <Clock className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
       default: return <Clock className="w-4 h-4 text-muted-foreground" />
     }
   }
@@ -79,6 +83,10 @@ function HistoricoContent() {
       case 'RECONTRATACAO': return "bg-green-100 text-green-700 border-green-200"
       case 'VINCULO': return "bg-purple-100 text-purple-700 border-purple-200"
       case 'BENEFICIOS': return "bg-pink-100 text-pink-700 border-pink-200"
+      case 'FECHAMENTO_PONTO':
+      case 'PONTO_RHID':
+      case 'HORARIOS_RHID':
+        return "bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800 font-bold"
       default: return "bg-gray-100 text-gray-700 border-gray-200"
     }
   }
@@ -86,7 +94,9 @@ function HistoricoContent() {
   function formatValue(val: any): string {
     if (val === null || val === undefined) return "N/A"
     if (typeof val === 'object') {
-      return Object.entries(val).map(([k, v]) => `${k}: ${v}`).join(' | ')
+      return Object.entries(val)
+        .map(([k, v]) => `• ${k.replace(/_/g, ' ').toUpperCase()}: ${v}`)
+        .join('\n')
     }
     return String(val)
   }

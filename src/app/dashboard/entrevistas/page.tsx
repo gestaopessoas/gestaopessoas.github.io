@@ -1038,6 +1038,19 @@ ${resumeText}`;
     setIsModalOpen(true);
   };
 
+  const handleDelete = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!confirm("Tem certeza que deseja excluir esta entrevista definitivamente?")) return;
+    const supabase = createClient();
+    const { error: delError } = await supabase.from("interviews").delete().eq("id", id);
+    if (delError) {
+      alert("Erro ao excluir entrevista: " + delError.message);
+      return;
+    }
+    setInterviews((prev) => prev.filter((i) => i.id !== id));
+    if (editingId === id) setIsModalOpen(false);
+  };
+
   const PREDEFINED_STRENGTHS = ["Proatividade", "Boa Comunicação", "Experiência", "Trabalho em Equipe", "Organização", "Liderança", "Foco em Resultados", "Empatia", "Resiliência"];
   const PREDEFINED_WEAKNESSES = ["Timidez", "Falta de Experiência Técnica", "Insegurança", "Dificuldade com Ferramentas", "Postura", "Conhecimento Básico", "Nervosismo", "Falta de Clareza"];
 
@@ -1150,17 +1163,18 @@ ${resumeText}`;
                   <th className="px-4 py-3">Data / Hora</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Resultado</th>
+                  <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
                 {loading && (
-                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={5}>Carregando entrevistas...</td></tr>
+                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>Carregando entrevistas...</td></tr>
                 )}
                 {!loading && filtered.length === 0 && (
-                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={5}>Nenhum registro encontrado.</td></tr>
+                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>Nenhum registro encontrado.</td></tr>
                 )}
                 {!loading && filtered.map((interview) => (
-                  <tr key={interview.id} onClick={() => openEditModal(interview)} className="hover:bg-muted/30 cursor-pointer transition-colors">
+                  <tr key={interview.id} onClick={() => openEditModal(interview)} className="hover:bg-muted/30 cursor-pointer transition-colors group">
                     <td className="px-4 py-3 min-w-64">
                       <div className="font-medium text-foreground">{interview.candidate_name || "Sem nome"}</div>
                       <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
@@ -1192,6 +1206,17 @@ ${resumeText}`;
                        <span className={resultStyle[interview.result || ""] || ""}>
                          {interview.result || "-"}
                        </span>
+                    </td>
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => handleDelete(interview.id, e)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Excluir entrevista"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -1985,18 +2010,26 @@ ${resumeText}`;
                 </div>
               )}
 
-              <div className="flex justify-between items-center gap-2 pt-4 border-t mt-auto shrink-0">
-                {editingId && activeTab === "avaliacao" ? (
-                  <div className="flex gap-2">
-                    <Button type="button" variant="secondary" onClick={exportParecer} className="gap-2">
-                      <FileText className="h-4 w-4" />
-                      Exportar .txt
+              <div className="flex justify-between items-center gap-2 pt-4 border-t mt-auto shrink-0 flex-wrap">
+                <div className="flex items-center gap-2">
+                  {editingId && activeTab === "avaliacao" && (
+                    <>
+                      <Button type="button" variant="secondary" onClick={exportParecer} className="gap-2">
+                        <FileText className="h-4 w-4" />
+                        Exportar .txt
+                      </Button>
+                      <Button type="button" variant="outline" onClick={printParecer} className="gap-2 text-primary border-primary/50 hover:bg-primary/10">
+                        🖨️ Imprimir / PDF
+                      </Button>
+                    </>
+                  )}
+                  {editingId && (
+                    <Button type="button" variant="destructive" onClick={() => handleDelete(editingId)} className="gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      Excluir
                     </Button>
-                    <Button type="button" variant="outline" onClick={printParecer} className="gap-2 text-primary border-primary/50 hover:bg-primary/10">
-                      🖨️ Imprimir / PDF
-                    </Button>
-                  </div>
-                ) : <div />}
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
                   <Button type="submit" disabled={saving}>

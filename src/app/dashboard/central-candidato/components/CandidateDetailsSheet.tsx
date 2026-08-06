@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Loader2, Calendar, User, Phone, Mail, Building, FileText, Briefcase, Plus, AlertCircle, Paperclip, Sparkles } from "lucide-react";
+import { Loader2, Calendar, User, Phone, Mail, Building, FileText, Briefcase, Plus, AlertCircle, Paperclip, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AddInterviewModal from "./AddInterviewModal";
 import { latestInterview, isLockedByInterview } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
@@ -68,6 +68,17 @@ export default function CandidateDetailsSheet({
       controller.abort();
     };
   }, [candidateId, retryTick]);
+
+  const handleDeleteInterview = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este registro de entrevista?")) return;
+    const { error } = await supabase.from("candidate_interviews").delete().eq("id", id);
+    if (error) {
+      alert("Erro ao excluir entrevista: " + error.message);
+      return;
+    }
+    setRetryTick((t) => t + 1);
+    onRefresh();
+  };
 
   const latest = latestInterview(candidate?.candidate_interviews);
   const isLocked = isLockedByInterview(latest);
@@ -204,10 +215,24 @@ export default function CandidateDetailsSheet({
                           <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-1.25rem)] bg-card p-4 rounded border border-border/50 shadow-sm">
                             <div className="flex items-center justify-between mb-1">
                               <span className="font-semibold text-primary">{interview.stage}</span>
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {new Date(interview.created_at).toLocaleDateString('pt-BR')}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {new Date(interview.created_at).toLocaleDateString('pt-BR')}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteInterview(interview.id);
+                                  }}
+                                  className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Excluir entrevista"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             </div>
                             <div className="text-sm mb-2 text-foreground">
                               <strong>Liderança:</strong> {interview.interviewer_name || "N/A"}<br/>
