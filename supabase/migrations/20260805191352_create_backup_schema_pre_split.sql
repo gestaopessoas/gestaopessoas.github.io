@@ -1,0 +1,2 @@
+-- Migration already applied to production through the Supabase dashboard.
+-- History-only reconciliation: do not recreate the production backup schema in previews.
