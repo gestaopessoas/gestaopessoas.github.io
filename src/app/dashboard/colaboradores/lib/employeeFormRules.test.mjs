@@ -5,6 +5,7 @@ import {
   canonicalizeOption,
   criticalFieldsMatch,
   getScheduleForWorkplaceType,
+  sanitizeRgInput,
 } from "./employeeFormRules.mjs";
 
 test("converte opção legada para o valor canônico sem diferenciar caixa", () => {
@@ -48,6 +49,7 @@ test("não sugere jornada para tipo desconhecido", () => {
 
 test("confere os campos críticos devolvidos pelo banco", () => {
   const expected = {
+    rg: "001234567890123",
     profile_code: "C-0100",
     company_id: "company-1",
     workplace_id: "workplace-1",
@@ -57,4 +59,9 @@ test("confere os campos críticos devolvidos pelo banco", () => {
 
   assert.equal(criticalFieldsMatch(expected, { ...expected }), true);
   assert.equal(criticalFieldsMatch(expected, { ...expected, profile_code: null }), false);
+  assert.equal(criticalFieldsMatch(expected, { ...expected, rg: "1234567890123" }), false);
+});
+
+test("RG mantém somente os primeiros 15 dígitos e preserva zeros à esquerda", () => {
+  assert.equal(sanitizeRgInput("00.123-ABC 4567890123456"), "001234567890123");
 });

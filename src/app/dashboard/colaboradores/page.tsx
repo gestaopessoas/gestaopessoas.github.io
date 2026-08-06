@@ -13,7 +13,7 @@ import { RelatedRecords } from "./components/RelatedRecords";
 import { Section, Field, Select } from "./components/FormHelpers";
 import { StatsCards } from "./components/StatsCards";
 import { normalizeRole } from "./lib/normalizeRole.mjs";
-import { canonicalizeOption, criticalFieldsMatch, getScheduleForWorkplaceType } from "./lib/employeeFormRules.mjs";
+import { canonicalizeOption, criticalFieldsMatch, getScheduleForWorkplaceType, sanitizeRgInput } from "./lib/employeeFormRules.mjs";
 
 type Department = { id: string; name: string };
 type Entity = { id: string; name: string; type?: string | null; trading_name?: string | null; tax_rate_clt?: number; tax_rate_prolabore?: number; };
@@ -49,14 +49,6 @@ const maskCpf = (value: string) => {
     .replace(/(\d{3})(\d)/, "$1.$2")
     .replace(/(\d{3})(\d)/, "$1.$2")
     .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-};
-
-const maskRg = (value: string) => {
-  const digits = onlyDigits(value).slice(0, 9);
-  return digits
-    .replace(/(\d{2})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d{1})$/, "$1-$2");
 };
 
 const maskPhone = (value: string) => {
@@ -273,8 +265,8 @@ export default function ColaboradoresPage() {
     const isPromoted = !isNew && !isDismissed && (form.role !== original?.role || form.level !== original?.level || form.department_id !== original?.department_id || form.workplace_id !== original?.workplace_id);
 
     const result = editingId
-      ? await supabase.from("employees").update(payload).eq("id", editingId).select("id, role, profile_code, company_id, workplace_id, marital_status, status").single()
-      : await supabase.from("employees").insert(payload).select("id, role, profile_code, company_id, workplace_id, marital_status, status").single();
+      ? await supabase.from("employees").update(payload).eq("id", editingId).select("id, rg, role, profile_code, company_id, workplace_id, marital_status, status").single()
+      : await supabase.from("employees").insert(payload).select("id, rg, role, profile_code, company_id, workplace_id, marital_status, status").single();
 
     if (result.error) {
       setSaving(false);
@@ -284,7 +276,7 @@ export default function ColaboradoresPage() {
 
     if (!criticalFieldsMatch(payload, result.data)) {
       setSaving(false);
-      setError("O banco não confirmou todos os campos alterados. Revise Cargo, Código do Perfil, Empresa, Obra/Unidade, Estado civil e Status.");
+      setError("O banco não confirmou todos os campos alterados. Revise RG, Cargo, Código do Perfil, Empresa, Obra/Unidade, Estado civil e Status.");
       return;
     }
       
@@ -471,7 +463,7 @@ export default function ColaboradoresPage() {
               <Field label="Matrícula"><Input value={form.registration_number} onChange={(e) => update("registration_number", e.target.value)} /></Field>
               <Field label="Código do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} /></Field>
               <Field label="CPF"><Input inputMode="numeric" value={form.cpf} onChange={(e) => update("cpf", maskCpf(e.target.value))} placeholder="000.000.000-00" /></Field>
-              <Field label="RG"><Input inputMode="numeric" value={form.rg} onChange={(e) => update("rg", maskRg(e.target.value))} placeholder="00.000.000-0" /></Field>
+              <Field label="RG"><Input inputMode="numeric" maxLength={15} value={form.rg} onChange={(e) => update("rg", sanitizeRgInput(e.target.value))} placeholder="Somente números (até 15 dígitos)" /></Field>
               <Field label="Nascimento"><Input type="date" max={todayIso} value={form.birthday} onChange={(e) => { setBirthdayError(""); update("birthday", e.target.value); }} />{birthdayError && <p className="text-xs text-red-600">{birthdayError}</p>}</Field>
               <Field label="Gênero"><Select value={form.gender} onChange={(value) => update("gender", value)} options={["", "Masculino", "Feminino", "Outro"]} /></Field>
               <Field label="Estado civil"><Select value={form.marital_status} onChange={(value) => update("marital_status", value)} options={maritalStatusOptions} /></Field>

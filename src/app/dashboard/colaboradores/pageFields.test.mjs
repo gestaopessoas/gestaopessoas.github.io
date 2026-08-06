@@ -20,3 +20,12 @@ test("não duplica a data do ASO em Documentos e arquivo", async () => {
 
   assert.doesNotMatch(documentsSection, /Data do ASO/);
 });
+
+test("campo RG usa sanitização numérica de até 15 dígitos", async () => {
+  const source = await readFile(new URL("./page.tsx", import.meta.url), "utf8");
+  const rgField = source.match(/<Field label="RG">([\s\S]*?)<\/Field>/)?.[1] ?? "";
+
+  assert.match(rgField, /sanitizeRgInput/);
+  assert.match(rgField, /maxLength=\{15\}/);
+  assert.doesNotMatch(source, /const maskRg/);
+});
