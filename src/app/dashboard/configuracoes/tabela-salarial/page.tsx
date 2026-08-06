@@ -8,20 +8,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
+import { formatCurrencyInput, maskCurrencyInput, parseCurrencyInput } from "../../colaboradores/lib/employeeFormRules.mjs";
 
 type SalaryRow = {
   id: string;
   role_code: string;
   role_name: string;
-  level: string;
+  level: string | null;
   modality: string;
-  salary: number;
+  salary: number | null;
+  uses_level: boolean;
+  salary_experience: number | null;
+  salary_after_probation: number | null;
 };
 
 export default function SalaryTablePage() {
   const [data, setData] = useState<SalaryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [saveError, setSaveError] = useState("");
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<string>("");
@@ -31,7 +36,7 @@ export default function SalaryTablePage() {
     role_name: "",
     level: "Júnior",
     modality: "CLT",
-    salary: 0
+    salary: 0, uses_level: true, salary_experience: null, salary_after_probation: null
   });
 
   const supabase = createClient();
@@ -72,71 +77,38 @@ export default function SalaryTablePage() {
   };
 
   const handleSave = async () => {
-    if (!editingRow.role_name || editingRow.salary === undefined) return;
-    
-    const supabase = createClient();
-    
-    if (editingRow.id) {
-      // Update existing variant
-      const { error } = await supabase.from("salary_table").update({
-        role_code: editingRow.role_code,
-        role_name: editingRow.role_name,
-        level: editingRow.level,
-        modality: editingRow.modality,
-        salary: editingRow.salary,
-        updated_at: new Date().toISOString()
-      }).eq("id", editingRow.id);
-
-      if (!error) {
-        fetchData();
-        if (editingRole) {
-          loadRoleVariants(editingRole);
-        }
-      }
-    } else {
-      // Insert new variant - only if role exists, otherwise create it
-      const { data: existingRoles } = await supabase
-        .from("salary_table")
-        .select("role_name")
-        .eq("role_name", editingRow.role_name)
-        .maybeSingle();
-
-      if (existingRoles) {
-        // Role exists, add variant
-        await supabase.from("salary_table").insert({
-          role_code: editingRow.role_code,
-          role_name: editingRow.role_name,
-          level: editingRow.level,
-          modality: editingRow.modality,
-          salary: editingRow.salary
-        });
-        fetchData();
-        if (editingRole) {
-          loadRoleVariants(editingRole);
-        }
-      } else {
-        // Create new role with variant
-        await supabase.from("salary_table").insert({
-          role_code: editingRow.role_code,
-          role_name: editingRow.role_name,
-          level: editingRow.level,
-          modality: editingRow.modality,
-          salary: editingRow.salary
-        });
-        fetchData();
-        if (editingRole) {
-          loadRoleVariants(editingRole);
-        }
-      }
+    if (!editingRow.role_name || (editingRow.uses_level !== false && editingRow.salary === undefined) || (editingRow.uses_level === false && (editingRow.salary_experience == null || editingRow.salary_after_probation == null))) {
+      setSaveError("Preencha todos os campos salariais obrigatórios.");
+      return;
     }
-    
+    const supabase = createClient();
+    const payload = {
+      role_code: editingRow.role_code,
+      role_name: editingRow.role_name,
+      level: editingRow.uses_level === false ? null : editingRow.level,
+      modality: editingRow.modality,
+      salary: editingRow.uses_level === false ? null : editingRow.salary,
+      uses_level: editingRow.uses_level !== false,
+      salary_experience: editingRow.uses_level === false ? editingRow.salary_experience : null,
+      salary_after_probation: editingRow.uses_level === false ? editingRow.salary_after_probation : null,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = editingRow.id
+      ? await supabase.from("salary_table").update(payload).eq("id", editingRow.id)
+      : await supabase.from("salary_table").insert(payload);
+    if (error) {
+      setSaveError(`Não foi possível salvar a faixa salarial: ${error.message}`);
+      return;
+    }
+    setSaveError("");
+    await fetchData();
     // Reset form
     setEditingRow({ 
       role_code: "", 
       role_name: "", 
       level: "Júnior", 
       modality: "CLT", 
-      salary: 0
+      salary: 0, uses_level: true, salary_experience: null, salary_after_probation: null
     });
     if (editingRole) {
       setIsModalOpen(true);
@@ -167,7 +139,8 @@ export default function SalaryTablePage() {
           </p>
         </div>
         <Button onClick={() => {
-          setEditingRow({ role_code: "", role_name: "", level: "Júnior", modality: "CLT", salary: 0 });
+          setEditingRow({ role_code: "", role_name: "", level: "Júnior", modality: "CLT", salary: 0, uses_level: true, salary_experience: null, salary_after_probation: null });
+          setSaveError("");
           setEditingRole("");
           setIsModalOpen(true);
         }}>
@@ -239,9 +212,9 @@ export default function SalaryTablePage() {
                 <tbody>
                   {roleVariants.map(v => (
                     <tr key={v.id} className="border-b">
-                      <td className="py-2">{v.level}</td>
+                      <td className="py-2">{v.uses_level ? v.level : "Sem nível"}</td>
                       <td className="py-2">{v.modality}</td>
-                      <td className="py-2">{formatCurrency(v.salary)}</td>
+                      <td className="py-2">{v.uses_level ? formatCurrency(v.salary || 0) : `${formatCurrency(v.salary_experience || 0)} → ${formatCurrency(v.salary_after_probation || 0)}`}</td>
                       <td className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => { setEditingRow(v); setEditingRole(""); }}>Editar</Button>
                         <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDelete(v.id)}><Trash2 className="h-4 w-4"/></Button>
@@ -250,7 +223,7 @@ export default function SalaryTablePage() {
                   ))}
                 </tbody>
               </table>
-              <Button onClick={() => setEditingRow({ role_name: editingRole, level: "Júnior", modality: "CLT", salary: 0, role_code: roleVariants[0].role_code })}>Adicionar Nível</Button>
+              <Button onClick={() => setEditingRow({ role_name: editingRole, level: "Júnior", modality: "CLT", salary: 0, role_code: roleVariants[0].role_code, uses_level: true, salary_experience: null, salary_after_probation: null })}>Adicionar faixa</Button>
             </div>
           ) : (
             <div className="space-y-4 py-4">
@@ -266,6 +239,14 @@ export default function SalaryTablePage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  <Label>Estrutura do cargo</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.uses_level === false ? "sem-nivel" : "com-nivel"} onChange={(e) => setEditingRow({ ...editingRow, uses_level: e.target.value === "com-nivel" })}>
+                    <option value="com-nivel">Com nível</option>
+                    <option value="sem-nivel">Sem nível</option>
+                  </select>
+                </div>
+                {editingRow.uses_level !== false &&
+                <div className="space-y-2">
                   <Label>Nível</Label>
                   <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.level || "Júnior"} onChange={(e) => setEditingRow({ ...editingRow, level: e.target.value })}>
                     <option value="Júnior">Júnior</option>
@@ -273,6 +254,7 @@ export default function SalaryTablePage() {
                     <option value="Sênior">Sênior</option>
                   </select>
                 </div>
+                }
                 <div className="space-y-2">
                   <Label>Modalidade</Label>
                   <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.modality || "CLT"} onChange={(e) => setEditingRow({ ...editingRow, modality: e.target.value })}>
@@ -281,10 +263,11 @@ export default function SalaryTablePage() {
                   </select>
                 </div>
               </div>
-              <div className="space-y-2">
+              {editingRow.uses_level !== false ? <div className="space-y-2">
                 <Label>Salário Base (R$) *</Label>
-                <Input type="number" value={editingRow.salary || 0} onChange={(e) => setEditingRow({ ...editingRow, salary: Number(e.target.value) })} />
-              </div>
+                <Input inputMode="numeric" value={formatCurrencyInput(editingRow.salary || 0)} onChange={(e) => setEditingRow({ ...editingRow, salary: parseCurrencyInput(maskCurrencyInput(e.target.value)) })} />
+              </div> : <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Salário experiência (R$) *</Label><Input inputMode="numeric" value={editingRow.salary_experience == null ? "" : formatCurrencyInput(editingRow.salary_experience)} onChange={(e) => setEditingRow({ ...editingRow, salary_experience: parseCurrencyInput(maskCurrencyInput(e.target.value)) })} /></div><div className="space-y-2"><Label>Salário após 90 dias (R$) *</Label><Input inputMode="numeric" value={editingRow.salary_after_probation == null ? "" : formatCurrencyInput(editingRow.salary_after_probation)} onChange={(e) => setEditingRow({ ...editingRow, salary_after_probation: parseCurrencyInput(maskCurrencyInput(e.target.value)) })} /></div></div>}
+              {saveError && <p role="alert" className="rounded border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">{saveError}</p>}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
                 <Button onClick={handleSave}>Salvar</Button>
