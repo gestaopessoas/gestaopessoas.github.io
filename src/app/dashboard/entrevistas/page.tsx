@@ -1029,6 +1029,9 @@ Resultado Final: ${form.result || "N/C"}
     const resumoMatch = resumeText.match(/Resumo profissional([\s\S]*?)(Experiência profissional|Formação|Cursos e certificações|Habilidades|Informações adicionais|$)/i);
     if (resumoMatch) professional_summary = resumoMatch[1].trim();
 
+    const infoAdicionaisMatch = resumeText.match(/Informações adicionais([\s\S]*?)$/i);
+    if (infoAdicionaisMatch) professional_summary += "\n\nInformações adicionais:\n" + infoAdicionaisMatch[1].trim();
+
     let experience_summary = "";
     const expMatch = resumeText.match(/Experiência profissional([\s\S]*?)(Formação|Cursos e certificações|Habilidades|Informações adicionais|$)/i);
     if (expMatch) experience_summary = expMatch[1].trim();
@@ -1053,16 +1056,16 @@ Resultado Final: ${form.result || "N/C"}
       ...prev,
       age: ageMatch ? ageMatch[1].trim() : prev.age,
       location: locationMatch ? locationMatch[1].trim() : prev.location,
-      professional_summary: professional_summary || prev.professional_summary,
+      professional_summary: professional_summary.trim() || prev.professional_summary,
       experience_summary: experience_summary || prev.experience_summary,
       education: educationText.trim() || prev.education,
-      // Tenta achar CNH
-      cnh: resumeText.match(/Possui CNH\?\s*(Sim|Não)/i)?.[1] || "",
-      cnh_category: resumeText.match(/Categoria da CNH\s*([A-Z]+)/i)?.[1] || "",
+      // Tenta achar CNH com regex mais flexível
+      cnh: resumeText.match(/Possui CNH\?\s*(Sim|Não)/i)?.[1] || (resumeText.match(/\bCNH\b/i) ? "Sim" : ""),
+      cnh_category: resumeText.match(/Categoria da CNH\s*([A-Z]+)/i)?.[1] || (resumeText.match(/(?:CNH|Categoria).*?\b(A|B|AB|C|D|E)\b/i)?.[1]?.toUpperCase() || ""),
       birth_date: resumeText.match(/Data de nascimento\s*(\d{2}\/\d{2}\/\d{4})/i)?.[1] || "",
       cpf: resumeText.match(/CPF\s*([\d.-]+)/i)?.[1] || "",
       gender: resumeText.match(/Gênero\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || "",
-      salary_expectation: resumeText.match(/Pretensão Salarial\s*(R\$\s*[\d,.]+)/i)?.[1] || ""
+      salary_expectation: resumeText.match(/Pretens.o Salarial.*?([\d.,]+)/i) ? ("R$ " + resumeText.match(/Pretens.o Salarial.*?([\d.,]+)/i)[1].trim()) : (resumeText.match(/Pretensão Salarial\s*(R\$\s*[\d,.]+)/i)?.[1] || "")
     }));
     
     setIsResumeModalOpen(false);
