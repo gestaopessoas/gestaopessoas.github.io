@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import { formatCurrencyInput, maskCurrencyInput, parseCurrencyInput } from "../../colaboradores/lib/employeeFormRules.mjs";
+import { summarizeSalaryRoles } from "./lib/salaryTableViewRules.mjs";
 
 type SalaryRow = {
   id: string;
@@ -21,6 +22,24 @@ type SalaryRow = {
   salary_experience: number | null;
   salary_after_probation: number | null;
 };
+
+type SalaryRoleSummary = {
+  name: string;
+  code: string;
+  usesLevel: boolean;
+  structureLabel: "Com nível" | "Sem nível";
+  actionLabel: "Gerenciar níveis" | "Gerenciar salários";
+  salariesByModality: Partial<Record<"CLT" | "PJ", {
+    experience: number | null;
+    afterProbation: number | null;
+  }>>;
+};
+
+const modalities = ["CLT", "PJ"] as const;
+
+function formatOptionalCurrency(value: number | null | undefined) {
+  return value == null ? "—" : formatCurrency(value);
+}
 
 export default function SalaryTablePage() {
   const [data, setData] = useState<SalaryRow[]>([]);
@@ -39,15 +58,9 @@ export default function SalaryTablePage() {
     salary: 0, uses_level: true, salary_experience: null, salary_after_probation: null
   });
 
-  const supabase = createClient();
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
-    const { data: rows, error } = await supabase
+    const { data: rows, error } = await createClient()
       .from("salary_table")
       .select("*")
       .order("role_name", { ascending: true });
@@ -56,14 +69,16 @@ export default function SalaryTablePage() {
       setData(rows as SalaryRow[]);
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void fetchData(), 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchData]);
 
   const uniqueRoles = useMemo(() => {
-    const roles = Array.from(new Set(data.map(r => r.role_name)));
-    return roles.map(name => ({
-      name,
-      code: data.find(r => r.role_name === name)?.role_code || "-"
-    })).filter(r => 
+    const roles = summarizeSalaryRoles(data) as SalaryRoleSummary[];
+    return roles.filter(r =>
       r.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       (r.code && r.code.toLowerCase().includes(searchTerm.toLowerCase()))
     );
@@ -120,8 +135,8 @@ export default function SalaryTablePage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir esta faixa salarial?")) return;
-    await supabase.from("salary_table").delete().eq("id", id);
-    fetchData();
+    await createClient().from("salary_table").delete().eq("id", id);
+    void fetchData();
     if (editingRole) {
       loadRoleVariants(editingRole);
     } else {
@@ -135,7 +150,7 @@ export default function SalaryTablePage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tabela Salarial</h1>
           <p className="text-muted-foreground text-sm">
-            Gerencie os cargos e seus níveis/modalidades.
+            Consulte cargos com nível e salários de experiência ou pós-90 dias.
           </p>
         </div>
         <Button onClick={() => {
@@ -167,22 +182,58 @@ export default function SalaryTablePage() {
               <tr className="border-b transition-colors hover:bg-muted/50">
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Código</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Cargo</th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Estrutura</th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Experiência</th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Pós-90 dias</th>
                 <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Ações</th>
               </tr>
             </thead>
             <tbody className="[&_tr:last-child]:border-0">
               {loading ? (
-                <tr><td colSpan={3} className="p-4 text-center text-muted-foreground">Carregando...</td></tr>
+                <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Carregando...</td></tr>
               ) : uniqueRoles.length === 0 ? (
-                <tr><td colSpan={3} className="p-4 text-center text-muted-foreground">Nenhum cargo encontrado.</td></tr>
+                <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Nenhum cargo encontrado.</td></tr>
               ) : (
                 uniqueRoles.map((role) => (
                   <tr key={role.name} className="border-b transition-colors hover:bg-muted/50">
                     <td className="p-4 font-mono text-xs">{role.code}</td>
                     <td className="p-4 font-medium">{role.name}</td>
+                    <td className="p-4">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${role.usesLevel ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
+                        {role.structureLabel}
+                      </span>
+                    </td>
+                    <td className="p-4 text-xs">
+                      {role.usesLevel ? (
+                        <span className="text-muted-foreground">Por nível</span>
+                      ) : (
+                        <div className="space-y-1">
+                          {modalities.map(modality => (
+                            <div key={modality} className="flex min-w-32 justify-between gap-3">
+                              <span className="font-medium text-muted-foreground">{modality}</span>
+                              <span>{formatOptionalCurrency(role.salariesByModality[modality]?.experience)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-4 text-xs">
+                      {role.usesLevel ? (
+                        <span className="text-muted-foreground">Por nível</span>
+                      ) : (
+                        <div className="space-y-1">
+                          {modalities.map(modality => (
+                            <div key={modality} className="flex min-w-32 justify-between gap-3">
+                              <span className="font-medium text-muted-foreground">{modality}</span>
+                              <span>{formatOptionalCurrency(role.salariesByModality[modality]?.afterProbation)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                     <td className="p-4 text-right">
                       <Button variant="outline" size="sm" onClick={() => loadRoleVariants(role.name)}>
-                        Gerenciar Níveis
+                        {role.actionLabel}
                       </Button>
                     </td>
                   </tr>

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { createClient } from "@/utils/supabase/client";
 import { Trash2, TrendingUp, Package, Activity, Plus, Printer } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { getEmployeeBenefitLevelLabel, matchesEmployeeBenefit } from "../lib/benefitRules.mjs";
 
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
@@ -443,7 +444,7 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
       return false;
     }
     if (table === "employee_benefits") setBenefitError("");
-    void load();
+    await load();
     return true;
   };
   const [pendingDelete, setPendingDelete] = useState<{ table: DeleteTable; id: string } | null>(null);
@@ -503,7 +504,8 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
         {benefitError && <p role="alert" className="mt-3 rounded border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">{benefitError}</p>}
         <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
           {companyBenefits.map(b => {
-            const hasBenefit = benefits.find(eb => String(eb.benefit_name) === b.name || String(eb.benefit_name).startsWith(b.name + " - Nível"));
+            const hasBenefit = benefits.find(eb => matchesEmployeeBenefit(eb.benefit_name, b.name));
+            const benefitLevel = hasBenefit ? getEmployeeBenefitLevelLabel(hasBenefit.benefit_name, b.name) : null;
             return (
               <div key={b.id} className="flex flex-col gap-1">
                 <Label className="flex items-center gap-2 cursor-pointer rounded border p-2 hover:bg-muted/50 transition-colors">
@@ -525,9 +527,9 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
                   /> 
                   {b.name}
                 </Label>
-                {hasBenefit && String(hasBenefit.benefit_name).includes(" - Nível") && (
+                {benefitLevel && (
                   <span className="text-[10px] text-muted-foreground ml-7 bg-muted px-2 py-0.5 rounded-full w-fit">
-                    {String(hasBenefit.benefit_name).replace(b.name + " - ", "")}
+                    {benefitLevel}
                   </span>
                 )}
               </div>
