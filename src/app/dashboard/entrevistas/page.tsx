@@ -1055,7 +1055,7 @@ Resultado Final: ${form.result || "N/C"}
     setAssessmentForm(prev => ({
       ...prev,
       age: ageMatch ? ageMatch[1].trim() : prev.age,
-      location: locationMatch ? locationMatch[1].trim() : prev.location,
+      location: locationMatch ? locationMatch[1].trim() : (resumeText.match(/Cidade\s*([A-Za-zÀ-ÖØ-öø-ÿ\s]+)/i)?.[1]?.trim() || prev.location),
       professional_summary: professional_summary.trim() || prev.professional_summary,
       experience_summary: experience_summary || prev.experience_summary,
       education: educationText.trim() || prev.education,
@@ -1064,7 +1064,8 @@ Resultado Final: ${form.result || "N/C"}
       cnh_category: resumeText.match(/Categoria da CNH\s*([A-Z]+)/i)?.[1] || (resumeText.match(/(?:CNH|Categoria).*?\b(A|B|AB|C|D|E)\b/i)?.[1]?.toUpperCase() || ""),
       birth_date: resumeText.match(/Data de nascimento\s*(\d{2}\/\d{2}\/\d{4})/i)?.[1] || "",
       cpf: resumeText.match(/CPF\s*([\d.-]+)/i)?.[1] || "",
-      gender: resumeText.match(/Gênero\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || "",
+      gender: resumeText.match(/Sexo\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || resumeText.match(/Gênero\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || "",
+      address: resumeText.match(/País\s*Brasil\s*([^\n]+)/i)?.[1]?.trim() || prev.address,
       salary_expectation: resumeText.match(/Pretens.o Salarial.*?([\d.,]+)/i) ? ("R$ " + resumeText.match(/Pretens.o Salarial.*?([\d.,]+)/i)[1].trim()) : (resumeText.match(/Pretensão Salarial\s*(R\$\s*[\d,.]+)/i)?.[1] || "")
     }));
     
