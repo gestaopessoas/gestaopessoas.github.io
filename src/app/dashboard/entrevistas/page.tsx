@@ -1014,55 +1014,6 @@ Resultado Final: ${form.result || "N/C"}
     setSaving(false);
   };
   
-  const analyzeResume = async () => {
-    if (!resumeText.trim()) return;
-    setIsAnalyzingResume(true);
-    
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!apiKey) {
-      alert("Chave do Gemini não configurada.");
-      setIsAnalyzingResume(false);
-      return;
-    }
-    
-    const prompt = `Extraia os seguintes dados do currículo abaixo e retorne APENAS um JSON válido, sem crases, sem markdown, no formato:
-{
-  "name": "Nome Completo",
-  "email": "Email",
-  "phone": "Telefone ou Celular",
-  "role": "Cargo ou Objetivo Profissional",
-  "age": "Idade (ex: 33 anos) ou Data de Nascimento",
-  "location": "Cidade / Estado (ex: Pelotas - RS)",
-  "is_internal": false,
-  "education": "Escolaridade / Formação Principal",
-  "professional_summary": "Resumo profissional completo",
-  "academic_list": [
-    {
-      "id": "1",
-      "course": "Nome do Curso ou Graduação",
-      "institution": "Nome da Instituição ou Universidade",
-      "start_date": "Mês/Ano de Início (ex: 2011 ou 03/2011)",
-      "end_date": "Mês/Ano de Conclusão (ex: 2015 ou 12/2015)",
-      "in_progress": false
-    }
-  ],
-  "experience_list": [
-    {
-      "id": "1",
-      "role": "Nome do Cargo (ex: Psicólogo Clínico)",
-      "company": "Nome da Empresa ou Clínica",
-      "start_date": "Mês/Ano Início (ex: 08/2022)",
-      "end_date": "Mês/Ano Fim (ex: 05/2024)",
-      "is_current": false,
-      "description": "Descrição detalhada das atividades e realizações no cargo"
-    }
-  ],
-  "experience_summary": "Histórico de experiência em formato de texto resumido"
-}
-
-Currículo:
-${resumeText}`;
-
   const parseWithoutAI = () => {
     if (!resumeText.trim()) return;
     
