@@ -1,0 +1,2 @@
+-- Migration already applied to production through the Supabase dashboard.
+-- History-only reconciliation; the branch inherits the resulting schema.

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { createClient } from "@/utils/supabase/client";
 import { Trash2, TrendingUp, Package, Activity, Plus, Printer } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { getEmployeeBenefitLevelLabel, matchesEmployeeBenefit } from "../lib/benefitRules.mjs";
 
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
@@ -414,6 +415,7 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
   // For benefit levels selection
   const [levelSelectBenefit, setLevelSelectBenefit] = useState<{ id: string, name: string, level_values: Record<string, number> } | null>(null);
   const [selectedLevelForBenefit, setSelectedLevelForBenefit] = useState<string>("");
+  const [benefitError, setBenefitError] = useState("");
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -437,7 +439,13 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
 
   const add = async (table: DeleteTable, payload: Record<string, string | null>) => {
     const { error } = await createClient().from(table).insert({ employee_id: employeeId, ...payload });
-    if (!error) void load();
+    if (error) {
+      if (table === "employee_benefits") setBenefitError(`Não foi possível salvar o benefício: ${error.message}`);
+      return false;
+    }
+    if (table === "employee_benefits") setBenefitError("");
+    await load();
+    return true;
   };
   const [pendingDelete, setPendingDelete] = useState<{ table: DeleteTable; id: string } | null>(null);
   const remove = (table: DeleteTable, id: string) => setPendingDelete({ table, id });
@@ -476,14 +484,14 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setLevelSelectBenefit(null)}>Cancelar</Button>
-              <Button type="button" disabled={!selectedLevelForBenefit} onClick={() => {
+              <Button type="button" disabled={!selectedLevelForBenefit} onClick={async () => {
                 if (selectedLevelForBenefit && levelSelectBenefit) {
                   const val = levelSelectBenefit.level_values[selectedLevelForBenefit];
-                  add("employee_benefits", { 
+                  const saved = await add("employee_benefits", {
                     benefit_name: `${levelSelectBenefit.name} - Nível ${selectedLevelForBenefit}`,
                     value: String(val)
                   });
-                  setLevelSelectBenefit(null);
+                  if (saved) setLevelSelectBenefit(null);
                 }
               }}>Confirmar</Button>
             </DialogFooter>
@@ -493,9 +501,11 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
       
       <details className="rounded-md border p-3" open>
         <summary className="cursor-pointer font-medium select-none">Benefícios ({benefits.length})</summary>
+        {benefitError && <p role="alert" className="mt-3 rounded border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">{benefitError}</p>}
         <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
           {companyBenefits.map(b => {
-            const hasBenefit = benefits.find(eb => String(eb.benefit_name) === b.name || String(eb.benefit_name).startsWith(b.name + " - Nível"));
+            const hasBenefit = benefits.find(eb => matchesEmployeeBenefit(eb.benefit_name, b.name));
+            const benefitLevel = hasBenefit ? getEmployeeBenefitLevelLabel(hasBenefit.benefit_name, b.name) : null;
             return (
               <div key={b.id} className="flex flex-col gap-1">
                 <Label className="flex items-center gap-2 cursor-pointer rounded border p-2 hover:bg-muted/50 transition-colors">
@@ -517,9 +527,9 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
                   /> 
                   {b.name}
                 </Label>
-                {hasBenefit && String(hasBenefit.benefit_name).includes(" - Nível") && (
+                {benefitLevel && (
                   <span className="text-[10px] text-muted-foreground ml-7 bg-muted px-2 py-0.5 rounded-full w-fit">
-                    {String(hasBenefit.benefit_name).replace(b.name + " - ", "")}
+                    {benefitLevel}
                   </span>
                 )}
               </div>

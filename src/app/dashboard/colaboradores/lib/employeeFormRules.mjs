@@ -43,10 +43,33 @@ export const getScheduleForWorkplaceType = (type) => {
 
 export const sanitizeRgInput = (value) => String(value ?? "").replace(/\D/g, "").slice(0, 15);
 
+export const formatCurrencyInput = (value) =>
+  Number(value ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export const parseCurrencyInput = (value) => {
+  const normalized = String(value ?? "").replace(/\./g, "").replace(",", ".").replace(/[^0-9.-]/g, "");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+export const maskCurrencyInput = (value) => {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits ? formatCurrencyInput(Number(digits) / 100) : "";
+};
+
+export const salaryChangeDue = (admissionDate, baseSalary, experienceSalary, afterProbationSalary, today = new Date()) => {
+  if (!admissionDate || afterProbationSalary == null || Number(baseSalary) !== Number(experienceSalary)) return false;
+  const start = new Date(`${admissionDate}T12:00:00`);
+  const reference = typeof today === "string" ? new Date(`${today}T12:00:00`) : today;
+  const days = Math.floor((reference.getTime() - start.getTime()) / 86_400_000);
+  return days >= 83;
+};
+
 const CRITICAL_FIELDS = [
   "rg",
   "role",
   "profile_code",
+  "level",
   "company_id",
   "workplace_id",
   "marital_status",

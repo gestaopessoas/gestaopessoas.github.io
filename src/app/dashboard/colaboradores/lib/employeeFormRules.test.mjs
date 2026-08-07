@@ -6,6 +6,10 @@ import {
   criticalFieldsMatch,
   getScheduleForWorkplaceType,
   sanitizeRgInput,
+  formatCurrencyInput,
+  parseCurrencyInput,
+  salaryChangeDue,
+  maskCurrencyInput,
 } from "./employeeFormRules.mjs";
 
 test("converte opção legada para o valor canônico sem diferenciar caixa", () => {
@@ -64,4 +68,17 @@ test("confere os campos críticos devolvidos pelo banco", () => {
 
 test("RG mantém somente os primeiros 15 dígitos e preserva zeros à esquerda", () => {
   assert.equal(sanitizeRgInput("00.123-ABC 4567890123456"), "001234567890123");
+});
+
+test("formata e converte salário brasileiro sem perder centavos", () => {
+  assert.equal(formatCurrencyInput(12345.6), "12.345,60");
+  assert.equal(parseCurrencyInput("12.345,60"), 12345.6);
+  assert.equal(maskCurrencyInput("1234560"), "12.345,60");
+  assert.equal(maskCurrencyInput(""), "");
+});
+
+test("avisa a troca salarial sete dias antes do fim da experiência", () => {
+  assert.equal(salaryChangeDue("2026-05-15", 1839.21, 1839.21, 2352.26, "2026-08-06"), true);
+  assert.equal(salaryChangeDue("2026-05-01", 1839.21, 1839.21, 2352.26, "2026-08-06"), true);
+  assert.equal(salaryChangeDue("2026-05-15", 2352.26, 1839.21, 2352.26, "2026-08-06"), false);
 });

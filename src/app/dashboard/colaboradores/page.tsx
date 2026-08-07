@@ -13,11 +13,12 @@ import { RelatedRecords } from "./components/RelatedRecords";
 import { Section, Field, Select } from "./components/FormHelpers";
 import { StatsCards } from "./components/StatsCards";
 import { normalizeRole } from "./lib/normalizeRole.mjs";
-import { canonicalizeOption, criticalFieldsMatch, getScheduleForWorkplaceType, sanitizeRgInput } from "./lib/employeeFormRules.mjs";
+import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput } from "./lib/employeeFormRules.mjs";
 
 type Department = { id: string; name: string };
 type Entity = { id: string; name: string; type?: string | null; trading_name?: string | null; tax_rate_clt?: number; tax_rate_prolabore?: number; };
 type Employee = Record<string, string | null | any> & { id: string; name: string; departments?: Entity | null; level?: string | null; companies?: Entity | null; cost_centers?: Entity | null; workplaces?: Entity | null; };
+type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
 const pageSize = 1000;
@@ -69,6 +70,7 @@ const canonicalizeEmployeeForm = (employee: Employee) => {
   for (const key of Object.keys(next) as (keyof EmployeeForm)[]) next[key] = String(employee[key] ?? "");
   next.marital_status = canonicalizeOption(next.marital_status, maritalStatusOptions);
   next.status = canonicalizeOption(next.status, statusOptions);
+  for (const field of ["base_salary", "variable_salary", "commission"] as const) if (next[field]) next[field] = formatCurrencyInput(next[field]);
   return next;
 };
 
@@ -79,6 +81,7 @@ export default function ColaboradoresPage() {
   const [costCenters, setCostCenters] = useState<Entity[]>([]);
   const [workplaces, setWorkplaces] = useState<Entity[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
+  const [salaryRules, setSalaryRules] = useState<SalaryRule[]>([]);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [birthdayError, setBirthdayError] = useState("");
@@ -119,8 +122,9 @@ export default function ColaboradoresPage() {
       supabase.from("companies").select("id, name, trading_name, tax_rate_clt, tax_rate_prolabore").order("name"),
       supabase.from("cost_centers").select("id, name").order("name"),
       supabase.from("workplaces").select("id, name, type").order("name"),
-      supabase.from("job_profiles").select("title")
-    ]).then(([depsRes, compsRes, ccRes, wpRes, rolesRes]) => {
+      supabase.from("job_profiles").select("title"),
+      supabase.from("salary_table").select("id, role_name, modality, level, salary, uses_level, salary_experience, salary_after_probation")
+    ]).then(([depsRes, compsRes, ccRes, wpRes, rolesRes, salaryRes]) => {
       if (depsRes.data) setDepartments(depsRes.data as Entity[]);
       if (compsRes.data) setCompanies(compsRes.data as Entity[]);
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
@@ -128,6 +132,7 @@ export default function ColaboradoresPage() {
       if (rolesRes.data) {
         setRoles(Array.from(new Set(rolesRes.data.map((d: any) => normalizeRole(d.title)))).sort() as string[]);
       }
+      if (salaryRes.data) setSalaryRules(salaryRes.data as SalaryRule[]);
     });
 
     const params = new URLSearchParams(window.location.search);
@@ -195,6 +200,20 @@ export default function ColaboradoresPage() {
     if (field === "status" && value !== "Desligado" && value !== "Arquivo Morto") {
       updated.dismissed_at = "";
     }
+    if (field === "role" || field === "contract_type" || field === "level") {
+      const role = field === "role" ? value : current.role;
+      const modality = field === "contract_type" ? value : current.contract_type;
+      const level = field === "level" ? value : current.level;
+      const candidates = salaryRules.filter((rule) => normalizeRole(rule.role_name) === normalizeRole(role) && rule.modality.toUpperCase() === modality.toUpperCase());
+      const noLevelRule = candidates.find((rule) => !rule.uses_level);
+      const leveledRule = candidates.find((rule) => rule.uses_level && rule.level === level);
+      if (noLevelRule) {
+        updated.level = "";
+        if (noLevelRule.salary_experience != null) updated.base_salary = formatCurrencyInput(noLevelRule.salary_experience);
+      } else if (leveledRule?.salary != null) {
+        updated.base_salary = formatCurrencyInput(leveledRule.salary);
+      }
+    }
     return updated;
   });
 
@@ -252,11 +271,12 @@ export default function ColaboradoresPage() {
     }
     const nullableDates = new Set(["birthday", "dismissed_at", "admission_date", "aso_date"]);
     const nullableUuids = new Set(["department_id", "company_id", "cost_center_id", "workplace_id"]);
-    const payload = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || nullableUuids.has(key) ? value || null : (value as string).trim() || null]));
+    const payload: Record<string, any> = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || nullableUuids.has(key) ? value || null : (value as string).trim() || null]));
     payload.name = form.name.trim();
     payload.role = normalizeRole(form.role);
     payload.marital_status = canonicalizeOption(form.marital_status, maritalStatusOptions) || null;
     payload.status = canonicalizeOption(form.status, statusOptions);
+    for (const field of ["base_salary", "variable_salary", "commission"]) payload[field] = parseCurrencyInput(form[field as keyof EmployeeForm]);
     const supabase = createClient();
     
     const isNew = !editingId;
@@ -265,8 +285,8 @@ export default function ColaboradoresPage() {
     const isPromoted = !isNew && !isDismissed && (form.role !== original?.role || form.level !== original?.level || form.department_id !== original?.department_id || form.workplace_id !== original?.workplace_id);
 
     const result = editingId
-      ? await supabase.from("employees").update(payload).eq("id", editingId).select("id, rg, role, profile_code, company_id, workplace_id, marital_status, status").single()
-      : await supabase.from("employees").insert(payload).select("id, rg, role, profile_code, company_id, workplace_id, marital_status, status").single();
+      ? await supabase.from("employees").update(payload).eq("id", editingId).select("id, rg, role, profile_code, level, company_id, workplace_id, marital_status, status").single()
+      : await supabase.from("employees").insert(payload).select("id, rg, role, profile_code, level, company_id, workplace_id, marital_status, status").single();
 
     if (result.error) {
       setSaving(false);
@@ -276,7 +296,7 @@ export default function ColaboradoresPage() {
 
     if (!criticalFieldsMatch(payload, result.data)) {
       setSaving(false);
-      setError("O banco não confirmou todos os campos alterados. Revise RG, Cargo, Código do Perfil, Empresa, Obra/Unidade, Estado civil e Status.");
+      setError("O banco não confirmou todos os campos alterados. Revise RG, Cargo, Código do Perfil, Nível, Empresa, Obra/Unidade, Estado civil e Status.");
       return;
     }
       
@@ -337,6 +357,17 @@ export default function ColaboradoresPage() {
     .map(e => ({ employee: e, trialInfo: getTrialInfo(e.admission_date as string | null) }))
     .filter(item => item.trialInfo !== null)
     .sort((a, b) => a.trialInfo!.daysRemaining - b.trialInfo!.daysRemaining);
+
+  const salaryChangeAlerts = employees.flatMap((employee) => {
+    if (employee.status !== "Ativo") return [];
+    const rule = salaryRules.find((item) =>
+      !item.uses_level
+      && normalizeRole(item.role_name) === normalizeRole(employee.role)
+      && item.modality.toUpperCase() === String(employee.contract_type ?? "").toUpperCase()
+    );
+    if (!rule || !salaryChangeDue(employee.admission_date, employee.base_salary, rule.salary_experience, rule.salary_after_probation)) return [];
+    return [{ employee, rule }];
+  });
 
   const getBirthdayInfo = (dateStr: string | null) => {
     if (!dateStr) return null;
@@ -493,9 +524,9 @@ export default function ColaboradoresPage() {
             </Section>
 
             <Section title="Remuneração">
-              <Field label="Salário Base"><Input type="number" step="0.01" value={form.base_salary} onChange={(e) => update("base_salary", e.target.value)} /></Field>
-              <Field label="Comissão"><Input type="number" step="0.01" value={form.commission} onChange={(e) => update("commission", e.target.value)} /></Field>
-              <Field label="Variável"><Input type="number" step="0.01" value={form.variable_salary} onChange={(e) => update("variable_salary", e.target.value)} /></Field>
+              <Field label="Salário Base"><Input inputMode="numeric" placeholder="0,00" value={form.base_salary} onChange={(e) => update("base_salary", maskCurrencyInput(e.target.value))} /></Field>
+              <Field label="Comissão"><Input inputMode="numeric" placeholder="0,00" value={form.commission} onChange={(e) => update("commission", maskCurrencyInput(e.target.value))} /></Field>
+              <Field label="Variável"><Input inputMode="numeric" placeholder="0,00" value={form.variable_salary} onChange={(e) => update("variable_salary", maskCurrencyInput(e.target.value))} /></Field>
             </Section>
 
             <Section title="Jornada de trabalho">
@@ -746,6 +777,20 @@ export default function ColaboradoresPage() {
               <span className="font-medium text-primary">{inProbation.length}</span> em experiência
             </div>
           </div>
+
+          {salaryChangeAlerts.length > 0 && (
+            <div className="mb-6 rounded-md border border-amber-300 bg-amber-50 p-4">
+              <h3 className="flex items-center gap-2 font-semibold text-amber-900"><AlertTriangle className="h-4 w-4" /> Alteração salarial necessária</h3>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {salaryChangeAlerts.map(({ employee, rule }) => (
+                  <button type="button" key={employee.id} onClick={() => startEdit(employee)} className="rounded border border-amber-200 bg-white p-3 text-left text-sm hover:bg-amber-100/50">
+                    <span className="block font-medium">{employee.name}</span>
+                    <span className="text-xs text-muted-foreground">{employee.role} · alterar de R$ {formatCurrencyInput(rule.salary_experience)} para R$ {formatCurrencyInput(rule.salary_after_probation)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {inProbation.length === 0 ? (

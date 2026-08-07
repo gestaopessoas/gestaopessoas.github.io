@@ -45,9 +45,12 @@ type SalaryRow = {
   id: string;
   role_code: string;
   role_name: string;
-  level: string;
+  level: string | null;
   modality: string;
-  salary: number;
+  salary: number | null;
+  uses_level: boolean;
+  salary_experience: number | null;
+  salary_after_probation: number | null;
 };
 
 type SalaryModality = { modality: string; roles: string[] };
@@ -151,9 +154,19 @@ export default function MPGeneratorPage() {
   }, [salaryTable, selectedModality, selectedRoleName]);
 
   const selectedSalaryInfo = useMemo(() => {
-    return salaryTable.find(s => s.id === selectedSalaryId) || levelsForRole.find(l => l.level === selectedLevel);
+    return salaryTable.find(s => s.id === selectedSalaryId) || levelsForRole.find(l => l.level === selectedLevel) || levelsForRole.find(l => !l.uses_level);
   }, [salaryTable, selectedSalaryId, levelsForRole, selectedLevel]);
   const selectedRoleInfo = selectedSalaryInfo;
+  const selectedSalaryValue = selectedSalaryInfo?.uses_level ? selectedSalaryInfo.salary : selectedSalaryInfo?.salary_experience;
+  const selectedRoleUsesLevel = levelsForRole.some((row) => row.uses_level);
+
+  const selectSalaryRole = (roleName: string | null) => {
+    if (!roleName) return;
+    setSelectedRoleName(roleName);
+    setSelectedLevel("");
+    const noLevel = salaryTable.find((row) => row.modality === selectedModality && row.role_name === roleName && !row.uses_level);
+    setSelectedSalaryId(noLevel?.id || "");
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -241,16 +254,16 @@ export default function MPGeneratorPage() {
         setCostCenterId(emp.cost_center_id || "");
 
         // Auto-match to salary table cascata
-        if (emp.contract_type && emp.role && emp.level) {
+        if (emp.contract_type && emp.role) {
           const modalityMatch = modalities.find(m => m.toLowerCase() === emp.contract_type?.toLowerCase());
           if (modalityMatch) setSelectedModality(modalityMatch);
 
           const roleMatch = rolesForModality.find(r => r.toLowerCase() === emp.role?.toLowerCase());
           if (roleMatch) setSelectedRoleName(roleMatch);
 
-          const levelMatch = levelsForRole.find(l => l.level === emp.level);
+          const levelMatch = levelsForRole.find(l => l.uses_level ? l.level === emp.level : !l.uses_level);
           if (levelMatch) {
-            setSelectedLevel(levelMatch.level);
+            setSelectedLevel(levelMatch.level || "");
             setSelectedSalaryId(levelMatch.id);
           }
         }
@@ -285,9 +298,9 @@ export default function MPGeneratorPage() {
           unit: location,
           cost_center_id: costCenterId || null,
           role: selectedSalaryInfo?.role_name,
-          level: selectedSalaryInfo?.level,
+          level: selectedSalaryInfo?.uses_level ? selectedSalaryInfo.level : null,
           profile_code: selectedSalaryInfo?.role_code,
-          base_salary: selectedSalaryInfo?.salary,
+          base_salary: selectedSalaryInfo?.uses_level ? selectedSalaryInfo.salary : selectedSalaryInfo?.salary_experience,
           contract_type: selectedSalaryInfo?.modality
         }).eq('id', selectedEmployeeId);
       }
@@ -444,7 +457,7 @@ export default function MPGeneratorPage() {
         sheet.getCell('E22').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
         sheet.getCell('E22').font = { color: { argb: 'FFFFFFFF' } };
         sheet.getCell('E22').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('F22').value = selectedRoleInfo ? formatCurrency(selectedRoleInfo.salary) : "";
+         sheet.getCell('F22').value = selectedRoleInfo ? formatCurrency(selectedSalaryValue || 0) : "";
         sheet.getCell('F22').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
 
         sheet.mergeCells('B24:C24');
@@ -636,7 +649,7 @@ export default function MPGeneratorPage() {
         sheet.getCell('F21').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
 
         addComparison(23, "Modalidade", selectedEmployee?.contract_type || "", selectedRoleInfo?.modality || "");
-        addComparison(25, "Remuneração", selectedEmployee?.base_salary ? formatCurrency(selectedEmployee.base_salary) : "", selectedRoleInfo ? formatCurrency(selectedRoleInfo.salary) : "");
+         addComparison(25, "Remuneração", selectedEmployee?.base_salary ? formatCurrency(selectedEmployee.base_salary) : "", selectedRoleInfo ? formatCurrency(selectedSalaryValue || 0) : "");
         addComparison(26, "Horário", "-", selectedSchedule || "");
         
         sheet.getCell('B27').value = "Benefícios";
@@ -860,7 +873,7 @@ export default function MPGeneratorPage() {
                     {/* 2. Cargo (filtrado por modalidade) */}
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Cargo</Label>
-                      <Select value={selectedRoleName} onValueChange={setSelectedRoleName} disabled={!selectedModality || rolesForModality.length === 0}>
+                      <Select value={selectedRoleName} onValueChange={selectSalaryRole} disabled={!selectedModality || rolesForModality.length === 0}>
                         <SelectTrigger>
                           <SelectValue placeholder={!selectedModality ? "Selecione modalidade primeiro" : rolesForModality.length === 0 ? "Nenhum cargo para esta modalidade" : "Selecione o cargo..."} />
                         </SelectTrigger>
@@ -875,13 +888,13 @@ export default function MPGeneratorPage() {
                     {/* 3. Nível (filtrado por modalidade + cargo) */}
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Nível</Label>
-                      <Select value={selectedLevel} onValueChange={(val) => { setSelectedLevel(val); const match = levelsForRole.find(l => l.level === val); if (match) setSelectedSalaryId(match.id); }} disabled={!selectedRoleName || levelsForRole.length === 0}>
+                      <Select value={selectedLevel} onValueChange={(val) => { setSelectedLevel(val); const match = levelsForRole.find(l => l.level === val); if (match) setSelectedSalaryId(match.id); }} disabled={!selectedRoleName || !selectedRoleUsesLevel}>
                         <SelectTrigger>
-                          <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : levelsForRole.length === 0 ? "Nenhum nível para este cargo" : "Selecione o nível..."} />
+                          <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : !selectedRoleUsesLevel ? "Cargo sem nível" : "Selecione o nível..."} />
                         </SelectTrigger>
                         <SelectContent>
-                          {levelsForRole.map(l => (
-                            <SelectItem key={l.id} value={l.level}>{l.level} — {formatCurrency(l.salary)}</SelectItem>
+                          {levelsForRole.filter(l => l.uses_level && l.level).map(l => (
+                            <SelectItem key={l.id} value={l.level!}>{l.level} — {formatCurrency(l.salary || 0)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -890,9 +903,9 @@ export default function MPGeneratorPage() {
                     {selectedSalaryInfo && (
                       <div className="p-3 bg-muted rounded-md text-sm mt-2 grid grid-cols-2 gap-2 border">
                         <div><span className="font-semibold text-muted-foreground">Cargo:</span> {selectedSalaryInfo.role_name}</div>
-                        <div><span className="font-semibold text-muted-foreground">Nível:</span> {selectedSalaryInfo.level}</div>
+                        <div><span className="font-semibold text-muted-foreground">Nível:</span> {selectedSalaryInfo.uses_level ? selectedSalaryInfo.level : "Sem nível"}</div>
                         <div><span className="font-semibold text-muted-foreground">Modo:</span> {selectedSalaryInfo.modality}</div>
-                        <div><span className="font-semibold text-muted-foreground">Salário:</span> {formatCurrency(selectedSalaryInfo.salary)}</div>
+                        <div><span className="font-semibold text-muted-foreground">Salário:</span> {selectedSalaryInfo.uses_level ? formatCurrency(selectedSalaryInfo.salary || 0) : `${formatCurrency(selectedSalaryInfo.salary_experience || 0)} → ${formatCurrency(selectedSalaryInfo.salary_after_probation || 0)}`}</div>
                         <div><span className="font-semibold text-muted-foreground">Cód:</span> {selectedSalaryInfo.role_code || "N/A"}</div>
                       </div>
                     )}
@@ -1139,7 +1152,7 @@ export default function MPGeneratorPage() {
                       {/* 2. Cargo (filtrado por modalidade) */}
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Cargo</Label>
-                        <Select value={selectedRoleName} onValueChange={setSelectedRoleName} disabled={!selectedModality || rolesForModality.length === 0}>
+                        <Select value={selectedRoleName} onValueChange={selectSalaryRole} disabled={!selectedModality || rolesForModality.length === 0}>
                           <SelectTrigger>
                             <SelectValue placeholder={!selectedModality ? "Selecione modalidade primeiro" : rolesForModality.length === 0 ? "Nenhum cargo para esta modalidade" : "Selecione o cargo..."} />
                           </SelectTrigger>
@@ -1154,13 +1167,13 @@ export default function MPGeneratorPage() {
                       {/* 3. Nível (filtrado por modalidade + cargo) */}
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Nível</Label>
-                        <Select value={selectedLevel} onValueChange={(val) => { setSelectedLevel(val); const match = levelsForRole.find(l => l.level === val); if (match) setSelectedSalaryId(match.id); }} disabled={!selectedRoleName || levelsForRole.length === 0}>
+                        <Select value={selectedLevel} onValueChange={(val) => { setSelectedLevel(val); const match = levelsForRole.find(l => l.level === val); if (match) setSelectedSalaryId(match.id); }} disabled={!selectedRoleName || !selectedRoleUsesLevel}>
                           <SelectTrigger>
-                            <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : levelsForRole.length === 0 ? "Nenhum nível para este cargo" : "Selecione o nível..."} />
+                            <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : !selectedRoleUsesLevel ? "Cargo sem nível" : "Selecione o nível..."} />
                           </SelectTrigger>
                           <SelectContent>
-                            {levelsForRole.map(l => (
-                              <SelectItem key={l.id} value={l.level}>{l.level} — {formatCurrency(l.salary)}</SelectItem>
+                            {levelsForRole.filter(l => l.uses_level && l.level).map(l => (
+                              <SelectItem key={l.id} value={l.level!}>{l.level} — {formatCurrency(l.salary || 0)}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -1169,9 +1182,9 @@ export default function MPGeneratorPage() {
                       {selectedSalaryInfo && (
                         <div className="p-3 bg-muted rounded-md text-sm mt-2 grid grid-cols-2 gap-2 border">
                           <div><span className="font-semibold text-muted-foreground">Cargo:</span> {selectedSalaryInfo.role_name}</div>
-                          <div><span className="font-semibold text-muted-foreground">Nível:</span> {selectedSalaryInfo.level}</div>
+                          <div><span className="font-semibold text-muted-foreground">Nível:</span> {selectedSalaryInfo.uses_level ? selectedSalaryInfo.level : "Sem nível"}</div>
                           <div><span className="font-semibold text-muted-foreground">Modo:</span> {selectedSalaryInfo.modality}</div>
-                          <div><span className="font-semibold text-muted-foreground">Salário:</span> {formatCurrency(selectedSalaryInfo.salary)}</div>
+                          <div><span className="font-semibold text-muted-foreground">Salário:</span> {selectedSalaryInfo.uses_level ? formatCurrency(selectedSalaryInfo.salary || 0) : `${formatCurrency(selectedSalaryInfo.salary_experience || 0)} → ${formatCurrency(selectedSalaryInfo.salary_after_probation || 0)}`}</div>
                           <div><span className="font-semibold text-muted-foreground">Cód:</span> {selectedSalaryInfo.role_code || "N/A"}</div>
                         </div>
                       )}
@@ -1317,4 +1330,3 @@ export default function MPGeneratorPage() {
     </div>
   );
 }
-
