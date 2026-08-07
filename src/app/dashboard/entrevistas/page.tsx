@@ -1024,10 +1024,21 @@ Resultado Final: ${form.result || "N/C"}
     const phoneMatch = resumeText.match(/(\(\d{2}\)\s*\d{4,5}-\d{4})/);
     const emailMatch = resumeText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
     
-    // Tenta extrair o resumo profissional
+    // Tenta extrair blocos de texto principais
     let professional_summary = "";
-    const resumoMatch = resumeText.match(/Resumo profissional([\s\S]*?)Experiência profissional/i);
+    const resumoMatch = resumeText.match(/Resumo profissional([\s\S]*?)(Experiência profissional|Formação|Cursos e certificações|Habilidades|Informações adicionais|$)/i);
     if (resumoMatch) professional_summary = resumoMatch[1].trim();
+
+    let experience_summary = "";
+    const expMatch = resumeText.match(/Experiência profissional([\s\S]*?)(Formação|Cursos e certificações|Habilidades|Informações adicionais|$)/i);
+    if (expMatch) experience_summary = expMatch[1].trim();
+
+    let educationText = "";
+    const formacaoMatch = resumeText.match(/Formação([\s\S]*?)(Cursos e certificações|Habilidades|Informações adicionais|$)/i);
+    if (formacaoMatch) educationText += "Formação:\n" + formacaoMatch[1].trim() + "\n\n";
+
+    const cursosMatch = resumeText.match(/Cursos e certificações([\s\S]*?)(Habilidades|Informações adicionais|$)/i);
+    if (cursosMatch) educationText += "Cursos e certificações:\n" + cursosMatch[1].trim() + "\n\n";
 
     openNewModal();
     setForm(prev => ({
@@ -1043,6 +1054,8 @@ Resultado Final: ${form.result || "N/C"}
       age: ageMatch ? ageMatch[1].trim() : prev.age,
       location: locationMatch ? locationMatch[1].trim() : prev.location,
       professional_summary: professional_summary || prev.professional_summary,
+      experience_summary: experience_summary || prev.experience_summary,
+      education: educationText.trim() || prev.education,
       // Tenta achar CNH
       cnh: resumeText.match(/Possui CNH\?\s*(Sim|Não)/i)?.[1] || "",
       cnh_category: resumeText.match(/Categoria da CNH\s*([A-Z]+)/i)?.[1] || "",
