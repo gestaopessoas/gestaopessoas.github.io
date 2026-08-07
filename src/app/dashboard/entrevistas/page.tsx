@@ -1043,6 +1043,10 @@ Resultado Final: ${form.result || "N/C"}
     const cursosMatch = resumeText.match(/Cursos e certificações([\s\S]*?)(Habilidades|Informações adicionais|$)/i);
     if (cursosMatch) educationText += "Cursos e certificações:\n" + cursosMatch[1].trim() + "\n\n";
 
+    const parsedSalary1 = resumeText.match(/Pretens.o Salarial.*?([\d.,]+)/i);
+    const parsedSalary2 = resumeText.match(/Pretensão Salarial\s*(R\$\s*[\d,.]+)/i);
+    const finalSalary = parsedSalary1 ? ("R$ " + parsedSalary1[1].trim()) : (parsedSalary2?.[1] || "");
+
     openNewModal();
     setForm(prev => ({
       ...prev,
@@ -1066,7 +1070,7 @@ Resultado Final: ${form.result || "N/C"}
       cpf: resumeText.match(/CPF\s*([\d.-]+)/i)?.[1] || "",
       gender: resumeText.match(/Sexo\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || resumeText.match(/Gênero\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || "",
       address: resumeText.match(/País\s*Brasil\s*([^\n]+)/i)?.[1]?.trim() || prev.address,
-      salary_expectation: resumeText.match(/Pretens.o Salarial.*?([\d.,]+)/i) ? ("R$ " + resumeText.match(/Pretens.o Salarial.*?([\d.,]+)/i)[1].trim()) : (resumeText.match(/Pretensão Salarial\s*(R\$\s*[\d,.]+)/i)?.[1] || "")
+      salary_expectation: finalSalary
     }));
     
     setIsResumeModalOpen(false);
