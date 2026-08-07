@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, Calendar, CheckCircle2, Clock, Download, Search, User, Plus, X, FileText, Trash2 } from "lucide-react";
+import { Briefcase, Calendar, CheckCircle2, Clock, Download, Search, User, Plus, X, FileText, Trash2, Key } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -64,6 +64,14 @@ type Assessment = {
   location?: string;
   professional_summary?: string;
   experience_summary?: string;
+  cnh?: string;
+  cnh_category?: string;
+  birth_date?: string;
+  cpf?: string;
+  gender?: string;
+  address?: string;
+  marital_status?: string;
+  salary_expectation?: string;
 };
 
 type Interview = {
@@ -115,7 +123,33 @@ const defaultAssessment: Assessment = {
   location: "",
   professional_summary: "",
   experience_summary: "",
+  cnh: "",
+  cnh_category: "",
+  birth_date: "",
+  cpf: "",
+  gender: "",
+  address: "",
+  marital_status: "",
+  salary_expectation: "",
 };
+
+export type AIProvider = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  isActive: boolean;
+  models: { id: string; name: string }[];
+  selectedModel: string;
+};
+
+export const defaultProviders: AIProvider[] = [
+  { id: "gemini", name: "Gemini (Sistema)", baseUrl: "https://generativelanguage.googleapis.com/v1beta", apiKey: "", isActive: true, models: [], selectedModel: "gemini-2.5-flash" },
+  { id: "9router", name: "9router", baseUrl: "http://localhost:11434/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
+  { id: "omniroute", name: "omniroute", baseUrl: "http://localhost:8000/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
+  { id: "opencode", name: "opencode", baseUrl: "http://localhost:8080/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
+  { id: "nvidia", name: "Nvidia NIM", baseUrl: "https://integrate.api.nvidia.com/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
+];
 
 // gemini-1.5-flash foi descontinuado na API; 2.5-flash e estavel.
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
@@ -446,9 +480,131 @@ export default function EntrevistasPage() {
   
   // Resume Modal State
   const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+  const [providers, setProviders] = useState<AIProvider[]>(defaultProviders);
   const [resumeText, setResumeText] = useState("");
   const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
   const [viewingCandidateProfile, setViewingCandidateProfile] = useState<{ interviewId?: string | null; email?: string | null; name?: string | null } | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("ai_providers");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        // Merge with defaults to ensure all providers exist
+        const merged = defaultProviders.map(dp => {
+          const found = parsed.find((p: AIProvider) => p.id === dp.id);
+          return found ? { ...dp, ...found, models: found.models || dp.models, selectedModel: found.selectedModel || dp.selectedModel } : dp;
+        });
+        setProviders(merged);
+      } catch (e) {
+        console.error("Error loading providers from local storage:", e);
+      }
+    }
+  }, []);
+
+  const updateProvider = (id: string, updates: Partial<AIProvider>) => {
+    const updated = providers.map(p => {
+      if (p.id === id) {
+        const isActivating = updates.isActive && !p.isActive;
+        return { ...p, ...updates, isActive: updates.isActive !== undefined ? updates.isActive : p.isActive };
+      }
+      // If activating a provider, deactivate all others
+      if (updates.isActive) return { ...p, isActive: false };
+      return p;
+    });
+    setProviders(updated);
+    localStorage.setItem("ai_providers", JSON.stringify(updated));
+  };
+
+  const fetchModels = async (providerId: string) => {
+    const provider = providers.find(p => p.id === providerId);
+    if (!provider) return;
+
+    try {
+      let models: { id: string; name: string }[] = [];
+      if (provider.id === "gemini") {
+        const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+        if (!apiKey) {
+          alert("Chave do Gemini não configurada no .env.");
+          return;
+        }
+        const res = await fetch(`${provider.baseUrl}/models?key=${apiKey}`);
+        if (!res.ok) throw new Error("Erro ao buscar modelos do Gemini");
+        const data = await res.json();
+        models = (data.models || [])
+          .filter((m: any) => m.name.includes("gemini"))
+          .map((m: any) => ({ id: m.name.replace("models/", ""), name: m.displayName || m.name }));
+      } else {
+        if (!provider.apiKey) {
+          alert("API Key não configurada para este provedor.");
+          return;
+        }
+        const res = await fetch(`${provider.baseUrl}/models`, {
+          headers: { "Authorization": `Bearer ${provider.apiKey}` }
+        });
+        if (!res.ok) throw new Error("Erro ao buscar modelos. Verifique a URL e a chave.");
+        const data = await res.json();
+        const modelsData = data.data || data;
+        models = (Array.isArray(modelsData) ? modelsData : []).map((m: any) => ({
+          id: m.id, name: m.id
+        }));
+      }
+
+      if (models.length > 0) {
+        updateProvider(providerId, { models, selectedModel: models[0].id });
+        alert(`Foram encontrados ${models.length} modelos!`);
+      } else {
+        alert("Nenhum modelo retornado pela API.");
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert(`Falha ao buscar modelos: ${e.message}`);
+    }
+  };
+
+  const generateWithAI = async (prompt: string): Promise<string | null> => {
+    const activeProvider = providers.find(p => p.isActive) || providers.find(p => p.id === "gemini");
+    if (!activeProvider) return null;
+
+    try {
+      if (activeProvider.id === "gemini") {
+        const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+        if (!apiKey) {
+          alert("Chave do Gemini não configurada.");
+          return null;
+        }
+        const modelToUse = activeProvider.selectedModel || "gemini-2.5-flash";
+        const url = `${activeProvider.baseUrl}/models/${modelToUse}:generateContent?key=${apiKey}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      } else {
+        const res = await fetch(`${activeProvider.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${activeProvider.apiKey}`
+          },
+          body: JSON.stringify({
+            model: activeProvider.selectedModel,
+            messages: [{ role: "user", content: prompt }]
+          })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content || null;
+      }
+    } catch (e) {
+      console.error("AI Generation Error:", e);
+      return null;
+    }
+  };
   
   // Test generation states
   const [selectedTest, setSelectedTest] = useState("G36");
@@ -503,29 +659,21 @@ export default function EntrevistasPage() {
       }
     }
     
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (apiKey && combinedResults.trim() !== "") {
+    if (combinedResults.trim() !== "") {
       const prompt = `O candidato de ${assessmentForm.age || 'idade não informada'} anos, escolaridade ${assessmentForm.education || 'não informada'}, realizou os seguintes testes psicológicos:\n${combinedResults}\nEscreva um parecer psicológico consolidado e profissional, em um parágrafo objetivo, explicando as características do candidato com base nessas classificações. O parecer deve focar estritamente nas classificações (inferior, médio, superior, etc) e no que elas significam.`;
+      
       try {
-        const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
-        if (!res.ok) {
-          setAssessmentForm({ ...assessmentForm, tests_details: "Erro ao comunicar com IA. Resultados brutos:\n" + combinedResults });
+        const generatedText = await generateWithAI(prompt);
+        if (generatedText) {
+          setAssessmentForm({ ...assessmentForm, tests_details: "RESULTADOS DA AVALIAÇÃO:\n" + combinedResults + "\nPARECER INTEGRADO DA IA:\n" + generatedText });
         } else {
-          const data = await res.json();
-          if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-            const text = data.candidates[0].content.parts[0].text;
-            setAssessmentForm({ ...assessmentForm, tests_details: "RESULTADOS DA AVALIAÇÃO:\n" + combinedResults + "\nPARECER INTEGRADO DA IA:\n" + text });
-          }
+          setAssessmentForm({ ...assessmentForm, tests_details: "Erro ao comunicar com IA. Resultados brutos:\n" + combinedResults });
         }
       } catch (e) {
         setAssessmentForm({ ...assessmentForm, tests_details: "Erro ao comunicar com IA. Resultados brutos:\n" + combinedResults });
       }
     } else {
-      setAssessmentForm({ ...assessmentForm, tests_details: "Resultados consultados (IA não configurada ou sem testes):\n" + combinedResults });
+      setAssessmentForm({ ...assessmentForm, tests_details: "Resultados consultados (Sem testes válidos):\n" + combinedResults });
     }
     setIsGeneratingTest(false);
   };
@@ -915,61 +1063,151 @@ Resultado Final: ${form.result || "N/C"}
 Currículo:
 ${resumeText}`;
 
+  const parseWithoutAI = () => {
+    if (!resumeText.trim()) return;
+    
+    // Expressões regulares baseadas no formato Sólides fornecido
+    const nameMatch = resumeText.match(/^([A-Za-zÀ-ÖØ-öø-ÿ\s]+)\s+\d{2}\s+anos/i);
+    const ageMatch = resumeText.match(/(\d{2})\s*anos/i);
+    const locationMatch = resumeText.match(/anos\s+([A-Za-zÀ-ÖØ-öø-ÿ\s]+-\s*[A-Z]{2})/i);
+    const phoneMatch = resumeText.match(/(\(\d{2}\)\s*\d{4,5}-\d{4})/);
+    const emailMatch = resumeText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
+    
+    // Tenta extrair o resumo profissional
+    let professional_summary = "";
+    const resumoMatch = resumeText.match(/Resumo profissional([\s\S]*?)Experiência profissional/i);
+    if (resumoMatch) professional_summary = resumoMatch[1].trim();
+
+    openNewModal();
+    setForm(prev => ({
+      ...prev,
+      candidate_name: nameMatch ? nameMatch[1].trim() : "",
+      email: emailMatch ? emailMatch[1].trim() : "",
+      phone: phoneMatch ? phoneMatch[1].trim() : "",
+      role: ""
+    }));
+    
+    setAssessmentForm(prev => ({
+      ...prev,
+      age: ageMatch ? ageMatch[1].trim() : prev.age,
+      location: locationMatch ? locationMatch[1].trim() : prev.location,
+      professional_summary: professional_summary || prev.professional_summary,
+      // Tenta achar CNH
+      cnh: resumeText.match(/Possui CNH\?\s*(Sim|Não)/i)?.[1] || "",
+      cnh_category: resumeText.match(/Categoria da CNH\s*([A-Z]+)/i)?.[1] || "",
+      birth_date: resumeText.match(/Data de nascimento\s*(\d{2}\/\d{2}\/\d{4})/i)?.[1] || "",
+      cpf: resumeText.match(/CPF\s*([\d.-]+)/i)?.[1] || "",
+      gender: resumeText.match(/Gênero\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || "",
+      salary_expectation: resumeText.match(/Pretensão Salarial\s*(R\$\s*[\d,.]+)/i)?.[1] || ""
+    }));
+    
+    setIsResumeModalOpen(false);
+  };
+
+  const analyzeResume = async () => {
+    if (!resumeText.trim()) return;
+    setIsAnalyzingResume(true);
+    
+    const prompt = `Extraia os seguintes dados do currículo abaixo e retorne APENAS um JSON válido, sem crases, sem markdown, no formato:
+{
+  "name": "Nome Completo",
+  "email": "Email",
+  "phone": "Telefone ou Celular",
+  "role": "Cargo ou Objetivo Profissional",
+  "age": "Idade (ex: 33 anos) ou Data de Nascimento",
+  "location": "Cidade / Estado (ex: Pelotas - RS)",
+  "is_internal": false,
+  "education": "Escolaridade / Formação Principal",
+  "professional_summary": "Resumo profissional completo",
+  "cnh": "Possui CNH? (Sim/Não/Não Informado)",
+  "cnh_category": "Categoria da CNH (A, B, AB, etc)",
+  "birth_date": "Data de nascimento (DD/MM/YYYY)",
+  "cpf": "CPF",
+  "gender": "Gênero",
+  "address": "Endereço completo",
+  "marital_status": "Estado Civil",
+  "salary_expectation": "Pretensão Salarial",
+  "academic_list": [
+    {
+      "id": "1",
+      "course": "Nome do Curso ou Graduação",
+      "institution": "Nome da Instituição ou Universidade",
+      "start_date": "Mês/Ano de Início (ex: 2011 ou 03/2011)",
+      "end_date": "Mês/Ano de Conclusão (ex: 2015 ou 12/2015)",
+      "in_progress": false
+    }
+  ],
+  "experience_list": [
+    {
+      "id": "1",
+      "role": "Nome do Cargo (ex: Psicólogo Clínico)",
+      "company": "Nome da Empresa ou Clínica",
+      "start_date": "Mês/Ano Início (ex: 08/2022)",
+      "end_date": "Mês/Ano Fim (ex: 05/2024)",
+      "is_current": false,
+      "description": "Descrição detalhada das atividades e realizações no cargo"
+    }
+  ],
+  "experience_summary": "Histórico de experiência em formato de texto resumido"
+}
+
+Currículo:
+${resumeText}`;
+
     try {
-      const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error("Gemini analyzeResume error:", res.status, errText);
-        alert(`Erro ao analisar currículo (${res.status}). Verifique a chave do Gemini ou tente novamente.`);
+      const generatedText = await generateWithAI(prompt);
+      if (!generatedText) {
+        alert("Erro ao analisar currículo. Verifique a chave de IA ativada no gerenciador de chaves.");
         setIsAnalyzingResume(false);
         return;
       }
-      const data = await res.json();
-      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-        let text = data.candidates[0].content.parts[0].text;
-        text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-        const parsed = JSON.parse(text);
+      
+      let text = generatedText.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(text);
 
-        openNewModal();
-        setForm(prev => ({
-          ...prev,
-          candidate_name: parsed.name || "",
-          email: parsed.email || "",
-          phone: parsed.phone || "",
-          role: parsed.role || ""
-        }));
-        setAssessmentForm(prev => ({
-          ...prev,
-          age: parsed.age || prev.age,
-          location: parsed.location || prev.location,
-          is_internal: typeof parsed.is_internal === "boolean" ? parsed.is_internal : prev.is_internal,
-          education: parsed.education || prev.education,
-          professional_summary: parsed.professional_summary || prev.professional_summary,
-          experience_summary: parsed.experience_summary || prev.experience_summary,
-          academic_list: Array.isArray(parsed.academic_list) ? parsed.academic_list.map((item: any, idx: number) => ({
-            id: String(Date.now() + idx),
-            course: item.course || "",
-            institution: item.institution || "",
-            start_date: item.start_date || "",
-            end_date: item.end_date || "",
-            in_progress: Boolean(item.in_progress)
-          })) : prev.academic_list || [],
-          experience_list: Array.isArray(parsed.experience_list) ? parsed.experience_list.map((item: any, idx: number) => ({
-            id: String(Date.now() + 100 + idx),
-            role: item.role || "",
-            company: item.company || "",
-            start_date: item.start_date || "",
-            end_date: item.end_date || "",
-            is_current: Boolean(item.is_current),
-            description: item.description || ""
-          })) : prev.experience_list || []
-        }));
-        setIsResumeModalOpen(false);
-      }
+      openNewModal();
+      setForm(prev => ({
+        ...prev,
+        candidate_name: parsed.name || "",
+        email: parsed.email || "",
+        phone: parsed.phone || "",
+        role: parsed.role || ""
+      }));
+      setAssessmentForm(prev => ({
+        ...prev,
+        age: parsed.age || prev.age,
+        location: parsed.location || prev.location,
+        is_internal: typeof parsed.is_internal === "boolean" ? parsed.is_internal : prev.is_internal,
+        education: parsed.education || prev.education,
+        professional_summary: parsed.professional_summary || prev.professional_summary,
+        experience_summary: parsed.experience_summary || prev.experience_summary,
+        cnh: parsed.cnh || prev.cnh,
+        cnh_category: parsed.cnh_category || prev.cnh_category,
+        birth_date: parsed.birth_date || prev.birth_date,
+        cpf: parsed.cpf || prev.cpf,
+        gender: parsed.gender || prev.gender,
+        address: parsed.address || prev.address,
+        marital_status: parsed.marital_status || prev.marital_status,
+        salary_expectation: parsed.salary_expectation || prev.salary_expectation,
+        academic_list: Array.isArray(parsed.academic_list) ? parsed.academic_list.map((item: any, idx: number) => ({
+          id: String(Date.now() + idx),
+          course: item.course || "",
+          institution: item.institution || "",
+          start_date: item.start_date || "",
+          end_date: item.end_date || "",
+          in_progress: Boolean(item.in_progress)
+        })) : prev.academic_list || [],
+        experience_list: Array.isArray(parsed.experience_list) ? parsed.experience_list.map((item: any, idx: number) => ({
+          id: String(Date.now() + 100 + idx),
+          role: item.role || "",
+          company: item.company || "",
+          start_date: item.start_date || "",
+          end_date: item.end_date || "",
+          is_current: Boolean(item.is_current),
+          description: item.description || ""
+        })) : prev.experience_list || []
+      }));
+      setIsResumeModalOpen(false);
     } catch (e) {
       console.error(e);
       alert("Não foi possível extrair os dados automaticamente. Verifique se o texto do currículo é válido.");
@@ -2047,7 +2285,12 @@ ${resumeText}`;
           <div className="bg-background w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-4 border-b">
               <div>
-                <h2 className="text-lg font-semibold">Ler Currículo</h2>
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  Ler Currículo
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => setIsKeyModalOpen(true)}>
+                    <Key className="h-4 w-4" />
+                  </Button>
+                </h2>
                 <p className="text-sm text-muted-foreground">Cole o texto do currículo (Ex: da Sólides ou outro formato) para preencher os dados via IA.</p>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setIsResumeModalOpen(false)}>
@@ -2062,17 +2305,109 @@ ${resumeText}`;
                 onChange={e => setResumeText(e.target.value)}
               />
             </div>
-            <div className="flex justify-end p-4 border-t gap-2 bg-muted/10">
-              <Button variant="ghost" onClick={() => setIsResumeModalOpen(false)}>Cancelar</Button>
-              <Button 
-                onClick={analyzeResume} 
-                disabled={!resumeText.trim() || isAnalyzingResume}
-                className="gap-2 text-primary border-primary hover:bg-primary/10"
-                variant="outline"
-              >
-                <span className="text-lg leading-none">🪄</span> 
-                {isAnalyzingResume ? "Analisando..." : "Analisar via IA"}
+            <div className="flex justify-between p-4 border-t gap-2 bg-muted/10 items-center">
+              <Button variant="ghost" className="text-muted-foreground text-xs" onClick={parseWithoutAI} disabled={!resumeText.trim()}>
+                Analisar sem IA (Padrão Sólides)
               </Button>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setIsResumeModalOpen(false)}>Cancelar</Button>
+                <Button 
+                  onClick={analyzeResume} 
+                  disabled={!resumeText.trim() || isAnalyzingResume}
+                  className="gap-2 text-primary border-primary hover:bg-primary/10"
+                  variant="outline"
+                >
+                  <span className="text-lg leading-none">🪄</span> 
+                  {isAnalyzingResume ? "Analisando..." : "Analisar via IA"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Gerenciar Chaves de IA */}
+      {isKeyModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-background w-full max-w-xl rounded-xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h2 className="text-lg font-semibold">Provedores de IA</h2>
+                <p className="text-sm text-muted-foreground">Selecione o provedor e insira sua chave para utilizar na análise.</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setIsKeyModalOpen(false)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="p-4 space-y-6 max-h-[60vh] overflow-y-auto">
+              {providers.map(provider => (
+                <div key={provider.id} className="p-4 border rounded-lg bg-muted/10 space-y-4 relative">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">{provider.name}</h3>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`active-${provider.id}`} 
+                        checked={provider.isActive}
+                        onCheckedChange={(checked) => updateProvider(provider.id, { isActive: Boolean(checked) })}
+                      />
+                      <Label htmlFor={`active-${provider.id}`} className="cursor-pointer">Ativo</Label>
+                    </div>
+                  </div>
+                  
+                  {provider.id !== "gemini" && (
+                    <>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Base URL</Label>
+                        <Input 
+                          value={provider.baseUrl} 
+                          onChange={(e) => updateProvider(provider.id, { baseUrl: e.target.value })} 
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">API Key</Label>
+                        <Input 
+                          type="password"
+                          value={provider.apiKey} 
+                          onChange={(e) => updateProvider(provider.id, { apiKey: e.target.value })} 
+                          className="h-8 text-xs"
+                          placeholder="Cole sua chave aqui..."
+                        />
+                      </div>
+                    </>
+                  )}
+                  {provider.id === "gemini" && (
+                    <p className="text-xs text-muted-foreground">Utiliza a chave NEXT_PUBLIC_GEMINI_API_KEY do sistema.</p>
+                  )}
+                  
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs">Modelo Selecionado</Label>
+                      {provider.models.length > 0 ? (
+                        <select 
+                          className="flex h-8 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          value={provider.selectedModel}
+                          onChange={(e) => updateProvider(provider.id, { selectedModel: e.target.value })}
+                        >
+                          {provider.models.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="h-8 px-3 py-1 text-xs border rounded-md bg-muted/30 text-muted-foreground flex items-center">
+                          {provider.selectedModel || "Nenhum modelo selecionado"}
+                        </div>
+                      )}
+                    </div>
+                    <Button variant="secondary" className="h-8 text-xs" onClick={() => fetchModels(provider.id)}>
+                      Buscar Modelos
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end p-4 border-t gap-2 bg-muted/10">
+              <Button onClick={() => setIsKeyModalOpen(false)}>Concluir</Button>
             </div>
           </div>
         </div>
