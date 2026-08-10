@@ -45,7 +45,7 @@ export const LogoCropperModal: React.FC<LogoCropperModalProps> = ({ isOpen, onCl
     if (!initialImageUrl) return;
     setErrorMsg(null);
     try {
-      const proxiedUrl = `https://corsproxy.io/?${encodeURIComponent(initialImageUrl)}`;
+      const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(initialImageUrl)}`;
       const res = await fetch(proxiedUrl);
       if (!res.ok) throw new Error("Failed to load image");
       const blob = await res.blob();
