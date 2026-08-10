@@ -4,14 +4,14 @@ import { createClient } from "@supabase/supabase-js";
 // Endpoint restrito para tabelas que precisam bypassar o RLS do frontend.
 // Útil para quando não temos acesso ao dashboard para corrigir as políticas RLS.
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 const ALLOWED_TABLES = ["benefit_audit_logs", "benefit_ignores", "rgs_processes"];
 
 export async function POST(request: Request) {
+  // Criado dentro do handler para garantir que as env vars já estejam disponíveis
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
   try {
     const { action, table, payload, match } = await request.json();
 
