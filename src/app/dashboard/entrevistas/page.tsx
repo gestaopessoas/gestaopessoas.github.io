@@ -59,6 +59,8 @@ type Assessment = {
   weaknesses: string;
   observations: string;
   worksite?: string;
+  worksite_type?: "all" | "specific";
+  available_worksites?: string[];
   selection_stage?: string;
   is_internal?: boolean;
   location?: string;
@@ -118,6 +120,8 @@ const defaultAssessment: Assessment = {
   weaknesses: "",
   observations: "",
   worksite: "",
+  worksite_type: "all",
+  available_worksites: [],
   selection_stage: "",
   is_internal: false,
   location: "",
@@ -998,6 +1002,7 @@ Resultado Final: ${form.result || "N/C"}
           phone: payloadAny.phone,
           role_interest: payloadAny.role,
           city: assessmentForm.worksite || "",
+          available_worksites: assessmentForm.worksite_type === "all" ? ["Todas as Obras"] : (assessmentForm.available_worksites || []),
           search_tags: [tag, assessmentForm.selection_stage || "Importado de Entrevistas"].filter(Boolean)
         });
         
@@ -1611,19 +1616,43 @@ ${resumeText}`;
             )}
             
             {activeTab === "dados" && (form.result === "Aprovado" || form.result === "Banco de Talentos") && (
-              <div className="px-6 py-4 bg-muted/30 border-t space-y-2">
-                <Label>Obra / Sede para envio à Central do Candidato</Label>
-                <select
-                  value={assessmentForm.worksite || ''}
-                  onChange={e => setAssessmentForm({...assessmentForm, worksite: e.target.value})}
-                  className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="">Selecione a Obra...</option>
-                  {worksites.map(w => <option key={w} value={w}>{w}</option>)}
-                  {assessmentForm.worksite && !worksites.includes(assessmentForm.worksite) && (
-                    <option value={assessmentForm.worksite}>{assessmentForm.worksite} (obra atual)</option>
-                  )}
-                </select>
+              <div className="px-6 py-4 bg-muted/30 border-t space-y-4">
+                <div className="space-y-2">
+                  <Label>Disponibilidade de Obra / Sede</Label>
+                  <select
+                    value={assessmentForm.worksite_type || 'all'}
+                    onChange={e => setAssessmentForm({...assessmentForm, worksite_type: e.target.value as "all" | "specific", available_worksites: []})}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                  >
+                    <option value="all">Disponível para Todas as Obras</option>
+                    <option value="specific">Obras Específicas...</option>
+                  </select>
+                </div>
+                
+                {assessmentForm.worksite_type === 'specific' && (
+                  <div className="space-y-2 p-3 border rounded-md bg-background">
+                    <Label className="text-xs text-muted-foreground uppercase">Selecione as obras adequadas ao perfil:</Label>
+                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto mt-2">
+                      {worksites.map(w => (
+                        <label key={w} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 p-1 rounded">
+                          <input 
+                            type="checkbox" 
+                            checked={(assessmentForm.available_worksites || []).includes(w)}
+                            onChange={(e) => {
+                              const current = assessmentForm.available_worksites || [];
+                              const next = e.target.checked 
+                                ? [...current, w] 
+                                : current.filter((x: string) => x !== w);
+                              setAssessmentForm({...assessmentForm, available_worksites: next});
+                            }}
+                            className="rounded border-input"
+                          />
+                          <span className="truncate">{w}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

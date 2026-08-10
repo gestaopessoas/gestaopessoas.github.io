@@ -34,7 +34,7 @@ export default function CentralCandidatoPage() {
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"banco" | "processo" | "contratado">("banco");
+  const [activeTab, setActiveTab] = useState<"processo">("processo");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -60,6 +60,8 @@ export default function CentralCandidatoPage() {
           role_interest,
           city,
           created_at,
+          search_tags,
+          available_worksites,
           candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, created_at),
           candidate_educations(candidate_id, degree, start_date, end_date)
         `)
@@ -70,6 +72,23 @@ export default function CentralCandidatoPage() {
       if (data) {
         const rows: CandidateRow[] = data.map((c: any) => {
           const derived = deriveCandidateStatus(c.candidate_interviews);
+          
+          let finalStatus = derived.status;
+          let finalChamado = derived.ultimo_chamado;
+          
+          // Se o candidato foi recém aprovado da tela de Entrevistas (ainda não tem entrevista na Central)
+          if ((!c.candidate_interviews || c.candidate_interviews.length === 0) && Array.isArray(c.search_tags) && c.search_tags.includes("Aprovado na Entrevista")) {
+              finalStatus = "Em Processo";
+              const worksitesStr = Array.isArray(c.available_worksites) && c.available_worksites.length > 0 
+                ? c.available_worksites.join(", ") 
+                : (c.city || "Obra não informada");
+              finalChamado = `Encaminhado para: ${worksitesStr}`;
+          }
+
+          // Se o candidato tem a tag de Banco de Talentos explícita da tela de Entrevistas
+          if (Array.isArray(c.search_tags) && c.search_tags.includes("Banco de Talentos")) {
+              finalStatus = "Banco de Talentos";
+          }
 
           return {
             id: c.id,
@@ -77,8 +96,8 @@ export default function CentralCandidatoPage() {
             phone: c.phone || "Não informado",
             email: c.email,
             escolaridade: latestEducationDegree(c.candidate_educations) || "Não informado",
-            status: derived.status,
-            ultimo_chamado: derived.ultimo_chamado,
+            status: finalStatus,
+            ultimo_chamado: finalChamado,
             obra_atual: derived.obra_atual || c.city || null,
             etapa_atual: derived.etapa_atual,
           };
@@ -98,10 +117,9 @@ export default function CentralCandidatoPage() {
   }, []);
 
   const filteredCandidates = useMemo(() => {
-    let list = candidates;
-    if (activeTab === "banco") list = candidates.filter(c => c.status === "Banco de Talentos");
-    if (activeTab === "processo") list = candidates.filter(c => c.status === "Em Processo");
-    if (activeTab === "contratado") list = candidates.filter(c => c.status === "Contratado");
+    let list = candidates.filter(c => c.status !== "Contratado" && c.status !== "Banco de Talentos");
+    
+    if (activeTab === "processo") list = list.filter(c => c.status === "Em Processo");
 
     if (!search.trim()) return list;
     const s = search.toLowerCase();
@@ -169,25 +187,11 @@ export default function CentralCandidatoPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
           <div className="flex bg-muted/50 p-1 rounded-md">
             <Button 
-              variant={activeTab === "banco" ? "secondary" : "ghost"} 
-              size="sm"
-              onClick={() => setActiveTab("banco")}
-            >
-              Banco de Talentos
-            </Button>
-            <Button 
               variant={activeTab === "processo" ? "secondary" : "ghost"} 
               size="sm"
               onClick={() => setActiveTab("processo")}
             >
               Em Processo
-            </Button>
-            <Button 
-              variant={activeTab === "contratado" ? "secondary" : "ghost"} 
-              size="sm"
-              onClick={() => setActiveTab("contratado")}
-            >
-              Contratados
             </Button>
           </div>
           <div className="relative flex-1 sm:w-64">
@@ -202,10 +206,7 @@ export default function CentralCandidatoPage() {
           <Button variant="outline" size="icon" onClick={fetchCandidates}>
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button onClick={() => setIsAddCandidateModalOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Novo Candidato</span>
-          </Button>
+
         </div>
       </div>
 

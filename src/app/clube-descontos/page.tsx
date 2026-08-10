@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { DiscountPartner, BenefitCategory } from "@/types/benefits";
 import { PartnerCard } from "@/components/benefits/PartnerCard";
 import { RedeemModal } from "@/components/benefits/RedeemModal";
+import { BecomePartnerModal } from "@/components/benefits/BecomePartnerModal";
 import { createClient } from "@/utils/supabase/client";
 import { Search, Sparkles, Filter, RefreshCw, Layers, Gift, ArrowRight } from "lucide-react";
 
@@ -24,6 +25,7 @@ export default function ClubeDescontosPage() {
   const [selectedCategory, setSelectedCategory] = useState<BenefitCategory>("Todos");
   const [selectedPartner, setSelectedPartner] = useState<DiscountPartner | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [partnerModalOpen, setPartnerModalOpen] = useState<boolean>(false);
   const supabase = useMemo(() => createClient(), []);
 
   // Implementação de alta performance do Debounce no input de pesquisa (300ms)
@@ -123,6 +125,14 @@ export default function ClubeDescontosPage() {
                 </button>
               )}
             </div>
+            <button
+              onClick={() => setPartnerModalOpen(true)}
+              type="button"
+              className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 py-3.5 text-sm font-bold text-zinc-950 shadow-md transition-all duration-200 hover:bg-amber-400 hover:shadow-lg active:scale-95 sm:w-auto"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Seja um Parceiro ACPO</span>
+            </button>
           </div>
         </div>
       </div>
@@ -241,6 +251,12 @@ export default function ClubeDescontosPage() {
         partner={selectedPartner}
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
+      />
+
+      {/* Modal "Seja um Parceiro" para leads externos */}
+      <BecomePartnerModal 
+        isOpen={partnerModalOpen}
+        onClose={() => setPartnerModalOpen(false)}
       />
     </div>
   );

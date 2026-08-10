@@ -18,9 +18,21 @@ import {
   ExternalLink, 
   Tag, 
   Sparkles,
-  Gift
+  Gift,
+  Rocket,
+  Building
 } from "lucide-react";
 import { DiscountPartner, PartnerLead } from "@/types/benefits";
+
+type PartnerProspect = {
+  id: string;
+  company_name: string;
+  contact_name: string;
+  email: string;
+  phone: string;
+  status: string;
+  created_at: string;
+};
 
 type Partner = DiscountPartner;
 
@@ -46,6 +58,7 @@ export default function ParceirosAdminPage() {
   const supabase = createClient();
   const [partners, setPartners] = useState<Partner[]>([]);
   const [leads, setLeads] = useState<(PartnerLead & { partner_name?: string; employee_name?: string })[]>([]);
+  const [prospects, setProspects] = useState<PartnerProspect[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -66,6 +79,12 @@ export default function ParceirosAdminPage() {
     // Fetch leads e funcionários para cruzar nomes
     const { data: lData, error: lErr } = await supabase
       .from("partner_leads")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    // Fetch prospects
+    const { data: prosData, error: prosErr } = await supabase
+      .from("partner_prospects")
       .select("*")
       .order("created_at", { ascending: false });
 
@@ -95,6 +114,13 @@ export default function ParceirosAdminPage() {
         employee_name: empsMap.get(String(lead.employee_id)) || `Colaborador (${String(lead.employee_id).slice(0, 8)})`
       }));
       setLeads(enrichedLeads);
+    }
+
+    if (prosErr) {
+      console.error("Erro ao carregar candidatos a parceiro:", prosErr);
+      setProspects([]);
+    } else {
+      setProspects(prosData as PartnerProspect[] || []);
     }
 
     setLoading(false);
@@ -187,6 +213,11 @@ export default function ParceirosAdminPage() {
     await supabase.from("partner_leads").update({ status: newStatus }).eq("id", leadId);
   };
 
+  const handleUpdateProspectStatus = async (prospectId: string, newStatus: string) => {
+    setProspects(prev => prev.map(p => p.id === prospectId ? { ...p, status: newStatus } : p));
+    await supabase.from("partner_prospects").update({ status: newStatus }).eq("id", prospectId);
+  };
+
   const filteredPartners = partners.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -227,20 +258,29 @@ export default function ParceirosAdminPage() {
       </div>
 
       <Tabs defaultValue="vitrine" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
-          <TabsTrigger value="vitrine" className="flex gap-2 relative">
+        <TabsList className="grid w-full max-w-2xl grid-cols-3 mb-4">
+          <TabsTrigger value="vitrine" className="flex gap-2 relative text-xs">
             <Gift className="w-4 h-4 text-emerald-500" />
-            <span>Vitrine Ativa (Catálogo)</span>
+            <span className="hidden sm:inline">Vitrine Ativa</span>
             <span className="ml-1 rounded-full bg-emerald-500/10 text-emerald-600 px-2 py-0.5 text-[10px] font-bold">
               {partners.length}
             </span>
           </TabsTrigger>
-          <TabsTrigger value="leads" className="flex gap-2 relative">
+          <TabsTrigger value="leads" className="flex gap-2 relative text-xs">
             <Users className="w-4 h-4 text-amber-500" />
-            <span>Fila de Interessados</span>
+            <span className="hidden sm:inline">Resgates Internos</span>
             {leads.length > 0 && (
               <span className="ml-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-bold">
                 {leads.filter(l => l.status === "resgatado").length || leads.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="prospects" className="flex gap-2 relative text-xs">
+            <Rocket className="w-4 h-4 text-blue-500" />
+            <span className="hidden sm:inline">Candidatos a Parceiro</span>
+            {prospects.length > 0 && (
+              <span className="ml-1 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 text-[10px] font-bold">
+                {prospects.filter(p => p.status === "pendente").length || prospects.length}
               </span>
             )}
           </TabsTrigger>
@@ -432,6 +472,116 @@ export default function ParceirosAdminPage() {
                         <tr>
                           <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                             Nenhum resgate registrado na tabela &ldquo;partner_leads&rdquo; até o momento.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ABA 3: CANDIDATOS A PARCEIRO */}
+        <TabsContent value="prospects" className="space-y-4">
+          <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm">
+            <CardHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 pb-4 border-b border-zinc-100 dark:border-zinc-800 rounded-t-xl">
+              <CardTitle className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <Building className="h-5 w-5 text-blue-500" />
+                Novas Empresas Interessadas
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Lista de empresas que enviaram solicitação pelo portal para se tornarem parceiras da ACPO.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="flex justify-center p-12"><div className="animate-spin h-6 w-6 border-2 border-emerald-500 rounded-full border-t-transparent" /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-zinc-50 dark:bg-zinc-900/50 text-xs uppercase text-zinc-500 dark:text-zinc-400 font-bold border-b border-zinc-200 dark:border-zinc-800">
+                      <tr>
+                        <th className="px-4 py-3">Data</th>
+                        <th className="px-4 py-3">Empresa</th>
+                        <th className="px-4 py-3">Contato</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                      {prospects.map((p) => (
+                        <tr key={p.id} className="hover:bg-muted/40 transition-colors">
+                          <td className="px-4 py-3 tabular-nums text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+                            {format(new Date(p.created_at || new Date().toISOString()), "dd/MM/yyyy HH:mm")}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100">
+                            {p.company_name}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-zinc-800 dark:text-zinc-200">{p.contact_name}</span>
+                              <span className="text-xs text-zinc-500">{p.email}</span>
+                              <span className="text-xs text-zinc-500">{p.phone}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide border ${
+                              p.status === "aprovado"
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                : p.status === "em_contato"
+                                ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/50 dark:text-blue-300"
+                                : p.status === "rejeitado"
+                                ? "bg-red-100 text-red-800 border-red-300 dark:bg-red-950/50 dark:text-red-300"
+                                : "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300"
+                            }`}>
+                              {p.status === "pendente" ? "Pendente" : 
+                               p.status === "em_contato" ? "Em Contato" : 
+                               p.status === "aprovado" ? "Aprovado" : "Rejeitado"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {p.status === "pendente" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleUpdateProspectStatus(p.id, "em_contato")}
+                                  className="text-xs text-blue-700 hover:bg-blue-50 border-blue-300"
+                                >
+                                  Contatar
+                                </Button>
+                              )}
+                              {p.status !== "aprovado" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleUpdateProspectStatus(p.id, "aprovado")}
+                                  className="text-xs text-emerald-700 hover:bg-emerald-50 border-emerald-300 font-semibold gap-1"
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                  <span>Aprovar</span>
+                                </Button>
+                              )}
+                              {p.status === "aprovado" && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleUpdateProspectStatus(p.id, "pendente")}
+                                  className="text-xs text-zinc-500"
+                                >
+                                  Reverter
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {prospects.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                            Nenhuma empresa se candidatou a parceiro até o momento.
                           </td>
                         </tr>
                       )}
