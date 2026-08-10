@@ -615,7 +615,29 @@ export default function EntrevistasPage() {
         const errorText = await res.text();
         throw new Error(`Erro AI (${res.status}): ${errorText}`);
       }
-      const data = await res.json();
+      const rawText = await res.text();
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        if (rawText.includes("data: ")) {
+          let fullText = "";
+          const lines = rawText.split('\n');
+          for (const line of lines) {
+            if (line.trim().startsWith('data: ')) {
+              const jsonStr = line.replace('data: ', '').trim();
+              if (jsonStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(jsonStr);
+                if (parsed.choices?.[0]?.delta?.content) fullText += parsed.choices[0].delta.content;
+                else if (parsed.choices?.[0]?.message?.content) fullText += parsed.choices[0].message.content;
+              } catch (err) {}
+            }
+          }
+          if (fullText) return fullText;
+        }
+        throw new Error("A resposta da IA não é um JSON válido (talvez seja um erro de conexão/proxy). " + String(e));
+      }
       return data.choices?.[0]?.message?.content || "";
     }
   };
