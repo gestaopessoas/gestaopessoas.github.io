@@ -850,6 +850,7 @@ export default function ParceirosAdminPage() {
           setForm({ ...form, logo_url: url });
           setIsCropperOpen(false);
         }} 
+        initialImageUrl={form.logo_url}
       />
     </div>
   );

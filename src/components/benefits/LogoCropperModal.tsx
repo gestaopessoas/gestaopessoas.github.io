@@ -10,6 +10,7 @@ interface LogoCropperModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCropped: (url: string) => void;
+  initialImageUrl?: string;
 }
 
 // Inicializa o crop centralizado com proporção 1:1
@@ -29,7 +30,7 @@ function centerAspectCrop(mediaWidth: number, mediaHeight: number, aspect: numbe
   );
 }
 
-export const LogoCropperModal: React.FC<LogoCropperModalProps> = ({ isOpen, onClose, onCropped }) => {
+export const LogoCropperModal: React.FC<LogoCropperModalProps> = ({ isOpen, onClose, onCropped, initialImageUrl }) => {
   const [imgSrc, setImgSrc] = useState("");
   const imgRef = useRef<HTMLImageElement>(null);
   const [crop, setCrop] = useState<Crop>();
@@ -39,6 +40,24 @@ export const LogoCropperModal: React.FC<LogoCropperModalProps> = ({ isOpen, onCl
   const supabase = createClient();
 
   if (!isOpen) return null;
+
+  const handleLoadFromUrl = async () => {
+    if (!initialImageUrl) return;
+    setErrorMsg(null);
+    try {
+      const proxiedUrl = `https://corsproxy.io/?${encodeURIComponent(initialImageUrl)}`;
+      const res = await fetch(proxiedUrl);
+      if (!res.ok) throw new Error("Failed to load image");
+      const blob = await res.blob();
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        setImgSrc(reader.result?.toString() || "");
+      });
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      setErrorMsg("Erro ao carregar a imagem do link. Talvez o link não permita acesso ou esteja quebrado.");
+    }
+  };
 
   // Lida com o upload do arquivo
   const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,15 +214,34 @@ export const LogoCropperModal: React.FC<LogoCropperModalProps> = ({ isOpen, onCl
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
                 Formatos recomendados: JPG, PNG, WEBP (Quadrado)
               </p>
-              <label className="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors">
-                Selecionar Arquivo
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={onSelectFile}
-                  className="hidden"
-                />
-              </label>
+              <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
+                <label className="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors">
+                  Selecionar do Computador
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={onSelectFile}
+                    className="hidden"
+                  />
+                </label>
+                
+                {initialImageUrl && (
+                  <>
+                    <div className="relative flex items-center py-2">
+                      <div className="flex-grow border-t border-zinc-300 dark:border-zinc-700"></div>
+                      <span className="flex-shrink-0 mx-4 text-zinc-400 text-xs font-medium">OU</span>
+                      <div className="flex-grow border-t border-zinc-300 dark:border-zinc-700"></div>
+                    </div>
+                    
+                    <button
+                      onClick={handleLoadFromUrl}
+                      className="rounded-lg bg-zinc-200 dark:bg-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+                    >
+                      Usar a URL preenchida
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
