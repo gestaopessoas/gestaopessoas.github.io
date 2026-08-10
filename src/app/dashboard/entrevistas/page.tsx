@@ -1065,7 +1065,19 @@ Resultado Final: ${form.result || "N/C"}
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const content = await page.getTextContent();
-            text += content.items.map((item: any) => item.str).join(" ") + "\n";
+            let lastY;
+            let pageText = "";
+            for (const rawItem of content.items) {
+              const item = rawItem as any;
+              if (item.str === undefined) continue;
+              // Verifica se a coordenada Y mudou (nova linha no PDF)
+              if (lastY !== undefined && item.transform && Math.abs(lastY - item.transform[5]) > 2) {
+                pageText += "\n";
+              }
+              pageText += item.str;
+              if (item.transform) lastY = item.transform[5];
+            }
+            text += pageText + "\n\n";
           }
           setResumeText(text);
         } catch (err) {
