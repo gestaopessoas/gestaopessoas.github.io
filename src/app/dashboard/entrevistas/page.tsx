@@ -158,7 +158,7 @@ export const defaultProviders: AIProvider[] = [
   { id: "9router", name: "9router", baseUrl: "https://rk9xyun.abc-tunnel.us/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
   { id: "openrouter", name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
   { id: "opencode", name: "Opencode", baseUrl: "https://api.opencode.com/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
-  { id: "nvidia", name: "Nvidia NIM", baseUrl: "https://integrate.api.nvidia.com/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
+  { id: "nvidia", name: "Nvidia NIM", baseUrl: "https://integrate.api.nvidia.com/v1", apiKey: "", isActive: false, models: [], selectedModel: "nvidia/nemotron-3-ultra-550b-a55b" },
 ];
 
 // gemini-1.5-flash foi descontinuado na API; 2.5-flash e estavel.
