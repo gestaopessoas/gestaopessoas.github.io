@@ -60,12 +60,10 @@ export function NotificationBell() {
         }
       } catch (e: any) { empError = e; }
 
-      const igsPromise = fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "select", table: "benefit_ignores" }) }).then(res => res.json());
-
       const [
         { data: rgsData, error: rgsError },
         { data: bens },
-        igsResponse,
+        { data: igs },
         { data: leadsData }
       ] = await Promise.all([
         supabase
@@ -73,15 +71,14 @@ export function NotificationBell() {
           .select("id, employee_name, process_type, created_at, status")
           .eq("status", "Pendente"),
         supabase.from("employee_benefits").select("employee_id, benefit_name"),
-        igsPromise,
+        supabase.from("benefit_ignores").select("employee_id"),
         supabase.from("partner_leads").select("id").neq("status", "atendido")
       ]);
 
       setPendingLeads(leadsData ? leadsData.length : 0);
 
       if (!empError && empData) {
-        const igs = igsResponse?.data || [];
-        const ignoredIds = igs.map((i: any) => i.employee_id);
+        const ignoredIds = (igs || []).map(i => (i as { employee_id: string }).employee_id);
         setPendingProfiles(generatePendingProfileNotifications(empData as any[], userPrefs));
         setTrialNotifications(generateTrialNotifications(empData as any[], userPrefs));
         setBenefitNotifications(generateBenefitNotifications(empData as any[], (bens || []) as any[], userPrefs, ignoredIds));
