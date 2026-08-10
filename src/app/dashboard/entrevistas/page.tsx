@@ -1103,32 +1103,31 @@ Resultado Final: ${form.result || "N/C"}
     const firstLineName = resumeText.split("\n").map(l => l.trim()).filter(Boolean)[0] || "";
     
     const ageMatch = resumeText.match(/(\d{2})\s*anos/i);
-    const locationMatch = resumeText.match(/(?:anos)?\s*([A-Za-zÀ-ÖØ-öø-ÿ\s]+-\s*[A-Z]{2})/i);
+    const locationMatch = resumeText.match(/([A-Za-zÀ-ÖØ-öø-ÿ\s]+-\s*[A-Z]{2})/i);
     const phoneMatch = resumeText.match(/(\(\d{2}\)\s*\d{4,5}-\d{4})/);
-    const emailMatch = resumeText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
+    const emailMatch = resumeText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+)/);
     
     // Tenta extrair blocos de texto principais (Pulando Habilidades explicitamente)
     let professional_summary = "";
-    const resumoMatch = resumeText.match(/Resumo profissional([\s\S]*?)(Experiência profissional|Formação|Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
+    const resumoMatch = resumeText.match(/Resumo profissional\s*([\s\S]*?)(Experiência profissional|Formação|Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
     if (resumoMatch) professional_summary = resumoMatch[1].trim();
 
-    const infoAdicionaisMatch = resumeText.match(/Informações adicionais([\s\S]*?)(Informações pessoais|Diversidade|Endereço|$)/i);
+    const infoAdicionaisMatch = resumeText.match(/Informações adicionais\s*([\s\S]*?)(Informações pessoais|Diversidade|Endereço|$)/i);
     if (infoAdicionaisMatch) professional_summary += "\n\nInformações adicionais:\n" + infoAdicionaisMatch[1].trim();
 
     let experience_summary = "";
-    const expMatch = resumeText.match(/Experiência profissional([\s\S]*?)(Formação|Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
+    const expMatch = resumeText.match(/Experiência profissional\s*([\s\S]*?)(Formação|Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
     if (expMatch) experience_summary = expMatch[1].trim();
 
     let educationText = "";
-    const formacaoMatch = resumeText.match(/Formação([\s\S]*?)(Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
+    const formacaoMatch = resumeText.match(/Formação\s*([\s\S]*?)(Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
     if (formacaoMatch) educationText += "Formação:\n" + formacaoMatch[1].trim() + "\n\n";
 
-    const cursosMatch = resumeText.match(/Cursos e certificações([\s\S]*?)(Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
+    const cursosMatch = resumeText.match(/Cursos e certificações\s*([\s\S]*?)(Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
     if (cursosMatch) educationText += "Cursos e certificações:\n" + cursosMatch[1].trim() + "\n\n";
 
-    const parsedSalary1 = resumeText.match(/Pretens.o Salarial.*?([\d.,]+)/i);
-    const parsedSalary2 = resumeText.match(/Pretensão Salarial\s*(R\$\s*[\d,.]+)/i);
-    const finalSalary = parsedSalary1 ? ("R$ " + parsedSalary1[1].trim()) : (parsedSalary2?.[1] || "");
+    const parsedSalary1 = resumeText.match(/Pretens.o Salarial\s*(?:R\$)?\s*([\d.,]+)/i);
+    const finalSalary = parsedSalary1 ? ("R$ " + parsedSalary1[1].trim()) : "";
 
     openNewModal();
     setForm(prev => ({
@@ -1136,23 +1135,22 @@ Resultado Final: ${form.result || "N/C"}
       candidate_name: firstLineName || (nameMatch ? nameMatch[1].trim() : ""),
       email: emailMatch ? emailMatch[1].trim() : "",
       phone: phoneMatch ? phoneMatch[1].trim() : "",
-      role: ""
+      role: resumeText.match(/Cargo\(s\) de interesse\s*([^\n]+)/i)?.[1]?.trim() || ""
     }));
     
     setAssessmentForm(prev => ({
       ...prev,
       age: ageMatch ? ageMatch[1].trim() : prev.age,
-      location: locationMatch ? locationMatch[1].trim() : (resumeText.match(/Cidade\s*([A-Za-zÀ-ÖØ-öø-ÿ\s]+)/i)?.[1]?.trim() || prev.location),
+      location: locationMatch ? locationMatch[1].trim() : (resumeText.match(/Cidade\s*([^\n]+)/i)?.[1]?.trim() || prev.location),
       professional_summary: professional_summary.trim() || prev.professional_summary,
       experience_summary: experience_summary || prev.experience_summary,
       education: educationText.trim() || prev.education,
-      // Tenta achar CNH com regex mais flexível
       cnh: resumeText.match(/Possui CNH\?\s*(Sim|Não)/i)?.[1] || (resumeText.match(/\bCNH\b/i) ? "Sim" : ""),
-      cnh_category: resumeText.match(/Categoria da CNH\s*([A-Z]+)/i)?.[1] || (resumeText.match(/(?:CNH|Categoria).*?\b(A|B|AB|C|D|E)\b/i)?.[1]?.toUpperCase() || ""),
+      cnh_category: resumeText.match(/Categoria da CNH\s*([A-Z]+)/i)?.[1] || "",
       birth_date: resumeText.match(/Data de nascimento\s*(\d{2}\/\d{2}\/\d{4})/i)?.[1] || "",
       cpf: resumeText.match(/CPF\s*([\d.-]+)/i)?.[1] || "",
       gender: resumeText.match(/Sexo\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || resumeText.match(/Gênero\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || "",
-      address: resumeText.match(/País\s*Brasil\s*([^\n]+)/i)?.[1]?.trim() || prev.address,
+      address: resumeText.match(/Endereço\s*([^\n]+)/i)?.[1]?.trim() || prev.address,
       salary_expectation: finalSalary
     }));
     
