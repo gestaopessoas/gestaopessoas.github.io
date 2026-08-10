@@ -226,21 +226,26 @@ export default function RgsPage() {
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/40 text-left">
             <tr>
-              <th className="p-3">Data</th>
+              <th className="p-3">Data / Vigência</th>
               <th className="p-3">Processo</th>
-              <th className="p-3">Colaborador</th>
-              <th className="p-3">Cargo / Local</th>
-              <th className="p-3">Progresso / Checklists</th>
-              <th className="p-3">Status</th>
+              <th className="p-3">Colaborador / Contrato</th>
+              <th className="p-3">Cargo / Local / Setor</th>
+              <th className="p-3">Checklists (Sistemas)</th>
+              <th className="p-3">SST & eSocial</th>
+              <th className="p-3 max-w-[200px]">Descrição</th>
+              <th className="p-3 text-center">Status</th>
             </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : filtered.length === 0 ? <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Nenhum processo encontrado.</td></tr> : filtered.map((row) => (
-              <tr key={row.id} className="border-b last:border-0">
-                <td className="p-3">{formatDate(row.process_date)}</td>
-                <td className="p-3 font-medium">{row.process_type}</td>
+            {loading ? <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : filtered.length === 0 ? <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">Nenhum processo encontrado.</td></tr> : filtered.map((row) => (
+              <tr key={row.id} className="border-b last:border-0 hover:bg-muted/30">
+                <td className="p-3 whitespace-nowrap">
+                  <div className="font-medium">{formatDate(row.process_date)}</div>
+                  {row.effective_date && <div className="text-xs text-muted-foreground">Vig: {formatDate(row.effective_date)}</div>}
+                </td>
+                <td className="p-3 font-medium whitespace-nowrap">{row.process_type}</td>
                 <td className="p-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 font-medium">
                     {row.employee_name ?? "-"}
                     {row.employee_name && (
                       <button 
@@ -252,6 +257,7 @@ export default function RgsPage() {
                       </button>
                     )}
                   </div>
+                  {row.contract_type && <div className="text-xs text-muted-foreground mt-0.5">{row.contract_type}</div>}
                 </td>
                 <td className="p-3">
                   <div className="font-medium">{row.role ?? "-"}</div>
@@ -263,16 +269,28 @@ export default function RgsPage() {
                     {row.integration && <div>Integ: <span className="font-medium text-foreground">{row.integration}</span></div>}
                     {row.domain_access && <div>Domínio: <span className="font-medium text-foreground">{row.domain_access}</span></div>}
                     {row.accesses && <div>Acessos: <span className="font-medium text-foreground">{row.accesses}</span></div>}
+                    {row.solides && <div>Sólides: <span className="font-medium text-foreground">{row.solides}</span></div>}
                   </div>
                 </td>
                 <td className="p-3">
-                  <div className="flex items-center gap-2">
+                  <div className="text-xs space-y-1 text-muted-foreground">
+                    {row.exam_date && <div>Exame: <span className="font-medium text-foreground">{formatDate(row.exam_date)}</span></div>}
+                    {row.sst_status && <div>SST: <span className="font-medium text-foreground">{row.sst_status}</span></div>}
+                    {row.esocial_aso && <div>ASO: <span className="font-medium text-foreground">{row.esocial_aso}</span></div>}
+                    {row.esocial_amb && <div>AMB: <span className="font-medium text-foreground">{row.esocial_amb}</span></div>}
+                  </div>
+                </td>
+                <td className="p-3 text-xs text-muted-foreground max-w-[200px] truncate" title={row.description || ""}>
+                  {row.description || "-"}
+                </td>
+                <td className="p-3 text-center">
+                  <div className="flex items-center justify-center gap-2">
                     <Button size="sm" variant={row.status === "Concluído" ? "outline" : "default"} onClick={() => toggle(row)}>
                       {row.status ?? "Pendente"}
                     </Button>
                     {isAdmin && (
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar (admin)" aria-label="Editar processo">
-                        <Pencil className="h-3.5 w-3.5" />
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(row)} title="Editar (admin)" aria-label="Editar processo">
+                        <Pencil className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     )}
                   </div>
