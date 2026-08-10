@@ -3,12 +3,18 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, Calendar, CheckCircle2, Clock, Download, Search, User, Plus, X, FileText, Trash2, Key } from "lucide-react";
+import { Check, Search, Filter, Loader2, Key, Download, MapPin, Briefcase, Calendar, Clock, Trash2, Phone, Mail, User, LogOut, Shield, ChevronDown, CheckCircle2, ChevronRight, X, FileText, ArrowRight, Printer, AlertTriangle, MessageSquare, Plus, FileUp } from "lucide-react";
+import * as pdfjsLib from "pdfjs-dist";
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+
+// Define a versão para baixar o worker correto do CDN
+if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+}
 
 type PsychologicalTestInput = {
   test_name: string;
@@ -567,46 +573,50 @@ export default function EntrevistasPage() {
     }
   };
 
-  const generateWithAI = async (prompt: string): Promise<string | null> => {
+  const generateWithAI = async (prompt: string): Promise<string> => {
     const activeProvider = providers.find(p => p.isActive) || providers.find(p => p.id === "gemini");
-    if (!activeProvider) return null;
+    if (!activeProvider) throw new Error("Nenhum provedor de IA ativo encontrado.");
 
-    try {
-      if (activeProvider.id === "gemini") {
-        const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-        if (!apiKey) {
-          alert("Chave do Gemini não configurada.");
-          return null;
-        }
-        const modelToUse = activeProvider.selectedModel || "gemini-2.5-flash";
-        const url = `${activeProvider.baseUrl}/models/${modelToUse}:generateContent?key=${apiKey}`;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-      } else {
-        const res = await fetch(`${activeProvider.baseUrl}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${activeProvider.apiKey}`
-          },
-          body: JSON.stringify({
-            model: activeProvider.selectedModel,
-            messages: [{ role: "user", content: prompt }]
-          })
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        return data.choices?.[0]?.message?.content || null;
+    if (activeProvider.id === "gemini") {
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("Chave do Gemini não configurada nas variáveis de ambiente.");
+      
+      const modelToUse = activeProvider.selectedModel || "gemini-2.5-flash";
+      const baseUrl = activeProvider.baseUrl.replace(/\/+$/, "");
+      const url = `${baseUrl}/models/${modelToUse}:generateContent?key=${apiKey}`;
+      
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Erro Gemini (${res.status}): ${errorText}`);
       }
-    } catch (e) {
-      console.error("AI Generation Error:", e);
-      return null;
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } else {
+      const baseUrl = activeProvider.baseUrl.replace(/\/+$/, "");
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${activeProvider.apiKey}`,
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "Gestaopessoas"
+        },
+        body: JSON.stringify({
+          model: activeProvider.selectedModel || "gpt-3.5-turbo",
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Erro AI (${res.status}): ${errorText}`);
+      }
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || "";
     }
   };
   
@@ -1019,33 +1029,67 @@ Resultado Final: ${form.result || "N/C"}
     setSaving(false);
   };
   
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type === "application/pdf") {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const typedarray = new Uint8Array(reader.result as ArrayBuffer);
+          const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+          let text = "";
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            text += content.items.map((item: any) => item.str).join(" ") + "\n";
+          }
+          setResumeText(text);
+        } catch (err) {
+          console.error(err);
+          alert("Erro ao extrair texto do PDF. O arquivo pode estar protegido.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else if (file.type === "text/plain") {
+      const reader = new FileReader();
+      reader.onload = () => setResumeText(reader.result as string);
+      reader.readAsText(file);
+    } else {
+      alert("Formato não suportado. Por favor, envie um arquivo PDF ou TXT.");
+    }
+  };
+
   const parseWithoutAI = () => {
     if (!resumeText.trim()) return;
     
     // Expressões regulares baseadas no formato Sólides fornecido
-    const nameMatch = resumeText.match(/^([A-Za-zÀ-ÖØ-öø-ÿ\s]+)\s+\d{2}\s+anos/i);
+    const nameMatch = resumeText.match(/^([A-Za-zÀ-ÖØ-öø-ÿ\s]+)/i);
+    const firstLineName = resumeText.split("\n").map(l => l.trim()).filter(Boolean)[0] || "";
+    
     const ageMatch = resumeText.match(/(\d{2})\s*anos/i);
-    const locationMatch = resumeText.match(/anos\s+([A-Za-zÀ-ÖØ-öø-ÿ\s]+-\s*[A-Z]{2})/i);
+    const locationMatch = resumeText.match(/(?:anos)?\s*([A-Za-zÀ-ÖØ-öø-ÿ\s]+-\s*[A-Z]{2})/i);
     const phoneMatch = resumeText.match(/(\(\d{2}\)\s*\d{4,5}-\d{4})/);
     const emailMatch = resumeText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
     
-    // Tenta extrair blocos de texto principais
+    // Tenta extrair blocos de texto principais (Pulando Habilidades explicitamente)
     let professional_summary = "";
-    const resumoMatch = resumeText.match(/Resumo profissional([\s\S]*?)(Experiência profissional|Formação|Cursos e certificações|Habilidades|Informações adicionais|$)/i);
+    const resumoMatch = resumeText.match(/Resumo profissional([\s\S]*?)(Experiência profissional|Formação|Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
     if (resumoMatch) professional_summary = resumoMatch[1].trim();
 
-    const infoAdicionaisMatch = resumeText.match(/Informações adicionais([\s\S]*?)$/i);
+    const infoAdicionaisMatch = resumeText.match(/Informações adicionais([\s\S]*?)(Informações pessoais|Diversidade|Endereço|$)/i);
     if (infoAdicionaisMatch) professional_summary += "\n\nInformações adicionais:\n" + infoAdicionaisMatch[1].trim();
 
     let experience_summary = "";
-    const expMatch = resumeText.match(/Experiência profissional([\s\S]*?)(Formação|Cursos e certificações|Habilidades|Informações adicionais|$)/i);
+    const expMatch = resumeText.match(/Experiência profissional([\s\S]*?)(Formação|Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
     if (expMatch) experience_summary = expMatch[1].trim();
 
     let educationText = "";
-    const formacaoMatch = resumeText.match(/Formação([\s\S]*?)(Cursos e certificações|Habilidades|Informações adicionais|$)/i);
+    const formacaoMatch = resumeText.match(/Formação([\s\S]*?)(Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
     if (formacaoMatch) educationText += "Formação:\n" + formacaoMatch[1].trim() + "\n\n";
 
-    const cursosMatch = resumeText.match(/Cursos e certificações([\s\S]*?)(Habilidades|Informações adicionais|$)/i);
+    const cursosMatch = resumeText.match(/Cursos e certificações([\s\S]*?)(Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
     if (cursosMatch) educationText += "Cursos e certificações:\n" + cursosMatch[1].trim() + "\n\n";
 
     const parsedSalary1 = resumeText.match(/Pretens.o Salarial.*?([\d.,]+)/i);
@@ -1055,7 +1099,7 @@ Resultado Final: ${form.result || "N/C"}
     openNewModal();
     setForm(prev => ({
       ...prev,
-      candidate_name: nameMatch ? nameMatch[1].trim() : "",
+      candidate_name: firstLineName || (nameMatch ? nameMatch[1].trim() : ""),
       email: emailMatch ? emailMatch[1].trim() : "",
       phone: phoneMatch ? phoneMatch[1].trim() : "",
       role: ""
@@ -1129,15 +1173,10 @@ Resultado Final: ${form.result || "N/C"}
 }
 
 Currículo:
-${resumeText}`;
+${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Informações pessoais|Diversidade|Endereço|$)/i, "$1")}`;
 
     try {
       const generatedText = await generateWithAI(prompt);
-      if (!generatedText) {
-        alert("Erro ao analisar currículo. Verifique a chave de IA ativada no gerenciador de chaves.");
-        setIsAnalyzingResume(false);
-        return;
-      }
       
       let text = generatedText.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(text);
@@ -1185,9 +1224,9 @@ ${resumeText}`;
         })) : prev.experience_list || []
       }));
       setIsResumeModalOpen(false);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Não foi possível extrair os dados automaticamente. Verifique se o texto do currículo é válido.");
+      alert("Falha na Inteligência Artificial: " + (e.message || "A resposta não estava no formato JSON correto."));
     }
     setIsAnalyzingResume(false);
   };
@@ -2298,10 +2337,17 @@ ${resumeText}`;
                 <X className="h-5 w-5" />
               </Button>
             </div>
+            <div className="flex justify-between items-center px-4 pt-4 border-b pb-4 bg-muted/5">
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-primary hover:underline">
+                <FileUp className="h-4 w-4" />
+                Carregar de um arquivo (PDF, TXT)
+                <input type="file" accept=".pdf,.txt" className="hidden" onChange={handleFileUpload} />
+              </label>
+            </div>
             <div className="p-4 space-y-4">
               <Textarea
                 className="min-h-[300px] text-sm"
-                placeholder="Cole o texto do currículo aqui..."
+                placeholder="Cole o texto do currículo aqui ou faça o upload de um PDF..."
                 value={resumeText}
                 onChange={e => setResumeText(e.target.value)}
               />
