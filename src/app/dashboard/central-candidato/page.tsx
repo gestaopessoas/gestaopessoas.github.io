@@ -34,7 +34,7 @@ export default function CentralCandidatoPage() {
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"banco" | "processo" | "contratado">("banco");
+  const [activeTab, setActiveTab] = useState<"banco" | "processo">("banco");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -98,10 +98,10 @@ export default function CentralCandidatoPage() {
   }, []);
 
   const filteredCandidates = useMemo(() => {
-    let list = candidates;
-    if (activeTab === "banco") list = candidates.filter(c => c.status === "Banco de Talentos");
-    if (activeTab === "processo") list = candidates.filter(c => c.status === "Em Processo");
-    if (activeTab === "contratado") list = candidates.filter(c => c.status === "Contratado");
+    let list = candidates.filter(c => c.status !== "Contratado");
+    
+    if (activeTab === "banco") list = list.filter(c => c.status === "Banco de Talentos");
+    if (activeTab === "processo") list = list.filter(c => c.status === "Em Processo");
 
     if (!search.trim()) return list;
     const s = search.toLowerCase();
@@ -181,13 +181,6 @@ export default function CentralCandidatoPage() {
               onClick={() => setActiveTab("processo")}
             >
               Em Processo
-            </Button>
-            <Button 
-              variant={activeTab === "contratado" ? "secondary" : "ghost"} 
-              size="sm"
-              onClick={() => setActiveTab("contratado")}
-            >
-              Contratados
             </Button>
           </div>
           <div className="relative flex-1 sm:w-64">
