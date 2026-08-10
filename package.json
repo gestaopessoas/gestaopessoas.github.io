@@ -25,6 +25,7 @@
     "next": "16.2.10",
     "pdf-parse": "^1.1.1",
     "pdf2json": "^4.0.3",
+    "pdfjs-dist": "^6.2.108",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-image-crop": "^11.1.2",

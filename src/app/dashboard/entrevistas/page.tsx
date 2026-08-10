@@ -155,9 +155,9 @@ export type AIProvider = {
 
 export const defaultProviders: AIProvider[] = [
   { id: "gemini", name: "Gemini (Sistema)", baseUrl: "https://generativelanguage.googleapis.com/v1beta", apiKey: "", isActive: true, models: [], selectedModel: "gemini-2.5-flash" },
-  { id: "9router", name: "9router", baseUrl: "http://localhost:11434/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
-  { id: "omniroute", name: "omniroute", baseUrl: "http://localhost:8000/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
-  { id: "opencode", name: "opencode", baseUrl: "http://localhost:8080/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
+  { id: "9router", name: "9router", baseUrl: "https://rk9xyun.abc-tunnel.us/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
+  { id: "openrouter", name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
+  { id: "opencode", name: "Opencode", baseUrl: "https://api.opencode.com/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
   { id: "nvidia", name: "Nvidia NIM", baseUrl: "https://integrate.api.nvidia.com/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
 ];
 
