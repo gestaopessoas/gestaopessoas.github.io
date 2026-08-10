@@ -641,7 +641,7 @@ export default function ParceirosAdminPage() {
                               </td>
                             </tr>
                           )}
-                        </React.Fragment>
+                        </Fragment>
                       ))}
                       {prospects.length === 0 && (
                         <tr>
