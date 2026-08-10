@@ -94,10 +94,9 @@ export default function BeneficiosPage() {
       .from("employee_benefits")
       .select("id, employee_id, benefit_name, value");
 
-    // Fetch ignorações cadastradas em benefit_ignores
-    const { data: igs } = await supabase
-      .from("benefit_ignores")
-      .select("employee_id");
+      // Fetch ignorações cadastradas em benefit_ignores via proxy
+      const igsRes = await fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "select", table: "benefit_ignores" }) });
+      const { data: igs } = await igsRes.json();
 
     // Fetch almoços futuros
     const today = new Date().toISOString().split("T")[0];
@@ -107,11 +106,11 @@ export default function BeneficiosPage() {
       .gte("lunch_date", today)
       .order("lunch_date", { ascending: true });
 
-    // Fetch de registros da tabela de auditoria benefit_audit_logs
-    const { data: audits, error: auditError } = await supabase
-      .from("benefit_audit_logs")
-      .select("*")
-      .order("created_at", { ascending: false });
+    // Fetch de registros da tabela de auditoria benefit_audit_logs via proxy
+    const auditsRes = await fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "select", table: "benefit_audit_logs" }) });
+    const auditsJson = await auditsRes.json();
+    const audits = auditsJson.data;
+    const auditError = auditsJson.error;
 
     const empsList: Employee[] = (emps || []).map((e: Record<string, unknown>) => {
       const deps = e.departments as Record<string, unknown> | null;
@@ -238,8 +237,8 @@ export default function BeneficiosPage() {
       benefit_details: `Elegibilidade de inclusão de plano ignorada no painel (${emp?.name || "Colaborador"})`,
       previous_payload: { employee_id: employeeId, employee_name: emp?.name, employee_department: emp?.department },
     };
-    await supabase.from("benefit_audit_logs").insert(auditPayload);
-    await supabase.from("benefit_ignores").insert({ employee_id: employeeId });
+      await fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "insert", table: "benefit_audit_logs", payload: auditPayload }) });
+      await fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "insert", table: "benefit_ignores", payload: { employee_id: employeeId } }) });
     await fetchData();
   };
 
@@ -256,7 +255,7 @@ export default function BeneficiosPage() {
       benefit_details: `Corte Pós-Demissão: excluídos ${empBens.length} benefício(s) de ${emp?.name || "Ex-colaborador"}`,
       previous_payload: empBens,
     };
-    await supabase.from("benefit_audit_logs").insert(auditPayload);
+      await fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "insert", table: "benefit_audit_logs", payload: auditPayload }) });
     await supabase.from("employee_benefits").delete().eq("employee_id", employeeId);
     await fetchData();
   };
@@ -278,8 +277,8 @@ export default function BeneficiosPage() {
       previous_payload: { employee_id: emp.id, employee_name: emp.name, employee_department: emp.department },
     }));
 
-    await supabase.from("benefit_audit_logs").insert(auditInserts);
-    await supabase.from("benefit_ignores").insert(inserts);
+      await fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "insert", table: "benefit_audit_logs", payload: auditInserts }) });
+      await fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "insert", table: "benefit_ignores", payload: inserts }) });
     await fetchData();
   };
 
@@ -304,7 +303,7 @@ export default function BeneficiosPage() {
       };
     });
 
-    await supabase.from("benefit_audit_logs").insert(auditInserts);
+      await fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "insert", table: "benefit_audit_logs", payload: auditInserts }) });
     await supabase.from("employee_benefits").delete().in("employee_id", ids);
     await fetchData();
   };
@@ -328,7 +327,7 @@ export default function BeneficiosPage() {
     try {
       if (log.action_type.includes("IGNORE")) {
         // Desfazer ignoração: apaga de benefit_ignores para recolocar na lista de Inclusões Pendentes
-        await supabase.from("benefit_ignores").delete().eq("employee_id", log.employee_id);
+        await fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "delete", table: "benefit_ignores", match: { employee_id: log.employee_id } }) });
         setIgnores((prev) => prev.filter((id) => id !== log.employee_id));
         alert(`✅ Ignoração desfeita com sucesso! O colaborador "${log.employee_name}" voltou para Inclusão Pendente.`);
       } else if (log.action_type.includes("REMOVE")) {
@@ -348,9 +347,8 @@ export default function BeneficiosPage() {
       }
 
       // Excluir ou marcar log como reverter na tabela de auditoria
-      if (!log.id.startsWith("log-demo-")) {
-        await supabase.from("benefit_audit_logs").delete().eq("id", log.id);
-      }
+      if (!log.id.startsWith("log-demo-"))          await fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "delete", table: "benefit_audit_logs", match: { id: log.id } }) });
+      
       setAuditLogs((prev) => prev.filter((l) => l.id !== log.id));
       await fetchData();
     } catch (err: unknown) {
@@ -370,7 +368,7 @@ export default function BeneficiosPage() {
     if (!confirm(`[DESFAZER ADMIN] Restaurar "${empName || employeeId}" para a fila de Inclusão Pendente?`)) return;
 
     setLoading(true);
-    await supabase.from("benefit_ignores").delete().eq("employee_id", employeeId);
+      await fetch("/api/supabase-proxy", { method: "POST", body: JSON.stringify({ action: "delete", table: "benefit_ignores", match: { employee_id: employeeId } }) });
     setIgnores((prev) => prev.filter((id) => id !== employeeId));
     alert(`✅ Elegibilidade restaurada para "${empName || "Colaborador"}"!`);
     await fetchData();

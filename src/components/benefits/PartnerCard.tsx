@@ -33,7 +33,7 @@ export const PartnerCard: React.FC<PartnerCardProps> = ({ partner, onSelect }) =
               <img
                 src={partner.logo_url}
                 alt={`Logo ${partner.name}`}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
                 style={{ objectPosition: partner.logo_position || 'center' }}
                 loading="lazy"
               />

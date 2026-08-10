@@ -80,6 +80,9 @@ type Assessment = {
   address?: string;
   marital_status?: string;
   salary_expectation?: string;
+  additional_info?: string;
+  personal_info?: string;
+  diversity_info?: string;
 };
 
 type Interview = {
@@ -908,6 +911,10 @@ Resultado Final: ${form.result || "N/C"}
     <div class="section">
       <div class="section-title">Resumo Curricular / Formação & Experiências</div>
       ${assessmentForm.professional_summary ? `<div style="margin-bottom:12px"><b>Resumo Profissional:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.professional_summary}</p></div>` : ''}
+      ${assessmentForm.address ? `<div style="margin-bottom:12px"><b>Endereço:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.address}</p></div>` : ''}
+      ${assessmentForm.personal_info ? `<div style="margin-bottom:12px"><b>Informações Pessoais:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.personal_info}</p></div>` : ''}
+      ${assessmentForm.diversity_info ? `<div style="margin-bottom:12px"><b>Diversidade:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.diversity_info}</p></div>` : ''}
+      ${assessmentForm.additional_info ? `<div style="margin-bottom:12px"><b>Informações Adicionais:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.additional_info}</p></div>` : ''}
       ${assessmentForm.academic_list && assessmentForm.academic_list.length > 0 ? `
       <div style="margin-bottom:14px">
         <b style="font-size:13px;color:#334155">Formação Acadêmica & Cursos:</b>
@@ -1107,23 +1114,34 @@ Resultado Final: ${form.result || "N/C"}
     const phoneMatch = resumeText.match(/(\(\d{2}\)\s*\d{4,5}-\d{4})/);
     const emailMatch = resumeText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+)/);
     
-    // Tenta extrair blocos de texto principais (Pulando Habilidades explicitamente)
+    // Tenta extrair blocos de texto principais
+    const allHeaders = "(Cargo\\(s\\) de interesse|Experiência profissional|Formação|Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|Diversidade|Endereço|$)";
+    
     let professional_summary = "";
-    const resumoMatch = resumeText.match(/Resumo profissional\s*([\s\S]*?)(Experiência profissional|Formação|Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
+    const resumoMatch = resumeText.match(new RegExp(`Resumo profissional\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
     if (resumoMatch) professional_summary = resumoMatch[1].trim();
 
-    const infoAdicionaisMatch = resumeText.match(/Informações adicionais\s*([\s\S]*?)(Informações pessoais|Diversidade|Endereço|$)/i);
-    if (infoAdicionaisMatch) professional_summary += "\n\nInformações adicionais:\n" + infoAdicionaisMatch[1].trim();
+    let additional_info = "";
+    const infoAdicionaisMatch = resumeText.match(new RegExp(`Informações adicionais\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
+    if (infoAdicionaisMatch) additional_info = infoAdicionaisMatch[1].trim();
+
+    let personal_info = "";
+    const personalInfoMatch = resumeText.match(new RegExp(`Informações pessoais\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
+    if (personalInfoMatch) personal_info = personalInfoMatch[1].trim();
+
+    let diversity_info = "";
+    const diversityMatch = resumeText.match(new RegExp(`Diversidade\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
+    if (diversityMatch) diversity_info = diversityMatch[1].trim();
 
     let experience_summary = "";
-    const expMatch = resumeText.match(/Experiência profissional\s*([\s\S]*?)(Formação|Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
+    const expMatch = resumeText.match(new RegExp(`Experiência profissional\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
     if (expMatch) experience_summary = expMatch[1].trim();
 
     let educationText = "";
-    const formacaoMatch = resumeText.match(/Formação\s*([\s\S]*?)(Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
+    const formacaoMatch = resumeText.match(new RegExp(`Formação\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
     if (formacaoMatch) educationText += "Formação:\n" + formacaoMatch[1].trim() + "\n\n";
 
-    const cursosMatch = resumeText.match(/Cursos e certificações\s*([\s\S]*?)(Habilidades|Idiomas|Informações adicionais|Informações pessoais|$)/i);
+    const cursosMatch = resumeText.match(new RegExp(`Cursos e certificações\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
     if (cursosMatch) educationText += "Cursos e certificações:\n" + cursosMatch[1].trim() + "\n\n";
 
     const parsedSalary1 = resumeText.match(/Pretens.o Salarial\s*(?:R\$)?\s*([\d.,]+)/i);
@@ -1151,7 +1169,10 @@ Resultado Final: ${form.result || "N/C"}
       cpf: resumeText.match(/CPF\s*([\d.-]+)/i)?.[1] || "",
       gender: resumeText.match(/Sexo\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || resumeText.match(/Gênero\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || "",
       address: resumeText.match(/Endereço\s*([^\n]+)/i)?.[1]?.trim() || prev.address,
-      salary_expectation: finalSalary
+      salary_expectation: finalSalary,
+      additional_info: additional_info.trim() || prev.additional_info,
+      personal_info: personal_info.trim() || prev.personal_info,
+      diversity_info: diversity_info.trim() || prev.diversity_info
     }));
     
     setIsResumeModalOpen(false);
@@ -1180,6 +1201,9 @@ Resultado Final: ${form.result || "N/C"}
   "address": "Endereço completo",
   "marital_status": "Estado Civil",
   "salary_expectation": "Pretensão Salarial",
+  "additional_info": "Informações adicionais do candidato",
+  "personal_info": "Informações pessoais do candidato",
+  "diversity_info": "Informações de diversidade",
   "academic_list": [
     {
       "id": "1",
@@ -2038,6 +2062,46 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
                         placeholder="Ex: Formado em Psicologia" 
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-sm font-medium">Endereço Completo</Label>
+                    <Input 
+                      value={assessmentForm.address || ''} 
+                      onChange={e => setAssessmentForm({...assessmentForm, address: e.target.value})}
+                      placeholder="Ex: Rua XYZ, Centro, Pelotas - RS"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2 pt-2">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Informações Pessoais</Label>
+                      <Textarea 
+                        value={assessmentForm.personal_info || ''} 
+                        onChange={e => setAssessmentForm({...assessmentForm, personal_info: e.target.value})}
+                        placeholder="Ex: Nascimento, Gênero, Estado civil..."
+                        className="resize-none min-h-[70px]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Diversidade</Label>
+                      <Textarea 
+                        value={assessmentForm.diversity_info || ''} 
+                        onChange={e => setAssessmentForm({...assessmentForm, diversity_info: e.target.value})}
+                        placeholder="Ex: Raça/cor, Orientação..."
+                        className="resize-none min-h-[70px]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-sm font-medium">Informações Adicionais</Label>
+                    <Textarea 
+                      value={assessmentForm.additional_info || ''} 
+                      onChange={e => setAssessmentForm({...assessmentForm, additional_info: e.target.value})}
+                      placeholder="Ex: Pretensão salarial, Possui CNH, etc..."
+                      className="resize-none min-h-[70px]"
+                    />
                   </div>
 
                   <div className="space-y-2 pt-2">

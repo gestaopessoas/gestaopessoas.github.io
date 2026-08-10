@@ -361,7 +361,7 @@ export default function ParceirosAdminPage() {
                           <div className="flex items-center gap-3">
                             <div className={`h-12 w-12 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden shrink-0 flex items-center justify-center font-bold text-lg text-emerald-600 ${p.logo_dark_mask ? 'bg-zinc-900' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
                               {p.logo_url ? (
-                                <img src={p.logo_url} alt={p.name} className="h-full w-full object-cover" style={{ objectPosition: p.logo_position || 'center' }} />
+                                <img src={p.logo_url} alt={p.name} className="h-full w-full object-contain" style={{ objectPosition: p.logo_position || 'center' }} />
                               ) : (
                                 p.name.charAt(0)
                               )}
