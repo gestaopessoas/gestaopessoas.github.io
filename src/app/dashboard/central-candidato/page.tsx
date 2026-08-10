@@ -202,10 +202,7 @@ export default function CentralCandidatoPage() {
           <Button variant="outline" size="icon" onClick={fetchCandidates}>
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button onClick={() => setIsAddCandidateModalOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Novo Candidato</span>
-          </Button>
+
         </div>
       </div>
 
