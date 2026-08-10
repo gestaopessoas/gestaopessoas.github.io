@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type Entity = { id: string; name: string };
 
@@ -99,7 +100,8 @@ export default function MPGeneratorPage() {
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
 
   // Form State
-  const [mpType, setMpType] = useState<"contratacao" | "movimentacao">("contratacao");
+  const [mpType, setMpType] = useState<"contratacao" | "movimentacao" | "historico">("contratacao");
+  const [mpHistory, setMpHistory] = useState<any[]>([]);
   const [selectedLogo, setSelectedLogo] = useState("MOOV.png");
   const [selectedWorkplaceId, setSelectedWorkplaceId] = useState("");
   
@@ -178,7 +180,7 @@ export default function MPGeneratorPage() {
         if (profile) setCurrentUser(profile.full_name || userData.user.email);
       }
 
-      const [empsRes, salaryRes, wpRes, ccRes, settingsRes] = await Promise.all([
+      const [empsRes, salaryRes, wpRes, ccRes, settingsRes, histRes] = await Promise.all([
         supabase.from("employees")
           .select("id, name, phone, email_corporate, unit, cost_center_id, departments(name), cost_centers(name), role, level, contract_type, base_salary, profile_code, status")
           .eq("status", "Ativo") // Somente colaboradores ativos, exclui Arquivo Morto e Inativos
@@ -186,7 +188,8 @@ export default function MPGeneratorPage() {
         supabase.from("salary_table").select("*").order("modality, role_name, level"),
         supabase.from("workplaces").select("id, name").order("name"),
         supabase.from("cost_centers").select("id, name").order("name"),
-        supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle()
+        supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle(),
+        supabase.from("mp_history").select("*, profiles:created_by(full_name), employees:employee_id(name)").order("created_at", { ascending: false })
       ]);
 
       if (empsRes.data) setEmployees((empsRes.data as any[]).filter(e => e.status === "Ativo" || !e.status));
@@ -207,6 +210,8 @@ export default function MPGeneratorPage() {
         ];
       }
       setWorkSchedules(scheds);
+      
+      if (histRes.data) setMpHistory(histRes.data);
 
       setLoading(false);
     };
@@ -310,6 +315,24 @@ export default function MPGeneratorPage() {
       const newBenefitsText = selectedBenefits.join(", ");
       const curBenefitsText = currentBenefits.join(", ");
       const selectedCcName = costCenters.find(c => c.id === costCenterId)?.name || "";
+
+      const { data: authData } = await supabase.auth.getUser();
+      await supabase.from('mp_history').insert({
+        created_by: authData?.user?.id || null,
+        mp_type: mpType,
+        employee_id: mpType === 'movimentacao' ? selectedEmployeeId : null,
+        candidate_name: mpType === 'contratacao' ? candidateName : null,
+        role_name: selectedRoleInfo?.role_name || null,
+        salary: selectedRoleInfo ? (selectedSalaryInfo?.uses_level ? selectedSalaryInfo.salary : selectedSalaryInfo?.salary_experience) : null,
+        workplace: location || null,
+        reason: finalReason || null,
+        requested_by: requestedBy || null
+      });
+
+      const { data: histData } = await supabase.from("mp_history")
+          .select("*, profiles:created_by(full_name), employees:employee_id(name)")
+          .order("created_at", { ascending: false });
+      if (histData) setMpHistory(histData);
 
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("MP", { pageSetup: { paperSize: 9, orientation: 'portrait' } });
@@ -795,9 +818,10 @@ export default function MPGeneratorPage() {
         onValueChange={(v) => setMpType(v as any)} 
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-2 max-w-md mb-8">
+        <TabsList className="grid w-full grid-cols-3 max-w-xl mb-8">
           <TabsTrigger value="contratacao">MP de Contratação</TabsTrigger>
           <TabsTrigger value="movimentacao">MP de Movimentação</TabsTrigger>
+          <TabsTrigger value="historico">Histórico de MPs</TabsTrigger>
         </TabsList>
         
         {mpType === "contratacao" ? (
@@ -1300,10 +1324,51 @@ export default function MPGeneratorPage() {
             </div>
           </div>
         )}
+
+        {mpType === "historico" && (
+          <div className="space-y-6 p-6 border rounded-lg bg-card shadow-sm overflow-x-auto">
+            <h2 className="text-xl font-semibold border-b pb-2">Histórico de Movimentações Geradas</h2>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Requisitante</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Colaborador / Candidato</TableHead>
+                  <TableHead>Cargo</TableHead>
+                  <TableHead>Local</TableHead>
+                  <TableHead>Salário</TableHead>
+                  <TableHead>Motivo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mpHistory.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-6">Nenhuma MP gerada ainda.</TableCell>
+                  </TableRow>
+                ) : (
+                  mpHistory.map((hist) => (
+                    <TableRow key={hist.id}>
+                      <TableCell className="whitespace-nowrap">{new Date(hist.created_at).toLocaleString('pt-BR')}</TableCell>
+                      <TableCell>{hist.profiles?.full_name || hist.requested_by || '-'}</TableCell>
+                      <TableCell className="capitalize">{hist.mp_type}</TableCell>
+                      <TableCell>{hist.mp_type === 'contratacao' ? hist.candidate_name : hist.employees?.name || '-'}</TableCell>
+                      <TableCell>{hist.role_name || '-'}</TableCell>
+                      <TableCell>{hist.workplace || '-'}</TableCell>
+                      <TableCell>{hist.salary ? formatCurrency(hist.salary) : '-'}</TableCell>
+                      <TableCell>{hist.reason || '-'}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </Tabs>
 
-      <div className="flex justify-end pt-4 mt-8">
-        <Button size="lg" onClick={onGenerate} disabled={isGenerating || !isFormValid()} className="bg-green-600 hover:bg-green-700 text-white shadow-lg">
+      {mpType !== "historico" && (
+        <div className="flex justify-end pt-4 mt-8">
+          <Button size="lg" onClick={onGenerate} disabled={isGenerating || !isFormValid()} className="bg-green-600 hover:bg-green-700 text-white shadow-lg">
           {isGenerating ? "Processando..." : (
             <>
               <FileSpreadsheet className="mr-2 h-5 w-5" /> 
@@ -1312,6 +1377,7 @@ export default function MPGeneratorPage() {
           )}
         </Button>
       </div>
+      )}
 
       <Dialog open={isUpdateConfirmOpen} onOpenChange={setIsUpdateConfirmOpen}>
         <DialogContent>
