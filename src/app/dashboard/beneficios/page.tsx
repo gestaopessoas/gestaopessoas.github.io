@@ -140,8 +140,8 @@ export default function BeneficiosPage() {
     setLunchLists((lunches || []) as unknown as LunchList[]);
 
     // Mapeia logs e enriquece com nomes de colaboradores para visualização clara no painel
-    if (auditError || !audits || audits.length === 0) {
-      setAuditLogs(FALLBACK_AUDIT_LOGS);
+    if (auditError || !audits) {
+      setAuditLogs([]);
     } else {
       const enrichedAudits: AuditLog[] = audits.map((a: Record<string, unknown>) => {
         const emp = empsList.find((e) => e.id === String(a.employee_id));
