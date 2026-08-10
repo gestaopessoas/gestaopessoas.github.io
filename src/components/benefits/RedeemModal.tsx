@@ -125,9 +125,9 @@ export const RedeemModal: React.FC<RedeemModalProps> = ({ partner, isOpen, onClo
         {/* Conteúdo do Modal */}
         <div className="p-6 space-y-6">
           <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 p-2 shadow-xs dark:border-zinc-700 dark:bg-zinc-800">
+            <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 shadow-xs dark:border-zinc-700 ${partner.logo_dark_mask ? 'bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-800'}`}>
               {partner.logo_url ? (
-                <img src={partner.logo_url} alt={partner.name} className="h-full w-full object-cover rounded-lg" />
+                <img src={partner.logo_url} alt={partner.name} className="h-full w-full object-cover" style={{ objectPosition: partner.logo_position || 'center' }} />
               ) : (
                 <Gift className="h-8 w-8 text-amber-500" />
               )}

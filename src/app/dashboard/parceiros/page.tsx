@@ -23,6 +23,7 @@ import {
   Building,
   Globe
 } from "lucide-react";
+import { LogoCropperModal } from "@/components/benefits/LogoCropperModal";
 import { DiscountPartner, PartnerLead } from "@/types/benefits";
 
 type PartnerProspect = {
@@ -75,6 +76,8 @@ export default function ParceirosAdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyPartnerForm);
   const [saving, setSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -707,8 +710,16 @@ export default function ParceirosAdminPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-400 mb-1">
-                    URL da Logo (Opcional)
+                  <label className="flex items-center justify-between text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-400 mb-1">
+                    <span>URL da Logo (Opcional)</span>
+                    <button 
+                      type="button"
+                      onClick={() => setIsCropperOpen(true)}
+                      className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Recortar Upload
+                    </button>
                   </label>
                   <input
                     type="url"
@@ -831,6 +842,15 @@ export default function ParceirosAdminPage() {
           </div>
         </div>
       )}
+      {/* MODAL CROPPER DE LOGO */}
+      <LogoCropperModal 
+        isOpen={isCropperOpen} 
+        onClose={() => setIsCropperOpen(false)} 
+        onCropped={(url) => {
+          setForm({ ...form, logo_url: url });
+          setIsCropperOpen(false);
+        }} 
+      />
     </div>
   );
 }
