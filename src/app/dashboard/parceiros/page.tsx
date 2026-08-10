@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -544,7 +544,7 @@ export default function ParceirosAdminPage() {
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                       {prospects.map((p) => (
-                        <React.Fragment key={p.id}>
+                        <Fragment key={p.id}>
                           <tr className="hover:bg-muted/40 transition-colors">
                             <td className="px-4 py-3 tabular-nums text-xs text-zinc-500 dark:text-zinc-400 font-mono">
                               {format(new Date(p.created_at || new Date().toISOString()), "dd/MM/yyyy HH:mm")}
