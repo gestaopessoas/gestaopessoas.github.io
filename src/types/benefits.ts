@@ -8,6 +8,8 @@ export interface DiscountPartner {
   contact_info: string;
   how_to_use: string;
   logo_url: string;
+  logo_position?: string;
+  logo_dark_mask?: boolean;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;

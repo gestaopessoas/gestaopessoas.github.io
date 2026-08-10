@@ -20,7 +20,8 @@ import {
   Sparkles,
   Gift,
   Rocket,
-  Building
+  Building,
+  Globe
 } from "lucide-react";
 import { DiscountPartner, PartnerLead } from "@/types/benefits";
 
@@ -32,6 +33,10 @@ type PartnerProspect = {
   phone: string;
   status: string;
   created_at: string;
+  discount_proposal?: string;
+  how_to_use_proposal?: string;
+  category_preference?: string;
+  website_or_social?: string;
 };
 
 type Partner = DiscountPartner;
@@ -51,6 +56,8 @@ const emptyPartnerForm: Omit<Partner, "id" | "created_at" | "updated_at"> = {
   contact_info: "",
   how_to_use: "",
   logo_url: "",
+  logo_position: "center",
+  logo_dark_mask: false,
   is_active: true
 };
 
@@ -61,6 +68,7 @@ export default function ParceirosAdminPage() {
   const [prospects, setProspects] = useState<PartnerProspect[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [expandedProspectId, setExpandedProspectId] = useState<string | null>(null);
 
   // Estados de formulário modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -146,6 +154,8 @@ export default function ParceirosAdminPage() {
       contact_info: p.contact_info || "",
       how_to_use: p.how_to_use || "",
       logo_url: p.logo_url || "",
+      logo_position: p.logo_position || "center",
+      logo_dark_mask: p.logo_dark_mask || false,
       is_active: p.is_active
     });
     setIsModalOpen(true);
@@ -167,6 +177,8 @@ export default function ParceirosAdminPage() {
       contact_info: form.contact_info.trim(),
       how_to_use: form.how_to_use.trim(),
       logo_url: form.logo_url?.trim() || "",
+      logo_position: form.logo_position,
+      logo_dark_mask: form.logo_dark_mask,
       is_active: form.is_active,
       updated_at: new Date().toISOString()
     };
@@ -216,6 +228,26 @@ export default function ParceirosAdminPage() {
   const handleUpdateProspectStatus = async (prospectId: string, newStatus: string) => {
     setProspects(prev => prev.map(p => p.id === prospectId ? { ...p, status: newStatus } : p));
     await supabase.from("partner_prospects").update({ status: newStatus }).eq("id", prospectId);
+  };
+
+  const handleApproveAndCreate = (prospect: PartnerProspect) => {
+    // Atualiza status para aprovado
+    handleUpdateProspectStatus(prospect.id, "aprovado");
+    
+    // Abre o formulário de parceiro preenchido com a proposta
+    setEditingId(null);
+    setForm({
+      name: prospect.company_name,
+      category: prospect.category_preference || "Saúde & Bem-Estar",
+      discount_rules: prospect.discount_proposal || "",
+      contact_info: [prospect.phone, prospect.email, prospect.website_or_social].filter(Boolean).join(" | "),
+      how_to_use: prospect.how_to_use_proposal || "",
+      logo_url: "",
+      logo_position: "center",
+      logo_dark_mask: false,
+      is_active: false // começa inativo para revisão final
+    });
+    setIsModalOpen(true);
   };
 
   const filteredPartners = partners.filter(p => 
@@ -324,9 +356,9 @@ export default function ParceirosAdminPage() {
                       <div>
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div className="flex items-center gap-3">
-                            <div className="h-12 w-12 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 overflow-hidden shrink-0 flex items-center justify-center font-bold text-lg text-emerald-600">
+                            <div className={`h-12 w-12 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden shrink-0 flex items-center justify-center font-bold text-lg text-emerald-600 ${p.logo_dark_mask ? 'bg-zinc-900' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
                               {p.logo_url ? (
-                                <img src={p.logo_url} alt={p.name} className="h-full w-full object-cover" />
+                                <img src={p.logo_url} alt={p.name} className="h-full w-full object-cover" style={{ objectPosition: p.logo_position || 'center' }} />
                               ) : (
                                 p.name.charAt(0)
                               )}
@@ -512,71 +544,104 @@ export default function ParceirosAdminPage() {
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                       {prospects.map((p) => (
-                        <tr key={p.id} className="hover:bg-muted/40 transition-colors">
-                          <td className="px-4 py-3 tabular-nums text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-                            {format(new Date(p.created_at || new Date().toISOString()), "dd/MM/yyyy HH:mm")}
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100">
-                            {p.company_name}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col">
-                              <span className="font-medium text-zinc-800 dark:text-zinc-200">{p.contact_name}</span>
-                              <span className="text-xs text-zinc-500">{p.email}</span>
-                              <span className="text-xs text-zinc-500">{p.phone}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide border ${
-                              p.status === "aprovado"
-                                ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300"
-                                : p.status === "em_contato"
-                                ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/50 dark:text-blue-300"
-                                : p.status === "rejeitado"
-                                ? "bg-red-100 text-red-800 border-red-300 dark:bg-red-950/50 dark:text-red-300"
-                                : "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300"
-                            }`}>
-                              {p.status === "pendente" ? "Pendente" : 
-                               p.status === "em_contato" ? "Em Contato" : 
-                               p.status === "aprovado" ? "Aprovado" : "Rejeitado"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              {p.status === "pendente" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleUpdateProspectStatus(p.id, "em_contato")}
-                                  className="text-xs text-blue-700 hover:bg-blue-50 border-blue-300"
-                                >
-                                  Contatar
-                                </Button>
-                              )}
-                              {p.status !== "aprovado" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleUpdateProspectStatus(p.id, "aprovado")}
-                                  className="text-xs text-emerald-700 hover:bg-emerald-50 border-emerald-300 font-semibold gap-1"
-                                >
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                  <span>Aprovar</span>
-                                </Button>
-                              )}
-                              {p.status === "aprovado" && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleUpdateProspectStatus(p.id, "pendente")}
-                                  className="text-xs text-zinc-500"
-                                >
-                                  Reverter
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                        <React.Fragment key={p.id}>
+                          <tr className="hover:bg-muted/40 transition-colors">
+                            <td className="px-4 py-3 tabular-nums text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+                              {format(new Date(p.created_at || new Date().toISOString()), "dd/MM/yyyy HH:mm")}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100">
+                              <div className="flex items-center gap-2">
+                                {p.company_name}
+                                {p.discount_proposal && (
+                                  <button 
+                                    onClick={() => setExpandedProspectId(expandedProspectId === p.id ? null : p.id)}
+                                    className="text-[10px] bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide hover:bg-indigo-200 transition-colors"
+                                  >
+                                    Ver Proposta
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col">
+                                <span className="font-medium text-zinc-800 dark:text-zinc-200">{p.contact_name}</span>
+                                <span className="text-xs text-zinc-500">{p.email}</span>
+                                <span className="text-xs text-zinc-500">{p.phone}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide border ${
+                                p.status === "aprovado"
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                  : p.status === "em_contato"
+                                  ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/50 dark:text-blue-300"
+                                  : p.status === "rejeitado"
+                                  ? "bg-red-100 text-red-800 border-red-300 dark:bg-red-950/50 dark:text-red-300"
+                                  : "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300"
+                              }`}>
+                                {p.status === "pendente" ? "Pendente" : 
+                                 p.status === "em_contato" ? "Em Contato" : 
+                                 p.status === "aprovado" ? "Aprovado" : "Rejeitado"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {p.status === "pendente" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleUpdateProspectStatus(p.id, "em_contato")}
+                                    className="text-xs text-blue-700 hover:bg-blue-50 border-blue-300"
+                                  >
+                                    Contatar
+                                  </Button>
+                                )}
+                                {p.status !== "aprovado" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleApproveAndCreate(p)}
+                                    className="text-xs text-emerald-700 hover:bg-emerald-50 border-emerald-300 font-semibold gap-1"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    <span>Aceitar e Criar Convênio</span>
+                                  </Button>
+                                )}
+                                {p.status === "aprovado" && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleUpdateProspectStatus(p.id, "pendente")}
+                                    className="text-xs text-zinc-500"
+                                  >
+                                    Reverter
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                          {expandedProspectId === p.id && (
+                            <tr className="bg-zinc-50/50 dark:bg-zinc-900/30 border-b border-zinc-200 dark:border-zinc-800">
+                              <td colSpan={5} className="p-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-4xl border-l-2 border-indigo-500 pl-4">
+                                  <div>
+                                    <h4 className="text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400 mb-1">Proposta de Desconto ({p.category_preference})</h4>
+                                    <p className="text-sm text-zinc-800 dark:text-zinc-200 whitespace-pre-line">{p.discount_proposal}</p>
+                                  </div>
+                                  <div>
+                                    <h4 className="text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400 mb-1">Como Utilizar</h4>
+                                    <p className="text-sm text-zinc-800 dark:text-zinc-200 whitespace-pre-line">{p.how_to_use_proposal || "Não informado"}</p>
+                                    {p.website_or_social && (
+                                      <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
+                                        <Globe className="h-3.5 w-3.5 inline mr-1" /> {p.website_or_social}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       ))}
                       {prospects.length === 0 && (
                         <tr>
@@ -652,6 +717,39 @@ export default function ParceirosAdminPage() {
                     onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-background text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-400 mb-1">
+                    Posição da Logo (Ajuste p/ banners)
+                  </label>
+                  <select
+                    value={form.logo_position}
+                    onChange={(e) => setForm({ ...form, logo_position: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-background text-sm focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="center">Centro (Padrão)</option>
+                    <option value="top">Topo</option>
+                    <option value="bottom">Base</option>
+                    <option value="left">Esquerda</option>
+                    <option value="right">Direita</option>
+                  </select>
+                </div>
+                <div className="flex flex-col justify-end">
+                  <div className="flex items-center gap-2 pb-2">
+                    <input
+                      type="checkbox"
+                      id="chk-dark-mask"
+                      checked={form.logo_dark_mask}
+                      onChange={(e) => setForm({ ...form, logo_dark_mask: e.target.checked })}
+                      className="h-4 w-4 rounded-sm border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <label htmlFor="chk-dark-mask" className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                      Fundo escuro (p/ logos brancas)
+                    </label>
+                  </div>
                 </div>
               </div>
 
