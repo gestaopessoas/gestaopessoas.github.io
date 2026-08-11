@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { UserProfile } from "@/components/layout/UserProfile";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Search, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
@@ -141,6 +142,7 @@ export default function DashboardLayout({
             {/* Right Header actions */}
             <div className="flex items-center gap-4">
               <GlobalSearch />
+              <ThemeToggle />
               <NotificationBell />
               <UserProfile />
             </div>

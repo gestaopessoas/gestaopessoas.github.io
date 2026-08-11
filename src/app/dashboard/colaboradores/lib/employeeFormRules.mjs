@@ -43,6 +43,21 @@ export const getScheduleForWorkplaceType = (type) => {
 
 export const sanitizeRgInput = (value) => String(value ?? "").replace(/\D/g, "").slice(0, 15);
 
+/** Valida os dois dígitos verificadores do CPF. Campo vazio é tratado como "não informado" pelo chamador. */
+export const isValidCpf = (value) => {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+
+  const checkDigit = (length) => {
+    let sum = 0;
+    for (let i = 0; i < length; i += 1) sum += Number(digits[i]) * (length + 1 - i);
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+
+  return checkDigit(9) === Number(digits[9]) && checkDigit(10) === Number(digits[10]);
+};
+
 export const formatCurrencyInput = (value) =>
   Number(value ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

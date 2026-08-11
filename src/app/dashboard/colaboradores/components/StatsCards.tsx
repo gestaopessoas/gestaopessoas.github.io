@@ -34,11 +34,11 @@ export function StatsCards({ employees }: StatsCardsProps) {
   };
 
   const cards = [
-    { label: "Total", value: stats.total, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
-    { label: "Ativos", value: stats.active, icon: Activity, color: "text-emerald-600", bg: "bg-emerald-100" },
-    { label: "Aniversariantes (" + MONTHS[currentMonth] + ")", value: stats.birthdays, icon: Cake, color: "text-amber-600", bg: "bg-amber-100" },
-    { label: "Experiencia 10+ anos", value: stats.experience, icon: AlertTriangle, color: "text-purple-600", bg: "bg-purple-100" },
-    { label: "ASO Vencendo (30d)", value: stats.alerts, icon: AlertCircle, color: "text-red-600", bg: "bg-red-100" },
+    { label: "Total", value: stats.total, icon: Users, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-950/50" },
+    { label: "Ativos", value: stats.active, icon: Activity, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-950/50" },
+    { label: "Aniversariantes (" + MONTHS[currentMonth] + ")", value: stats.birthdays, icon: Cake, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-950/50" },
+    { label: "Experiência 10+ anos", value: stats.experience, icon: AlertTriangle, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-100 dark:bg-purple-950/50" },
+    { label: "ASO Vencendo (30d)", value: stats.alerts, icon: AlertCircle, color: "text-red-600 dark:text-red-400", bg: "bg-red-100 dark:bg-red-950/50" },
   ];
 
   return (

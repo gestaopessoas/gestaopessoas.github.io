@@ -1,6 +1,7 @@
 export interface Entity {
   id: string;
   name: string;
+  type?: string | null;
   trading_name?: string | null;
   tax_rate_clt?: number;
   tax_rate_prolabore?: number;
@@ -33,7 +34,7 @@ export const emptyForm = {
 export type EmployeeForm = typeof emptyForm;
 
 export const MONTHS = [
-  "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 

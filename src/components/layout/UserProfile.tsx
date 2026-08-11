@@ -9,8 +9,10 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
+import { useTheme, type Theme } from "@/components/theme/ThemeProvider";
 
 export function UserProfile() {
+  const { theme, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("perfil");
   const [oldPassword, setOldPassword] = useState("");
@@ -30,7 +32,9 @@ export function UserProfile() {
   const [customPhone, setCustomPhone] = useState("");
   const [userStatus, setUserStatus] = useState("online"); // online, busy, focus
   const [userBio, setUserBio] = useState("Focado(a) na excelência e bem-estar organizacional.");
-  const [themePref, setThemePref] = useState("system"); // system, light, dark
+  // A fonte de verdade do tema é o ThemeProvider; o banco só guarda para valer entre dispositivos.
+  const themePref = theme;
+  const changeTheme = (next: Theme) => setTheme(next);
 
   // Preferências de Notificação
   const [preferences, setPreferences] = useState({ trial: true, rgs: true, benefits: true, profile: true });
@@ -55,7 +59,8 @@ export function UserProfile() {
           if (custom.phone) setCustomPhone(custom.phone);
           if (custom.status) setUserStatus(custom.status);
           if (custom.bio) setUserBio(custom.bio);
-          if (custom.theme) setThemePref(custom.theme);
+          // Preferência salva em outro dispositivo passa a valer aqui.
+          if (custom.theme === "light" || custom.theme === "dark" || custom.theme === "system") setTheme(custom.theme);
         }
       }
     };
@@ -308,7 +313,7 @@ export function UserProfile() {
                     </Label>
                     <select
                       value={themePref}
-                      onChange={(e) => setThemePref(e.target.value)}
+                      onChange={(e) => changeTheme(e.target.value as Theme)}
                       className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
                     >
                       <option value="system">⚡ Sincronizar com Sistema (Auto)</option>

@@ -5,12 +5,26 @@ import {
   canonicalizeOption,
   criticalFieldsMatch,
   getScheduleForWorkplaceType,
+  isValidCpf,
   sanitizeRgInput,
   formatCurrencyInput,
   parseCurrencyInput,
   salaryChangeDue,
   maskCurrencyInput,
 } from "./employeeFormRules.mjs";
+
+test("aceita CPF com dígitos verificadores corretos, com ou sem máscara", () => {
+  assert.equal(isValidCpf("529.982.247-25"), true);
+  assert.equal(isValidCpf("52998224725"), true);
+});
+
+test("rejeita CPF com dígito verificador errado, tamanho errado ou repetido", () => {
+  assert.equal(isValidCpf("529.982.247-24"), false);
+  assert.equal(isValidCpf("1234567890"), false);
+  assert.equal(isValidCpf("111.111.111-11"), false);
+  assert.equal(isValidCpf(""), false);
+  assert.equal(isValidCpf(null), false);
+});
 
 test("converte opção legada para o valor canônico sem diferenciar caixa", () => {
   const options = ["Ativo", "Férias", "Afastado", "Inativo", "Desligado"];

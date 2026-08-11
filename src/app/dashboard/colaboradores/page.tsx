@@ -5,29 +5,32 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Plus, Search, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History } from "lucide-react";
+import { useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { RelatedRecords } from "./components/RelatedRecords";
 import { Section, Field, Select } from "./components/FormHelpers";
 import { StatsCards } from "./components/StatsCards";
+import { DocumentsCell, EmployeeTable, Pagination, SearchBar } from "./components/EmployeeTable";
+import { MONTHS, type Employee, type Entity } from "./components/types";
 import { normalizeRole } from "./lib/normalizeRole.mjs";
-import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput } from "./lib/employeeFormRules.mjs";
+import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, isValidCpf, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput } from "./lib/employeeFormRules.mjs";
 
-type Department = { id: string; name: string };
-type Entity = { id: string; name: string; type?: string | null; trading_name?: string | null; tax_rate_clt?: number; tax_rate_prolabore?: number; };
-type Employee = Record<string, string | null | any> & { id: string; name: string; departments?: Entity | null; level?: string | null; companies?: Entity | null; cost_centers?: Entity | null; workplaces?: Entity | null; };
 type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
-type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
-const pageSize = 1000;
+// Abas de lista paginam no banco. As abas de agregação (aniversários / experiência) calculam
+// no cliente a partir do array carregado, então precisam do conjunto completo de ativos.
+const LIST_PAGE_SIZE = 25;
+const AGGREGATE_PAGE_SIZE = 1000;
+const AGGREGATE_TABS = ["aniversarios", "experiencia"];
+
 const fields = [
-  "id", "name", "registration_number", "profile_code", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
+  "id", "name", "registration_number", "profile_code", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
 ].join(", ");
 
 const emptyForm = {
-  name: "", registration_number: "", profile_code: "", department_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", level: "", phone: "",
+  name: "", registration_number: "", profile_code: "", department_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "", boot_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
@@ -36,11 +39,6 @@ const emptyForm = {
 };
 
 type EmployeeForm = typeof emptyForm;
-
-const MONTHS = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-];
 
 const onlyDigits = (value: string) => value.replace(/\D/g, "");
 
@@ -60,10 +58,22 @@ const maskPhone = (value: string) => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
+const SENIORITY_LEVEL_MAP: Record<string, string[]> = {
+  "Júnior":    ["Nível I", "Nível II", "Nível III", "Nível IV", "Nível V"],
+  "Pleno":     ["Nível VI", "Nível VII", "Nível VIII", "Nível IX", "Nível X"],
+  "Sênior":    ["Nível XI", "Nível XII", "Nível XIII", "Nível XIV", "Nível XV"],
+  "Diretoria": ["Diretoria"],
+};
+
+const ALL_LEVELS = ["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Nível VIII", "Nível IX", "Nível X", "Nível XI", "Nível XII", "Nível XIII", "Nível XIV", "Nível XV", "Diretoria"];
+
 const MIN_AGE_YEARS = 14;
-const todayIso = new Date().toISOString().split("T")[0];
+const todayIso = () => new Date().toISOString().split("T")[0];
 const maritalStatusOptions = ["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"];
 const statusOptions = ["Ativo", "Férias", "Afastado", "Inativo", "Desligado"];
+// Registros legados gravaram o status em inglês; ambos convivem no banco.
+const INACTIVE_STATUSES = ["Inativo", "inactive"];
+const HIDDEN_STATUSES = ["Desligado", "Arquivo Morto", ...INACTIVE_STATUSES];
 
 const canonicalizeEmployeeForm = (employee: Employee) => {
   const next = { ...emptyForm };
@@ -76,6 +86,8 @@ const canonicalizeEmployeeForm = (employee: Employee) => {
 
 export default function ColaboradoresPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  // Os cartões de resumo descrevem a força de trabalho inteira, não a página atual.
+  const [statsRows, setStatsRows] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Entity[]>([]);
   const [companies, setCompanies] = useState<Entity[]>([]);
   const [costCenters, setCostCenters] = useState<Entity[]>([]);
@@ -85,6 +97,7 @@ export default function ColaboradoresPage() {
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [birthdayError, setBirthdayError] = useState("");
+  const [cpfError, setCpfError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
   
   // Modals state
@@ -105,6 +118,10 @@ export default function ColaboradoresPage() {
   
   const [activeTab, setActiveTab] = useState<"todos" | "aniversarios" | "experiencia" | "inativos">("todos");
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+
+  const pageSize = AGGREGATE_TABS.includes(activeTab) ? AGGREGATE_PAGE_SIZE : LIST_PAGE_SIZE;
+  // Trocar de aba muda o tamanho da página: manter o índice antigo apontaria para um intervalo inválido.
+  const changeTab = (tab: typeof activeTab) => { setActiveTab(tab); setPage(0); };
 
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
@@ -153,6 +170,16 @@ export default function ColaboradoresPage() {
     }
   }, []);
 
+  // Query enxuta e independente da paginação: só as colunas que os cartões consomem.
+  useEffect(() => {
+    const supabase = createClient();
+    const request = HIDDEN_STATUSES.reduce(
+      (acc, status) => acc.neq("status", status),
+      supabase.from("employees").select("status, birthday, admission_date, aso_date").limit(10000)
+    );
+    request.then(({ data }) => setStatsRows((data ?? []) as unknown as Employee[]));
+  }, [refresh]);
+
   useEffect(() => {
     const timer = window.setTimeout(async () => {
       setLoading(true);
@@ -165,11 +192,11 @@ export default function ColaboradoresPage() {
         .range(page * pageSize, page * pageSize + pageSize - 1);
       
       if (activeTab === "inativos") {
-        request = request.eq("status", "inactive");
+        request = request.in("status", INACTIVE_STATUSES);
       } else if (advancedFilters.status) {
         request = request.eq("status", advancedFilters.status);
       } else {
-        request = request.neq("status", "Desligado").neq("status", "Arquivo Morto").neq("status", "inactive");
+        request = HIDDEN_STATUSES.reduce((acc, status) => acc.neq("status", status), request);
       }
       
       const term = query.trim().replace(/[,%()]/g, " ");
@@ -193,27 +220,58 @@ export default function ColaboradoresPage() {
       setTotal(count ?? 0);
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [page, query, refresh, advancedFilters, activeTab]);
+  }, [page, pageSize, query, refresh, advancedFilters, activeTab]);
 
   const update = (field: keyof EmployeeForm, value: string) => setForm((current) => {
     const updated = { ...current, [field]: value };
+
     if (field === "status" && value !== "Desligado" && value !== "Arquivo Morto") {
       updated.dismissed_at = "";
     }
-    if (field === "role" || field === "contract_type" || field === "level") {
+
+    if (field === "role") {
+      updated.senioridade = "";
+      updated.level = "";
+    }
+
+    if (field === "role" || field === "contract_type" || field === "level" || field === "senioridade") {
       const role = field === "role" ? value : current.role;
       const modality = field === "contract_type" ? value : current.contract_type;
-      const level = field === "level" ? value : current.level;
-      const candidates = salaryRules.filter((rule) => normalizeRole(rule.role_name) === normalizeRole(role) && rule.modality.toUpperCase() === modality.toUpperCase());
+      const level = field === "level" ? value : (field === "role" ? "" : current.level);
+
+      const candidates = salaryRules.filter(
+        (rule) => normalizeRole(rule.role_name) === normalizeRole(role) && rule.modality.toUpperCase() === modality.toUpperCase()
+      );
       const noLevelRule = candidates.find((rule) => !rule.uses_level);
-      const leveledRule = candidates.find((rule) => rule.uses_level && rule.level === level);
+
       if (noLevelRule) {
         updated.level = "";
+        updated.senioridade = "";
         if (noLevelRule.salary_experience != null) updated.base_salary = formatCurrencyInput(noLevelRule.salary_experience);
-      } else if (leveledRule?.salary != null) {
-        updated.base_salary = formatCurrencyInput(leveledRule.salary);
+      } else if (field === "senioridade" && value) {
+        const allowedLevels = SENIORITY_LEVEL_MAP[value] ?? [];
+        const matchingRules = candidates.filter((r) => r.uses_level && r.level && allowedLevels.includes(r.level));
+        if (matchingRules.length === 1) {
+          updated.level = matchingRules[0].level!;
+          if (matchingRules[0].salary != null) updated.base_salary = formatCurrencyInput(matchingRules[0].salary);
+        } else {
+          updated.level = "";
+        }
+      } else {
+        const leveledRule = candidates.find((rule) => rule.uses_level && rule.level === level);
+        if (leveledRule?.salary != null) updated.base_salary = formatCurrencyInput(leveledRule.salary);
+        if (level === "PISO") {
+          const minRule = candidates.filter((r) => r.uses_level && r.salary != null).sort((a, b) => (a.salary ?? 0) - (b.salary ?? 0))[0];
+          if (minRule?.salary != null) updated.base_salary = formatCurrencyInput(minRule.salary);
+        }
+        if (field === "level" && level && !["PISO", "Não Enquadrado"].includes(level)) {
+          for (const [sen, levels] of Object.entries(SENIORITY_LEVEL_MAP)) {
+            if (levels.includes(level)) { updated.senioridade = sen; break; }
+          }
+        }
       }
     }
+
     return updated;
   });
 
@@ -221,6 +279,7 @@ export default function ColaboradoresPage() {
     setEditingId(null);
     setForm(emptyForm);
     setBirthdayError("");
+    setCpfError("");
     setIsEmployeeModalOpen(true);
   };
 
@@ -228,6 +287,7 @@ export default function ColaboradoresPage() {
     setEditingId(employee.id);
     setForm(canonicalizeEmployeeForm(employee));
     setBirthdayError("");
+    setCpfError("");
     setIsEmployeeModalOpen(true);
   };
 
@@ -250,6 +310,12 @@ export default function ColaboradoresPage() {
     event.preventDefault();
     setSaving(true);
     setError("");
+    if (form.cpf && !isValidCpf(form.cpf)) {
+      setCpfError("CPF inválido. Confira os 11 dígitos.");
+      setSaving(false);
+      return;
+    }
+    setCpfError("");
     if (form.birthday) {
       const birth = parseISO(form.birthday);
       if (!isValid(birth)) {
@@ -326,18 +392,19 @@ export default function ColaboradoresPage() {
     setRefresh((value) => value + 1);
   };
 
-  const deleteEmployee = async (id: string, name: string) => {
+  const deleteEmployee = async (id: string) => {
     setSaving(true);
+    setError("");
     const supabase = createClient();
-    const { error } = await supabase.from("employees").delete().eq("id", id);
+    const { error: deleteError } = await supabase.from("employees").delete().eq("id", id);
     setSaving(false);
+    setConfirmDelete(null);
 
-    if (error) {
-      alert(`Erro ao excluir colaborador: ${error.message}`);
-    } else {
-      setConfirmDelete(null);
-      setRefresh(v => v + 1);
+    if (deleteError) {
+      setError(`Não foi possível excluir o colaborador: ${deleteError.message}`);
+      return;
     }
+    setRefresh(v => v + 1);
   };
 
   const getTrialInfo = (admissionDateStr: string | null) => {
@@ -376,73 +443,89 @@ export default function ColaboradoresPage() {
     return { month: date.getMonth(), date, day: date.getDate() };
   };
 
-  const birthdaysThisMonth = employees.filter(e => {
-    const info = getBirthdayInfo(e.birthday as string | null);
-    return info && info.month === selectedMonth;
-  }).sort((a, b) => getBirthdayInfo(a.birthday as string | null)!.day - getBirthdayInfo(b.birthday as string | null)!.day);
+  const birthdaysThisMonth = employees
+    .flatMap((employee) => {
+      const info = getBirthdayInfo(employee.birthday as string | null);
+      return info && info.month === selectedMonth ? [{ employee, info }] : [];
+    })
+    .sort((a, b) => a.info.day - b.info.day);
 
-  const workAnniversariesThisMonth = employees.filter(e => {
-    const info = getBirthdayInfo(e.admission_date as string | null);
-    if (!info || info.month !== selectedMonth) return false;
-    const years = differenceInYears(new Date(), info.date);
-    return years > 0; // At least 1 year
-  }).sort((a, b) => getBirthdayInfo(a.admission_date as string | null)!.day - getBirthdayInfo(b.admission_date as string | null)!.day);
+  const workAnniversariesThisMonth = employees
+    .flatMap((employee) => {
+      const info = getBirthdayInfo(employee.admission_date as string | null);
+      if (!info || info.month !== selectedMonth) return [];
+      return differenceInYears(new Date(), info.date) > 0 ? [{ employee, info }] : []; // pelo menos 1 ano de casa
+    })
+    .sort((a, b) => a.info.day - b.info.day);
 
   const exportBirthdaysCsv = () => {
     if (birthdaysThisMonth.length === 0) return;
     const headers = ["Colaborador", "Cargo", "Departamento", "Dia do Aniversário", "Idade Atual", "Data de Nascimento"];
-    const rows = birthdaysThisMonth.map(e => {
-      const info = getBirthdayInfo(e.birthday as string | null)!;
-      const age = differenceInYears(new Date(), info.date);
-      return [
-        `"${e.name}"`, 
-        `"${e.role || ''}"`, 
-        `"${e.departments?.name || e.unit || e.workplace || ''}"`, 
-        `"${info.day.toString().padStart(2, '0')}"`, 
-        `"${age}"`,
-        `"${info.date.toLocaleDateString('pt-BR', {timeZone: 'UTC'})}"`
-      ].join(",");
-    });
-    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows].join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const csvCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const rows = birthdaysThisMonth.map(({ employee, info }) => [
+      csvCell(employee.name),
+      csvCell(employee.role),
+      csvCell(employee.departments?.name || employee.unit || employee.workplace),
+      csvCell(info.day.toString().padStart(2, "0")),
+      csvCell(differenceInYears(new Date(), info.date)),
+      csvCell(info.date.toLocaleDateString("pt-BR", { timeZone: "UTC" })),
+    ].join(","));
+
+    const blob = new Blob(["\uFEFF" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `aniversariantes_${MONTHS[selectedMonth]}.csv`);
+    link.href = url;
+    link.download = `aniversariantes_${MONTHS[selectedMonth]}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
+    URL.revokeObjectURL(url);
   };
+
+  const roleSalaryEntries = salaryRules.filter(
+    (rule) => normalizeRole(rule.role_name) === normalizeRole(form.role) &&
+              form.contract_type && rule.modality.toUpperCase() === form.contract_type.toUpperCase()
+  );
+  const roleUsesLevel = roleSalaryEntries.length > 0 && roleSalaryEntries.some((r) => r.uses_level);
+  const allRoleLevels = roleSalaryEntries.filter((r) => r.uses_level && r.level).map((r) => r.level as string);
+  const seniorityAllowedLevels = form.senioridade ? SENIORITY_LEVEL_MAP[form.senioridade] : undefined;
+  const seniorityFilteredLevels = seniorityAllowedLevels
+    ? allRoleLevels.filter((l) => seniorityAllowedLevels.includes(l))
+    : allRoleLevels;
+  const levelDisplayOptions = roleUsesLevel
+    ? ["", ...(seniorityFilteredLevels.length > 0 ? seniorityFilteredLevels : allRoleLevels), "PISO", "Não Enquadrado"]
+    : ALL_LEVELS;
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Colaboradores</h1>
-          <p className="text-sm text-muted-foreground">{total.toLocaleString("pt-BR")} registros ativos ou em movimentação.</p>
+          <p className="text-sm text-muted-foreground">{total.toLocaleString("pt-BR")} {activeTab === "inativos" ? "colaboradores inativos." : "registros ativos ou em movimentação."}</p>
         </div>
         <Button onClick={startNew}><Plus className="mr-2 h-4 w-4" />Novo colaborador</Button>
       </header>
 
-      {/* Stats */}
-      <StatsCards employees={employees} />
+      {/* Stats — descrevem a força de trabalho ativa; na aba Inativos os números seriam enganosos. */}
+      {activeTab !== "inativos" && <StatsCards employees={statsRows} />}
 
       {/* Tabs */}
       <div className="flex w-full flex-wrap gap-2 rounded-md bg-muted p-1 sm:w-fit">
-        <Button variant={activeTab === "todos" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("todos")}>
+        <Button variant={activeTab === "todos" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => changeTab("todos")}>
           <Users className="mr-2 h-4 w-4" /> Todos
         </Button>
-        <Button variant={activeTab === "aniversarios" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("aniversarios")}>
+        <Button variant={activeTab === "aniversarios" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => changeTab("aniversarios")}>
           <Cake className="mr-2 h-4 w-4" /> Aniversariantes
         </Button>
-        <Button variant={activeTab === "experiencia" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("experiencia")}>
+        <Button variant={activeTab === "experiencia" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => changeTab("experiencia")}>
           <CalendarDays className="mr-2 h-4 w-4" /> Fim de Experiência (90d)
         </Button>
-        <Button variant={activeTab === "inativos" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => setActiveTab("inativos")}>
+        <Button variant={activeTab === "inativos" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => changeTab("inativos")}>
           <AlertCircle className="mr-2 h-4 w-4" /> Inativos
         </Button>
       </div>
 
-      {error && <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {error && !isEmployeeModalOpen && <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">{error}</div>}
 
       {/* Colaborador Edit/Create Modal */}
       <Dialog open={isEmployeeModalOpen} onOpenChange={setIsEmployeeModalOpen}>
@@ -478,10 +561,10 @@ export default function ColaboradoresPage() {
             <DialogDescription>Dados pessoais, contratuais, documentos, saúde ocupacional e histórico.</DialogDescription>
             {form.company_id && (
               <div className="mt-2 flex items-center gap-2">
-                <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
+                <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10 dark:bg-purple-950/40 dark:text-purple-300 dark:ring-purple-300/20">
                   Taxa Encargo CLT: {companies.find(c => c.id === form.company_id)?.tax_rate_clt ?? 65.98}%
                 </span>
-                <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
+                <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10 dark:bg-purple-950/40 dark:text-purple-300 dark:ring-purple-300/20">
                   Taxa Pro Labore: {companies.find(c => c.id === form.company_id)?.tax_rate_prolabore ?? 20.00}%
                 </span>
               </div>
@@ -493,9 +576,9 @@ export default function ColaboradoresPage() {
               <Field label="Nome completo *" span><Input required value={form.name} onChange={(e) => update("name", e.target.value)} /></Field>
               <Field label="Matrícula"><Input value={form.registration_number} onChange={(e) => update("registration_number", e.target.value)} /></Field>
               <Field label="Código do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} /></Field>
-              <Field label="CPF"><Input inputMode="numeric" value={form.cpf} onChange={(e) => update("cpf", maskCpf(e.target.value))} placeholder="000.000.000-00" /></Field>
+              <Field label="CPF"><Input inputMode="numeric" value={form.cpf} onChange={(e) => { setCpfError(""); update("cpf", maskCpf(e.target.value)); }} placeholder="000.000.000-00" aria-invalid={!!cpfError} />{cpfError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{cpfError}</p>}</Field>
               <Field label="RG"><Input inputMode="numeric" maxLength={15} value={form.rg} onChange={(e) => update("rg", sanitizeRgInput(e.target.value))} placeholder="Somente números (até 15 dígitos)" /></Field>
-              <Field label="Nascimento"><Input type="date" max={todayIso} value={form.birthday} onChange={(e) => { setBirthdayError(""); update("birthday", e.target.value); }} />{birthdayError && <p className="text-xs text-red-600">{birthdayError}</p>}</Field>
+              <Field label="Nascimento"><Input type="date" max={todayIso()} value={form.birthday} onChange={(e) => { setBirthdayError(""); update("birthday", e.target.value); }} />{birthdayError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{birthdayError}</p>}</Field>
               <Field label="Gênero"><Select value={form.gender} onChange={(value) => update("gender", value)} options={["", "Masculino", "Feminino", "Outro"]} /></Field>
               <Field label="Estado civil"><Select value={form.marital_status} onChange={(value) => update("marital_status", value)} options={maritalStatusOptions} /></Field>
               <Field label="Telefone"><Input inputMode="numeric" value={form.phone} onChange={(e) => update("phone", maskPhone(e.target.value))} placeholder="(00) 00000-0000" /></Field>
@@ -506,7 +589,8 @@ export default function ColaboradoresPage() {
             <Section title="Vínculo e lotação">
               <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={statusOptions} /></Field>
               <Field label="Cargo *"><select required value={form.role} onChange={(e) => update("role", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Selecione...</option>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
-              <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Nível VIII", "Nível IX", "Nível X", "Nível XI", "Nível XII", "Nível XIII", "Nível XIV", "Nível XV", "Diretoria"]} /></Field>
+              <Field label="Senioridade"><Select value={form.senioridade} onChange={(value) => update("senioridade", value)} options={["", "Júnior", "Pleno", "Sênior", "Diretoria"]} /></Field>
+              <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={levelDisplayOptions} /></Field>
               <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.trading_name || c.name}</option>)}</select></Field>
               <Field label="Centro de Custo *"><select value={form.cost_center_id} onChange={(e) => update("cost_center_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{costCenters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
               <Field label="Obra/Unidade"><select value={form.workplace_id} onChange={(e) => {
@@ -524,9 +608,24 @@ export default function ColaboradoresPage() {
             </Section>
 
             <Section title="Remuneração">
-              <Field label="Salário Base"><Input inputMode="numeric" placeholder="0,00" value={form.base_salary} onChange={(e) => update("base_salary", maskCurrencyInput(e.target.value))} /></Field>
-              <Field label="Comissão"><Input inputMode="numeric" placeholder="0,00" value={form.commission} onChange={(e) => update("commission", maskCurrencyInput(e.target.value))} /></Field>
-              <Field label="Variável"><Input inputMode="numeric" placeholder="0,00" value={form.variable_salary} onChange={(e) => update("variable_salary", maskCurrencyInput(e.target.value))} /></Field>
+              <Field label="Salário Base">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none select-none">R$</span>
+                  <Input inputMode="numeric" className="pl-9" placeholder="0,00" value={form.base_salary} onChange={(e) => update("base_salary", maskCurrencyInput(e.target.value))} />
+                </div>
+              </Field>
+              <Field label="Comissão">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none select-none">R$</span>
+                  <Input inputMode="numeric" className="pl-9" placeholder="0,00" value={form.commission} onChange={(e) => update("commission", maskCurrencyInput(e.target.value))} />
+                </div>
+              </Field>
+              <Field label="Variável">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none select-none">R$</span>
+                  <Input inputMode="numeric" className="pl-9" placeholder="0,00" value={form.variable_salary} onChange={(e) => update("variable_salary", maskCurrencyInput(e.target.value))} />
+                </div>
+              </Field>
             </Section>
 
             <Section title="Jornada de trabalho">
@@ -547,6 +646,8 @@ export default function ColaboradoresPage() {
 
             {editingId && <RelatedRecords employeeId={editingId} />}
 
+            {error && <div role="alert" className="mt-6 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">{error}</div>}
+
             <DialogFooter className="mt-8 border-t pt-4">
               <Button type="button" variant="outline" onClick={() => setIsEmployeeModalOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar registro"}</Button>
@@ -558,82 +659,66 @@ export default function ColaboradoresPage() {
       {/* TABS CONTENT */}
       {activeTab === "todos" && (
         <>
-          <div className="relative max-w-md flex items-center gap-2 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nome, CPF, RG ou cargo" className="pl-9" />
-            </div>
+          <SearchBar value={query} onChange={(value) => { setQuery(value); setPage(0); }}>
             <Button variant="outline" size="icon" onClick={() => setShowFilterModal(true)} title="Filtros avançados">
               <Filter className="h-4 w-4" />
             </Button>
-          </div>
+          </SearchBar>
 
-          <div className="overflow-x-auto rounded-lg border bg-card">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotação</th><th className="p-3">Status</th><th className="p-3 text-right">Ações</th></tr></thead>
-              <tbody>
-                {loading ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : employees.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum colaborador encontrado.</td></tr> : employees.map((employee) => {
-                  const trialInfo = getTrialInfo(employee.admission_date as string | null);
-                  return (
-                  <tr key={employee.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => startEdit(employee)}>
-                    <td className="p-3">
-                      <div className="font-medium flex items-center gap-2">
-                        {employee.name}
-                        {(() => {
-                          const isActive = ["Ativo", "Férias", "Afastado"].includes(employee.status);
-                          const isRed = (isActive && (!employee.admission_date || !employee.registration_number || !employee.birthday || !employee.cost_center_id || !employee.company_id || !employee.workplace_id)) || 
-                                        (["Inativo", "Desligado"].includes(employee.status) && !employee.dismissed_at);
-                                        
-                          return (
-                            <div className="flex gap-1.5 ml-1">
-                              {isRed && <span title="Cadastro Incompleto (Admissão, Matrícula, Nascimento, Centro de Custo, Empresa, Obra ou Desligamento)" className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-sm" />}
-                              {trialInfo?.isWarning && <span title="Fim de Experiência Próximo (90 Dias)" className="h-2.5 w-2.5 rounded-full bg-yellow-400 shadow-sm" />}
-                            </div>
-                          );
-                        })()}
+          <EmployeeTable
+            employees={employees}
+            loading={loading}
+            emptyMessage="Nenhum colaborador encontrado."
+            renderRow={(employee) => {
+              const trialInfo = getTrialInfo(employee.admission_date as string | null);
+              const isActive = ["Ativo", "Férias", "Afastado"].includes(employee.status);
+              const isIncomplete =
+                (isActive && (!employee.admission_date || !employee.registration_number || !employee.birthday || !employee.cost_center_id || !employee.company_id || !employee.workplace_id))
+                || (["Inativo", "Desligado"].includes(employee.status) && !employee.dismissed_at);
+              const lotacao = [employee.companies?.trading_name || employee.companies?.name, employee.workplaces?.name, employee.departments?.name].filter(Boolean).join(" · ");
+              return (
+                <tr key={employee.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => startEdit(employee)}>
+                  <td className="p-3">
+                    <div className="font-medium flex items-center gap-2">
+                      {employee.name}
+                      <div className="flex gap-1.5 ml-1">
+                        {isIncomplete && <span title="Cadastro Incompleto (Admissão, Matrícula, Nascimento, Centro de Custo, Empresa, Obra ou Desligamento)" className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-sm" />}
+                        {trialInfo?.isWarning && <span title="Fim de Experiência Próximo (90 Dias)" className="h-2.5 w-2.5 rounded-full bg-yellow-400 shadow-sm" />}
                       </div>
-                      {employee.registration_number && (
-                        <div className="text-xs text-muted-foreground mt-0.5">Matrícula: {employee.registration_number}</div>
-                      )}
-                      <div className="text-xs text-muted-foreground">{String(employee.email_corporate ?? employee.email_personal ?? "")}</div>
-                    </td>
-                    <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
-                    <td className="p-3">
-                      <div>{String(employee.role ?? "-")} {employee.level && <span className="text-[10px] bg-muted px-1.5 rounded-full ml-1">{employee.level}</span>}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {employee.companies?.trading_name || employee.companies?.name ? `${employee.companies.trading_name || employee.companies.name}` : ""}
-                        {employee.workplaces?.name ? ` · ${employee.workplaces.name}` : ""}
-                        {employee.departments?.name ? ` · ${employee.departments.name}` : ""}
-                        {(!employee.companies?.trading_name && !employee.companies?.name && !employee.workplaces?.name && !employee.departments?.name) && "-"}
-                      </div>
-                    </td>
-                    <td className="p-3">{String(employee.status ?? "-")}</td>
-                    <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setSelectedEmployeeId(employee.id)} title="Perfil Big Five">
-                          <Activity className="h-3.5 w-3.5 text-primary" />
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => startEdit(employee)}>
-                          <Edit3 className="mr-2 h-3.5 w-3.5" />Abrir
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); window.location.href = `/dashboard/historico?id=${employee.id}`; }} title="Ver Histórico">
-                          <History className="h-3.5 w-3.5 text-primary" />
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => setConfirmDelete({ id: employee.id, name: String(employee.name || "Sem Nome") })} title="Excluir Colaborador">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                )})}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                    {employee.registration_number && (
+                      <div className="text-xs text-muted-foreground mt-0.5">Matrícula: {employee.registration_number}</div>
+                    )}
+                    <div className="text-xs text-muted-foreground">{String(employee.email_corporate ?? employee.email_personal ?? "")}</div>
+                  </td>
+                  <DocumentsCell employee={employee} />
+                  <td className="p-3">
+                    <div>{String(employee.role ?? "-")} {employee.level && <span className="text-[10px] bg-muted px-1.5 rounded-full ml-1">{employee.level}</span>}</div>
+                    <div className="text-xs text-muted-foreground">{lotacao || "-"}</div>
+                  </td>
+                  <td className="p-3">{String(employee.status ?? "-")}</td>
+                  <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setSelectedEmployeeId(employee.id)} title="Perfil Big Five">
+                        <Activity className="h-3.5 w-3.5 text-primary" />
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => startEdit(employee)} title="Abrir registro completo">
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); window.location.href = `/dashboard/historico?id=${employee.id}`; }} title="Ver Histórico">
+                        <History className="h-3.5 w-3.5 text-primary" />
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => setConfirmDelete({ id: employee.id, name: String(employee.name || "Sem Nome") })} title="Excluir Colaborador">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            }}
+          />
 
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
-            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button></div>
-          </div>
+          <Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} />
         </>
       )}
 
@@ -644,50 +729,38 @@ export default function ColaboradoresPage() {
             <p className="text-sm text-muted-foreground">Estes colaboradores estão marcados como inativos, mas ainda não foram enviados para o Arquivo Morto. Revise e atualize o status quando necessário.</p>
           </div>
 
-          <div className="relative max-w-md flex items-center gap-2 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nome, CPF, RG ou cargo" className="pl-9" />
-            </div>
-          </div>
+          <SearchBar value={query} onChange={(value) => { setQuery(value); setPage(0); }} />
 
-          <div className="overflow-x-auto rounded-lg border bg-card">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left"><tr><th className="p-3">Colaborador</th><th className="p-3">Documentos</th><th className="p-3">Cargo e lotação</th><th className="p-3">Status</th><th className="p-3 text-right">Ações</th></tr></thead>
-              <tbody>
-                {loading ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Carregando...</td></tr> : employees.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Nenhum colaborador inativo encontrado.</td></tr> : employees.map((employee) => (
-                  <tr key={employee.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => startEdit(employee)}>
-                    <td className="p-3">
-                      <div className="font-medium flex items-center gap-2">{employee.name}</div>
-                      {employee.registration_number && (
-                        <div className="text-xs text-muted-foreground mt-0.5">Matrícula: {employee.registration_number}</div>
-                      )}
-                    </td>
-                    <td className="p-3"><div>CPF: {String(employee.cpf ?? "-")}</div><div className="text-xs text-muted-foreground">RG: {String(employee.rg ?? "-")}</div></td>
-                    <td className="p-3">
-                      <div>{String(employee.role ?? "-")}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {employee.companies?.trading_name || employee.companies?.name ? `${employee.companies.trading_name || employee.companies.name}` : ""}
-                      </div>
-                    </td>
-                    <td className="p-3"><span className="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20">{String(employee.status ?? "-")}</span></td>
-                    <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={() => startEdit(employee)}>
-                          <Edit3 className="mr-2 h-3.5 w-3.5" />Abrir
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <EmployeeTable
+            employees={employees}
+            loading={loading}
+            emptyMessage="Nenhum colaborador inativo encontrado."
+            renderRow={(employee) => (
+              <tr key={employee.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => startEdit(employee)}>
+                <td className="p-3">
+                  <div className="font-medium flex items-center gap-2">{employee.name}</div>
+                  {employee.registration_number && (
+                    <div className="text-xs text-muted-foreground mt-0.5">Matrícula: {employee.registration_number}</div>
+                  )}
+                </td>
+                <DocumentsCell employee={employee} />
+                <td className="p-3">
+                  <div>{String(employee.role ?? "-")}</div>
+                  <div className="text-xs text-muted-foreground">{employee.companies?.trading_name || employee.companies?.name || ""}</div>
+                </td>
+                <td className="p-3"><span className="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20 dark:bg-yellow-950/40 dark:text-yellow-200 dark:ring-yellow-500/30">{String(employee.status ?? "-")}</span></td>
+                <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => startEdit(employee)} title="Abrir registro completo">
+                      <Edit3 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            )}
+          />
 
-          <div className="flex items-center justify-between text-sm text-muted-foreground mt-4">
-            <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
-            <div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button></div>
-          </div>
+          <Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} />
         </>
       )}
 
@@ -722,21 +795,17 @@ export default function ColaboradoresPage() {
               <div className="space-y-3">
                 {birthdaysThisMonth.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum aniversariante neste mês.</p>
-                ) : birthdaysThisMonth.map(e => {
-                  const info = getBirthdayInfo(e.birthday as string | null)!;
-                  const age = differenceInYears(new Date(), info.date);
-                  return (
-                    <div key={e.id} className="flex items-center justify-between rounded-md border bg-background p-3 shadow-sm">
-                      <div>
-                        <div className="font-medium">{e.name}</div>
-                        <div className="text-xs text-muted-foreground">Dia {info.day.toString().padStart(2, '0')}</div>
-                      </div>
-                      <div className="rounded-full bg-pink-100 px-2.5 py-1 text-xs font-semibold text-pink-700">
-                        {age} anos
-                      </div>
+                ) : birthdaysThisMonth.map(({ employee, info }) => (
+                  <div key={employee.id} className="flex items-center justify-between rounded-md border bg-background p-3 shadow-sm">
+                    <div>
+                      <div className="font-medium">{employee.name}</div>
+                      <div className="text-xs text-muted-foreground">Dia {info.day.toString().padStart(2, '0')}</div>
                     </div>
-                  );
-                })}
+                    <div className="rounded-full bg-pink-100 px-2.5 py-1 text-xs font-semibold text-pink-700 dark:bg-pink-950/50 dark:text-pink-300">
+                      {differenceInYears(new Date(), info.date)} anos
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -745,16 +814,15 @@ export default function ColaboradoresPage() {
               <div className="space-y-3">
                 {workAnniversariesThisMonth.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum aniversário de casa neste mês.</p>
-                ) : workAnniversariesThisMonth.map(e => {
-                  const info = getBirthdayInfo(e.admission_date as string | null)!;
+                ) : workAnniversariesThisMonth.map(({ employee, info }) => {
                   const years = differenceInYears(new Date(), info.date);
                   return (
-                    <div key={e.id} className="flex items-center justify-between rounded-md border bg-background p-3 shadow-sm">
+                    <div key={employee.id} className="flex items-center justify-between rounded-md border bg-background p-3 shadow-sm">
                       <div>
-                        <div className="font-medium">{e.name}</div>
+                        <div className="font-medium">{employee.name}</div>
                         <div className="text-xs text-muted-foreground">Dia {info.day.toString().padStart(2, '0')}</div>
                       </div>
-                      <div className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                      <div className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
                         {years} {years === 1 ? 'ano' : 'anos'}
                       </div>
                     </div>
@@ -779,11 +847,11 @@ export default function ColaboradoresPage() {
           </div>
 
           {salaryChangeAlerts.length > 0 && (
-            <div className="mb-6 rounded-md border border-amber-300 bg-amber-50 p-4">
-              <h3 className="flex items-center gap-2 font-semibold text-amber-900"><AlertTriangle className="h-4 w-4" /> Alteração salarial necessária</h3>
+            <div className="mb-6 rounded-md border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+              <h3 className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-200"><AlertTriangle className="h-4 w-4" /> Alteração salarial necessária</h3>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {salaryChangeAlerts.map(({ employee, rule }) => (
-                  <button type="button" key={employee.id} onClick={() => startEdit(employee)} className="rounded border border-amber-200 bg-white p-3 text-left text-sm hover:bg-amber-100/50">
+                  <button type="button" key={employee.id} onClick={() => startEdit(employee)} className="rounded border border-amber-200 bg-white p-3 text-left text-sm hover:bg-amber-100/50 dark:border-amber-800 dark:bg-amber-950/40 dark:hover:bg-amber-900/40">
                     <span className="block font-medium">{employee.name}</span>
                     <span className="text-xs text-muted-foreground">{employee.role} · alterar de R$ {formatCurrencyInput(rule.salary_experience)} para R$ {formatCurrencyInput(rule.salary_after_probation)}</span>
                   </button>
@@ -796,7 +864,7 @@ export default function ColaboradoresPage() {
             {inProbation.length === 0 ? (
               <p className="text-sm text-muted-foreground col-span-full">Nenhum colaborador em período de experiência.</p>
             ) : inProbation.map(({ employee: e, trialInfo }) => (
-              <div key={e.id} className={`flex flex-col justify-between rounded-md border p-4 shadow-sm ${trialInfo!.isWarning ? "bg-red-50/50 border-red-200" : "bg-background"}`}>
+              <div key={e.id} className={`flex flex-col justify-between rounded-md border p-4 shadow-sm ${trialInfo!.isWarning ? "bg-red-50/50 border-red-200 dark:bg-red-950/30 dark:border-red-900" : "bg-background"}`}>
                 <div className="mb-3">
                   <div className="font-semibold text-base">{e.name}</div>
                   <div className="text-xs text-muted-foreground">Admissão: {trialInfo!.admission.toLocaleDateString("pt-BR")}</div>
@@ -804,7 +872,7 @@ export default function ColaboradoresPage() {
                 </div>
                 <div className="flex items-center justify-between pt-3 border-t">
                   <div className="text-xs font-medium text-muted-foreground">Tempo restante:</div>
-                  <div className={`rounded-full px-2.5 py-1 text-xs font-bold ${trialInfo!.isWarning ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                  <div className={`rounded-full px-2.5 py-1 text-xs font-bold ${trialInfo!.isWarning ? "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300" : "bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-300"}`}>
                     {trialInfo!.daysRemaining} {trialInfo!.daysRemaining === 1 ? 'dia' : 'dias'}
                   </div>
                 </div>
@@ -899,7 +967,7 @@ export default function ColaboradoresPage() {
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setConfirmDelete(null)} disabled={saving}>Cancelar</Button>
-            <Button type="button" variant="destructive" disabled={saving} onClick={() => confirmDelete && deleteEmployee(confirmDelete.id, confirmDelete.name)}>
+            <Button type="button" variant="destructive" disabled={saving} onClick={() => confirmDelete && deleteEmployee(confirmDelete.id)}>
               {saving ? "Excluindo..." : "Excluir"}
             </Button>
           </DialogFooter>

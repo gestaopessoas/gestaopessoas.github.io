@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Trash2, TrendingUp, Package, Activity, Plus, Printer } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { getEmployeeBenefitLevelLabel, matchesEmployeeBenefit } from "../lib/benefitRules.mjs";
+import { Select } from "./FormHelpers";
 
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
@@ -75,7 +76,7 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
             <div key={row.id} className="rounded border bg-muted/20 p-4 text-sm">
               <div className="flex justify-between items-center mb-3">
                 <span className="font-semibold">{new Date(row.created_at).toLocaleDateString('pt-BR')}</span>
-                <span className={`px-2 py-1 text-xs rounded-full ${isCompleted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                <span className={`px-2 py-1 text-xs rounded-full ${isCompleted ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'}`}>
                   {isCompleted ? 'Concluído' : 'Pendente'}
                 </span>
               </div>
@@ -301,7 +302,7 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
         {deliveries.map((row) => (
           <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm">
             <div className="flex items-center gap-3">
-              <input type="checkbox" checked={selectedDeliveries.has(row.id)} onChange={() => toggleDelivery(row.id)} className="h-4 w-4 rounded border-gray-300" title="Incluir no termo" />
+              <input type="checkbox" checked={selectedDeliveries.has(row.id)} onChange={() => toggleDelivery(row.id)} className="h-4 w-4 rounded border-input" title="Incluir no termo" />
               <span>{row.quantity_delivered}x {row.uniform_items?.name} ({row.uniform_items?.size}) &middot; {new Date(row.delivered_at).toLocaleDateString()} {row.notes ? '- ' + row.notes : ''}</span>
             </div>
             <Button type="button" size="icon" variant="ghost" onClick={() => askRemove(row.id, row.uniform_items?.name || "item", row.uniform_item_id, row.quantity_delivered)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button>
@@ -321,7 +322,7 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
               id="deductStock" 
               checked={deductFromStock} 
               onChange={(e) => setDeductFromStock(e.target.checked)} 
-              className="h-4 w-4 rounded border-gray-300" 
+              className="h-4 w-4 rounded border-input" 
             />
             <Label htmlFor="deductStock" className="text-xs font-normal cursor-pointer whitespace-nowrap">
               Abater do estoque
@@ -396,8 +397,7 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
   );
 }
 
-export function Related({ title, icon: Icon, rows, render, onRemove, children }: { title: string; icon?: React.ElementType; rows: RelatedRow[]; render: (row: RelatedRow) => string; onRemove: (id: string) => void; children: React.ReactNode }) { return <details className="rounded-md border p-3"><summary className="cursor-pointer font-medium flex items-center gap-2">{Icon && <Icon className="w-4 h-4 text-muted-foreground" />} {title} ({rows.length})</summary><div className="mt-3 space-y-2">{rows.map((row) => <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm"><span>{render(row)}</span><Button type="button" size="icon" variant="ghost" onClick={() => onRemove(row.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button></div>)}<div className="grid gap-2 md:flex md:flex-wrap">{children}</div></div></details>; }
-export function Select({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) { return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
+function Related({ title, icon: Icon, rows, render, onRemove, children }: { title: string; icon?: React.ElementType; rows: RelatedRow[]; render: (row: RelatedRow) => string; onRemove: (id: string) => void; children: React.ReactNode }) { return <details className="rounded-md border p-3"><summary className="cursor-pointer font-medium flex items-center gap-2">{Icon && <Icon className="w-4 h-4 text-muted-foreground" />} {title} ({rows.length})</summary><div className="mt-3 space-y-2">{rows.map((row) => <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm"><span>{render(row)}</span><Button type="button" size="icon" variant="ghost" onClick={() => onRemove(row.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button></div>)}<div className="grid gap-2 md:flex md:flex-wrap">{children}</div></div></details>; }
 
 export function RelatedRecords({ employeeId }: { employeeId: string }) {
   const [companyBenefits, setCompanyBenefits] = useState<{id: string, name: string, level_values?: Record<string, number> | null}[]>([]);

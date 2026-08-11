@@ -1,8 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://bnwwdseczwrmmuvallml.supabase.co'
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJud3dkc2VjendybW11dmFsbG1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NDIxMDcsImV4cCI6MjA5OTAxODEwN30.46hTU6b8xgpsoASZu0K7cEi_FfA3ZBt8e417mfrda7k'
+import { supabase } from './lib/supabaseClient.mjs'
 // I'll use raw SQL generation instead of direct supabase client if I don't have the service role key!
 
 function normalizeStr(s) {
