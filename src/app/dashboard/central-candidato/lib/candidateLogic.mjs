@@ -65,6 +65,10 @@ export function deriveCandidateStatus(interviews = []) {
   if (isTerminal) {
     return { status: "Banco de Talentos", etapa_atual: null, ...base };
   }
+  // Se a etapa atual contém "Entrevista", marcar como "Em Entrevista"
+  if (latest.stage?.includes("Entrevista")) {
+    return { status: "Em Entrevista", etapa_atual: latest.stage, ...base };
+  }
   return { status: "Em Processo", etapa_atual: latest.stage, ...base };
 }
 

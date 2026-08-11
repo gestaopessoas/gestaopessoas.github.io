@@ -519,7 +519,6 @@ export default function EntrevistasPage() {
   const updateProvider = (id: string, updates: Partial<AIProvider>) => {
     const updated = providers.map(p => {
       if (p.id === id) {
-        const isActivating = updates.isActive && !p.isActive;
         return { ...p, ...updates, isActive: updates.isActive !== undefined ? updates.isActive : p.isActive };
       }
       // If activating a provider, deactivate all others
@@ -1072,12 +1071,17 @@ Resultado Final: ${form.result || "N/C"}
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const content = await page.getTextContent();
-            let lastY;
+            // Ordena por Y decrescente (topo→baixo) e X crescente (esq→dir)
+            // para suportar PDFs com layout em duas colunas sem misturar o texto
+            const sorted = [...content.items].sort((a: any, b: any) => {
+              const yDiff = b.transform[5] - a.transform[5];
+              return Math.abs(yDiff) > 2 ? yDiff : a.transform[4] - b.transform[4];
+            });
+            let lastY: number | undefined;
             let pageText = "";
-            for (const rawItem of content.items) {
+            for (const rawItem of sorted) {
               const item = rawItem as any;
               if (item.str === undefined) continue;
-              // Verifica se a coordenada Y mudou (nova linha no PDF)
               if (lastY !== undefined && item.transform && Math.abs(lastY - item.transform[5]) > 2) {
                 pageText += "\n";
               }
@@ -1109,8 +1113,11 @@ Resultado Final: ${form.result || "N/C"}
     const nameMatch = resumeText.match(/^([A-Za-zÀ-ÖØ-öø-ÿ\s]+)/i);
     const firstLineName = resumeText.split("\n").map(l => l.trim()).filter(Boolean)[0] || "";
     
-    const ageMatch = resumeText.match(/(\d{2})\s*anos/i);
-    const locationMatch = resumeText.match(/([A-Za-zÀ-ÖØ-öø-ÿ\s]+-\s*[A-Z]{2})/i);
+    // Idade: exige espaço antes para não capturar "22" em "22/03/1990" ou "R$2.200"
+    const ageMatch = resumeText.match(/(?<![\d/])\b([1-9][0-9])\s*anos/i);
+    // Cidade: aceita nomes compostos como "São Paulo - SP" (inclui espaços e acentos)
+    const locationMatch = resumeText.match(/([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ\s]*?)\s*-\s*([A-Z]{2})\b/);
+    const locationStr = locationMatch ? `${locationMatch[1].trim()} - ${locationMatch[2]}` : null;
     const phoneMatch = resumeText.match(/(\(\d{2}\)\s*\d{4,5}-\d{4})/);
     const emailMatch = resumeText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+)/);
     
@@ -1159,7 +1166,7 @@ Resultado Final: ${form.result || "N/C"}
     setAssessmentForm(prev => ({
       ...prev,
       age: ageMatch ? ageMatch[1].trim() : prev.age,
-      location: locationMatch ? locationMatch[1].trim() : (resumeText.match(/Cidade\s*([^\n]+)/i)?.[1]?.trim() || prev.location),
+      location: locationStr ?? (resumeText.match(/Cidade\s*([^\n]+)/i)?.[1]?.trim() || prev.location),
       professional_summary: professional_summary.trim() || prev.professional_summary,
       experience_summary: experience_summary || prev.experience_summary,
       education: educationText.trim() || prev.education,
@@ -1300,7 +1307,7 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
     setError("");
     const supabase = createClient();
     const parts = form.candidate_name.split(" ");
-    
+
     const candidateData = {
       full_name: form.candidate_name,
       first_name: parts[0] || "",
@@ -1308,16 +1315,57 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
       email: form.email,
       phone: form.phone,
       role_interest: form.role,
-      city: assessmentForm.worksite,
-      search_tags: [assessmentForm.selection_stage, "Importado de Entrevistas"]
+      // Usa a cidade/localização real do candidato; worksite é a obra de destino
+      city: assessmentForm.location || assessmentForm.worksite,
+      available_worksites: assessmentForm.worksite ? [assessmentForm.worksite] : [],
+      search_tags: [assessmentForm.selection_stage, "Importado de Entrevistas"].filter(Boolean)
     };
 
-    const { error: insertError } = await supabase.from("candidates").insert(candidateData);
+    const { data: inserted, error: insertError } = await supabase
+      .from("candidates")
+      .insert(candidateData)
+      .select("id")
+      .single();
+
     if (insertError) {
       setError("Erro ao enviar para o Banco de Talentos: " + insertError.message);
-    } else {
-      alert("Candidato movido para o Banco de Talentos com sucesso!");
+      setMovingToTalents(false);
+      return;
     }
+
+    const candidateId = inserted?.id;
+
+    // Persiste formação acadêmica extraída pela IA / parser
+    const academicList = assessmentForm.academic_list ?? [];
+    if (candidateId && academicList.length > 0) {
+      const educations = academicList.map(item => ({
+        candidate_id: candidateId,
+        institution_name: item.institution || "Não informada",
+        degree: item.course || "Não informado",
+        start_date: item.start_date || null,
+        end_date: item.in_progress ? null : (item.end_date || null),
+      }));
+      const { error: eduError } = await supabase.from("candidate_educations").insert(educations);
+      if (eduError) console.warn("Erro ao salvar formações:", eduError.message);
+    }
+
+    // Persiste experiências profissionais extraídas pela IA / parser
+    const experienceList = assessmentForm.experience_list ?? [];
+    if (candidateId && experienceList.length > 0) {
+      const experiences = experienceList.map(item => ({
+        candidate_id: candidateId,
+        company_name: item.company || "Não informada",
+        position_title: item.role || "Não informado",
+        start_date: item.start_date || null,
+        end_date: item.is_current ? null : (item.end_date || null),
+        is_current: item.is_current ?? false,
+        description: item.description || "",
+      }));
+      const { error: expError } = await supabase.from("candidate_experiences").insert(experiences);
+      if (expError) console.warn("Erro ao salvar experiências:", expError.message);
+    }
+
+    alert("Candidato movido para o Banco de Talentos com sucesso!");
     setMovingToTalents(false);
   };
 

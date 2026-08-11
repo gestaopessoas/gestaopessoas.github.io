@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Briefcase, CheckCircle2, Clock, ExternalLink, MessageCircle, Plus, Search, Edit3, Archive, ListTodo, ArchiveRestore, User, Calendar, MapPin } from "lucide-react";
+import { Briefcase, CheckCircle2, Clock, ExternalLink, MessageCircle, Plus, Search, Edit3, Archive, ListTodo, ArchiveRestore, User, Calendar, MapPin, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -300,8 +300,7 @@ export default function VagasAdminPage() {
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive/80 hover:bg-destructive/10" title="Excluir" onClick={() => deleteRequest(selectedJob.id)}>
-                        <Archive className="h-4 w-4 hidden" /> {/* Placeholder just to import Trash2 without changing imports, wait I'll just use a generic text or import Trash2 */}
-                        <span className="text-xs">Excluir</span>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </>
                   ) : (

@@ -7,6 +7,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 
 const COLUMNS = ["Sugestões", "Nova", "Triagem", "Entrevista", "Proposta", "Contratado"];
 
@@ -17,6 +18,7 @@ function KanbanContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   
   useEffect(() => {
     let active = true;
@@ -134,7 +136,8 @@ function KanbanContent() {
                       draggable
                       onDragStart={(e) => handleDragStart(e, c.id)}
                       onDragEnd={() => setDraggedId(null)}
-                      className={`bg-card border p-3 rounded-md shadow-sm cursor-grab active:cursor-grabbing transition-opacity ${draggedId === c.id ? 'opacity-50' : ''} hover:border-primary/40`}
+                      onClick={() => setSelectedCandidateId(c.id)}
+                      className={`bg-card border p-3 rounded-md shadow-sm cursor-pointer active:cursor-grabbing transition-opacity ${draggedId === c.id ? 'opacity-50' : ''} hover:border-primary/40`}
                     >
                       <div className="font-medium text-sm mb-1">{c.name}</div>
                       <div className="text-xs text-muted-foreground truncate mb-2">{c.email}</div>
@@ -152,6 +155,13 @@ function KanbanContent() {
           })}
         </div>
       </div>
+
+      {selectedCandidateId && (
+        <CandidateProfileModal
+          candidateId={selectedCandidateId}
+          onClose={() => setSelectedCandidateId(null)}
+        />
+      )}
     </div>
   );
 }

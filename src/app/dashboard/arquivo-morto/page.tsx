@@ -11,8 +11,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Archive, RotateCcw, Search, Package, ChevronDown, ChevronUp } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Archive, RotateCcw, Search, Package, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
 
 type EmployeeArchive = { physical_boxes: { code: string } | null };
 type Employee = { 
@@ -33,6 +33,75 @@ type BoxData = {
 };
 
 const pageSize = 100;
+
+function Pagination({ currentPage, totalPages, onPageChange }: { currentPage: number; totalPages: number; onPageChange: (page: number) => void }) {
+  if (totalPages <= 1) return null;
+
+  const pages = useMemo(() => {
+    const result: (number | string)[] = [];
+    const maxVisible = 5;
+    let start = Math.max(0, currentPage - Math.floor(maxVisible / 2));
+    let end = Math.min(totalPages - 1, start + maxVisible - 1);
+
+    if (end - start + 1 < maxVisible) {
+      start = Math.max(0, end - maxVisible + 1);
+    }
+
+    if (start > 0) {
+      result.push(0);
+      if (start > 1) result.push("...");
+    }
+
+    for (let i = start; i <= end; i++) {
+      result.push(i);
+    }
+
+    if (end < totalPages - 1) {
+      if (end < totalPages - 2) result.push("...");
+      result.push(totalPages - 1);
+    }
+
+    return result;
+  }, [currentPage, totalPages]);
+
+  return (
+    <div className="flex items-center justify-center gap-1">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={currentPage === 0}
+        onClick={() => onPageChange(currentPage - 1)}
+        aria-label="Página anterior"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      {pages.map((page, idx) =>
+        page === "..." ? (
+          <span key={`ellipsis-${idx}`} className="px-2 text-muted-foreground">...</span>
+        ) : (
+          <Button
+            key={page}
+            variant={page === currentPage ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => onPageChange(page as number)}
+            className="min-w-[36px] h-8"
+          >
+            {String((page as number) + 1)}
+          </Button>
+        )
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={currentPage === totalPages - 1}
+        onClick={() => onPageChange(currentPage + 1)}
+        aria-label="Próxima página"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
 
 export default function ArquivoMortoPage() {
   const [boxes, setBoxes] = useState<BoxData[]>([]);
@@ -247,13 +316,11 @@ export default function ArquivoMortoPage() {
       </div>
     )}
 
-    <div className="flex items-center justify-between text-sm text-muted-foreground pt-4 border-t border-border/50">
-      <span>Página {page + 1} de {Math.max(1, Math.ceil(total / pageSize))}</span>
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Anterior</Button>
-        <Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((value) => value + 1)}>Próxima</Button>
-      </div>
-    </div>
+    <Pagination
+        currentPage={page}
+        totalPages={Math.max(1, Math.ceil(total / pageSize))}
+        onPageChange={setPage}
+      />
 
     <Dialog open={reactivateTarget !== null} onOpenChange={(open) => { if (!open) setReactivateTarget(null); }}>
       <DialogContent className="sm:max-w-md">

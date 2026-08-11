@@ -233,6 +233,17 @@ export default function ParceirosAdminPage() {
     await supabase.from("partner_prospects").update({ status: newStatus }).eq("id", prospectId);
   };
 
+  const handleDeleteProspect = async (prospectId: string, companyName: string) => {
+    if (!confirm(`Deseja realmente excluir a candidatura de "${companyName}"?`)) return;
+    try {
+      const { error } = await supabase.from("partner_prospects").delete().eq("id", prospectId);
+      if (error) throw error;
+      setProspects(prev => prev.filter(p => p.id !== prospectId));
+    } catch (err: any) {
+      alert("Erro ao excluir candidatura: " + err.message);
+    }
+  };
+
   const handleApproveAndCreate = (prospect: PartnerProspect) => {
     // Atualiza status para aprovado
     handleUpdateProspectStatus(prospect.id, "aprovado");
@@ -587,41 +598,50 @@ export default function ParceirosAdminPage() {
                                  p.status === "aprovado" ? "Aprovado" : "Rejeitado"}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                {p.status === "pendente" && (
+<td className="px-4 py-3 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  {p.status === "pendente" && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleUpdateProspectStatus(p.id, "em_contato")}
+                                      className="text-xs text-blue-700 hover:bg-blue-50 border-blue-300"
+                                    >
+                                      Contatar
+                                    </Button>
+                                  )}
+                                  {p.status !== "aprovado" && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleApproveAndCreate(p)}
+                                      className="text-xs text-emerald-700 hover:bg-emerald-50 border-emerald-300 font-semibold gap-1"
+                                    >
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                      <span>Aceitar e Criar Convênio</span>
+                                    </Button>
+                                  )}
+                                  {p.status === "aprovado" && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleUpdateProspectStatus(p.id, "pendente")}
+                                      className="text-xs text-zinc-500"
+                                    >
+                                      Reverter
+                                    </Button>
+                                  )}
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleUpdateProspectStatus(p.id, "em_contato")}
-                                    className="text-xs text-blue-700 hover:bg-blue-50 border-blue-300"
+                                    onClick={() => handleDeleteProspect(p.id, p.company_name)}
+                                    className="text-xs text-red-600 hover:bg-red-50 border-red-200"
                                   >
-                                    Contatar
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <span>Excluir</span>
                                   </Button>
-                                )}
-                                {p.status !== "aprovado" && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleApproveAndCreate(p)}
-                                    className="text-xs text-emerald-700 hover:bg-emerald-50 border-emerald-300 font-semibold gap-1"
-                                  >
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                    <span>Aceitar e Criar Convênio</span>
-                                  </Button>
-                                )}
-                                {p.status === "aprovado" && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleUpdateProspectStatus(p.id, "pendente")}
-                                    className="text-xs text-zinc-500"
-                                  >
-                                    Reverter
-                                  </Button>
-                                )}
-                              </div>
-                            </td>
+                                </div>
+                              </td>
                           </tr>
                           {expandedProspectId === p.id && (
                             <tr className="bg-zinc-50/50 dark:bg-zinc-900/30 border-b border-zinc-200 dark:border-zinc-800">
