@@ -12,6 +12,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -45,6 +47,23 @@ export default function AdvanceStageModal({
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const [technical, setTechnical] = useState("");
+  const [communication, setCommunication] = useState("");
+  const [culturalFit, setCulturalFit] = useState("");
+  const [strengths, setStrengths] = useState("");
+  const [weaknesses, setWeaknesses] = useState("");
+  const [candidateFuture, setCandidateFuture] = useState<string[]>([]);
+
+  const futureOptions = [
+    "Aprovado para Banco de Talentos",
+    "Potencial para Liderança",
+    "Recomendado para Promoção Futura",
+    "Perfil Técnico Forte",
+    "Requer Treinamento Específico",
+    "Pode assumir cargo de confiança",
+    "Transferência entre Obras"
+  ];
 
   const validNextStages = useMemo(() => {
     // Retorna todos os estágios do balde atual e do balde seguinte
@@ -82,10 +101,19 @@ export default function AdvanceStageModal({
     const supabase = createClient();
 
     try {
+      let finalNotes = "";
+      if (technical) finalNotes += `[Avaliação Técnica]\n${technical}\n\n`;
+      if (communication) finalNotes += `[Comunicação]\n${communication}\n\n`;
+      if (culturalFit) finalNotes += `[Fit Cultural]\n${culturalFit}\n\n`;
+      if (strengths) finalNotes += `[Pontos Fortes]\n${strengths}\n\n`;
+      if (weaknesses) finalNotes += `[Pontos a Desenvolver]\n${weaknesses}\n\n`;
+      if (candidateFuture.length > 0) finalNotes += `[Futuro do Candidato]\n${candidateFuture.join(", ")}\n\n`;
+      if (notes) finalNotes += `[Observações Gerais]\n${notes}\n\n`;
+
       const { error: insertError } = await supabase.from("candidate_interviews").insert({
         candidate_id: candidateId,
         stage: selectedStage,
-        notes: notes.trim() || null,
+        notes: finalNotes.trim() || null,
         workplace_name: workplaceName || null,
       });
 
@@ -93,6 +121,12 @@ export default function AdvanceStageModal({
       onSuccess();
       setSelectedStage("");
       setNotes("");
+      setTechnical("");
+      setCommunication("");
+      setCulturalFit("");
+      setStrengths("");
+      setWeaknesses("");
+      setCandidateFuture([]);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Ocorreu um erro ao avançar o candidato.");
@@ -103,7 +137,7 @@ export default function AdvanceStageModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Avançar Etapa</DialogTitle>
           <DialogDescription>
@@ -137,14 +171,98 @@ export default function AdvanceStageModal({
             </Select>
           </div>
 
-          <div className="grid gap-2">
-            <label className="text-sm font-medium">Observações (Opcional)</label>
-            <Textarea
-              placeholder="Detalhes adicionais sobre este avanço"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="min-h-[80px]"
-            />
+          <div className="space-y-4 pt-2 border-t mt-4">
+            <h4 className="text-sm font-semibold text-muted-foreground">Avaliação (Opcional)</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="technical">Avaliação Técnica</Label>
+                <Textarea
+                  id="technical"
+                  placeholder="Conhecimentos técnicos, experiência..."
+                  value={technical}
+                  onChange={(e) => setTechnical(e.target.value)}
+                  className="min-h-[80px]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="communication">Comunicação</Label>
+                <Textarea
+                  id="communication"
+                  placeholder="Clareza, articulação, postura..."
+                  value={communication}
+                  onChange={(e) => setCommunication(e.target.value)}
+                  className="min-h-[80px]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="culturalFit">Fit Cultural</Label>
+                <Textarea
+                  id="culturalFit"
+                  placeholder="Alinhamento com os valores da empresa..."
+                  value={culturalFit}
+                  onChange={(e) => setCulturalFit(e.target.value)}
+                  className="min-h-[80px]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="strengths">Pontos Fortes</Label>
+                <Textarea
+                  id="strengths"
+                  placeholder="Principais qualidades do candidato..."
+                  value={strengths}
+                  onChange={(e) => setStrengths(e.target.value)}
+                  className="min-h-[80px]"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="weaknesses">Pontos a Desenvolver</Label>
+                <Textarea
+                  id="weaknesses"
+                  placeholder="Pontos de melhoria, atenção..."
+                  value={weaknesses}
+                  onChange={(e) => setWeaknesses(e.target.value)}
+                  className="min-h-[80px]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <Label>Futuro do Candidato</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border p-3 rounded-md bg-muted/20">
+                {futureOptions.map((option) => (
+                  <div key={option} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`future-${option}`}
+                      checked={candidateFuture.includes(option)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setCandidateFuture([...candidateFuture, option]);
+                        } else {
+                          setCandidateFuture(candidateFuture.filter((item) => item !== option));
+                        }
+                      }}
+                    />
+                    <Label
+                      htmlFor={`future-${option}`}
+                      className="text-sm font-normal cursor-pointer leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      {option}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-2 pt-2">
+              <label className="text-sm font-medium">Observações Gerais</label>
+              <Textarea
+                placeholder="Detalhes adicionais sobre este avanço"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="min-h-[80px]"
+              />
+            </div>
           </div>
         </div>
 

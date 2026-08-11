@@ -239,9 +239,31 @@ export default function CandidateDetailsSheet({
                               <strong>Obra:</strong> {interview.workplace_name || "N/A"}
                             </div>
                             {interview.notes && (
-                              <p className="text-sm text-muted-foreground bg-muted/20 p-2 rounded mb-2 whitespace-pre-wrap">
-                                {interview.notes}
-                              </p>
+                              <div className="text-sm text-muted-foreground bg-muted/20 p-3 rounded mb-2">
+                                {(() => {
+                                  if (!interview.notes.includes('[')) {
+                                    return <p className="whitespace-pre-wrap">{interview.notes}</p>;
+                                  }
+                                  
+                                  const parts = interview.notes.split(/\[(.*?)\]/g);
+                                  const elements = [];
+                                  
+                                  if (parts[0] && parts[0].trim()) {
+                                    elements.push(<p key="intro" className="whitespace-pre-wrap mb-3">{parts[0].trim()}</p>);
+                                  }
+                                  
+                                  for (let i = 1; i < parts.length; i += 2) {
+                                    elements.push(
+                                      <div key={i} className="mb-3 last:mb-0">
+                                        <span className="text-sm font-semibold text-foreground/90 block mb-0.5">[{parts[i]}]</span>
+                                        <p className="whitespace-pre-wrap">{parts[i + 1]?.trim()}</p>
+                                      </div>
+                                    );
+                                  }
+                                  
+                                  return <div>{elements}</div>;
+                                })()}
+                              </div>
                             )}
                             {interview.rejection_reason && (
                               <div className="text-sm text-destructive bg-destructive/10 p-2 rounded">

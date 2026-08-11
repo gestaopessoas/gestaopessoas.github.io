@@ -347,7 +347,14 @@ export default function AddInterviewModal({
                   required
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={loadingWorkplaces ? "Carregando..." : "Selecione a obra"} />
+                    <SelectValue placeholder={loadingWorkplaces ? "Carregando..." : "Selecione a obra"}>
+                      {workplaceId && workplaces.length > 0
+                        ? (() => {
+                            const wp = workplaces.find((w) => w.id === workplaceId);
+                            return wp ? `${wp.name}${wp.type ? ` (${wp.type})` : ""}` : undefined;
+                          })()
+                        : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {workplaces.map((wp) => (
