@@ -775,11 +775,11 @@ export default function ParceirosAdminPage() {
                 </div>
                 <div>
                   <label className="flex items-center justify-between text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-400 mb-1">
-                    <span className="flex items-center gap-1"><Camera className="h-3 w-3" /> Instagram URL</span>
+                    <span className="flex items-center gap-1"><ExternalLink className="h-3 w-3" /> Link (Insta, Site, Canva)</span>
                   </label>
                   <input
                     type="url"
-                    placeholder="https://instagram.com/..."
+                    placeholder="https://..."
                     value={form.instagram_url || ""}
                     onChange={(e) => setForm({ ...form, instagram_url: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-background text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
