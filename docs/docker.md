@@ -105,15 +105,36 @@ o dump do schema antes e depois é idêntico byte a byte.
 
 Não é preciso repetir. `db push` de migrations novas funciona normalmente.
 
+## Login local
+
+O banco sobe sem usuários, e `/dashboard` exige login. O `supabase/seed.sql`
+cria um admin a cada `db reset`:
+
+```
+admin@local.dev / admin123
+```
+
+Level 99 — o `can_access()` libera tudo a partir de 50. O seed nunca vai para
+produção: `db push` ignora seeds por padrão.
+
+Duas armadilhas ao criar usuários direto no SQL, já tratadas no seed:
+
+- `auth.users` precisa de uma linha correspondente em `auth.identities`, senão
+  o login por e-mail não encontra o provider.
+- `confirmation_token`, `recovery_token`, `email_change_token_new` e
+  `email_change` não têm default e aceitam `NULL`, mas o GoTrue lê essas colunas
+  como string não-nulável. Deixá-las nulas faz o login falhar com
+  `Database error querying schema`. Precisam ser string vazia.
+
+Criar usuários pelo Studio (Authentication → Users) evita as duas — mas ainda
+exige inserir o `profiles` na mão, porque não há trigger em `auth.users`.
+
 ## Dados
 
-As migrations criam o schema, não os dados. O banco local sobe vazio (fora dos
-seeds que as próprias migrations inserem, como as normas dos testes psicológicos
-e o questionário BFI-44). Para popular:
-
-- criar usuário pelo Studio (Authentication → Users) ou pelo `/login` do app;
-- inserir registros pelo Studio;
-- ou escrever um `supabase/seed.sql` — o `config.toml` já o carrega no `db reset`.
+As migrations criam o schema, não os dados. Fora o admin do seed, o banco local
+sobe vazio (além do que as próprias migrations inserem, como as normas dos
+testes psicológicos e o questionário BFI-44). Para popular, use o Studio ou
+acrescente ao `supabase/seed.sql`.
 
 ## Build de produção em container
 
