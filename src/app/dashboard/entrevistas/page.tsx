@@ -1241,9 +1241,7 @@ Resultado Final: ${form.result || "N/C"}
   "personal_info": "Informações pessoais do candidato",
   "diversity_info": "Informações de diversidade",
   "salary_expectation": "Pretensão Salarial",
-  "additional_info": "Informações adicionais do candidato",
-  "personal_info": "Informações pessoais do candidato",
-  "diversity_info": "Informações de diversidade",
+
   "academic_list": [
     {
       "id": "1",
@@ -1316,7 +1314,6 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
         gender_identity: parsed.gender_identity || prev.gender_identity,
         sexual_orientation: parsed.sexual_orientation || prev.sexual_orientation,
         race_declaration: parsed.race_declaration || prev.race_declaration,
-        salary_expectation: parsed.salary_expectation || prev.salary_expectation,
         academic_list: Array.isArray(parsed.academic_list) ? parsed.academic_list.map((item: any, idx: number) => ({
           id: String(Date.now() + idx),
           course: item.course || "",

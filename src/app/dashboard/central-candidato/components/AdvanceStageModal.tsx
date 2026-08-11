@@ -48,18 +48,19 @@ export default function AdvanceStageModal({
 
   const validNextStages = useMemo(() => {
     // Retorna todos os estágios do balde atual e do balde seguinte
-    const currentIdx = BUCKET_ORDER.indexOf(currentBucket);
+    const currentIdx = (BUCKET_ORDER as readonly string[]).indexOf(currentBucket);
     const stages: string[] = [];
     
     // Add current bucket stages (so they can move sideways)
-    if (currentBucket && STAGE_BUCKETS[currentBucket]) {
-      stages.push(...STAGE_BUCKETS[currentBucket]);
+    const currentBucketType = currentBucket as keyof typeof STAGE_BUCKETS;
+    if (currentBucketType && STAGE_BUCKETS[currentBucketType]) {
+      stages.push(...STAGE_BUCKETS[currentBucketType]);
     }
     
     // Add next bucket stages
     const nextBucket = BUCKET_ORDER[currentIdx + 1];
-    if (nextBucket && STAGE_BUCKETS[nextBucket]) {
-      stages.push(...STAGE_BUCKETS[nextBucket]);
+    if (nextBucket && STAGE_BUCKETS[nextBucket as keyof typeof STAGE_BUCKETS]) {
+      stages.push(...STAGE_BUCKETS[nextBucket as keyof typeof STAGE_BUCKETS]);
     }
 
     // Add contratado if not already there, just in case
@@ -122,7 +123,7 @@ export default function AdvanceStageModal({
 
           <div className="grid gap-2">
             <label className="text-sm font-medium">Próxima Etapa *</label>
-            <Select value={selectedStage} onValueChange={setSelectedStage}>
+            <Select value={selectedStage} onValueChange={(val) => setSelectedStage(val || "")}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione a etapa..." />
               </SelectTrigger>
