@@ -22,7 +22,7 @@ import {
   Rocket,
   Building,
   Globe,
-  Instagram,
+  Camera,
   RefreshCw
 } from "lucide-react";
 import { LogoCropperModal } from "@/components/benefits/LogoCropperModal";
@@ -801,7 +801,7 @@ export default function ParceirosAdminPage() {
                 </div>
                 <div>
                   <label className="flex items-center justify-between text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-400 mb-1">
-                    <span className="flex items-center gap-1"><Instagram className="h-3 w-3" /> Instagram URL</span>
+                    <span className="flex items-center gap-1"><Camera className="h-3 w-3" /> Instagram URL</span>
                     <button 
                       type="button"
                       onClick={handleFetchInstagramAvatar}
