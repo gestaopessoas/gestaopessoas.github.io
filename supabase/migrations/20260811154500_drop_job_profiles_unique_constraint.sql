@@ -1,0 +1,1 @@
+ALTER TABLE public.job_profiles DROP CONSTRAINT IF EXISTS job_profiles_profile_code_key;
