@@ -80,6 +80,35 @@ export const salaryChangeDue = (admissionDate, baseSalary, experienceSalary, aft
   return days >= 83;
 };
 
+// Todo cargo pode entrar no piso da categoria ou ficar fora do enquadramento.
+export const LEVEL_FALLBACK_OPTIONS = ["PISO", "Não Enquadrado"];
+
+// Decide o que mostrar nos campos Senioridade e Nível a partir das faixas do cargo:
+// - faixas com nível: trilha de senioridade normal, níveis filtrados pela senioridade;
+// - faixas sem nível (Oficial, Meio-Oficial, Servente): não existe trilha de senioridade,
+//   o colaborador entra no piso ou fica não enquadrado;
+// - cargo sem faixa cadastrada: não esconde nada, para não perder dado de cargo novo.
+export const levelFieldOptions = (roleSalaryEntries, seniorityAllowedLevels, allLevels) => {
+  const entries = roleSalaryEntries ?? [];
+  const leveled = entries.filter((rule) => rule.uses_level && rule.level).map((rule) => rule.level);
+
+  if (entries.some((rule) => rule.uses_level)) {
+    const filtered = seniorityAllowedLevels
+      ? leveled.filter((level) => seniorityAllowedLevels.includes(level))
+      : leveled;
+    return {
+      showSeniority: true,
+      levelOptions: ["", ...(filtered.length ? filtered : leveled), ...LEVEL_FALLBACK_OPTIONS],
+    };
+  }
+
+  if (entries.length > 0) {
+    return { showSeniority: false, levelOptions: ["", ...LEVEL_FALLBACK_OPTIONS] };
+  }
+
+  return { showSeniority: true, levelOptions: [...allLevels, ...LEVEL_FALLBACK_OPTIONS] };
+};
+
 const CRITICAL_FIELDS = [
   "rg",
   "role",

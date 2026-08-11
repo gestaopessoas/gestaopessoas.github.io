@@ -11,7 +11,10 @@ import {
   parseCurrencyInput,
   salaryChangeDue,
   maskCurrencyInput,
+  levelFieldOptions,
 } from "./employeeFormRules.mjs";
+
+const ALL_LEVELS = ["", "Nível I", "Nível VI", "Nível XI", "Diretoria"];
 
 test("aceita CPF com dígitos verificadores corretos, com ou sem máscara", () => {
   assert.equal(isValidCpf("529.982.247-25"), true);
@@ -24,6 +27,39 @@ test("rejeita CPF com dígito verificador errado, tamanho errado ou repetido", (
   assert.equal(isValidCpf("111.111.111-11"), false);
   assert.equal(isValidCpf(""), false);
   assert.equal(isValidCpf(null), false);
+});
+
+test("cargo de campo não oferece senioridade e entra pelo piso", () => {
+  const oficial = [{ role_name: "OFICIAL", modality: "CLT", uses_level: false, level: null }];
+  const { showSeniority, levelOptions } = levelFieldOptions(oficial, undefined, ALL_LEVELS);
+
+  assert.equal(showSeniority, false);
+  assert.deepEqual(levelOptions, ["", "PISO", "Não Enquadrado"]);
+});
+
+test("cargo com nível mantém senioridade e filtra os níveis da faixa", () => {
+  const analista = [
+    { role_name: "ANALISTA", modality: "CLT", uses_level: true, level: "Nível I" },
+    { role_name: "ANALISTA", modality: "CLT", uses_level: true, level: "Nível VI" },
+  ];
+
+  const semFiltro = levelFieldOptions(analista, undefined, ALL_LEVELS);
+  assert.equal(semFiltro.showSeniority, true);
+  assert.deepEqual(semFiltro.levelOptions, ["", "Nível I", "Nível VI", "PISO", "Não Enquadrado"]);
+
+  const junior = levelFieldOptions(analista, ["Nível I"], ALL_LEVELS);
+  assert.deepEqual(junior.levelOptions, ["", "Nível I", "PISO", "Não Enquadrado"]);
+
+  // senioridade sem nenhum nível correspondente não pode zerar a lista
+  const diretoria = levelFieldOptions(analista, ["Diretoria"], ALL_LEVELS);
+  assert.deepEqual(diretoria.levelOptions, ["", "Nível I", "Nível VI", "PISO", "Não Enquadrado"]);
+});
+
+test("cargo sem faixa cadastrada mantém todos os níveis mais piso", () => {
+  const { showSeniority, levelOptions } = levelFieldOptions([], undefined, ALL_LEVELS);
+
+  assert.equal(showSeniority, true);
+  assert.deepEqual(levelOptions, [...ALL_LEVELS, "PISO", "Não Enquadrado"]);
 });
 
 test("converte opção legada para o valor canônico sem diferenciar caixa", () => {

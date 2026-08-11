@@ -300,6 +300,7 @@ export default function SalaryTablePage() {
                 <div className="space-y-2">
                   <Label>Nível</Label>
                   <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.level || "Júnior"} onChange={(e) => setEditingRow({ ...editingRow, level: e.target.value })}>
+                    <option value="PISO">PISO</option>
                     <option value="Júnior">Júnior</option>
                     <option value="Pleno">Pleno</option>
                     <option value="Sênior">Sênior</option>

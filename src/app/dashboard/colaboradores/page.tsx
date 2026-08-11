@@ -15,7 +15,7 @@ import { StatsCards } from "./components/StatsCards";
 import { DocumentsCell, EmployeeTable, Pagination, SearchBar } from "./components/EmployeeTable";
 import { MONTHS, type Employee, type Entity } from "./components/types";
 import { normalizeRole } from "./lib/normalizeRole.mjs";
-import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, isValidCpf, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput } from "./lib/employeeFormRules.mjs";
+import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, isValidCpf, levelFieldOptions, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput } from "./lib/employeeFormRules.mjs";
 
 type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
 
@@ -245,7 +245,6 @@ export default function ColaboradoresPage() {
       const noLevelRule = candidates.find((rule) => !rule.uses_level);
 
       if (noLevelRule) {
-        updated.level = "";
         updated.senioridade = "";
         if (noLevelRule.salary_experience != null) updated.base_salary = formatCurrencyInput(noLevelRule.salary_experience);
       } else if (field === "senioridade" && value) {
@@ -486,15 +485,11 @@ export default function ColaboradoresPage() {
     (rule) => normalizeRole(rule.role_name) === normalizeRole(form.role) &&
               form.contract_type && rule.modality.toUpperCase() === form.contract_type.toUpperCase()
   );
-  const roleUsesLevel = roleSalaryEntries.length > 0 && roleSalaryEntries.some((r) => r.uses_level);
-  const allRoleLevels = roleSalaryEntries.filter((r) => r.uses_level && r.level).map((r) => r.level as string);
-  const seniorityAllowedLevels = form.senioridade ? SENIORITY_LEVEL_MAP[form.senioridade] : undefined;
-  const seniorityFilteredLevels = seniorityAllowedLevels
-    ? allRoleLevels.filter((l) => seniorityAllowedLevels.includes(l))
-    : allRoleLevels;
-  const levelDisplayOptions = roleUsesLevel
-    ? ["", ...(seniorityFilteredLevels.length > 0 ? seniorityFilteredLevels : allRoleLevels), "PISO", "Não Enquadrado"]
-    : ALL_LEVELS;
+  const { showSeniority, levelOptions: levelDisplayOptions } = levelFieldOptions(
+    roleSalaryEntries,
+    form.senioridade ? SENIORITY_LEVEL_MAP[form.senioridade] : undefined,
+    ALL_LEVELS
+  );
 
   return (
     <div className="space-y-6">
@@ -589,7 +584,9 @@ export default function ColaboradoresPage() {
             <Section title="Vínculo e lotação">
               <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={statusOptions} /></Field>
               <Field label="Cargo *"><select required value={form.role} onChange={(e) => update("role", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Selecione...</option>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
-              <Field label="Senioridade"><Select value={form.senioridade} onChange={(value) => update("senioridade", value)} options={["", "Júnior", "Pleno", "Sênior", "Diretoria"]} /></Field>
+              {showSeniority && (
+                <Field label="Senioridade"><Select value={form.senioridade} onChange={(value) => update("senioridade", value)} options={["", "Júnior", "Pleno", "Sênior", "Diretoria"]} /></Field>
+              )}
               <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={levelDisplayOptions} /></Field>
               <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.trading_name || c.name}</option>)}</select></Field>
               <Field label="Centro de Custo *"><select value={form.cost_center_id} onChange={(e) => update("cost_center_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{costCenters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
