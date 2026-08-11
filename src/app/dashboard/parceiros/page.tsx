@@ -21,7 +21,9 @@ import {
   Gift,
   Rocket,
   Building,
-  Globe
+  Globe,
+  Instagram,
+  RefreshCw
 } from "lucide-react";
 import { LogoCropperModal } from "@/components/benefits/LogoCropperModal";
 import { DiscountPartner, PartnerLead } from "@/types/benefits";
@@ -59,6 +61,7 @@ const emptyPartnerForm: Omit<Partner, "id" | "created_at" | "updated_at"> = {
   logo_url: "",
   logo_position: "center",
   logo_dark_mask: false,
+  instagram_url: "",
   is_active: true
 };
 
@@ -159,9 +162,36 @@ export default function ParceirosAdminPage() {
       logo_url: p.logo_url || "",
       logo_position: p.logo_position || "center",
       logo_dark_mask: p.logo_dark_mask || false,
+      instagram_url: p.instagram_url || "",
       is_active: p.is_active
     });
     setIsModalOpen(true);
+  };
+
+  const handleFetchInstagramAvatar = () => {
+    if (!form.instagram_url) {
+      alert("Por favor, preencha o link do Instagram primeiro.");
+      return;
+    }
+    
+    // Extrai o username de URLs como https://instagram.com/usuario ou @usuario
+    let username = form.instagram_url.trim();
+    if (username.includes('instagram.com/')) {
+      const parts = username.split('instagram.com/');
+      if (parts[1]) {
+        username = parts[1].split('/')[0].split('?')[0];
+      }
+    }
+    if (username.startsWith('@')) {
+      username = username.substring(1);
+    }
+    
+    if (username) {
+      const avatarUrl = `https://unavatar.io/instagram/${username}`;
+      setForm({ ...form, logo_url: avatarUrl });
+    } else {
+      alert("Não foi possível identificar o nome de usuário do Instagram.");
+    }
   };
 
   const handleSavePartner = async (e: React.FormEvent) => {
@@ -182,6 +212,7 @@ export default function ParceirosAdminPage() {
       logo_url: form.logo_url?.trim() || "",
       logo_position: form.logo_position,
       logo_dark_mask: form.logo_dark_mask,
+      instagram_url: form.instagram_url?.trim() || "",
       is_active: form.is_active,
       updated_at: new Date().toISOString()
     };
@@ -768,6 +799,29 @@ export default function ParceirosAdminPage() {
                     <option value="right">Direita</option>
                   </select>
                 </div>
+                <div>
+                  <label className="flex items-center justify-between text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-400 mb-1">
+                    <span className="flex items-center gap-1"><Instagram className="h-3 w-3" /> Instagram URL</span>
+                    <button 
+                      type="button"
+                      onClick={handleFetchInstagramAvatar}
+                      className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Puxar Foto
+                    </button>
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://instagram.com/..."
+                    value={form.instagram_url || ""}
+                    onChange={(e) => setForm({ ...form, instagram_url: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-background text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col justify-end">
                   <div className="flex items-center gap-2 pb-2">
                     <input

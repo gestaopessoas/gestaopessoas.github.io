@@ -10,6 +10,7 @@ export interface DiscountPartner {
   logo_url: string;
   logo_position?: string;
   logo_dark_mask?: boolean;
+  instagram_url?: string;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
