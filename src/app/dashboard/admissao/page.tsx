@@ -142,7 +142,7 @@ function DocumentItem({ candidateId, docType, existingDoc, onUpdate }: { candida
           </div>
         ) : (
           <div className="flex w-full gap-2">
-            <Button size="sm" variant="outline" className="flex-1 h-8 gap-2" onClick={() => window.open(existingDoc.file_url, '_blank')}>
+            <Button size="sm" variant="outline" className="flex-1 h-8 gap-2" onClick={() => window.open(existingDoc.file_url || '', '_blank')}>
               <ExternalLink className="h-4 w-4" />
               Visualizar
             </Button>
