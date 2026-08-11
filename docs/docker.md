@@ -66,7 +66,7 @@ que o `npm run dev` na máquina host usa. O container usa só o `.env.docker`.
 o dump de estrutura de produção. Ele reproduz o banco real — 76 tabelas, 3 views,
 214 policies RLS, 177 funções, 40 triggers.
 
-As 86 migrations anteriores foram para `supabase/migrations_legacy/` porque não
+As 91 migrations anteriores foram para `supabase/migrations_legacy/` porque não
 reconstroem produção: referenciam 11 tabelas que nenhuma delas cria, e o
 `employees` que descrevem (`first_name` + `last_name`) diverge do real (`name` +
 `birthday`). O diagnóstico completo está no README daquele diretório.
@@ -74,6 +74,21 @@ reconstroem produção: referenciam 11 tabelas que nenhuma delas cria, e o
 **Mudanças novas de schema continuam sendo migrations normais**, com timestamp
 posterior, em `supabase/migrations/` — o fluxo de sempre. O baseline só substitui
 o passado.
+
+### A regra que mantém isso consistente
+
+`supabase/migrations/` contém **só o que ainda não foi para produção**. Quando
+uma migration é aplicada em produção e o baseline é regerado, ela passa a estar
+dentro do baseline e precisa ir para `migrations_legacy/` — senão o `db reset`
+quebra com "already exists".
+
+Hoje estão ativas as três que ainda não foram aplicadas:
+
+```
+20260811154500_drop_job_profiles_unique_constraint.sql
+20260811160500_create_documents_bucket.sql
+20260811161500_add_instagram_to_partners.sql
+```
 
 Para regerar o baseline depois de alguma mudança feita direto em produção:
 
@@ -103,9 +118,16 @@ e o questionário BFI-44). Para popular:
 ## Build de produção em container
 
 ```bash
-docker compose --env-file .env.docker --profile prod up --build
+docker compose --profile prod up --build
 ```
 
 Gera o mesmo artefato do GitHub Pages (`next build` com `output: "export"` → `out/`)
 e serve por nginx em http://localhost:8080. As `NEXT_PUBLIC_*` são inlinadas no
 bundle no momento do build, por isso entram como build args e não como env de runtime.
+
+Por padrão builda contra o Supabase local. Para apontar para outro ambiente,
+exporte as variáveis antes:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... docker compose --profile prod up --build
+```

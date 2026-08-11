@@ -39,12 +39,15 @@ Feito com `migration repair --status applied 00000000000000` mais
 `Remote database is up to date`, e o dump de produção antes e depois é idêntico
 byte a byte — as duas operações mexeram só na tabela de histórico. Não repetir.
 
-**Produção tinha 5 migrations que nunca estiveram no repo.**
-`20260810160001`, `20260810163000`, `20260811130000`, `20260811150000`,
-`20260811151000` — aplicadas direto no banco. O SQL delas não existe em lugar
-nenhum; só o efeito, capturado no baseline. Os números estão registrados em
-`supabase/migrations_legacy/README.md`. Sinal de que mudança por fora do repo
-acontece com frequência aqui.
+**Conferir `origin/main` antes de concluir que algo sumiu do repo.**
+Cinco migrations (`20260810160001` a `20260811151000`) pareciam existir só em
+produção — na verdade estavam em `origin/main`, e a árvore local é que estava
+16 commits atrás. `git fetch` primeiro; o working tree não é o repositório.
+
+**Migration cujo efeito já está no baseline vai para `migrations_legacy/`.**
+Depois de regerar o baseline, toda migration anterior ao dump precisa sair de
+`supabase/migrations/` — senão o `db reset` quebra com "policy already exists".
+Em `supabase/migrations/` ficam só as que ainda não foram para produção.
 
 **Boa parte do schema foi criada à mão no SQL Editor.**
 É a causa raiz de tudo acima: produção nunca reexecuta migration já registrada,

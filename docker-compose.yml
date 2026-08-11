@@ -8,10 +8,8 @@
 #
 # Este compose cuida só do app Next.js:
 #
-#   docker compose up web                                        # dev com hot reload -> http://localhost:3000
-#   docker compose --env-file .env.docker --profile prod up      # export estático    -> http://localhost:8080
-#
-# O `--env-file` só é necessário no perfil prod, onde as chaves viram build args.
+#   docker compose up web                # dev com hot reload -> http://localhost:3000
+#   docker compose --profile prod up     # export estático    -> http://localhost:8080
 
 services:
   web:
@@ -36,9 +34,11 @@ services:
       context: .
       target: prod
       args:
-        # NEXT_PUBLIC_* são inlinadas no bundle no momento do build.
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        # NEXT_PUBLIC_* são inlinadas no bundle no momento do build. Os defaults
+        # apontam para o Supabase local, então o perfil prod funciona sem passar
+        # --env-file; exporte as variáveis para buildar contra outro ambiente.
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0}
         NEXT_PUBLIC_GEMINI_API_KEY: ${NEXT_PUBLIC_GEMINI_API_KEY:-}
     ports:
       - "8080:80"

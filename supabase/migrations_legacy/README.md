@@ -33,23 +33,22 @@ ficaram invisíveis por lá e só aparecem em banco novo:
 Os três últimos itens já estão corrigidos nos arquivos deste diretório — as
 correções não foram descartadas, caso alguém queira retomar o histórico.
 
-## Cinco migrations que nunca estiveram no repositório
+## Cinco migrations que pareciam não estar no repositório
 
-Em 11/08/2026 o histórico de produção listava 91 versões, contra 86 arquivos
-aqui. Estas cinco foram aplicadas direto em produção e nunca versionadas:
+Em 11/08/2026 o histórico de produção listava 91 versões contra 86 arquivos
+aqui, e estas cinco pareciam existir só em produção:
 
 ```
-20260810160001
-20260810163000
-20260811130000
-20260811150000
-20260811151000
+20260810160001  20260810163000  20260811130000  20260811150000  20260811151000
 ```
 
-Não existe cópia do SQL delas em lugar nenhum — só o efeito, já capturado no
-baseline. Ficam registradas aqui porque o `migration repair --status reverted`
-remove essas linhas da tabela de histórico de produção, e depois disso não
-haveria mais nenhum vestígio de que existiram.
+**Estavam versionadas o tempo todo, em `origin/main`.** A conclusão errada veio
+de olhar só a árvore local, que estava 16 commits atrás do remoto. Os arquivos
+foram trazidos pelo rebase e estão neste diretório, com o SQL completo.
+
+Fica registrado porque o erro é fácil de repetir: antes de concluir que algo
+sumiu do repositório, `git fetch` e conferir contra `origin/main`, não contra
+o working tree.
 
 ## Histórico completo que produção tinha antes do baseline
 
