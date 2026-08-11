@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { DiscountPartner } from "@/types/benefits";
 import { createClient } from "@/utils/supabase/client";
-import { X, Check, Copy, ShieldCheck, Loader2, Gift, Phone, AlertCircle } from "lucide-react";
+import { X, Check, Copy, ShieldCheck, Loader2, Gift, Phone, AlertCircle, ExternalLink } from "lucide-react";
 
 interface RedeemModalProps {
   partner: DiscountPartner | null;
@@ -195,6 +195,24 @@ export const RedeemModal: React.FC<RedeemModalProps> = ({ partner, isOpen, onClo
                   </>
                 )}
               </button>
+            </div>
+          )}
+
+          {partner.instagram_url && (
+            <div className="relative rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-800/40 mt-4">
+              <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-pink-600 dark:text-pink-400 mb-2">
+                <ExternalLink className="h-3.5 w-3.5" />
+                Redes Sociais
+              </span>
+              <a
+                href={partner.instagram_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-pink-50 px-4 py-2.5 text-xs font-bold text-pink-700 transition-colors hover:bg-pink-100 dark:bg-pink-950/30 dark:text-pink-400 dark:hover:bg-pink-900/40"
+              >
+                <span>Visitar Instagram do Parceiro</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
             </div>
           )}
 

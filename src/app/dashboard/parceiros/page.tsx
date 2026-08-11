@@ -168,32 +168,6 @@ export default function ParceirosAdminPage() {
     setIsModalOpen(true);
   };
 
-  const handleFetchInstagramAvatar = () => {
-    if (!form.instagram_url) {
-      alert("Por favor, preencha o link do Instagram primeiro.");
-      return;
-    }
-    
-    // Extrai o username de URLs como https://instagram.com/usuario ou @usuario
-    let username = form.instagram_url.trim();
-    if (username.includes('instagram.com/')) {
-      const parts = username.split('instagram.com/');
-      if (parts[1]) {
-        username = parts[1].split('/')[0].split('?')[0];
-      }
-    }
-    if (username.startsWith('@')) {
-      username = username.substring(1);
-    }
-    
-    if (username) {
-      const avatarUrl = `https://unavatar.io/instagram/${username}`;
-      setForm({ ...form, logo_url: avatarUrl });
-    } else {
-      alert("Não foi possível identificar o nome de usuário do Instagram.");
-    }
-  };
-
   const handleSavePartner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.discount_rules) {
@@ -802,14 +776,6 @@ export default function ParceirosAdminPage() {
                 <div>
                   <label className="flex items-center justify-between text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-400 mb-1">
                     <span className="flex items-center gap-1"><Camera className="h-3 w-3" /> Instagram URL</span>
-                    <button 
-                      type="button"
-                      onClick={handleFetchInstagramAvatar}
-                      className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      Puxar Foto
-                    </button>
                   </label>
                   <input
                     type="url"
