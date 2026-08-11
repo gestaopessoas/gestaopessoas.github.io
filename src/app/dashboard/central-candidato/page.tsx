@@ -8,7 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import CandidateDetailsSheet from "./components/CandidateDetailsSheet";
 import AddCandidateModal from "./components/AddCandidateModal";
-import { deriveCandidateStatus, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import {
+  resolveCandidateStatus,
+  latestEducationDegree,
+  candidateBucket,
+  BUCKET_ORDER,
+  BUCKET_LABELS,
+} from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import {
   Dialog,
   DialogContent,
@@ -28,13 +34,24 @@ type CandidateRow = {
   ultimo_chamado: string;
   obra_atual: string | null;
   etapa_atual: string | null;
+  bucket: string;
+};
+
+type Bucket = "todos" | "livre" | "entrevista" | "documentacao" | "contratacao";
+
+// Cor por balde para leitura rápida na tabela.
+const BUCKET_STYLE: Record<string, string> = {
+  livre: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
+  entrevista: "bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300",
+  documentacao: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+  contratacao: "bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300",
 };
 
 export default function CentralCandidatoPage() {
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"processo">("processo");
+  const [activeTab, setActiveTab] = useState<Bucket>("todos");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -71,24 +88,9 @@ export default function CentralCandidatoPage() {
 
       if (data) {
         const rows: CandidateRow[] = data.map((c: any) => {
-          const derived = deriveCandidateStatus(c.candidate_interviews);
-          
-          let finalStatus = derived.status;
-          let finalChamado = derived.ultimo_chamado;
-          
-          // Se o candidato foi recém aprovado da tela de Entrevistas (ainda não tem entrevista na Central)
-          if ((!c.candidate_interviews || c.candidate_interviews.length === 0) && Array.isArray(c.search_tags) && c.search_tags.includes("Aprovado na Entrevista")) {
-              finalStatus = "Em Processo";
-              const worksitesStr = Array.isArray(c.available_worksites) && c.available_worksites.length > 0 
-                ? c.available_worksites.join(", ") 
-                : (c.city || "Obra não informada");
-              finalChamado = `Encaminhado para: ${worksitesStr}`;
-          }
-
-          // Se o candidato tem a tag de Banco de Talentos explícita da tela de Entrevistas
-          if (Array.isArray(c.search_tags) && c.search_tags.includes("Banco de Talentos")) {
-              finalStatus = "Banco de Talentos";
-          }
+          const derived = resolveCandidateStatus(c);
+          const finalStatus = derived.status;
+          const finalChamado = derived.ultimo_chamado;
 
           return {
             id: c.id,
@@ -100,6 +102,7 @@ export default function CentralCandidatoPage() {
             ultimo_chamado: finalChamado,
             obra_atual: derived.obra_atual || c.city || null,
             etapa_atual: derived.etapa_atual,
+            bucket: candidateBucket(finalStatus, derived.etapa_atual),
           };
         });
         setCandidates(rows);
@@ -116,10 +119,24 @@ export default function CentralCandidatoPage() {
     fetchCandidates();
   }, []);
 
+  // Contratados/reprovados/desistentes saem da Central; o resto é visível por balde.
+  const emAcompanhamento = useMemo(
+    () => candidates.filter((c) => c.bucket !== "encerrado"),
+    [candidates]
+  );
+
+  const contagens = useMemo(() => {
+    const acc: Record<string, number> = { todos: emAcompanhamento.length };
+    for (const bucket of BUCKET_ORDER) acc[bucket] = 0;
+    for (const c of emAcompanhamento) acc[c.bucket] = (acc[c.bucket] ?? 0) + 1;
+    return acc;
+  }, [emAcompanhamento]);
+
   const filteredCandidates = useMemo(() => {
-    let list = candidates.filter(c => c.status !== "Contratado" && c.status !== "Banco de Talentos");
-    
-    if (activeTab === "processo") list = list.filter(c => c.status === "Em Processo");
+    const list =
+      activeTab === "todos"
+        ? emAcompanhamento
+        : emAcompanhamento.filter((c) => c.bucket === activeTab);
 
     if (!search.trim()) return list;
     const s = search.toLowerCase();
@@ -127,9 +144,10 @@ export default function CentralCandidatoPage() {
       (c) =>
         c.full_name.toLowerCase().includes(s) ||
         c.email.toLowerCase().includes(s) ||
-        (c.phone && c.phone.toLowerCase().includes(s))
+        (c.phone && c.phone.toLowerCase().includes(s)) ||
+        (c.obra_atual && c.obra_atual.toLowerCase().includes(s))
     );
-  }, [candidates, search, activeTab]);
+  }, [emAcompanhamento, search, activeTab]);
 
   const handleDeleteCandidate = (candidateId: string, candidateName: string) => {
     setCandidateToDelete({ id: candidateId, name: candidateName });
@@ -181,19 +199,10 @@ export default function CentralCandidatoPage() {
             Central do Candidato
           </h1>
           <p className="text-muted-foreground mt-1">
-            Gestão de candidatos, histórico de entrevistas e contatos.
+            Quem está livre e quem já está em entrevista, documentação ou contratação — e em qual obra.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-          <div className="flex bg-muted/50 p-1 rounded-md">
-            <Button 
-              variant={activeTab === "processo" ? "secondary" : "ghost"} 
-              size="sm"
-              onClick={() => setActiveTab("processo")}
-            >
-              Em Processo
-            </Button>
-          </div>
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -203,11 +212,32 @@ export default function CentralCandidatoPage() {
               className="pl-8 bg-background border-border"
             />
           </div>
-          <Button variant="outline" size="icon" onClick={fetchCandidates}>
+          <Button variant="outline" size="icon" onClick={fetchCandidates} title="Recarregar">
             <RefreshCw className="h-4 w-4" />
           </Button>
-
+          <Button onClick={() => setIsAddCandidateModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo candidato
+          </Button>
         </div>
+      </div>
+
+      {/* Baldes de disponibilidade: é o que o administrativo de obra consulta. */}
+      <div className="flex w-full flex-wrap gap-2 rounded-md bg-muted p-1 sm:w-fit">
+        {(["todos", ...BUCKET_ORDER] as Bucket[]).map((bucket) => (
+          <Button
+            key={bucket}
+            variant={activeTab === bucket ? "default" : "ghost"}
+            size="sm"
+            className="flex-1 sm:flex-none"
+            onClick={() => setActiveTab(bucket)}
+          >
+            {bucket === "todos" ? "Todos" : BUCKET_LABELS[bucket]}
+            <span className="ml-2 rounded-full bg-background/60 px-1.5 text-xs tabular-nums">
+              {contagens[bucket] ?? 0}
+            </span>
+          </Button>
+        ))}
       </div>
 
       {error && (
@@ -266,12 +296,16 @@ export default function CentralCandidatoPage() {
                     <td className="px-6 py-4">{candidate.escolaridade}</td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
-                        <span className="inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                          {candidate.status}
+                        <span className={`inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${BUCKET_STYLE[candidate.bucket] ?? "bg-primary/10 text-primary"}`}>
+                          {BUCKET_LABELS[candidate.bucket] ?? candidate.status}
                         </span>
-                        {candidate.status === "Em Processo" && (
+                        {candidate.bucket === "livre" ? (
+                          <span className="text-xs text-muted-foreground">Disponível para alocação</span>
+                        ) : (
+                          // etapa_atual é nulo em quem foi encaminhado pela tela de Entrevistas
+                          // sem registro em candidate_interviews — não deixar o separador solto.
                           <span className="text-xs text-muted-foreground font-medium">
-                            {candidate.etapa_atual} - {candidate.obra_atual || "Sem obra"}
+                            {[candidate.etapa_atual, candidate.obra_atual || "Sem obra"].filter(Boolean).join(" · ")}
                           </span>
                         )}
                       </div>

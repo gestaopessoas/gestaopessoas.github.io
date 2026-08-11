@@ -5,6 +5,39 @@
 
 export const UNLOCK_STAGES = ["Reprovado", "Desistente", "Banco de Talentos", "Contratado"];
 
+// Agrupa as etapas granulares gravadas em candidate_interviews.stage nos baldes que o
+// administrativo de obra precisa enxergar. A etapa exata continua visível na linha —
+// o balde existe só para filtrar e contar.
+export const STAGE_BUCKETS = {
+  entrevista: ["Triagem", "Entrevista RH", "Entrevista Gestor", "Testagem Psicológica"],
+  documentacao: ["Coleta de Documentos & Exames"],
+  contratacao: ["Proposta"],
+};
+
+export const BUCKET_ORDER = ["livre", "entrevista", "documentacao", "contratacao"];
+
+export const BUCKET_LABELS = {
+  livre: "Livres",
+  entrevista: "Em entrevista",
+  documentacao: "Documentação",
+  contratacao: "Contratação",
+};
+
+/**
+ * Em qual balde o candidato cai. `encerrado` cobre Contratado/Reprovado/Desistente,
+ * que não aparecem na Central.
+ */
+export function candidateBucket(status, etapaAtual) {
+  if (status === "Banco de Talentos") return "livre";
+  if (status !== "Em Processo") return "encerrado";
+
+  for (const bucket of BUCKET_ORDER) {
+    if (STAGE_BUCKETS[bucket]?.includes(etapaAtual)) return bucket;
+  }
+  // Etapa ativa porém não mapeada (ex.: "Outros") ainda é um processo em andamento.
+  return "entrevista";
+}
+
 export function latestInterview(interviews = []) {
   if (!Array.isArray(interviews) || interviews.length === 0) return null;
   return [...interviews].sort(
@@ -33,6 +66,36 @@ export function deriveCandidateStatus(interviews = []) {
     return { status: "Banco de Talentos", etapa_atual: null, ...base };
   }
   return { status: "Em Processo", etapa_atual: latest.stage, ...base };
+}
+
+/**
+ * Status final do candidato, considerando também as tags gravadas pela tela de Entrevistas.
+ * Central do Candidato e Banco de Talentos precisam concordar sobre o mesmo candidato —
+ * por isso a regra mora aqui, e não duplicada em cada página.
+ */
+export function resolveCandidateStatus(candidate = {}) {
+  const entrevistas = candidate.candidate_interviews;
+  const derived = deriveCandidateStatus(entrevistas);
+  const tags = Array.isArray(candidate.search_tags) ? candidate.search_tags : [];
+  const semEntrevista = !Array.isArray(entrevistas) || entrevistas.length === 0;
+
+  let status = derived.status;
+  let ultimo_chamado = derived.ultimo_chamado;
+
+  // Encaminhado pela tela de Entrevistas, ainda sem registro de entrevista na Central.
+  if (semEntrevista && tags.includes("Aprovado na Entrevista")) {
+    status = "Em Processo";
+    const obras =
+      Array.isArray(candidate.available_worksites) && candidate.available_worksites.length > 0
+        ? candidate.available_worksites.join(", ")
+        : candidate.city || "Obra não informada";
+    ultimo_chamado = `Encaminhado para: ${obras}`;
+  }
+
+  // Marcação explícita de Banco de Talentos vence a derivação.
+  if (tags.includes("Banco de Talentos")) status = "Banco de Talentos";
+
+  return { ...derived, status, ultimo_chamado };
 }
 
 export function latestEducationDegree(educations = []) {

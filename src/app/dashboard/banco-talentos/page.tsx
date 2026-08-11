@@ -3,10 +3,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { createClient } from "@/utils/supabase/client";
-import { Search, Loader2, Database, RefreshCw, Trash2, AlertCircle, Edit2 } from "lucide-react";
+import { Search, Loader2, Database, RefreshCw, Trash2, AlertCircle, Edit2, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { deriveCandidateStatus, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import { resolveCandidateStatus, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ type CandidateRow = {
   role_interest: string;
   status: string;
   obras: string;
+  tags: string[];
   raw_data: any;
 };
 
@@ -41,6 +43,7 @@ export default function BancoTalentosPage() {
   const [error, setError] = useState("");
   
   const [worksites, setWorksites] = useState<string[]>([]);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   
   const { can } = usePermissions();
   const canDelete = can("central_candidato", "delete");
@@ -48,11 +51,15 @@ export default function BancoTalentosPage() {
   const supabase = createClient();
 
   useEffect(() => {
+    // As obras vêm de `workplaces`. A versão anterior lia cost_centers.workplace_name,
+    // coluna que não existe — a query falhava calada e a lista ficava sempre vazia.
     const fetchWorksites = async () => {
-      const { data } = await supabase.from('cost_centers').select('workplace_name').eq('is_active', true);
-      if (data) {
-        setWorksites(Array.from(new Set(data.map(d => d.workplace_name).filter(Boolean))));
+      const { data, error } = await supabase.from('workplaces').select('name').order('name');
+      if (error) {
+        console.error('Erro ao carregar obras:', error);
+        return;
       }
+      setWorksites(Array.from(new Set((data ?? []).map(d => d.name).filter(Boolean))));
     };
     fetchWorksites();
   }, [supabase]);
@@ -72,6 +79,7 @@ export default function BancoTalentosPage() {
           city,
           created_at,
           search_tags,
+          behavioral_tags,
           available_worksites,
           candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, created_at),
           candidate_educations(candidate_id, degree, start_date, end_date)
@@ -82,12 +90,7 @@ export default function BancoTalentosPage() {
 
       if (data) {
         const rows: CandidateRow[] = data.map((c: any) => {
-          const derived = deriveCandidateStatus(c.candidate_interviews);
-          let finalStatus = derived.status;
-          
-          if (Array.isArray(c.search_tags) && c.search_tags.includes("Banco de Talentos")) {
-              finalStatus = "Banco de Talentos";
-          }
+          const finalStatus = resolveCandidateStatus(c).status;
 
           const worksitesStr = Array.isArray(c.available_worksites) && c.available_worksites.length > 0 
                 ? c.available_worksites.join(", ") 
@@ -102,6 +105,10 @@ export default function BancoTalentosPage() {
             role_interest: c.role_interest || "Não informado",
             status: finalStatus,
             obras: worksitesStr,
+            // "Banco de Talentos" é marcador de status, não competência — não polui a busca.
+            tags: [...(c.behavioral_tags ?? []), ...(c.search_tags ?? [])].filter(
+              (t: string) => t !== "Banco de Talentos"
+            ),
             raw_data: c
           };
         }).filter(c => c.status === "Banco de Talentos");
@@ -128,7 +135,9 @@ export default function BancoTalentosPage() {
         c.full_name.toLowerCase().includes(s) ||
         c.email.toLowerCase().includes(s) ||
         (c.phone && c.phone.toLowerCase().includes(s)) ||
-        c.role_interest.toLowerCase().includes(s)
+        c.role_interest.toLowerCase().includes(s) ||
+        c.obras.toLowerCase().includes(s) ||
+        c.tags.some((t) => t.toLowerCase().includes(s))
     );
   }, [candidates, search]);
 
@@ -205,7 +214,7 @@ export default function BancoTalentosPage() {
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar candidatos..."
+              placeholder="Buscar por nome, cargo, obra ou tag..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 bg-background border-border"
@@ -257,6 +266,16 @@ export default function BancoTalentosPage() {
                       <div className="font-semibold text-foreground truncate max-w-[200px]">
                         {candidate.full_name}
                       </div>
+                      {candidate.tags.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1 max-w-[220px]">
+                          {candidate.tags.slice(0, 4).map((tag) => (
+                            <span key={tag} className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{tag}</span>
+                          ))}
+                          {candidate.tags.length > 4 && (
+                            <span className="text-[10px] text-muted-foreground">+{candidate.tags.length - 4}</span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 truncate max-w-[150px]">
                       {candidate.role_interest}
@@ -275,7 +294,10 @@ export default function BancoTalentosPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(candidate)} className="h-8 w-8 text-muted-foreground hover:text-primary">
+                          <Button variant="ghost" size="icon" onClick={() => setSelectedCandidateId(candidate.id)} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Ver dossiê / currículo">
+                              <FileText className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(candidate)} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Editar">
                               <Edit2 className="h-4 w-4" />
                           </Button>
                           {canDelete && (
@@ -297,6 +319,14 @@ export default function BancoTalentosPage() {
           </table>
         </div>
       </div>
+
+      {selectedCandidateId && (
+        <CandidateProfileModal
+          candidateId={selectedCandidateId}
+          initialTab="curriculum"
+          onClose={() => setSelectedCandidateId(null)}
+        />
+      )}
 
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent>

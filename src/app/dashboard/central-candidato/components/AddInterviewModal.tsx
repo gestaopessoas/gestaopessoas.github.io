@@ -41,6 +41,9 @@ type Workplace = {
 type Interviewer = {
   id: string;
   name: string;
+  role: string | null;
+  /** "obra" = liderança lotada na obra escolhida; "rh" = Gestão de Pessoas/RH, entrevista para qualquer obra. */
+  origem: "obra" | "rh";
 };
 
 export default function AddInterviewModal({
@@ -91,6 +94,16 @@ export default function AddInterviewModal({
 
   const supabase = createClient();
 
+  // Gestão de Pessoas / RH entrevista para qualquer obra — não depende de lotação.
+  const hrRoles = [
+    "gestão de pessoas",
+    "gestao de pessoas",
+    "recursos humanos",
+    "de rh",
+    "psicólog",
+    "psicolog",
+  ];
+
   // Roles that can conduct interviews in obras
   const interviewRoles = [
     "coordenador de obras",
@@ -135,29 +148,58 @@ export default function AddInterviewModal({
       setInterviewerId("");
       return;
     }
+    // Guarda contra corrida: trocar de obra rápido pode fazer a resposta antiga chegar por último.
+    let atual = true;
+
     async function loadInterviewers() {
       setLoadingInterviewers(true);
       setInterviewersError(false);
       try {
         // Match flexible: tolera variação de grafia/acento no texto livre de employees.role
-        const roleFilters = interviewRoles.map((r) => `role.ilike.%${r}%`).join(",");
-        const { data, error } = await supabase
-          .from("employees")
-          .select("id, name")
-          .eq("status", "Ativo")
-          .eq("workplace_id", workplaceId)
-          .or(roleFilters)
-          .order("name");
-        if (error) throw error;
-        setInterviewers((data ?? []) as Interviewer[]);
+        const leadershipFilters = interviewRoles.map((r) => `role.ilike.%${r}%`).join(",");
+        const hrFilters = hrRoles.map((r) => `role.ilike.%${r}%`).join(",");
+
+        // Duas consultas: lideranças são restritas à obra, RH não é.
+        const [obraRes, hrRes] = await Promise.all([
+          supabase
+            .from("employees")
+            .select("id, name, role")
+            .eq("status", "Ativo")
+            .eq("workplace_id", workplaceId)
+            .or(leadershipFilters),
+          supabase
+            .from("employees")
+            .select("id, name, role")
+            .eq("status", "Ativo")
+            .or(hrFilters),
+        ]);
+        if (obraRes.error) throw obraRes.error;
+        if (hrRes.error) throw hrRes.error;
+        if (!atual) return;
+
+        // RH depois da obra: se a pessoa é das duas, prevalece "obra" (está lotada ali).
+        const porId = new Map<string, Interviewer>();
+        for (const e of hrRes.data ?? []) porId.set(e.id, { ...e, origem: "rh" });
+        for (const e of obraRes.data ?? []) porId.set(e.id, { ...e, origem: "obra" });
+
+        setInterviewers(
+          [...porId.values()].sort(
+            (a, b) =>
+              a.origem.localeCompare(b.origem) || a.name.localeCompare(b.name, "pt-BR")
+          )
+        );
       } catch (err) {
         console.error("Error loading interviewers:", err);
-        setInterviewersError(true);
+        if (atual) setInterviewersError(true);
       } finally {
-        setLoadingInterviewers(false);
+        if (atual) setLoadingInterviewers(false);
       }
     }
     loadInterviewers();
+
+    return () => {
+      atual = false;
+    };
   }, [workplaceId]);
 
   // Reset form when modal opens/closes or lock changes
@@ -344,6 +386,9 @@ export default function AddInterviewModal({
                     {interviewers.map((int) => (
                       <SelectItem key={int.id} value={int.id}>
                         {int.name}
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          {int.role || "sem cargo"}{int.origem === "rh" ? " · Gestão de Pessoas" : ""}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -358,7 +403,13 @@ export default function AddInterviewModal({
                 )}
                 {!interviewersError && workplaceId && interviewers.length === 0 && !loadingInterviewers && (
                   <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Nenhum colaborador com cargo de liderança (coordenador, administrativo de obras, analista técnico, mestre de obras) encontrado nesta obra.
+                    Nenhuma liderança lotada nesta obra e ninguém da Gestão de Pessoas ativo no cadastro.
+                    Confira os cargos em Colaboradores.
+                  </p>
+                )}
+                {interviewers.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Lideranças lotadas nesta obra + toda a Gestão de Pessoas / RH.
                   </p>
                 )}
               </div>

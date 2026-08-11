@@ -26,4 +26,24 @@ export interface CandidateStatus {
 
 export function deriveCandidateStatus(interviews?: InterviewLike[] | null): CandidateStatus;
 
+export interface CandidateLike {
+  candidate_interviews?: InterviewLike[] | null;
+  search_tags?: string[] | null;
+  available_worksites?: string[] | null;
+  city?: string | null;
+}
+
+export function resolveCandidateStatus(candidate?: CandidateLike | null): CandidateStatus;
+
 export function latestEducationDegree(educations?: EducationLike[] | null): string | null;
+
+export type CandidateBucket = "livre" | "entrevista" | "documentacao" | "contratacao" | "encerrado";
+
+export const STAGE_BUCKETS: Record<string, string[]>;
+export const BUCKET_ORDER: readonly ["livre", "entrevista", "documentacao", "contratacao"];
+export const BUCKET_LABELS: Record<string, string>;
+
+export function candidateBucket(
+  status: string | null | undefined,
+  etapaAtual: string | null | undefined
+): CandidateBucket;

@@ -12,7 +12,7 @@ import { createClient } from "@/utils/supabase/client"
 import { usePermissions } from "@/hooks/usePermissions"
 import { GlobalHistoryTab } from "@/components/configuracoes/GlobalHistoryTab"
 
-const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "talentos", "recrutamento", "armarios", "uniformes", "ponto", "rgs", "ilhas", "admissao", "onboarding", "centros_de_custo", "departamentos", "cargos", "empresas", "obras", "beneficios", "treinamentos", "ferias", "holerites", "avaliacoes", "clima", "metas", "pdi", "competencias", "turnover", "analytics", "salarios", "configuracoes", "financeiro"] as const
+const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "central_candidato", "recrutamento", "armarios", "uniformes", "ponto", "rgs", "ilhas", "admissao", "onboarding", "centros_de_custo", "departamentos", "cargos", "empresas", "obras", "beneficios", "treinamentos", "ferias", "holerites", "avaliacoes", "clima", "metas", "pdi", "competencias", "turnover", "analytics", "salarios", "configuracoes", "financeiro"] as const
 const ACTIONS = ["view", "create", "edit", "delete"] as const
 
 type UserPerms = Record<string, Record<string, boolean>>

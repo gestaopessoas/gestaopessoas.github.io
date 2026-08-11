@@ -6,7 +6,59 @@ import {
   isLockedByInterview,
   deriveCandidateStatus,
   latestEducationDegree,
+  candidateBucket,
+  BUCKET_ORDER,
+  STAGE_BUCKETS,
+  resolveCandidateStatus,
 } from "./candidateLogic.mjs";
+
+test("resolveCandidateStatus dá o mesmo veredito para Central e Banco de Talentos", () => {
+  // Encaminhado pela tela de Entrevistas, ainda sem registro de entrevista.
+  const encaminhado = {
+    candidate_interviews: [],
+    search_tags: ["Aprovado na Entrevista"],
+    available_worksites: ["SEDE"],
+  };
+  assert.equal(resolveCandidateStatus(encaminhado).status, "Em Processo");
+  assert.equal(resolveCandidateStatus(encaminhado).ultimo_chamado, "Encaminhado para: SEDE");
+
+  // Marcação explícita vence a derivação.
+  assert.equal(
+    resolveCandidateStatus({ candidate_interviews: [], search_tags: ["Banco de Talentos"] }).status,
+    "Banco de Talentos"
+  );
+
+  // Sem tags, cai na derivação normal.
+  assert.equal(resolveCandidateStatus({ candidate_interviews: [] }).status, "Banco de Talentos");
+  assert.equal(resolveCandidateStatus({}).status, "Banco de Talentos");
+});
+
+test("candidateBucket separa os baldes que o adm de obra precisa ver", () => {
+  assert.equal(candidateBucket("Banco de Talentos", null), "livre");
+  assert.equal(candidateBucket("Em Processo", "Triagem"), "entrevista");
+  assert.equal(candidateBucket("Em Processo", "Entrevista Gestor"), "entrevista");
+  assert.equal(candidateBucket("Em Processo", "Testagem Psicológica"), "entrevista");
+  assert.equal(candidateBucket("Em Processo", "Coleta de Documentos & Exames"), "documentacao");
+  assert.equal(candidateBucket("Em Processo", "Proposta"), "contratacao");
+});
+
+test("candidateBucket trata terminais e etapa desconhecida", () => {
+  assert.equal(candidateBucket("Contratado", null), "encerrado");
+  // Processo ativo com etapa fora do mapa não pode sumir da tela.
+  assert.equal(candidateBucket("Em Processo", "Outros"), "entrevista");
+  assert.equal(candidateBucket("Em Processo", null), "entrevista");
+});
+
+test("todo balde declarado em BUCKET_ORDER é alcançável", () => {
+  for (const bucket of BUCKET_ORDER) {
+    if (bucket === "livre") continue; // derivado do status, não de uma etapa
+    const etapas = STAGE_BUCKETS[bucket];
+    assert.ok(etapas?.length, `${bucket} não tem etapas mapeadas`);
+    for (const etapa of etapas) {
+      assert.equal(candidateBucket("Em Processo", etapa), bucket);
+    }
+  }
+});
 
 const int = (stage, created_at, extra = {}) => ({ stage, created_at, ...extra });
 

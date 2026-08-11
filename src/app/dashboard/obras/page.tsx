@@ -56,7 +56,7 @@ export default function ObrasPage() {
       const [companyResult, workplaceResult, coordResult, dirResult] = await Promise.all([
         supabase.from("companies").select("id, name, trading_name").order("name"),
         supabase.from("workplaces").select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").order("name"),
-        supabase.from("employees").select("id, name").eq("status", "Ativo").ilike("role", "coordenador").order("name"),
+        supabase.from("employees").select("id, name").eq("status", "Ativo").ilike("role", "%coordenador%").order("name"),
         supabase.from("employees").select("id, name").eq("status", "Ativo").ilike("role", "%diretor%").order("name"),
       ]);
 

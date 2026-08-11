@@ -22,7 +22,6 @@ const sidebarGroups = [
     items: [
       { name: "Vagas", href: "/dashboard/vagas", icon: Briefcase, module: "vagas" },
       { name: "Entrevistas", href: "/dashboard/entrevistas", icon: Users, module: "entrevistas" },
-      { name: "Talentos", href: "/dashboard/talentos", icon: Users, module: "talentos" },
       { name: "Central do Candidato", href: "/dashboard/central-candidato", icon: Contact, module: "central_candidato" },
       { name: "Banco de Talentos", href: "/dashboard/banco-talentos", icon: Database, module: "central_candidato" },
     ]
