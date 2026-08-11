@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import CandidateDetailsSheet from "./components/CandidateDetailsSheet";
 import AddCandidateModal from "./components/AddCandidateModal";
+import AdvanceStageModal from "./components/AdvanceStageModal";
+import RecusaModal from "./components/RecusaModal";
+import { useRouter } from "next/navigation";
 import {
   resolveCandidateStatus,
   latestEducationDegree,
@@ -38,12 +41,15 @@ type CandidateRow = {
   bucket: string;
 };
 
-type Bucket = "todos" | "livre" | "entrevista" | "documentacao" | "contratacao";
+type Bucket = "todos" | "livre" | "entrevista" | "encaminhado" | "obras" | "proposta" | "documentacao" | "contratacao";
 
 // Cor por balde para leitura rápida na tabela.
 const BUCKET_STYLE: Record<string, string> = {
   livre: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
   entrevista: "bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300",
+  encaminhado: "bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300",
+  obras: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300",
+  proposta: "bg-teal-100 text-teal-800 dark:bg-teal-950/50 dark:text-teal-300",
   documentacao: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
   contratacao: "bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300",
 };
@@ -59,8 +65,11 @@ export default function CentralCandidatoPage() {
   const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+  const [advanceModalData, setAdvanceModalData] = useState<{ id: string; name: string; bucket: string; stage: string | null; workplace: string | null } | null>(null);
+  const [recusaModalData, setRecusaModalData] = useState<{ id: string; name: string; workplace: string | null } | null>(null);
   const { can } = usePermissions();
   const canDelete = can("central_candidato", "delete");
+  const router = useRouter();
 
   const supabase = createClient();
 
@@ -261,7 +270,7 @@ export default function CentralCandidatoPage() {
                 <th className="px-6 py-4 font-medium">Escolaridade</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Último Chamado</th>
-                {canDelete && <th className="px-6 py-4 font-medium text-right">Ações</th>}
+                <th className="px-6 py-4 font-medium text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
@@ -314,22 +323,71 @@ export default function CentralCandidatoPage() {
                     <td className="px-6 py-4 text-muted-foreground text-xs">
                       {candidate.ultimo_chamado}
                     </td>
-                    {canDelete && (
-                      <td className="px-6 py-4 text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteCandidate(candidate.id, candidate.full_name);
-                          }}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Excluir candidato"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    )}
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2 items-center">
+                        {candidate.bucket !== "livre" && candidate.bucket !== "contratacao" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAdvanceModalData({
+                                id: candidate.id,
+                                name: candidate.full_name,
+                                bucket: candidate.bucket,
+                                stage: candidate.etapa_atual,
+                                workplace: candidate.obra_atual,
+                              });
+                            }}
+                          >
+                            Avançar
+                          </Button>
+                        )}
+                        {candidate.bucket === "obras" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:bg-destructive/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRecusaModalData({
+                                id: candidate.id,
+                                name: candidate.full_name,
+                                workplace: candidate.obra_atual,
+                              });
+                            }}
+                          >
+                            Recusar
+                          </Button>
+                        )}
+                        {candidate.bucket === "documentacao" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/dashboard/admissao`);
+                            }}
+                          >
+                            Ver Checklist
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCandidate(candidate.id, candidate.full_name);
+                            }}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Excluir candidato"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -385,6 +443,36 @@ export default function CentralCandidatoPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {advanceModalData && (
+        <AdvanceStageModal
+          isOpen={!!advanceModalData}
+          onClose={() => setAdvanceModalData(null)}
+          onSuccess={() => {
+            setAdvanceModalData(null);
+            fetchCandidates();
+          }}
+          candidateId={advanceModalData.id}
+          candidateName={advanceModalData.name}
+          currentBucket={advanceModalData.bucket}
+          currentStage={advanceModalData.stage}
+          workplaceName={advanceModalData.workplace}
+        />
+      )}
+
+      {recusaModalData && (
+        <RecusaModal
+          isOpen={!!recusaModalData}
+          onClose={() => setRecusaModalData(null)}
+          onSuccess={() => {
+            setRecusaModalData(null);
+            fetchCandidates();
+          }}
+          candidateId={recusaModalData.id}
+          candidateName={recusaModalData.name}
+          workplaceName={recusaModalData.workplace}
+        />
+      )}
     </div>
   );
 }

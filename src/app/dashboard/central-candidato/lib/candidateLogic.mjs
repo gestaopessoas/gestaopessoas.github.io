@@ -10,15 +10,21 @@ export const UNLOCK_STAGES = ["Reprovado", "Desistente", "Banco de Talentos", "C
 // o balde existe só para filtrar e contar.
 export const STAGE_BUCKETS = {
   entrevista: ["Triagem", "Entrevista RH", "Entrevista Gestor", "Testagem Psicológica"],
+  encaminhado: ["Encaminhado - Pool Geral", "Encaminhado - Obra Específica"],
+  obras: ["Aguardando Obra", "Em Avaliação na Obra"],
+  proposta: ["Proposta Pendente", "Proposta em Aprovação RH", "Proposta Aprovada", "Proposta"],
   documentacao: ["Coleta de Documentos & Exames"],
-  contratacao: ["Proposta"],
+  contratacao: ["Contratado"],
 };
 
-export const BUCKET_ORDER = ["livre", "entrevista", "documentacao", "contratacao"];
+export const BUCKET_ORDER = ["livre", "entrevista", "encaminhado", "obras", "proposta", "documentacao", "contratacao"];
 
 export const BUCKET_LABELS = {
   livre: "Livres",
   entrevista: "Em entrevista",
+  encaminhado: "Encaminhados",
+  obras: "Em Obra",
+  proposta: "Proposta",
   documentacao: "Documentação",
   contratacao: "Contratação",
 };

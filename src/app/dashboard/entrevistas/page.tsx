@@ -80,6 +80,21 @@ type Assessment = {
   address?: string;
   marital_status?: string;
   salary_expectation?: string;
+  birthplace?: string;
+  secondary_phone?: string;
+  secondary_email?: string;
+  emergency_contact_phone?: string;
+  emergency_contact_name?: string;
+  has_cnh?: boolean;
+  cnh_categories?: string[];
+  has_dependents?: boolean;
+  dependents_count?: number;
+  dependents_notes?: string;
+  uniform_size?: string;
+  boot_size?: string;
+  gender_identity?: string;
+  sexual_orientation?: string;
+  race_declaration?: string;
   additional_info?: string;
   personal_info?: string;
   diversity_info?: string;
@@ -1204,9 +1219,27 @@ Resultado Final: ${form.result || "N/C"}
   "cnh_category": "Categoria da CNH (A, B, AB, etc)",
   "birth_date": "Data de nascimento (DD/MM/YYYY)",
   "cpf": "CPF",
-  "gender": "Gênero",
-  "address": "Endereço completo",
-  "marital_status": "Estado Civil",
+  "marital_status": "Estado Civil (Solteiro, Casado, Divorciado, Viúvo, União Estável)",
+  "birthplace": "Naturalidade (Cidade/Estado de origem)",
+  "address": "Endereço atual completo",
+  "secondary_phone": "Telefone secundário",
+  "secondary_email": "E-mail secundário",
+  "emergency_contact_phone": "Telefone de recado",
+  "emergency_contact_name": "Nome do contato de recado",
+  "salary_expectation": "Pretensão Salarial",
+  "has_cnh": false,
+  "cnh_categories": ["B", "D"],
+  "has_dependents": false,
+  "dependents_count": 0,
+  "dependents_notes": "Nomes/idades dos dependentes (filhos, enteados)",
+  "uniform_size": "Tamanho de uniforme (PP, P, M, G, GG, XG)",
+  "boot_size": "Número da botina",
+  "gender_identity": "Autodeclaração de gênero (Homem cis, Mulher cis, Homem trans, Mulher trans, Não-binário, Prefiro não informar)",
+  "sexual_orientation": "Orientação sexual (Heterossexual, Homossexual, Bissexual, Pansexual, Prefiro não informar)",
+  "race_declaration": "Autodeclaração de raça/cor (Branca, Preta, Parda, Amarela, Indígena, Prefiro não informar)",
+  "additional_info": "Informações adicionais do candidato",
+  "personal_info": "Informações pessoais do candidato",
+  "diversity_info": "Informações de diversidade",
   "salary_expectation": "Pretensão Salarial",
   "additional_info": "Informações adicionais do candidato",
   "personal_info": "Informações pessoais do candidato",
@@ -1267,6 +1300,22 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
         gender: parsed.gender || prev.gender,
         address: parsed.address || prev.address,
         marital_status: parsed.marital_status || prev.marital_status,
+        birthplace: parsed.birthplace || prev.birthplace,
+        secondary_phone: parsed.secondary_phone || prev.secondary_phone,
+        secondary_email: parsed.secondary_email || prev.secondary_email,
+        emergency_contact_phone: parsed.emergency_contact_phone || prev.emergency_contact_phone,
+        emergency_contact_name: parsed.emergency_contact_name || prev.emergency_contact_name,
+        salary_expectation: parsed.salary_expectation || prev.salary_expectation,
+        has_cnh: typeof parsed.has_cnh === "boolean" ? parsed.has_cnh : prev.has_cnh,
+        cnh_categories: Array.isArray(parsed.cnh_categories) ? parsed.cnh_categories : prev.cnh_categories,
+        has_dependents: typeof parsed.has_dependents === "boolean" ? parsed.has_dependents : prev.has_dependents,
+        dependents_count: typeof parsed.dependents_count === "number" ? parsed.dependents_count : prev.dependents_count,
+        dependents_notes: parsed.dependents_notes || prev.dependents_notes,
+        uniform_size: parsed.uniform_size || prev.uniform_size,
+        boot_size: parsed.boot_size || prev.boot_size,
+        gender_identity: parsed.gender_identity || prev.gender_identity,
+        sexual_orientation: parsed.sexual_orientation || prev.sexual_orientation,
+        race_declaration: parsed.race_declaration || prev.race_declaration,
         salary_expectation: parsed.salary_expectation || prev.salary_expectation,
         academic_list: Array.isArray(parsed.academic_list) ? parsed.academic_list.map((item: any, idx: number) => ({
           id: String(Date.now() + idx),

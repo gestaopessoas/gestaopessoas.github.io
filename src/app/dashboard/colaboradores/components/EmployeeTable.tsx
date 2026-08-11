@@ -65,16 +65,35 @@ export function EmployeeTable({ employees, loading, emptyMessage, renderRow }: {
   );
 }
 
-export function Pagination({ page, total, pageSize, onPageChange }: {
+export function Pagination({ page, total, pageSize, onPageChange, onPageSizeChange }: {
   page: number;
   total: number;
   pageSize: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
 }) {
   const lastPage = Math.max(1, Math.ceil(total / pageSize));
   return (
-    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-      <span>Página {page + 1} de {lastPage}</span>
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">
+      <div className="flex items-center gap-4">
+        <span>Página {page + 1} de {lastPage}</span>
+        {onPageSizeChange && (
+          <div className="flex items-center gap-2">
+            <label htmlFor="pageSize">Mostrar:</label>
+            <select
+              id="pageSize"
+              className="h-8 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm"
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+        )}
+      </div>
       <div className="flex gap-2">
         <Button variant="outline" size="sm" disabled={page === 0} onClick={() => onPageChange(page - 1)}>Anterior</Button>
         <Button variant="outline" size="sm" disabled={(page + 1) * pageSize >= total} onClick={() => onPageChange(page + 1)}>Próxima</Button>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
-import { X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, Sparkles, GraduationCap, Building2, Award, CheckCircle2, User } from "lucide-react";
+import { X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, Info, Heart, DollarSign, Users } from "lucide-react";
 
 type BigFiveResult = {
   id: string;
@@ -236,7 +236,7 @@ export function CandidateProfileModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label="Perfil do Candidato"
@@ -373,6 +373,168 @@ export function CandidateProfileModal({
                 {/* Conteúdo da Aba: Currículo & Entrevistas */}
                 {activeTab === "curriculum" && (
                   <div className="space-y-8 animate-in fade-in duration-200">
+                    {/* Dados Pessoais & Contato */}
+                    <div className="space-y-4">
+                      <h3 className="text-base font-bold flex items-center gap-2 text-foreground border-b pb-2">
+                        <Contact className="h-5 w-5 text-primary" />
+                        Dados Pessoais & Contato
+                      </h3>
+                      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 text-sm">
+                        {person.cpf && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
+                            <span className="text-xs text-muted-foreground block">CPF</span>
+                            <span className="font-semibold">{person.cpf}</span>
+                          </div>
+                        )}
+                        {person.birth_date && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
+                            <span className="text-xs text-muted-foreground block">Data de Nascimento</span>
+                            <span className="font-semibold">{new Date(person.birth_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                          </div>
+                        )}
+                        {person.birthplace && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
+                            <span className="text-xs text-muted-foreground block">Naturalidade</span>
+                            <span className="font-semibold">{person.birthplace}</span>
+                          </div>
+                        )}
+                        {person.marital_status && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
+                            <span className="text-xs text-muted-foreground block">Estado Civil</span>
+                            <span className="font-semibold">{person.marital_status}</span>
+                          </div>
+                        )}
+                        {person.address && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs md:col-span-2">
+                            <span className="text-xs text-muted-foreground block">Endereço</span>
+                            <span className="font-semibold">{person.address}</span>
+                          </div>
+                        )}
+                        {person.secondary_phone && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
+                            <span className="text-xs text-muted-foreground block">Telefone Secundário</span>
+                            <span className="font-semibold">{person.secondary_phone}</span>
+                          </div>
+                        )}
+                        {person.secondary_email && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
+                            <span className="text-xs text-muted-foreground block">E-mail Secundário</span>
+                            <span className="font-semibold break-all">{person.secondary_email}</span>
+                          </div>
+                        )}
+                        {(person.emergency_contact_name || person.emergency_contact_phone) && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs md:col-span-2">
+                            <span className="text-xs text-muted-foreground block">Contato de Emergência</span>
+                            <span className="font-semibold">
+                              {person.emergency_contact_name} {person.emergency_contact_phone && `- ${person.emergency_contact_phone}`}
+                            </span>
+                          </div>
+                        )}
+                        {person.has_cnh && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
+                            <span className="text-xs text-muted-foreground block">CNH</span>
+                            <span className="font-semibold">Sim {person.cnh_categories && `(Categoria ${person.cnh_categories})`}</span>
+                          </div>
+                        )}
+                      </div>
+                      {person.personal_info && (
+                        <div className="mt-2 text-sm p-3 rounded-xl border bg-muted/20">
+                          <span className="text-xs font-bold block mb-1">Mais Detalhes Pessoais:</span>
+                          <p className="text-muted-foreground whitespace-pre-line">{person.personal_info}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Informações Adicionais */}
+                    <div className="space-y-4">
+                      <h3 className="text-base font-bold flex items-center gap-2 text-foreground border-b pb-2">
+                        <Info className="h-5 w-5 text-primary" />
+                        Informações Adicionais
+                      </h3>
+                      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 text-sm">
+                        {person.salary_expectation && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-primary shrink-0" />
+                            <div>
+                              <span className="text-xs text-muted-foreground block">Pretensão Salarial</span>
+                              <span className="font-semibold">{person.salary_expectation}</span>
+                            </div>
+                          </div>
+                        )}
+                        {person.has_dependents && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-primary shrink-0" />
+                              <div>
+                                <span className="text-xs text-muted-foreground block">Dependentes</span>
+                                <span className="font-semibold">Sim ({person.dependents_count || 'Não informado'})</span>
+                              </div>
+                            </div>
+                            {person.dependents_notes && (
+                              <p className="text-[11px] text-muted-foreground mt-1 bg-muted/30 p-1.5 rounded">{person.dependents_notes}</p>
+                            )}
+                          </div>
+                        )}
+                        {(person.uniform_size || person.boot_size) && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
+                            <span className="text-xs text-muted-foreground block">Tamanhos (EPIs)</span>
+                            <span className="font-semibold">
+                              {person.uniform_size && `Uniforme: ${person.uniform_size}`}
+                              {person.uniform_size && person.boot_size && ' / '}
+                              {person.boot_size && `Botina: ${person.boot_size}`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {person.additional_info && (
+                        <div className="mt-2 text-sm p-3 rounded-xl border bg-muted/20">
+                          <span className="text-xs font-bold block mb-1">Outras Informações Adicionais:</span>
+                          <p className="text-muted-foreground whitespace-pre-line">{person.additional_info}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Diversidade */}
+                    {(person.gender_identity || person.sexual_orientation || person.race_declaration || person.diversity_info) && (
+                      <details className="group space-y-4 rounded-xl border bg-card shadow-2xs p-4 [&_summary::-webkit-details-marker]:hidden">
+                        <summary className="flex cursor-pointer items-center justify-between font-bold text-foreground">
+                          <div className="flex items-center gap-2">
+                            <Heart className="h-5 w-5 text-primary" />
+                            Diversidade
+                          </div>
+                          <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-1 rounded-full group-open:hidden">
+                            Mostrar dados sensíveis
+                          </span>
+                        </summary>
+                        <div className="pt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 text-sm border-t mt-3">
+                          {person.gender_identity && (
+                            <div className="p-3 rounded-lg border bg-muted/20">
+                              <span className="text-xs text-muted-foreground block">Autodeclaração de Gênero</span>
+                              <span className="font-semibold">{person.gender_identity}</span>
+                            </div>
+                          )}
+                          {person.sexual_orientation && (
+                            <div className="p-3 rounded-lg border bg-muted/20">
+                              <span className="text-xs text-muted-foreground block">Orientação Sexual</span>
+                              <span className="font-semibold">{person.sexual_orientation}</span>
+                            </div>
+                          )}
+                          {person.race_declaration && (
+                            <div className="p-3 rounded-lg border bg-muted/20">
+                              <span className="text-xs text-muted-foreground block">Autodeclaração de Raça</span>
+                              <span className="font-semibold">{person.race_declaration}</span>
+                            </div>
+                          )}
+                        </div>
+                        {person.diversity_info && (
+                          <div className="mt-2 text-sm p-3 rounded-lg border bg-muted/20">
+                            <span className="text-xs font-bold block mb-1">Informações Adicionais (Diversidade):</span>
+                            <p className="text-muted-foreground whitespace-pre-line">{person.diversity_info}</p>
+                          </div>
+                        )}
+                      </details>
+                    )}
+
                     {/* Formação Acadêmica */}
                     <div className="space-y-4">
                       <h3 className="text-base font-bold flex items-center gap-2 text-foreground border-b pb-2">

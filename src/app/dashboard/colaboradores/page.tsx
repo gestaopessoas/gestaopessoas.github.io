@@ -21,7 +21,6 @@ type SalaryRule = { id: string; role_name: string; modality: string; level: stri
 
 // Abas de lista paginam no banco. As abas de agregação (aniversários / experiência) calculam
 // no cliente a partir do array carregado, então precisam do conjunto completo de ativos.
-const LIST_PAGE_SIZE = 25;
 const AGGREGATE_PAGE_SIZE = 1000;
 const AGGREGATE_TABS = ["aniversarios", "experiencia"];
 
@@ -118,8 +117,9 @@ export default function ColaboradoresPage() {
   
   const [activeTab, setActiveTab] = useState<"todos" | "aniversarios" | "experiencia" | "inativos">("todos");
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [listPageSize, setListPageSize] = useState(25);
 
-  const pageSize = AGGREGATE_TABS.includes(activeTab) ? AGGREGATE_PAGE_SIZE : LIST_PAGE_SIZE;
+  const pageSize = AGGREGATE_TABS.includes(activeTab) ? AGGREGATE_PAGE_SIZE : listPageSize;
   // Trocar de aba muda o tamanho da página: manter o índice antigo apontaria para um intervalo inválido.
   const changeTab = (tab: typeof activeTab) => { setActiveTab(tab); setPage(0); };
 
@@ -715,7 +715,7 @@ export default function ColaboradoresPage() {
             }}
           />
 
-          <Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={!AGGREGATE_TABS.includes(activeTab) ? (size) => { setListPageSize(size); setPage(0); } : undefined} />
         </>
       )}
 
@@ -757,7 +757,7 @@ export default function ColaboradoresPage() {
             )}
           />
 
-          <Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={!AGGREGATE_TABS.includes(activeTab) ? (size) => { setListPageSize(size); setPage(0); } : undefined} />
         </>
       )}
 
