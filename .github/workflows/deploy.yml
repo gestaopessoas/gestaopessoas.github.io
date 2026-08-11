@@ -11,10 +11,6 @@ permissions:
   pages: write
   id-token: write
 
-env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-  NODE_OPTIONS: "--use-system-ca"
-
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -46,7 +42,7 @@ jobs:
           NEXT_PUBLIC_GEMINI_API_KEY: ${{ secrets.NEXT_PUBLIC_GEMINI_API_KEY }}
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
