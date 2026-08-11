@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from "@/utils/supabase/client";
-import { CheckCircle2, Circle, FileText, Search, ShieldCheck, Check, Clock } from "lucide-react";
+import { CheckCircle2, Circle, FileText, Search, ShieldCheck, Check, Clock, Upload, ExternalLink, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type Admission = {
@@ -73,24 +73,37 @@ const requiredDocuments = [
 ];
 
 function DocumentItem({ candidateId, docType, existingDoc, onUpdate }: { candidateId: string, docType: string, existingDoc?: CandidateDocument, onUpdate: () => void }) {
-  const [val, setVal] = useState(existingDoc?.file_url || existingDoc?.notes || "");
   const [saving, setSaving] = useState(false);
 
-  // Sync state if existingDoc changes from outside
-  useEffect(() => {
-    setVal(existingDoc?.file_url || existingDoc?.notes || "");
-  }, [existingDoc]);
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const handleSave = async () => {
     setSaving(true);
     const supabase = createClient();
-    const isUrl = val.startsWith("http");
+    
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${docType.replace(/\s+/g, '_')}_${Date.now()}.${fileExt}`;
+    const filePath = `${candidateId}/${fileName}`;
+    
+    // Upload the file
+    const { data: uploadData, error: uploadError } = await supabase.storage.from("documents").upload(filePath, file);
+    
+    if (uploadError) {
+      alert(`Erro ao fazer upload: ${uploadError.message}`);
+      setSaving(false);
+      return;
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage.from("documents").getPublicUrl(filePath);
+
     const payload = {
       candidate_id: candidateId,
       document_type: docType,
-      status: val ? "entregue" : "pendente",
-      file_url: isUrl ? val : null,
-      notes: isUrl ? null : val,
+      status: "entregue",
+      file_url: publicUrl,
+      notes: null,
     };
     
     if (existingDoc?.id) {
@@ -98,11 +111,13 @@ function DocumentItem({ candidateId, docType, existingDoc, onUpdate }: { candida
     } else {
       await supabase.from("candidate_documents").insert(payload);
     }
+    
     setSaving(false);
     onUpdate();
   };
 
   const isDone = existingDoc?.status === "entregue";
+  const hasFile = !!existingDoc?.file_url;
 
   return (
     <div className="flex flex-col gap-2 rounded-md border p-3">
@@ -110,17 +125,43 @@ function DocumentItem({ candidateId, docType, existingDoc, onUpdate }: { candida
         {isDone ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Clock className="h-4 w-4 text-muted-foreground" />}
         <span className="text-sm font-medium">{docType}</span>
       </div>
-      <div className="flex gap-2">
-        <Input 
-          size={1} 
-          className="h-8 text-xs" 
-          value={val} 
-          onChange={e => setVal(e.target.value)} 
-          placeholder="Cole URL ou texto" 
-        />
-        <Button size="sm" variant="secondary" className="h-8" disabled={saving} onClick={handleSave}>
-          {saving ? "..." : "Salvar"}
-        </Button>
+      <div className="flex gap-2 items-center">
+        {!hasFile ? (
+          <div className="relative w-full">
+            <input 
+              type="file" 
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" 
+              onChange={handleUpload}
+              disabled={saving}
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
+            <Button size="sm" variant="secondary" className="w-full h-8 flex gap-2 pointer-events-none" disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {saving ? "Enviando..." : "Selecionar arquivo"}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex w-full gap-2">
+            <Button size="sm" variant="outline" className="flex-1 h-8 gap-2" asChild>
+              <a href={existingDoc.file_url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4" />
+                Visualizar
+              </a>
+            </Button>
+            <div className="relative">
+              <input 
+                type="file" 
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" 
+                onChange={handleUpload}
+                disabled={saving}
+                accept=".pdf,.jpg,.jpeg,.png"
+              />
+              <Button size="sm" variant="ghost" className="h-8 px-2 pointer-events-none" disabled={saving} title="Substituir arquivo">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
