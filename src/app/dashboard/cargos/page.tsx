@@ -115,7 +115,11 @@ export default function CargosPage() {
 
     setSaving(false);
     if (result.error) {
-      setError(`Não foi possível salvar o cargo: ${result.error.message || JSON.stringify(result.error)}`);
+      if (result.error.code === '23505' && result.error.message.includes('profile_code')) {
+        setError("Já existe um cargo cadastrado com este Código do Perfil. Por favor, escolha um código diferente.");
+      } else {
+        setError(`Não foi possível salvar o cargo: ${result.error.message || JSON.stringify(result.error)}`);
+      }
       return;
     }
 
