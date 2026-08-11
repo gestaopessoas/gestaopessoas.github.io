@@ -33,10 +33,18 @@ As 86 migrations legadas estão em `supabase/migrations_legacy/` e não rodam ma
 real). O diagnóstico completo está no README daquele diretório. Mudanças novas
 de schema continuam sendo migrations normais em `supabase/migrations/`.
 
-**Produção ainda não conhece o baseline.**
-Antes do próximo `supabase db push`, rodar uma vez
-`npx supabase migration repair --status applied 00000000000000` — senão o CLI
-tenta aplicar o baseline lá. Escreve só na tabela de histórico, não no schema.
+**O histórico de produção já foi reconciliado com o baseline (11/08/2026).**
+Feito com `migration repair --status applied 00000000000000` mais
+`--status reverted` nas 90 versões antigas. `db push --dry-run` responde
+`Remote database is up to date`, e o dump de produção antes e depois é idêntico
+byte a byte — as duas operações mexeram só na tabela de histórico. Não repetir.
+
+**Produção tinha 5 migrations que nunca estiveram no repo.**
+`20260810160001`, `20260810163000`, `20260811130000`, `20260811150000`,
+`20260811151000` — aplicadas direto no banco. O SQL delas não existe em lugar
+nenhum; só o efeito, capturado no baseline. Os números estão registrados em
+`supabase/migrations_legacy/README.md`. Sinal de que mudança por fora do repo
+acontece com frequência aqui.
 
 **Boa parte do schema foi criada à mão no SQL Editor.**
 É a causa raiz de tudo acima: produção nunca reexecuta migration já registrada,

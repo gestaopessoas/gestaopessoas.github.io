@@ -81,18 +81,14 @@ Para regerar o baseline depois de alguma mudança feita direto em produção:
 npx supabase db dump --linked -f supabase/migrations/00000000000000_baseline_producao.sql
 ```
 
-### Antes do próximo `db push` para produção
+### O histórico de produção já está reconciliado
 
-Produção tem as 86 migrations antigas registradas e não conhece o baseline. Sem
-avisar o CLI, o próximo `supabase db push` tentaria aplicar o baseline lá.
-Registrar o baseline como já aplicado, uma vez só:
+Feito em 11/08/2026: o baseline foi marcado como aplicado e as 90 versões
+antigas como revertidas. `supabase db push --dry-run` responde `Remote database
+is up to date`. Só a tabela `supabase_migrations.schema_migrations` foi tocada —
+o dump do schema antes e depois é idêntico byte a byte.
 
-```bash
-npx supabase migration repair --status applied 00000000000000
-```
-
-Isso escreve só na tabela de histórico (`supabase_migrations.schema_migrations`),
-não no schema.
+Não é preciso repetir. `db push` de migrations novas funciona normalmente.
 
 ## Dados
 
