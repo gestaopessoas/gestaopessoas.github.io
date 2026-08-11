@@ -1,8 +1,19 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Ambiente local em Docker
+
+App e banco completo (Postgres + Auth + REST + Storage + Realtime + Studio) em containers:
+
+```bash
+npx supabase start
+docker compose up web
+```
+
+App em http://localhost:3000, Studio em http://localhost:54323. Detalhes em [`docs/docker.md`](docs/docker.md).
+
 ## Getting Started
 
-First, run the development server:
+Alternativa sem Docker — roda direto na máquina e aponta para o Supabase de produção via `.env.local`:
 
 ```bash
 npm run dev

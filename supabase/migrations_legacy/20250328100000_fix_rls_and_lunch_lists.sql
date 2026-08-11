@@ -28,6 +28,12 @@ CREATE POLICY "profiles_admin_all" ON public.profiles FOR ALL USING (public.can_
 
 -- Fix RLS policies on employee_benefits table
 DROP POLICY IF EXISTS "Allow all operations for employee_benefits" ON public.employee_benefits;
+-- employee_benefits_select já foi criada no init; sem o drop, o CREATE abaixo
+-- quebra em banco novo.
+DROP POLICY IF EXISTS "employee_benefits_select" ON public.employee_benefits;
+DROP POLICY IF EXISTS "employee_benefits_insert" ON public.employee_benefits;
+DROP POLICY IF EXISTS "employee_benefits_update" ON public.employee_benefits;
+DROP POLICY IF EXISTS "employee_benefits_delete" ON public.employee_benefits;
 
 -- Create policy that allows access
 CREATE POLICY "employee_benefits_select" ON public.employee_benefits FOR SELECT USING (public.can_access('colaboradores'::text, 'view'::text));

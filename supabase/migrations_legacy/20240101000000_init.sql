@@ -284,6 +284,10 @@ CREATE TABLE IF NOT EXISTS public.memos (
 );
 
 ALTER TABLE public.memos ENABLE ROW LEVEL SECURITY;
+-- Bloco duplicado do trecho acima: a policy já foi criada, então o CREATE
+-- precisa do DROP para não quebrar em banco novo (CREATE POLICY não aceita
+-- IF NOT EXISTS, ao contrário do CREATE TABLE que a duplicata usa).
+DROP POLICY IF EXISTS "Allow all actions for anon" ON public.memos;
 CREATE POLICY "Allow all actions for anon" ON public.memos FOR ALL USING (true) WITH CHECK (true);
 -- Adiciona colunas extras baseadas no Access MDB
 ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS cpf text;

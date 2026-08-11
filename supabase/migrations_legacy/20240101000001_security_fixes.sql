@@ -46,8 +46,10 @@ CREATE POLICY "hires_update" ON public.hires FOR UPDATE USING (public.can_access
 DROP POLICY IF EXISTS "employees_delete" ON public.employees;
 DROP POLICY IF EXISTS "vacations_all" ON public.vacations;
 DROP POLICY IF EXISTS "occupational_exams_all" ON public.occupational_exams;
-DROP POLICY IF EXISTS "benefits_all" ON public.benefits;
-DROP POLICY IF EXISTS "epi_records_all" ON public.epi_records;
+-- As tabelas public.benefits e public.epi_records nunca existiram (nem em
+-- produção) — os nomes reais são employee_benefits e employee_epis, já tratadas
+-- acima. DROP POLICY IF EXISTS falha se a TABELA não existe, então estes dois
+-- statements quebravam qualquer banco novo.
 
 -- Restringir DELETE nas tabelas críticas EXCLUSIVAMENTE para Admins (Sede)
 CREATE POLICY "employees_delete_admin_only" ON public.employees 

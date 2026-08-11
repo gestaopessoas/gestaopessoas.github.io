@@ -24,6 +24,72 @@ gerando ~130 linhas de diff sem efeito funcional. Reverter com
 `git commit` falha com "Author identity unknown". A identidade usada nos commits
 anteriores é `Bruno Souza <130676240+psibrunosg@users.noreply.github.com>`.
 
+## Banco / migrations
+
+**O schema agora vem de `00000000000000_baseline_producao.sql`, não das migrations antigas.**
+As 86 migrations legadas estão em `supabase/migrations_legacy/` e não rodam mais
+— elas não reconstroem produção (11 tabelas referenciadas e nunca criadas, e um
+`employees` divergente: `first_name`/`last_name` contra `name`/`birthday` do
+real). O diagnóstico completo está no README daquele diretório. Mudanças novas
+de schema continuam sendo migrations normais em `supabase/migrations/`.
+
+**Produção ainda não conhece o baseline.**
+Antes do próximo `supabase db push`, rodar uma vez
+`npx supabase migration repair --status applied 00000000000000` — senão o CLI
+tenta aplicar o baseline lá. Escreve só na tabela de histórico, não no schema.
+
+**Boa parte do schema foi criada à mão no SQL Editor.**
+É a causa raiz de tudo acima: produção nunca reexecuta migration já registrada,
+então divergência entre o histórico e o banco real não dá erro nenhum — só
+aparece quando alguém tenta subir um banco novo. Mudança de schema feita pelo
+Studio precisa virar migration no mesmo dia, ou o baseline precisa ser regerado.
+
+**`CREATE POLICY` não é idempotente; `DROP POLICY IF EXISTS` exige a tabela.**
+Não existe `CREATE POLICY IF NOT EXISTS` — a única forma de tornar idempotente é
+`DROP POLICY IF EXISTS` antes. E o `DROP ... IF EXISTS` só ignora a policy ausente,
+não a tabela ausente: se a tabela não existe, ele falha. Por isso os erros só
+aparecem em banco novo, nunca em produção (que não re-executa migrations).
+
+**`src/types/supabase.ts` não serve como fonte de schema.**
+É um stub com `[key: string]: any`, não o arquivo gerado pelo
+`supabase gen types`. Não dá para derivar colunas dele.
+
+**Detectar esses problemas antes de subir o banco.**
+Vale rodar uma varredura estática nas migrations (tabelas referenciadas e nunca
+criadas; `CREATE POLICY` repetido sem `DROP` anterior) — é muito mais rápido que
+descobrir de migration em migration a cada `supabase start`.
+
+## Docker
+
+**A primeira subida do Supabase baixa ~12 imagens e vários GB.**
+`npx supabase start` puxa postgres, gotrue, postgrest, realtime, storage, kong,
+studio, vector, logflare, mailpit, postgres-meta e edge-runtime. Leva bastante
+tempo e o log fica só com linhas de camada — não é travamento. Depois disso as
+subidas são rápidas.
+
+**O `.env.local` entra no container pelo bind mount, mas não vence.**
+O dev server loga `Environments: .env.local` (que aponta para PRODUÇÃO), o que
+assusta. O `@next/env` não sobrescreve o que já está em `process.env`, então o
+`env_file: .env.docker` do compose prevalece — verificado no log de rede do
+browser (`GET http://localhost:54321/rest/v1/...`). Ao mudar essa configuração,
+reconferir por lá, não pelo log do Next.
+
+**O `NEXT_PUBLIC_SUPABASE_URL` do container é `localhost`, não nome de serviço.**
+Quem fala com o Supabase é o browser na máquina do usuário
+(`createBrowserClient`), não o container. Trocar por um hostname de rede Docker
+quebra o app no navegador.
+
+**`supabase db dump --linked` é bloqueado por ser leitura em produção.**
+Precisa de autorização explícita do usuário nomeando produção como alvo.
+
+## Código
+
+**`src/middleware.ts` nunca roda no build publicado.**
+`next.config.ts` tem `output: "export"`, e middleware é incompatível com export —
+o dev server loga `Middleware cannot be used with "output: export"` a cada
+request. O guard de `/dashboard` do middleware não protege a build do GitHub
+Pages; a proteção efetiva é client-side.
+
 ## Ferramentas
 
 **O MCP do Supabase está sem permissão.**

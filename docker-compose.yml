@@ -1,0 +1,48 @@
+# Stack local do projeto.
+#
+# O banco (Postgres + Auth + REST + Storage + Realtime + Studio) roda em Docker
+# pelo Supabase CLI, que lê `supabase/config.toml` e aplica `supabase/migrations/`:
+#
+#   npx supabase start     # sobe o banco    (API 54321 / Studio 54323 / DB 54322)
+#   npx supabase stop      # derruba o banco
+#
+# Este compose cuida só do app Next.js:
+#
+#   docker compose up web                                        # dev com hot reload -> http://localhost:3000
+#   docker compose --env-file .env.docker --profile prod up      # export estático    -> http://localhost:8080
+#
+# O `--env-file` só é necessário no perfil prod, onde as chaves viram build args.
+
+services:
+  web:
+    build:
+      context: .
+      target: dev
+    env_file: .env.docker
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      # node_modules e .next ficam em volumes: o bind mount do Windows os
+      # esconderia (e o I/O do .next via bind é muito lento).
+      - node_modules:/app/node_modules
+      - next_cache:/app/.next
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  web-prod:
+    profiles: ["prod"]
+    build:
+      context: .
+      target: prod
+      args:
+        # NEXT_PUBLIC_* são inlinadas no bundle no momento do build.
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_GEMINI_API_KEY: ${NEXT_PUBLIC_GEMINI_API_KEY:-}
+    ports:
+      - "8080:80"
+
+volumes:
+  node_modules:
+  next_cache:
