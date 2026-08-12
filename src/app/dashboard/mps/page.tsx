@@ -505,21 +505,9 @@ export default function MPGeneratorPage() {
               <option key={w.id} value={w.id}>{w.name}</option>
             ))}
           </select>
-          <p className="text-xs text-muted-foreground">Selecionar a obra preenche automaticamente o Logo e o Local.</p>
+          <p className="text-xs text-muted-foreground">Selecionar a obra preenche automaticamente o Local.</p>
         </div>
-        <div className="flex-1 space-y-2">
-          <Label>Logo da Planilha</Label>
-          <select 
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-            value={selectedLogo}
-            onChange={(e) => setSelectedLogo(e.target.value)}
-          >
-            <option value="">Sem Logo</option>
-            {availableLogos.map(logo => (
-              <option key={logo} value={logo}>{logo.replace('.png', '')}</option>
-            ))}
-          </select>
-        </div>
+        
       </div>
 
       <Tabs 
