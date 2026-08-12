@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { resolveCandidateStatus, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { errorMessage } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +28,17 @@ type CandidateRow = {
   status: string;
   obras: string;
   tags: string[];
-  raw_data: any;
+  raw_data: { available_worksites?: string[] | null };
+};
+
+type CandidateEditForm = {
+  id: string;
+  full_name: string;
+  phone: string;
+  email: string;
+  role_interest: string;
+  available_worksites: string[];
+  worksite_type: "all" | "specific";
 };
 
 export default function BancoTalentosPage() {
@@ -37,7 +48,7 @@ export default function BancoTalentosPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [candidateToEdit, setCandidateToEdit] = useState<any>(null);
+  const [candidateToEdit, setCandidateToEdit] = useState<CandidateEditForm | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -65,8 +76,6 @@ export default function BancoTalentosPage() {
   }, [supabase]);
 
   const fetchCandidates = async () => {
-    setLoading(true);
-    setError("");
     try {
       const { data, error } = await supabase
         .from("candidates")
@@ -89,7 +98,7 @@ export default function BancoTalentosPage() {
       if (error) throw error;
 
       if (data) {
-        const rows: CandidateRow[] = data.map((c: any) => {
+        const rows: CandidateRow[] = data.map((c) => {
           const finalStatus = resolveCandidateStatus(c).status;
 
           const worksitesStr = Array.isArray(c.available_worksites) && c.available_worksites.length > 0 
@@ -114,17 +123,19 @@ export default function BancoTalentosPage() {
         }).filter(c => c.status === "Banco de Talentos");
         
         setCandidates(rows);
+        setError("");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Fetch error:", err);
-      setError(err?.message || "Falha ao carregar candidatos.");
+      setError(errorMessage(err, "Falha ao carregar candidatos."));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCandidates();
+    const run = async () => { await fetchCandidates(); };
+    run();
   }, []);
 
   const filteredCandidates = useMemo(() => {
@@ -155,14 +166,14 @@ export default function BancoTalentosPage() {
       setCandidates(candidates.filter(c => c.id !== candidateToDelete.id));
       setIsDeleteModalOpen(false);
       setCandidateToDelete(null);
-    } catch (err: any) {
-      alert("Erro ao excluir candidato: " + err.message);
+    } catch (err) {
+      alert("Erro ao excluir candidato: " + errorMessage(err));
     } finally {
       setDeleting(false);
     }
   };
   
-  const handleEdit = (c: any) => {
+  const handleEdit = (c: CandidateRow) => {
     setCandidateToEdit({
         id: c.id,
         full_name: c.full_name,
@@ -191,8 +202,8 @@ export default function BancoTalentosPage() {
           if (error) throw error;
           setIsEditModalOpen(false);
           fetchCandidates();
-      } catch (err: any) {
-          alert("Erro ao salvar: " + err.message);
+      } catch (err) {
+          alert("Erro ao salvar: " + errorMessage(err));
       } finally {
           setSaving(false);
       }

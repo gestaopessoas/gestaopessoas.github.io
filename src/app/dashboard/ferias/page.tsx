@@ -8,6 +8,7 @@ import { AlertCircle, CheckCircle2, Clock, EyeOff, RotateCcw } from "lucide-reac
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
+import { errorMessage } from "@/lib/utils";
 
 type EmployeeVacation = {
   id: string;
@@ -17,6 +18,17 @@ type EmployeeVacation = {
   vacationInfo: FeriasInfo;
   ignored: boolean;
 };
+
+// `departments (name)` é relação to-one, mas os tipos-stub do supabase a descrevem
+// como array — por isso o passo por `unknown` na conversão.
+type EmployeeVacationRow = {
+  id: string;
+  name: string;
+  admission_date: string;
+  departments: { name: string | null } | null;
+};
+
+type VacationRow = { employee_id: string; dias: number | null };
 
 export default function FeriasPage() {
   const supabase = createClient();
@@ -48,17 +60,19 @@ export default function FeriasPage() {
       .from("vacation_ignores")
       .select("employee_id");
 
-    const ignoredSet = new Set((ignores || []).map((i: any) => i.employee_id));
+    const ignoredSet = new Set((ignores || []).map((i) => i.employee_id));
     setIgnoredIds(Array.from(ignoredSet));
 
     // Fetch vacations history to calculate diasGozados
     const { data: vacs } = await supabase.from("vacations").select("*");
 
-    const parsedData: EmployeeVacation[] = (emps || []).map((emp: any) => {
+    const vacRows = (vacs ?? []) as unknown as VacationRow[];
+
+    const parsedData: EmployeeVacation[] = ((emps ?? []) as unknown as EmployeeVacationRow[]).map((emp) => {
       const isIgnored = ignoredSet.has(emp.id);
-      const diasGozados = (vacs || [])
-        .filter((v: any) => v.employee_id === emp.id)
-        .reduce((acc: number, v: any) => acc + (v.dias || 0), 0);
+      const diasGozados = vacRows
+        .filter((v) => v.employee_id === emp.id)
+        .reduce((acc, v) => acc + (v.dias || 0), 0);
 
       return {
         id: emp.id,
@@ -83,7 +97,8 @@ export default function FeriasPage() {
   }, [supabase]);
 
   useEffect(() => {
-    fetchData();
+    const run = async () => { await fetchData(); };
+    run();
   }, [fetchData]);
 
   const handleIgnore = async (employeeId: string, employeeName: string) => {
@@ -94,8 +109,8 @@ export default function FeriasPage() {
         .insert({ employee_id: employeeId, reason: "Ignorado manualmente no painel" });
       if (error) throw error;
       await fetchData();
-    } catch (err: any) {
-      alert("Erro ao ignorar férias: " + err.message);
+    } catch (err) {
+      alert("Erro ao ignorar férias: " + errorMessage(err));
     }
   };
 
@@ -108,8 +123,8 @@ export default function FeriasPage() {
         .eq("employee_id", employeeId);
       if (error) throw error;
       await fetchData();
-    } catch (err: any) {
-      alert("Erro ao restaurar férias: " + err.message);
+    } catch (err) {
+      alert("Erro ao restaurar férias: " + errorMessage(err));
     }
   };
 

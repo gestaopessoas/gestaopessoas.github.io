@@ -4,17 +4,21 @@ import { useEffect, useState, useRef } from "react";
 import { Bell, UserX, AlertTriangle, Briefcase, ChevronRight, HeartPulse } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { 
-  TrialNotification, 
-  RgsNotification, 
-  BenefitNotification, 
+import {
+  TrialNotification,
+  RgsNotification,
+  BenefitNotification,
   PendingProfileNotification,
   UserPreferences,
+  EmployeeData,
+  RgsData,
+  BenefitData,
   generatePendingProfileNotifications,
   generateTrialNotifications,
   generateRgsNotifications,
   generateBenefitNotifications
 } from "@/lib/notifications";
+import { errorMessage } from "@/lib/utils";
 
 export function NotificationBell() {
   const [trialNotifications, setTrialNotifications] = useState<TrialNotification[]>([]);
@@ -45,7 +49,7 @@ export function NotificationBell() {
       // employees tem ~4.8k registros; o PostgREST limita a 1000 por query.
       // Paginamos via .range() para nao perder colaboradores (bug do badge estatico).
       const EMP_PAGE = 1000;
-      let empData: any[] = [];
+      let empData: EmployeeData[] = [];
       let empError: { message: string } | null = null;
       try {
         for (let from = 0; from < 10000; from += EMP_PAGE) {
@@ -55,10 +59,10 @@ export function NotificationBell() {
             .neq("status", "Arquivo Morto")
             .range(from, from + EMP_PAGE - 1);
           if (error) { empError = error; break; }
-          empData = empData.concat(data || []);
+          empData = empData.concat((data ?? []) as unknown as EmployeeData[]);
           if ((data || []).length < EMP_PAGE) break; // última página
         }
-      } catch (e: any) { empError = e; }
+      } catch (e) { empError = { message: errorMessage(e) }; }
 
       const [
         { data: rgsData, error: rgsError },
@@ -79,13 +83,13 @@ export function NotificationBell() {
 
       if (!empError && empData) {
         const ignoredIds = (igs || []).map(i => (i as { employee_id: string }).employee_id);
-        setPendingProfiles(generatePendingProfileNotifications(empData as any[], userPrefs));
-        setTrialNotifications(generateTrialNotifications(empData as any[], userPrefs));
-        setBenefitNotifications(generateBenefitNotifications(empData as any[], (bens || []) as any[], userPrefs, ignoredIds));
+        setPendingProfiles(generatePendingProfileNotifications(empData, userPrefs));
+        setTrialNotifications(generateTrialNotifications(empData, userPrefs));
+        setBenefitNotifications(generateBenefitNotifications(empData, (bens ?? []) as unknown as BenefitData[], userPrefs, ignoredIds));
       }
 
       if (!rgsError && rgsData) {
-        setRgsNotifications(generateRgsNotifications(rgsData as any[], userPrefs));
+        setRgsNotifications(generateRgsNotifications(rgsData as unknown as RgsData[], userPrefs));
       }
     };
 

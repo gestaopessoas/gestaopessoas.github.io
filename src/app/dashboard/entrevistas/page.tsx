@@ -10,11 +10,35 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import { errorMessage } from "@/lib/utils";
 
 // Define a versão para baixar o worker correto do CDN
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 }
+
+/** Formação/experiência como a IA devolve no JSON da análise de currículo. */
+type ParsedAcademicItem = {
+  course?: string;
+  institution?: string;
+  start_date?: string;
+  end_date?: string;
+  in_progress?: boolean;
+};
+
+type ParsedExperienceItem = {
+  role?: string;
+  company?: string;
+  start_date?: string;
+  end_date?: string;
+  is_current?: boolean;
+  description?: string;
+};
+
+/** Item de texto do pdf.js: `getTextContent().items` também traz marcações sem texto. */
+type PdfTextItem = { str: string; transform: number[] };
+const isPdfTextItem = (item: unknown): item is PdfTextItem =>
+  typeof (item as PdfTextItem)?.str === "string" && Array.isArray((item as PdfTextItem)?.transform);
 
 type PsychologicalTestInput = {
   test_name: string;
@@ -206,7 +230,7 @@ async function generateTestText(testName: string, classification: string): Promi
     }
   }
 
-  const levels: any = {
+  const levels: Record<string, string> = {
     "Superior": "acima da média, demonstrando excelente capacidade",
     "Médio Superior": "ligeiramente acima da média, demonstrando boa capacidade",
     "Médio": "dentro do esperado para a população geral, demonstrando capacidade adequada",
@@ -509,27 +533,27 @@ export default function EntrevistasPage() {
   // Resume Modal State
   const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
-  const [providers, setProviders] = useState<AIProvider[]>(defaultProviders);
+  // Os provedores salvos já valem no primeiro render — evita renderizar uma vez
+  // com os defaults e sobrescrever logo depois.
+  const [providers, setProviders] = useState<AIProvider[]>(() => {
+    if (typeof window === "undefined") return defaultProviders;
+    const stored = localStorage.getItem("ai_providers");
+    if (!stored) return defaultProviders;
+    try {
+      const parsed = JSON.parse(stored) as AIProvider[];
+      // Merge with defaults to ensure all providers exist
+      return defaultProviders.map(dp => {
+        const found = parsed.find((p: AIProvider) => p.id === dp.id);
+        return found ? { ...dp, ...found, models: found.models || dp.models, selectedModel: found.selectedModel || dp.selectedModel } : dp;
+      });
+    } catch (e) {
+      console.error("Error loading providers from local storage:", e);
+      return defaultProviders;
+    }
+  });
   const [resumeText, setResumeText] = useState("");
   const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
   const [viewingCandidateProfile, setViewingCandidateProfile] = useState<{ interviewId?: string | null; email?: string | null; name?: string | null } | null>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("ai_providers");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        // Merge with defaults to ensure all providers exist
-        const merged = defaultProviders.map(dp => {
-          const found = parsed.find((p: AIProvider) => p.id === dp.id);
-          return found ? { ...dp, ...found, models: found.models || dp.models, selectedModel: found.selectedModel || dp.selectedModel } : dp;
-        });
-        setProviders(merged);
-      } catch (e) {
-        console.error("Error loading providers from local storage:", e);
-      }
-    }
-  }, []);
 
   const updateProvider = (id: string, updates: Partial<AIProvider>) => {
     const updated = providers.map(p => {
@@ -559,9 +583,10 @@ export default function EntrevistasPage() {
         const res = await fetch(`${provider.baseUrl}/models?key=${apiKey}`);
         if (!res.ok) throw new Error("Erro ao buscar modelos do Gemini");
         const data = await res.json();
-        models = (data.models || [])
-          .filter((m: any) => m.name.includes("gemini"))
-          .map((m: any) => ({ id: m.name.replace("models/", ""), name: m.displayName || m.name }));
+        const geminiModels: { name: string; displayName?: string }[] = data.models || [];
+        models = geminiModels
+          .filter((m) => m.name.includes("gemini"))
+          .map((m) => ({ id: m.name.replace("models/", ""), name: m.displayName || m.name }));
       } else {
         if (!provider.apiKey) {
           alert("API Key não configurada para este provedor.");
@@ -572,10 +597,8 @@ export default function EntrevistasPage() {
         });
         if (!res.ok) throw new Error("Erro ao buscar modelos. Verifique a URL e a chave.");
         const data = await res.json();
-        const modelsData = data.data || data;
-        models = (Array.isArray(modelsData) ? modelsData : []).map((m: any) => ({
-          id: m.id, name: m.id
-        }));
+        const modelsData: { id: string }[] = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+        models = modelsData.map((m) => ({ id: m.id, name: m.id }));
       }
 
       if (models.length > 0) {
@@ -584,9 +607,9 @@ export default function EntrevistasPage() {
       } else {
         alert("Nenhum modelo retornado pela API.");
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
-      alert(`Falha ao buscar modelos: ${e.message}`);
+      alert(`Falha ao buscar modelos: ${errorMessage(e)}`);
     }
   };
 
@@ -747,7 +770,7 @@ export default function EntrevistasPage() {
     }
     setInterviews((data ?? []) as Interview[]);
     if (profilesData) {
-      const allRoles = [...profilesData.map(r => r.title), ...((data ?? []).map((i: any) => i.role))].filter(Boolean);
+      const allRoles = [...profilesData.map(r => r.title), ...((data ?? []).map((i) => i.role))].filter(Boolean);
       const uniqueRoles = Array.from(new Set(allRoles)).sort();
       setRoles(uniqueRoles);
     }
@@ -757,7 +780,8 @@ export default function EntrevistasPage() {
   };
 
   useEffect(() => {
-    loadInterviews();
+    const run = async () => { await loadInterviews(); };
+    run();
   }, []);
 
   // B1: fecha modais com ESC (modais handrolled sem handler)
@@ -1042,7 +1066,8 @@ Resultado Final: ${form.result || "N/C"}
     
     if (isSuccess) {
       // Se Aprovado ou Banco de Talentos, joga pra central do candidato automaticamente
-      const payloadAny = payload as any;
+      // O payload nasce de Object.fromEntries, então o TS perde os nomes das colunas.
+      const payloadAny = payload as unknown as Record<string, string | null>;
       if ((payloadAny.result === "Aprovado" || payloadAny.result === "Banco de Talentos") && payloadAny.candidate_name) {
         const parts = payloadAny.candidate_name.split(" ");
         const tag = payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : "Banco de Talentos";
@@ -1088,20 +1113,19 @@ Resultado Final: ${form.result || "N/C"}
             const content = await page.getTextContent();
             // Ordena por Y decrescente (topo→baixo) e X crescente (esq→dir)
             // para suportar PDFs com layout em duas colunas sem misturar o texto
-            const sorted = [...content.items].sort((a: any, b: any) => {
+            // `items` mistura TextItem e TextMarkedContent — só o primeiro tem texto/posição.
+            const sorted = (content.items as unknown[]).filter(isPdfTextItem).sort((a, b) => {
               const yDiff = b.transform[5] - a.transform[5];
               return Math.abs(yDiff) > 2 ? yDiff : a.transform[4] - b.transform[4];
             });
             let lastY: number | undefined;
             let pageText = "";
-            for (const rawItem of sorted) {
-              const item = rawItem as any;
-              if (item.str === undefined) continue;
-              if (lastY !== undefined && item.transform && Math.abs(lastY - item.transform[5]) > 2) {
+            for (const item of sorted) {
+              if (lastY !== undefined && Math.abs(lastY - item.transform[5]) > 2) {
                 pageText += "\n";
               }
               pageText += item.str;
-              if (item.transform) lastY = item.transform[5];
+              lastY = item.transform[5];
             }
             text += pageText + "\n\n";
           }
@@ -1272,7 +1296,7 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
     try {
       const generatedText = await generateWithAI(prompt);
       
-      let text = generatedText.replace(/```json/g, "").replace(/```/g, "").trim();
+      const text = generatedText.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(text);
 
       openNewModal();
@@ -1314,7 +1338,7 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
         gender_identity: parsed.gender_identity || prev.gender_identity,
         sexual_orientation: parsed.sexual_orientation || prev.sexual_orientation,
         race_declaration: parsed.race_declaration || prev.race_declaration,
-        academic_list: Array.isArray(parsed.academic_list) ? parsed.academic_list.map((item: any, idx: number) => ({
+        academic_list: Array.isArray(parsed.academic_list) ? (parsed.academic_list as ParsedAcademicItem[]).map((item, idx: number) => ({
           id: String(Date.now() + idx),
           course: item.course || "",
           institution: item.institution || "",
@@ -1322,7 +1346,7 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
           end_date: item.end_date || "",
           in_progress: Boolean(item.in_progress)
         })) : prev.academic_list || [],
-        experience_list: Array.isArray(parsed.experience_list) ? parsed.experience_list.map((item: any, idx: number) => ({
+        experience_list: Array.isArray(parsed.experience_list) ? (parsed.experience_list as ParsedExperienceItem[]).map((item, idx: number) => ({
           id: String(Date.now() + 100 + idx),
           role: item.role || "",
           company: item.company || "",
@@ -1333,9 +1357,9 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
         })) : prev.experience_list || []
       }));
       setIsResumeModalOpen(false);
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
-      alert("Falha na Inteligência Artificial: " + (e.message || "A resposta não estava no formato JSON correto."));
+      alert("Falha na Inteligência Artificial: " + errorMessage(e, "A resposta não estava no formato JSON correto."));
     }
     setIsAnalyzingResume(false);
   };
@@ -1977,14 +2001,14 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
                               </div>
                               {isNeo && (
                                 <div className="grid grid-cols-5 gap-2 mt-2 pt-2 border-t border-border/30">
-                                  {["N", "E", "O", "A", "C"].map(f => (
+                                  {(["N", "E", "O", "A", "C"] as const).map(f => (
                                     <div key={f} className="space-y-1">
                                       <Label title={f === 'N' ? 'Neuroticismo' : f === 'E' ? 'Extroversão' : f === 'O' ? 'Abertura' : f === 'A' ? 'Amabilidade' : 'Conscienciosidade'} className="cursor-help">Fator {f}</Label>
-                                      <Input type="number" placeholder="0" value={t.factors?.[f as keyof typeof t.factors] || ''} onChange={e => {
+                                      <Input type="number" placeholder="0" value={t.factors?.[f] || ''} onChange={e => {
                                         const list = [...(assessmentForm.tests_list || [])];
-                                        if(!list[index].factors) list[index].factors = {};
-                                        // @ts-ignore
-                                        list[index].factors[f] = e.target.value;
+                                        const factors = { ...(list[index].factors ?? {}) };
+                                        factors[f] = e.target.value;
+                                        list[index] = { ...list[index], factors };
                                         setAssessmentForm(p => ({...p, tests_list: list}));
                                       }} className="h-8 px-2" />
                                     </div>
@@ -2232,7 +2256,7 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
 
                     {(assessmentForm.academic_list || []).length === 0 ? (
                       <div className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg bg-muted/10">
-                        Nenhuma formação cadastrada. Clique em "+ Adicionar Formação" para registrar cursos e graduações do candidato.
+                        Nenhuma formação cadastrada. Clique em &quot;+ Adicionar Formação&quot; para registrar cursos e graduações do candidato.
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -2354,7 +2378,7 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
                     {(assessmentForm.experience_list || []).length === 0 ? (
                       <div className="space-y-3">
                         <div className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg bg-muted/10">
-                          Nenhum histórico profissional estruturado. Clique em "+ Adicionar Experiência" para incluir cargos, empresas e períodos.
+                          Nenhum histórico profissional estruturado. Clique em &quot;+ Adicionar Experiência&quot; para incluir cargos, empresas e períodos.
                         </div>
                         {assessmentForm.experience_summary && (
                           <div className="space-y-1 pt-1">

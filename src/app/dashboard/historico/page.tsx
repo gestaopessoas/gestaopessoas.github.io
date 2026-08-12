@@ -13,8 +13,8 @@ type EmployeeHistory = {
   id: string
   change_date: string
   change_type: string
-  old_value: any
-  new_value: any
+  old_value: unknown
+  new_value: unknown
   description: string
 }
 
@@ -91,7 +91,7 @@ function HistoricoContent() {
     }
   }
 
-  function formatValue(val: any): string {
+  function formatValue(val: unknown): string {
     if (val === null || val === undefined) return "N/A"
     if (typeof val === 'object') {
       return Object.entries(val)

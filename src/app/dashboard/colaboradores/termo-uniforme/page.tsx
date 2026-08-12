@@ -4,6 +4,19 @@ import { createClient } from "@/utils/supabase/client";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
+type UniformDelivery = {
+  id: string;
+  quantity_delivered: number | null;
+  notes: string | null;
+  delivered_at: string;
+  uniform_items: { name: string | null; size: string | null } | null;
+};
+
+type TermoData = {
+  employee: { name: string; role: string | null } | null;
+  uniforms: UniformDelivery[];
+};
+
 function TermoUniformeContent() {
   const searchParams = useSearchParams();
   const employeeId = searchParams.get("id");
@@ -11,7 +24,7 @@ function TermoUniformeContent() {
   const typeParam = searchParams.get("type");
   const priceParam = searchParams.get("price");
   const installmentsParam = searchParams.get("installments");
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<TermoData | null>(null);
 
   useEffect(() => {
     if (!employeeId) return;
@@ -26,7 +39,7 @@ function TermoUniformeContent() {
         const itemIds = itemsParam.split(',');
         filteredUnis = filteredUnis.filter(u => itemIds.includes(u.id));
       }
-      setData({ employee: emp.data, uniforms: filteredUnis });
+      setData({ employee: emp.data as TermoData["employee"], uniforms: filteredUnis as unknown as UniformDelivery[] });
     };
     load();
   }, [employeeId]);
@@ -77,7 +90,7 @@ function TermoUniformeContent() {
                 <td colSpan={4} className="border border-black p-4 text-center italic">Nenhum item registrado.</td>
               </tr>
             ) : (
-              data.uniforms.map((u: any) => (
+              data.uniforms.map((u) => (
                 <tr key={u.id}>
                   <td className="border border-black p-2">{u.quantity_delivered}</td>
                   <td className="border border-black p-2">{u.uniform_items?.name} {u.notes ? `(${u.notes})` : ''}</td>

@@ -13,14 +13,14 @@ export default function Home() {
     <main className="min-h-screen bg-background relative overflow-hidden">
       {/* Decorative background elements matching the MIV pattern */}
       <div className="absolute top-0 right-0 -mr-32 -mt-32 opacity-5 pointer-events-none text-9xl font-black text-foreground transform rotate-12 select-none">
-        // // //
+        {"// // //"}
       </div>
       
       <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-center gap-12 px-6 py-16 relative z-10">
         <div className="max-w-3xl space-y-8">
           
           <div className="flex items-center select-none">
-            <span className="text-primary text-5xl font-bold tracking-tighter mr-1">//</span>
+            <span className="text-primary text-5xl font-bold tracking-tighter mr-1">{"//"}</span>
             <span className="text-foreground text-4xl font-extrabold tracking-widest uppercase">ACPO</span>
           </div>
 

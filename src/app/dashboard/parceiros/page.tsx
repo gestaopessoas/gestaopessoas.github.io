@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { LogoCropperModal } from "@/components/benefits/LogoCropperModal";
 import { DiscountPartner, PartnerLead } from "@/types/benefits";
+import { errorMessage } from "@/lib/utils";
 
 type PartnerProspect = {
   id: string;
@@ -141,7 +142,8 @@ export default function ParceirosAdminPage() {
   }, [supabase]);
 
   useEffect(() => {
-    fetchData();
+    const run = async () => { await fetchData(); };
+    run();
   }, [fetchData]);
 
   // Manipuladores do CRUD de Parceiros
@@ -244,8 +246,8 @@ export default function ParceirosAdminPage() {
       const { error } = await supabase.from("partner_prospects").delete().eq("id", prospectId);
       if (error) throw error;
       setProspects(prev => prev.filter(p => p.id !== prospectId));
-    } catch (err: any) {
-      alert("Erro ao excluir candidatura: " + err.message);
+    } catch (err) {
+      alert("Erro ao excluir candidatura: " + errorMessage(err));
     }
   };
 
@@ -475,8 +477,8 @@ export default function ParceirosAdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                      {leads.map((l) => (
-                        <tr key={l.id || Math.random().toString()} className="hover:bg-muted/40 transition-colors">
+                      {leads.map((l, index) => (
+                        <tr key={l.id || `lead-${index}`} className="hover:bg-muted/40 transition-colors">
                           <td className="px-4 py-3 tabular-nums text-xs text-zinc-500 dark:text-zinc-400 font-mono">
                             {format(new Date(l.created_at || new Date().toISOString()), "dd/MM/yyyy HH:mm")}
                           </td>

@@ -13,11 +13,19 @@ const navLinks = [
   // add others if needed
 ];
 
+type SearchResult = {
+  href: string;
+  label: string;
+  description?: string | null;
+  icon?: React.ReactNode;
+  type: string;
+};
+
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 300);
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -33,12 +41,11 @@ export function GlobalSearch() {
   }, []);
 
   useEffect(() => {
-    if (!debouncedQuery) {
-      setResults([]);
-      return;
-    }
-
     const search = async () => {
+      if (!debouncedQuery) {
+        setResults([]);
+        return;
+      }
       setLoading(true);
       const supabase = createClient();
       
@@ -117,7 +124,7 @@ export function GlobalSearch() {
               </div>
             ) : results.length === 0 && query ? (
               <div className="text-center p-4 text-sm text-muted-foreground">
-                Nenhum resultado encontrado para "{query}"
+                Nenhum resultado encontrado para &quot;{query}&quot;
               </div>
             ) : (
               <div className="space-y-1">

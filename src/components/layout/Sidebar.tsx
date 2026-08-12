@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award, Package, CheckSquare, CircleDollarSign, FileOutput, Contact, BadgePercent, Database } from "lucide-react"
 import { usePermissions } from "@/hooks/usePermissions"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
@@ -100,12 +100,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       return {}
     }
   })
-  const [loading, setLoading] = useState(true)
-  const { can } = usePermissions()
-
-  useEffect(() => {
-    setLoading(false)
-  }, [])
+  // Enquanto as permissões não chegam, o menu mostra tudo — o flag vem do próprio
+  // contexto, que sabe quando a consulta terminou (antes era um mount flag local,
+  // que virava false bem antes das permissões carregarem).
+  const { can, loading } = usePermissions()
 
   const toggleGroup = (groupName: string) => {
     setCollapsedGroups((prev) => {
@@ -131,7 +129,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     >
       <div className="flex h-16 shrink-0 items-center justify-between px-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
-          <span className="text-primary mr-1">//</span>
+          <span className="text-primary mr-1">{"//"}</span>
           <span className={cn("transition-opacity duration-300", isCollapsed ? "opacity-0 w-0" : "opacity-100")}>
             Gente & Gestão
           </span>

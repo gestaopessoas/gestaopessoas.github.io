@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UNLOCK_STAGES } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { errorMessage } from "@/lib/utils";
 
 type AddInterviewModalProps = {
   isOpen: boolean;
@@ -141,13 +142,19 @@ export default function AddInterviewModal({
     loadWorkplaces();
   }, []);
 
+  // Trocar de obra invalida a lista carregada: ajuste durante o render (padrão do
+  // React para estado derivado), então nenhum entrevistador da obra anterior fica
+  // visível enquanto a nova consulta corre.
+  const [lastWorkplaceId, setLastWorkplaceId] = useState(workplaceId);
+  if (lastWorkplaceId !== workplaceId) {
+    setLastWorkplaceId(workplaceId);
+    setInterviewers([]);
+    setInterviewerId("");
+  }
+
   // Load interviewers when workplace changes
   useEffect(() => {
-    if (!workplaceId) {
-      setInterviewers([]);
-      setInterviewerId("");
-      return;
-    }
+    if (!workplaceId) return;
     // Guarda contra corrida: trocar de obra rápido pode fazer a resposta antiga chegar por último.
     let atual = true;
 
@@ -202,8 +209,13 @@ export default function AddInterviewModal({
     };
   }, [workplaceId]);
 
-  // Reset form when modal opens/closes or lock changes
-  useEffect(() => {
+  // Reset form when modal opens/closes or lock changes. Ajuste durante o render:
+  // `workplaces.length` entra na chave porque a obra travada só pode ser resolvida
+  // depois que a lista chega do banco.
+  const resetKey = `${isOpen}|${isLocked}|${currentWorkplace ?? ""}|${workplaces.length}`;
+  const [lastResetKey, setLastResetKey] = useState(resetKey);
+  if (lastResetKey !== resetKey) {
+    setLastResetKey(resetKey);
     if (isOpen) {
       if (isLocked) {
         // Find workplace id by name
@@ -228,7 +240,7 @@ export default function AddInterviewModal({
         setError("");
       }
     }
-  }, [isOpen, isLocked, currentWorkplace, workplaces]);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,9 +280,9 @@ export default function AddInterviewModal({
       if (error) throw error;
 
       onSuccess();
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error inserting interview:", err);
-      setError(err?.message || "Ocorreu um erro ao salvar o registro.");
+      setError(errorMessage(err, "Ocorreu um erro ao salvar o registro."));
     } finally {
       setLoading(false);
     }

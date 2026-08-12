@@ -167,7 +167,8 @@ export default function BeneficiosPage() {
   }, [supabase]);
 
   useEffect(() => {
-    fetchData();
+    const run = async () => { await fetchData(); };
+    run();
   }, [fetchData]);
 
   // Elegíveis para Planos (> 90 dias, ativos, sem benefício, e não ignorados)

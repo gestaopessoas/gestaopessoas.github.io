@@ -8,7 +8,8 @@ import { Clock, Users, Target } from "lucide-react";
 export default function MetricasVagasPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState({ slaMedio: 0, totalAbertas: 0, totalContratados: 0, funil: [] as any[] });
+  type FunnelStage = { stage: string; count: number };
+  const [metrics, setMetrics] = useState({ slaMedio: 0, totalAbertas: 0, totalContratados: 0, funil: [] as FunnelStage[] });
 
   useEffect(() => {
     async function fetchMetrics() {
@@ -27,13 +28,13 @@ export default function MetricasVagasPage() {
         : 0;
 
       // Funil
-      const stageCounts = (apps || []).reduce((acc: any, a: any) => {
+      const stageCounts = (apps || []).reduce<Record<string, number>>((acc, a) => {
         const stage = a.kanban_stages?.name || 'Desconhecido';
         acc[stage] = (acc[stage] || 0) + 1;
         return acc;
       }, {});
       
-      const funil = Object.entries(stageCounts).map(([stage, count]) => ({ stage, count }));
+      const funil: FunnelStage[] = Object.entries(stageCounts).map(([stage, count]) => ({ stage, count }));
 
       setMetrics({ slaMedio: Math.round(slaMedio), totalAbertas, totalContratados, funil });
       setLoading(false);
@@ -88,7 +89,7 @@ export default function MetricasVagasPage() {
         <CardContent>
           {loading ? <p>Carregando...</p> : (
             <div className="space-y-4 mt-4">
-              {metrics.funil.map((f: any, i: number) => (
+              {metrics.funil.map((f, i: number) => (
                 <div key={i} className="flex items-center justify-between border-b pb-2">
                   <span className="font-medium">{f.stage}</span>
                   <span className="text-muted-foreground tabular-nums">{f.count} candidato(s)</span>

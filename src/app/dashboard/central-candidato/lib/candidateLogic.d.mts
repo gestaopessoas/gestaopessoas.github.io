@@ -37,10 +37,26 @@ export function resolveCandidateStatus(candidate?: CandidateLike | null): Candid
 
 export function latestEducationDegree(educations?: EducationLike[] | null): string | null;
 
-export type CandidateBucket = "livre" | "entrevista" | "documentacao" | "contratacao" | "encerrado";
+export type CandidateBucket =
+  | "livre"
+  | "entrevista"
+  | "encaminhado"
+  | "obras"
+  | "proposta"
+  | "documentacao"
+  | "contratacao"
+  | "encerrado";
 
 export const STAGE_BUCKETS: Record<string, string[]>;
-export const BUCKET_ORDER: readonly ["livre", "entrevista", "documentacao", "contratacao"];
+export const BUCKET_ORDER: readonly [
+  "livre",
+  "entrevista",
+  "encaminhado",
+  "obras",
+  "proposta",
+  "documentacao",
+  "contratacao",
+];
 export const BUCKET_LABELS: Record<string, string>;
 
 export function candidateBucket(

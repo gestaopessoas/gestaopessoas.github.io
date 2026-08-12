@@ -22,40 +22,54 @@ function BfiBar({ label, score, description }: { label: string, score: number, d
   );
 }
 
+type BfiQuestion = {
+  id: string;
+  item_number: number;
+  item_text: string;
+};
+
+type BfiSession = {
+  raw_answers: Record<string, number> | null;
+  openness_score: number | null;
+  conscientiousness_score: number | null;
+  extraversion_score: number | null;
+  agreeableness_score: number | null;
+  neuroticism_score: number | null;
+};
+
 function TestContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
-  
-  const [questions, setQuestions] = useState<any[]>([]);
+
+  const [questions, setQuestions] = useState<BfiQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
+  // Sem `session` na URL não há o que carregar: o estado inicial já é o estado final.
+  const [loading, setLoading] = useState(Boolean(sessionId));
   const [saving, setSaving] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState("");
-  const [sessionError, setSessionError] = useState("");
-  const [results, setResults] = useState<any>(null);
+  const [sessionError, setSessionError] = useState(
+    sessionId ? "" : "Link inválido. O parâmetro de sessão está ausente."
+  );
+  const [results, setResults] = useState<BfiSession | null>(null);
   const [isStarted, setIsStarted] = useState(false);
-  
+
   const [currentPage, setCurrentPage] = useState(0);
   const questionsPerPage = 20;
 
   useEffect(() => {
-    if (!sessionId) {
-      setSessionError("Link inválido. O parâmetro de sessão está ausente.");
-      setLoading(false);
-      return;
-    }
+    if (!sessionId) return;
 
     const init = async () => {
       const supabase = createClient();
-      
+
       // Check session
       const { data: sessData, error: sessErr } = await supabase
         .rpc("get_bfi_session", { session_id: sessionId })
         .single();
-        
-      const sessionData = sessData as any;
-         
+
+      const sessionData = sessData as BfiSession | null;
+
       if (sessErr || !sessionData) {
         setSessionError("Sessão não encontrada ou link inválido.");
         setLoading(false);
@@ -119,7 +133,7 @@ function TestContent() {
       if (fetchError || !updatedData) {
         setError("Erro ao carregar os resultados calculados.");
       } else {
-        setResults(updatedData);
+        setResults(updatedData as BfiSession);
       }
       setCompleted(true);
     }

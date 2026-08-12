@@ -4,10 +4,15 @@ import { createClient } from "@/utils/supabase/client";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
+type TermoObraData = {
+  workplace: { name: string } | null;
+  employees: { id: string; registration_number: string | null; name: string }[];
+};
+
 function TermoObraContent() {
   const searchParams = useSearchParams();
   const workplaceId = searchParams.get("id");
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<TermoObraData | null>(null);
 
   useEffect(() => {
     if (!workplaceId) return;
@@ -17,7 +22,10 @@ function TermoObraContent() {
         supabase.from("workplaces").select("*").eq("id", workplaceId).single(),
         supabase.from("employees").select("id, registration_number, name").eq("workplace_id", workplaceId).eq("status", "Ativo").order("name"),
       ]);
-      setData({ workplace: wp.data, employees: emps.data || [] });
+      setData({
+        workplace: wp.data as TermoObraData["workplace"],
+        employees: (emps.data ?? []) as unknown as TermoObraData["employees"],
+      });
     };
     load();
   }, [workplaceId]);
@@ -57,7 +65,7 @@ function TermoObraContent() {
                 <td colSpan={7} className="border border-black p-4 text-center italic">Nenhum colaborador ativo encontrado nesta unidade.</td>
               </tr>
             ) : (
-              data.employees.map((emp: any) => (
+              data.employees.map((emp) => (
                 <tr key={emp.id} className="h-10">
                   <td className="border border-black p-1 text-center font-mono text-xs">{emp.registration_number || ""}</td>
                   <td className="border border-black p-1 text-xs truncate max-w-xs">{emp.name}</td>

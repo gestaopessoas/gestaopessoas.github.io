@@ -39,7 +39,8 @@ test("candidateBucket separa os baldes que o adm de obra precisa ver", () => {
   assert.equal(candidateBucket("Em Processo", "Entrevista Gestor"), "entrevista");
   assert.equal(candidateBucket("Em Processo", "Testagem Psicológica"), "entrevista");
   assert.equal(candidateBucket("Em Processo", "Coleta de Documentos & Exames"), "documentacao");
-  assert.equal(candidateBucket("Em Processo", "Proposta"), "contratacao");
+  assert.equal(candidateBucket("Em Processo", "Proposta"), "proposta");
+  assert.equal(candidateBucket("Em Processo", "Contratado"), "contratacao");
 });
 
 test("candidateBucket trata terminais e etapa desconhecida", () => {

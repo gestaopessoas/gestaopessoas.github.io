@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { X, Check, Loader2, Building, User, Mail, Phone, Rocket, Globe, Tag, Percent, Ticket, ArrowRight, ArrowLeft } from "lucide-react";
+import { errorMessage } from "@/lib/utils";
 
 interface BecomePartnerModalProps {
   isOpen: boolean;
@@ -18,45 +19,42 @@ const CATEGORIES = [
   "Outros"
 ];
 
+const emptyForm = {
+  company_name: "",
+  contact_name: "",
+  email: "",
+  phone: "",
+  website_or_social: "",
+  category_preference: "Saúde & Bem-Estar",
+  discount_proposal: "",
+  how_to_use_proposal: ""
+};
+
 export const BecomePartnerModal: React.FC<BecomePartnerModalProps> = ({ isOpen, onClose }) => {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
-  const [form, setForm] = useState({
-    company_name: "",
-    contact_name: "",
-    email: "",
-    phone: "",
-    website_or_social: "",
-    category_preference: "Saúde & Bem-Estar",
-    discount_proposal: "",
-    how_to_use_proposal: ""
-  });
+  const [form, setForm] = useState(emptyForm);
 
   const modalRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
-  // Reset de estado quando abre/fecha
-  useEffect(() => {
+  // Reset de estado quando abre/fecha. Ajuste durante o render (padrão do React
+  // para estado derivado de prop): acontece antes da pintura, sem o render extra
+  // que um efeito causaria.
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen);
     if (isOpen) {
       setStep(1);
       setConfirmed(false);
       setIsSubmitting(false);
       setErrorMsg(null);
-      setForm({
-        company_name: "",
-        contact_name: "",
-        email: "",
-        phone: "",
-        website_or_social: "",
-        category_preference: "Saúde & Bem-Estar",
-        discount_proposal: "",
-        how_to_use_proposal: ""
-      });
+      setForm(emptyForm);
     }
-  }, [isOpen]);
+  }
 
   // Suporte acessível para fechar via ESC e foco no teclado
   useEffect(() => {
@@ -125,9 +123,9 @@ export const BecomePartnerModal: React.FC<BecomePartnerModalProps> = ({ isOpen, 
       if (error) throw error;
       
       setConfirmed(true);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Erro ao enviar candidatura:", err);
-      setErrorMsg(err.message || "Não foi possível enviar sua proposta. Tente novamente mais tarde.");
+      setErrorMsg(errorMessage(err, "Não foi possível enviar sua proposta. Tente novamente mais tarde."));
     } finally {
       setIsSubmitting(false);
     }

@@ -37,17 +37,16 @@ export default function RgsPage() {
   const [type, setType] = useState("Todos");
   const [status, setStatus] = useState("Todos");
   const [selectedMonth, setSelectedMonth] = useState(""); // YYYY-MM
-  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // desc = mais recentes primeiro
+  // desc = mais recentes primeiro; a preferência salva já vale no primeiro render
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">(() => {
+    if (typeof window === "undefined") return "desc";
+    const saved = localStorage.getItem("rgs_sort_order");
+    return saved === "asc" || saved === "desc" ? saved : "desc";
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [roles, setRoles] = useState<string[]>([]);
-
-  // Load sort preference
-  useEffect(() => {
-    const saved = localStorage.getItem("rgs_sort_order");
-    if (saved === "asc" || saved === "desc") setSortOrder(saved);
-  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);

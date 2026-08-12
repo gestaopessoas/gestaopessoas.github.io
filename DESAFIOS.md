@@ -101,6 +101,34 @@ o dev server loga `Middleware cannot be used with "output: export"` a cada
 request. O guard de `/dashboard` do middleware não protege a build do GitHub
 Pages; a proteção efetiva é client-side.
 
+**`react-hooks/set-state-in-effect` (React 19) só aceita três formas.**
+Chamar direto no efeito uma função de escopo do componente que faz `setState`
+(mesmo `async`, mesmo em `useCallback`) é erro. O que passa:
+1. função `async` declarada **dentro** do efeito (`const run = async () => { await fetchX(); }; run();`);
+2. estado inicial preguiçoso (`useState(() => localStorage.getItem(...))`) para
+   hidratar de storage/URL;
+3. ajuste durante o render com chave de comparação, para estado derivado de prop
+   (`if (lastKey !== key) { setLastKey(key); ... }`) — é o padrão do React para
+   reset de modal e auto-preenchimento em cascata.
+`useSyncExternalStore` resolve os casos de store externa (matchMedia, tema).
+Efeito que só mexe no DOM (sem `setState`) nunca é sinalizado.
+
+**Efeito não pode citar função declarada depois dele.**
+`react-hooks/immutability` acusa "accessed before it is declared". Mover o
+`useEffect` para baixo das declarações resolve.
+
+**Os `any` do código vêm dos tipos-stub do Supabase.**
+`src/types/supabase.ts` é stub, então relação to-one (`departments (name)`) chega
+tipada como array e `data` vem sem forma. O padrão adotado: declarar um type
+local com as colunas do `select` e converter com `as unknown as Tipo[]`. Para
+`catch`, usar `errorMessage(err)` de `src/lib/utils.ts` em vez de `err: any`.
+
+**Codemod em .ts/.tsx precisa preservar CRLF.**
+Os arquivos do repo são CRLF; script que insere linhas com `\n` deixa o arquivo
+misto e o git avisa em todo comando. Normalizar depois de qualquer edição em
+massa. Também: inserir import "depois do último `import`" quebra quando o último
+é multi-linha — conferir o resultado antes de rodar o build.
+
 ## Ferramentas
 
 **O MCP do Supabase está sem permissão.**

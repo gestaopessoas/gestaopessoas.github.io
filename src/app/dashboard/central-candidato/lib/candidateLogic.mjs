@@ -71,10 +71,8 @@ export function deriveCandidateStatus(interviews = []) {
   if (isTerminal) {
     return { status: "Banco de Talentos", etapa_atual: null, ...base };
   }
-  // Se a etapa atual contém "Entrevista", marcar como "Em Entrevista"
-  if (latest.stage?.includes("Entrevista")) {
-    return { status: "Em Entrevista", etapa_atual: latest.stage, ...base };
-  }
+  // Toda etapa não terminal é "Em Processo" — é o único status que candidateBucket()
+  // reconhece como ativo. A etapa granular vai em etapa_atual e define o balde.
   return { status: "Em Processo", etapa_atual: latest.stage, ...base };
 }
 

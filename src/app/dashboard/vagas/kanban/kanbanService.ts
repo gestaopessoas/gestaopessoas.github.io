@@ -11,6 +11,16 @@ export type KanbanCandidate = {
   tags: string[];
 };
 
+type CandidateRow = {
+  id: string;
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  search_tags: string[] | null;
+  behavioral_tags: string[] | null;
+};
+
 export async function fetchKanbanData(jobId: string) {
   const supabase = createClient();
 
@@ -59,7 +69,7 @@ export async function fetchKanbanData(jobId: string) {
 
   // Add applied candidates
   applications?.forEach(app => {
-    const c = app.candidates as any;
+    const c = app.candidates as unknown as CandidateRow | null;
     if (!c) return;
     const cTags = [...(c.search_tags || []), ...(c.behavioral_tags || [])];
     result.push({

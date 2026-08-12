@@ -20,9 +20,9 @@ async function run() {
 
   for (const file of files) {
     const filePath = `file:///${path.join(teacoDir, file).replace(/\\/g, '/')}`;
-    const module = await import(filePath);
-    const varName = Object.keys(module)[0];
-    const tableData = module[varName];
+    const tableModule = await import(filePath);
+    const varName = Object.keys(tableModule)[0];
+    const tableData = tableModule[varName];
 
     const tableName = tableData.nome;
     const desc = tableData.descricao;

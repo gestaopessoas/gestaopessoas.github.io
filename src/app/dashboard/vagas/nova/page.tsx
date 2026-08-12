@@ -227,7 +227,12 @@ export default function NovaVagaPage() {
     }));
   };
 
-  useEffect(() => {
+  // Faixa salarial derivada do cargo/nível escolhido. Ajuste durante o render
+  // (padrão do React para estado derivado), sem o render extra de um efeito.
+  const salaryKey = `${selectedLevelMin}|${selectedLevelMax}|${selectedSeniority}|${form.profile_id}|${salaryTable.length}|${profiles.length}|${availableSeniorities.length}`;
+  const [lastSalaryKey, setLastSalaryKey] = useState(salaryKey);
+  if (lastSalaryKey !== salaryKey) {
+    setLastSalaryKey(salaryKey);
     if (form.profile_id && (selectedLevelMin || selectedLevelMax)) {
       const profile = profiles.find((item) => item.id === form.profile_id);
       
@@ -250,7 +255,7 @@ export default function NovaVagaPage() {
         contract_type: modalityMatch?.modality === "Estágio" ? "Estágio" : modalityMatch?.modality === "Jovem Aprendiz" ? "Jovem Aprendiz" : "CLT"
       }));
     }
-  }, [selectedLevelMin, selectedLevelMax, selectedSeniority, form.profile_id, salaryTable, profiles, availableSeniorities.length]);
+  }
 
   const handleUnitChange = (unit: string) => {
     let schedule = form.work_schedule;

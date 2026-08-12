@@ -10,10 +10,34 @@ import { Select } from "./FormHelpers";
 
 type RelatedRow = Record<string, string | number | boolean | null> & { id: string };
 
+type BigFiveRow = {
+  id: string;
+  created_at: string;
+  raw_answers: Record<string, number> | null;
+  openness_score: number | null;
+  conscientiousness_score: number | null;
+  extraversion_score: number | null;
+  agreeableness_score: number | null;
+  neuroticism_score: number | null;
+};
+
+type UniformItem = { id: string; name: string; size: string | null; quantity_in_stock: number | null };
+
+type UniformDeliveryRow = {
+  id: string;
+  quantity_delivered: number;
+  delivered_at: string;
+  notes: string | null;
+  uniform_item_id: string;
+  uniform_items: { name: string | null; size: string | null } | null;
+};
+
+type CompanyBenefit = { id: string; name: string; level_values?: Record<string, number> | null };
+
 type DeleteTable = "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams" | "employee_promotions";
 
-function BfiBar({ label, score }: { label: string, score: number }) {
-  const percent = ((score - 1) / 4) * 100;
+function BfiBar({ label, score }: { label: string, score: number | null }) {
+  const percent = (((score ?? 0) - 1) / 4) * 100;
   return (
     <div className="flex items-center gap-3">
       <span className="w-40 truncate text-xs sm:text-sm">{label}</span>
@@ -26,19 +50,22 @@ function BfiBar({ label, score }: { label: string, score: number }) {
 }
 
 function EmployeePersonality({ employeeId }: { employeeId: string }) {
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<BigFiveRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedReport, setSelectedReport] = useState<any>(null);
+  const [selectedReport, setSelectedReport] = useState<BigFiveRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
     const { data } = await supabase.from("candidate_big_five_results").select("*").eq("employee_id", employeeId).order("created_at", { ascending: false });
-    setHistory(data || []);
+    setHistory((data ?? []) as unknown as BigFiveRow[]);
     setLoading(false);
   }, [employeeId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const run = async () => { await load(); };
+    run();
+  }, [load]);
 
   const generateLink = async () => {
     const supabase = createClient();
@@ -166,8 +193,8 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
 }
 
 function EmployeeUniforms({ employeeId }: { employeeId: string }) {
-  const [items, setItems] = useState<any[]>([]);
-  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [items, setItems] = useState<UniformItem[]>([]);
+  const [deliveries, setDeliveries] = useState<UniformDeliveryRow[]>([]);
   const [uniformId, setUniformId] = useState("");
   const [qty, setQty] = useState(1);
   const [notes, setNotes] = useState("");
@@ -225,8 +252,8 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
       supabase.from("uniform_items").select("*").order("name"),
       supabase.from("employee_uniforms").select("*, uniform_items(name, size)").eq("employee_id", employeeId).order("delivered_at", { ascending: false }),
     ]);
-    setItems((i.data ?? []));
-    setDeliveries((d.data ?? []));
+    setItems((i.data ?? []) as unknown as UniformItem[]);
+    setDeliveries((d.data ?? []) as unknown as UniformDeliveryRow[]);
     if (d.data) {
        setSelectedDeliveries(prev => {
           if (prev.size === 0 && d.data.length > 0) return new Set(d.data.map(x => x.id));
@@ -235,7 +262,10 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
     }
   }, [employeeId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const run = async () => { await load(); };
+    run();
+  }, [load]);
 
   const add = async () => {
     if (!uniformId || qty < 1) return;
@@ -400,7 +430,7 @@ function EmployeeUniforms({ employeeId }: { employeeId: string }) {
 function Related({ title, icon: Icon, rows, render, onRemove, children }: { title: string; icon?: React.ElementType; rows: RelatedRow[]; render: (row: RelatedRow) => string; onRemove: (id: string) => void; children: React.ReactNode }) { return <details className="rounded-md border p-3"><summary className="cursor-pointer font-medium flex items-center gap-2">{Icon && <Icon className="w-4 h-4 text-muted-foreground" />} {title} ({rows.length})</summary><div className="mt-3 space-y-2">{rows.map((row) => <div key={row.id} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm"><span>{render(row)}</span><Button type="button" size="icon" variant="ghost" onClick={() => onRemove(row.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button></div>)}<div className="grid gap-2 md:flex md:flex-wrap">{children}</div></div></details>; }
 
 export function RelatedRecords({ employeeId }: { employeeId: string }) {
-  const [companyBenefits, setCompanyBenefits] = useState<{id: string, name: string, level_values?: Record<string, number> | null}[]>([]);
+  const [companyBenefits, setCompanyBenefits] = useState<CompanyBenefit[]>([]);
   const [benefits, setBenefits] = useState<RelatedRow[]>([]);
   const [epis, setEpis] = useState<RelatedRow[]>([]);
   const [vacations, setVacations] = useState<RelatedRow[]>([]);
@@ -427,7 +457,7 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
       supabase.from("occupational_exams").select("*").eq("employee_id", employeeId).order("exam_date", { ascending: false }),
       supabase.from("employee_promotions").select("*").eq("employee_id", employeeId).order("promotion_date", { ascending: false }),
     ]);
-    setCompanyBenefits((cb.data ?? []) as any[]);
+    setCompanyBenefits((cb.data ?? []) as unknown as CompanyBenefit[]);
     setBenefits((b.data ?? []) as RelatedRow[]); 
     setEpis((e.data ?? []) as RelatedRow[]); 
     setVacations((v.data ?? []) as RelatedRow[]); 

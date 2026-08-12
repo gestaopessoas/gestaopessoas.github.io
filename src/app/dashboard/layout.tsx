@@ -86,21 +86,23 @@ export default function DashboardLayout({
   // Sidebar collapse: estado elevado do Sidebar para o layout (fix QA §0/C1).
   // isCollapsed = preferência persistida (desktop). Em <768px o Sidebar deriva
   // colapsado via isMobile, então o padding nunca deixa a sidebar cobrir conteúdo.
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const isFirstRender = useRef(true)
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
+  // A preferência já vale no primeiro render: enquanto `checking` é true a tela é
+  // o loader, igual no HTML pré-renderizado, então ler o storage aqui não briga
+  // com a hidratação.
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false
     try {
       const saved = localStorage.getItem("sidebar-collapsed")
       if (saved !== null) {
         const v = JSON.parse(saved)
-        if (typeof v === "boolean") setIsCollapsed(v)
+        if (typeof v === "boolean") return v
       }
     } catch {
       // storage corrompido -> mantém default expandido
     }
-  }, [])
+    return false
+  })
+  const isFirstRender = useRef(true)
 
   useEffect(() => {
     if (isFirstRender.current) {

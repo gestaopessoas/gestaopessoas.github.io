@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { cn } from "@/lib/utils";
+import { cn, errorMessage } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { createClient } from "@/utils/supabase/client";
 import { Search, Loader2, Contact, RefreshCw, Plus, Trash2, AlertCircle, Briefcase, CheckCircle2, Users, UserCheck, Funnel, ChevronRight } from "lucide-react";
@@ -97,7 +97,7 @@ export default function CentralCandidatoPage() {
       if (error) throw error;
 
       if (data) {
-        const rows: CandidateRow[] = data.map((c: any) => {
+        const rows: CandidateRow[] = data.map((c) => {
           const derived = resolveCandidateStatus(c);
           const finalStatus = derived.status;
           const finalChamado = derived.ultimo_chamado;
@@ -117,16 +117,17 @@ export default function CentralCandidatoPage() {
         });
         setCandidates(rows);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Fetch error:", err);
-      setError(err?.message || "Falha ao carregar candidatos.");
+      setError(errorMessage(err, "Falha ao carregar candidatos."));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCandidates();
+    const run = async () => { await fetchCandidates(); };
+    run();
   }, []);
 
   // Contratados/reprovados/desistentes saem da Central; o resto é visível por balde.
@@ -187,7 +188,7 @@ export default function CentralCandidatoPage() {
       setIsDeleteModalOpen(false);
       setCandidateToDelete(null);
 
-    } catch (err: any) {
+    } catch (err) {
       console.error("Delete error:", err);
       alert("Erro inesperado ao excluir candidato.");
     } finally {

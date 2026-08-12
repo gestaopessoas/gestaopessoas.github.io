@@ -15,18 +15,15 @@ function KanbanContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id") || "";
   const [candidates, setCandidates] = useState<KanbanCandidate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  // Sem `id` na URL não há o que buscar: o estado inicial já é o estado final.
+  const [loading, setLoading] = useState(Boolean(id));
+  const [error, setError] = useState(id ? "" : "ID da vaga não fornecido");
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   
   useEffect(() => {
+    if (!id) return;
     let active = true;
-    if (!id) {
-      setError("ID da vaga não fornecido");
-      setLoading(false);
-      return;
-    }
     fetchKanbanData(id)
       .then(data => {
         if (!active) return;
