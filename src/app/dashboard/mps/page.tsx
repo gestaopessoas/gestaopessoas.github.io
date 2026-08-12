@@ -79,9 +79,12 @@ const availableLogos = [
   "SEDE.png", "Solanas.png"
 ];
 
-const availableReasons = [
-  "Substituição", "Aumento de quadro", "Promoção", "Transferência",
-  "Enquadramento/Mérito", "Alteração de Cargo", "Outros"
+const availableReasonsContratacao = [
+  "Substituição", "Aumento de quadro", "Outros"
+];
+const availableReasonsMovimentacao = [
+  "Promoção", "Transferência de local", "Alteração de salário",
+  "Inclusão / Alteração de benefício", "Outros"
 ];
 
 const availableBenefits = [
@@ -952,7 +955,7 @@ export default function MPGeneratorPage() {
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableReasons.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                      {availableReasonsContratacao.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

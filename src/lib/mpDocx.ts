@@ -433,7 +433,7 @@ export type MpMovimentacaoData = {
 
 function headerMovimentacao(data: MpMovimentacaoData): (Paragraph | Table)[] {
   const logoCell = new TableCell({
-    width: { size: 34, type: WidthType.PERCENTAGE },
+    width: { size: 50, type: WidthType.PERCENTAGE },
     borders: noBorders,
     verticalAlign: VerticalAlign.CENTER,
     children: [
@@ -452,183 +452,136 @@ function headerMovimentacao(data: MpMovimentacaoData): (Paragraph | Table)[] {
   });
 
   const titleCell = new TableCell({
-    width: { size: 33, type: WidthType.PERCENTAGE },
+    width: { size: 50, type: WidthType.PERCENTAGE },
     borders: noBorders,
     verticalAlign: VerticalAlign.CENTER,
     children: [
       new Paragraph({
-        alignment: AlignmentType.CENTER,
+        alignment: AlignmentType.RIGHT,
         children: [text("MP", { bold: true, size: 26 })],
       }),
       new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [text("Movimentação de Pessoal", { size: 16, caps: true, color: LABEL_TEXT })],
-      }),
-    ],
-  });
-
-  const codeCell = new TableCell({
-    width: { size: 33, type: WidthType.PERCENTAGE },
-    borders: noBorders,
-    verticalAlign: VerticalAlign.CENTER,
-    children: [
-      new Paragraph({
         alignment: AlignmentType.RIGHT,
-        children: [text(MP_CONTROL_CODE, { size: 13, color: LABEL_TEXT })],
-      }),
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        children: [text(MP_REVISION, { size: 13, color: LABEL_TEXT })],
+        children: [text("MOVIMENTAÇÃO DE PESSOAL", { size: 16, caps: true, color: LABEL_TEXT })],
       }),
     ],
   });
 
   return [
-    layoutTable([new TableRow({ children: [logoCell, titleCell, codeCell] })]),
+    layoutTable([new TableRow({ children: [logoCell, titleCell] })]),
     goldRule(120, 200),
     new Paragraph({
       alignment: AlignmentType.CENTER,
       heading: HeadingLevel.HEADING_1,
       spacing: { after: 60 },
-      children: [text("Alteração de Cargo ou Salário", { bold: true, size: 22, caps: true })],
+      children: [text("ALTERAÇÕES DE PESSOAL", { bold: true, size: 22, caps: true })],
     }),
     goldRule(0, 200),
   ];
 }
 
-/** Monta o documento da MP de Movimentação. */
+const arrowCell = new TableCell({
+  width: { size: 10, type: WidthType.PERCENTAGE },
+  borders: noBorders,
+  verticalAlign: VerticalAlign.CENTER,
+  children: [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [text("→", { size: 24, bold: true, color: GOLD })],
+    })
+  ]
+});
+
 export function buildMpMovimentacaoDocument(data: MpMovimentacaoData): Document {
   const children: ISectionOptions["children"] = [
     ...headerMovimentacao(data),
 
-    sectionHeader("01", "Identificação"),
+    sectionHeader("01", "Identificação do Colaborador"),
     layoutTable([
       new TableRow({
         children: [
-          panelCell([...field("Nome do colaborador", data.candidateName)], 100)
+          panelCell([...field("Nome do(a) colaborador(a)", data.candidateName)], 50),
+          panelCell([...field("Telefone", data.phone)], 50),
         ],
       }),
-    ]),
-    layoutTable([
       new TableRow({
         children: [
-          panelCell([...field("Matrícula", data.registration)], 50),
-          panelCell([...field("Ficha", data.ficha)], 50),
+          panelCell([...field("E-mail", data.email)], 45),
+          panelCell([...field("Matrícula", data.registration)], 25),
+          panelCell([...field("Ficha", data.ficha)], 30),
         ],
       }),
     ]),
     spacer(),
 
-    sectionHeader("02", "Comparativo (Atual vs Alteração)"),
-    layoutTable([
-      new TableRow({
-        children: [
-          new TableCell({
-            width: { size: 50, type: WidthType.PERCENTAGE },
-            borders: noBorders,
-            shading: { fill: "808080" },
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                spacing: { before: 80, after: 80 },
-                children: [text("ATUAL", { bold: true, color: WHITE })],
-              }),
-            ],
-          }),
-          new TableCell({
-            width: { size: 50, type: WidthType.PERCENTAGE },
-            borders: noBorders,
-            shading: { fill: "4F81BD" },
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                spacing: { before: 80, after: 80 },
-                children: [text("ALTERAÇÃO", { bold: true, color: WHITE })],
-              }),
-            ],
-          }),
-        ],
-      }),
-    ]),
-    
-    // Comparativo rows
-    layoutTable([
-      new TableRow({
-        children: [
-          panelCell([...field("Local", data.current.location)], 50),
-          panelCell([...field("Local", data.newData.location)], 50),
-        ]
-      }),
-      new TableRow({
-        children: [
-          panelCell([...field("Setor", data.current.sector)], 50),
-          panelCell([...field("Setor", data.newData.sector)], 50),
-        ]
-      }),
-      new TableRow({
-        children: [
-          panelCell([...field("Centro de Custo", data.current.costCenter)], 50),
-          panelCell([...field("Centro de Custo", data.newData.costCenter)], 50),
-        ]
-      }),
-      new TableRow({
-        children: [
-          panelCell([...field("Cargo", data.current.role)], 50),
-          panelCell([...field("Cargo", data.newData.role)], 50),
-        ]
-      }),
-      new TableRow({
-        children: [
-          panelCell([
-            ...field("Nível", data.current.level),
-            ...field("Código do Perfil", data.current.profileCode)
-          ], 50),
-          panelCell([
-            ...field("Nível", data.newData.level),
-            ...field("Código do Perfil", data.newData.profileCode)
-          ], 50),
-        ]
-      }),
-      new TableRow({
-        children: [
-          panelCell([...field("Modalidade", data.current.modality)], 50),
-          panelCell([...field("Modalidade", data.newData.modality)], 50),
-        ]
-      }),
-      new TableRow({
-        children: [
-          panelCell([...field("Remuneração", data.current.salary)], 50),
-          panelCell([...field("Remuneração", data.newData.salary)], 50),
-        ]
-      }),
-      new TableRow({
-        children: [
-          panelCell([...field("Benefícios", data.current.benefits, 2)], 50),
-          panelCell([...field("Benefícios", data.newData.benefits, 2)], 50),
-        ]
-      }),
-    ]),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: noBorders,
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              width: { size: 45, type: WidthType.PERCENTAGE },
+              borders: noBorders,
+              children: [
+                sectionHeader("02", "Dados Atuais"),
+                layoutTable([
+                  new TableRow({ children: [panelCell([...field("Cargo", data.current.role)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Nível", data.current.level)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Local", data.current.location)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Setor", data.current.sector)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Centro de custo", data.current.costCenter)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Código do perfil", data.current.profileCode)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Modalidade", data.current.modality)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Remuneração", data.current.salary)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Benefícios", data.current.benefits, 2)], 100)] }),
+                ])
+              ]
+            }),
+            arrowCell,
+            new TableCell({
+              width: { size: 45, type: WidthType.PERCENTAGE },
+              borders: noBorders,
+              children: [
+                sectionHeader("03", "Dados Alterados"),
+                layoutTable([
+                  new TableRow({ children: [panelCell([...field("Cargo", data.newData.role)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Nível", data.newData.level)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Local", data.newData.location)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Setor", data.newData.sector)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Centro de custo", data.newData.costCenter)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Código do perfil", data.newData.profileCode)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Modalidade", data.newData.modality)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Remuneração", data.newData.salary)], 100)] }),
+                  new TableRow({ children: [panelCell([...field("Benefícios", data.newData.benefits, 2)], 100)] }),
+                ])
+              ]
+            }),
+          ]
+        })
+      ]
+    }),
     spacer(),
 
-    sectionHeader("03", "Gestão da vaga"),
+    sectionHeader("04", "Detalhamento da Alteração"),
     layoutTable([
       new TableRow({
         children: [
           panelCell([
-            ...field("Requisição da vaga (solicitado por)", data.requestedBy),
             label("Razão da movimentação"),
             checkbox(data.reason === "Promoção", "Promoção"),
-            checkbox(data.reason === "Mérito", "Mérito"),
-            checkbox(data.reason === "Equiparação Salarial", "Equiparação Salarial"),
-            checkbox(!["Promoção", "Mérito", "Equiparação Salarial"].includes(data.reason), `Outra: ${data.reason === 'Outros' ? data.customReason : data.reason}`),
+            checkbox(data.reason === "Transferência de local", "Transferência de local"),
+            checkbox(data.reason === "Alteração de salário", "Alteração de salário"),
+            checkbox(data.reason === "Inclusão / Alteração de benefício", "Inclusão / Alteração de benefício"),
+            checkbox(!["Promoção", "Transferência de local", "Alteração de salário", "Inclusão / Alteração de benefício"].includes(data.reason), `Outra: ${data.reason === 'Outros' ? data.customReason : (['Promoção', 'Transferência de local', 'Alteração de salário', 'Inclusão / Alteração de benefício'].includes(data.reason) ? '' : data.reason)}`),
           ], 48),
-          panelCell([...field("Justificativa / Observações", data.justification, 10)], 52),
+          panelCell([...field("Justificativa / Observações", data.justification, 8)], 52),
         ],
       }),
     ]),
     spacer(),
 
-    sectionHeader("04", "Aprovações"),
+    sectionHeader("05", "Aprovações"),
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
       rows: [
