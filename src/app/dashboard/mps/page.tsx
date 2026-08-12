@@ -9,8 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { FileSpreadsheet, ArrowRight } from "lucide-react";
+import { FileSpreadsheet, FileText, ArrowRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { buildMpContratacaoDocx, pngSize } from "@/lib/mpDocx";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import {
@@ -309,10 +310,10 @@ export default function MPGeneratorPage() {
       setIsUpdateConfirmOpen(true);
       return;
     }
-    void generateExcel();
+    void generateDocument();
   };
 
-  const generateExcel = async () => {
+  const generateDocument = async () => {
     setIsGenerating(true);
     try {
       const supabase = createClient();
@@ -355,236 +356,45 @@ export default function MPGeneratorPage() {
           .order("created_at", { ascending: false });
       if (histData) setMpHistory(histData as unknown as MpHistoryRow[]);
 
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("MP", { pageSetup: { paperSize: 9, orientation: 'portrait' } });
-
-      // Build Contratação Layout
       if (mpType === "contratacao") {
-        sheet.getColumn(1).width = 3;  
-        sheet.getColumn(2).width = 20; 
-        sheet.getColumn(3).width = 25; 
-        sheet.getColumn(4).width = 3;  
-        sheet.getColumn(5).width = 15; 
-        sheet.getColumn(6).width = 25; 
-        sheet.getColumn(7).width = 3;  
-
-        // Header
-        sheet.mergeCells('B2:C4');
+        // Formulário impresso da ACPO (Assinatura.pdf, Rev.04) em DOCX.
+        let logo: { data: ArrayBuffer; width: number; height: number } | undefined;
         if (selectedLogo) {
           try {
             const response = await fetch(`/logos/${selectedLogo}`);
             const arrayBuffer = await response.arrayBuffer();
-            const imageId = workbook.addImage({ buffer: arrayBuffer, extension: 'png' });
-            sheet.addImage(imageId, 'B2:D5');
+            logo = { data: arrayBuffer, ...pngSize(arrayBuffer, 130) };
           } catch (e) { console.error(e); }
         }
-        
-        sheet.mergeCells('E2:F2');
-        const titleCell = sheet.getCell('E2');
-        titleCell.value = "MP\nMovimentação de Pessoal";
-        titleCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        titleCell.font = { bold: true, size: 14 };
 
-        sheet.getCell('E3').value = "Matrícula:";
-        sheet.getCell('E3').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E3').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('F3').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
-        sheet.getCell('E4').value = "Ficha:";
-        sheet.getCell('E4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E4').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('F4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
-
-        sheet.mergeCells('B6:F6');
-        const section1 = sheet.getCell('B6');
-        section1.value = "CONTRATAÇÃO DE NOVOS COLABORADORES";
-        section1.alignment = { horizontal: 'center' };
-        section1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
-        section1.font = { bold: true };
-
-        sheet.mergeCells('B8:C8');
-        sheet.getCell('B8').value = "Nome do candidato";
-        sheet.getCell('B8').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B8').alignment = { horizontal: 'center' };
-        sheet.getCell('B8').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.mergeCells('B9:C9');
-        sheet.getCell('B9').value = empName;
-        sheet.getCell('B9').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('E8').value = "Telefone";
-        sheet.getCell('E8').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('E8').alignment = { horizontal: 'center' };
-        sheet.getCell('E8').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('F8').value = phone;
-        sheet.getCell('F8').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('E9').value = "E-mail";
-        sheet.getCell('E9').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('E9').alignment = { horizontal: 'center' };
-        sheet.getCell('E9').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('F9').value = email;
-        sheet.getCell('F9').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('B11').value = "FUNÇÃO";
-        sheet.getCell('E11').value = "ALOCAÇÃO";
-
-        sheet.mergeCells('B12:C12');
-        sheet.getCell('B12').value = "Cargo";
-        sheet.getCell('B12').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B12').alignment = { horizontal: 'center' };
-        sheet.getCell('B12').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('B13:C13');
-        sheet.getCell('B13').value = selectedRoleInfo?.role_name || "";
-        sheet.getCell('B13').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.mergeCells('E12:F12');
-        sheet.getCell('E12').value = "Local";
-        sheet.getCell('E12').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E12').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('E12').alignment = { horizontal: 'center' };
-        sheet.getCell('E12').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('E13:F13');
-        sheet.getCell('E13').value = location;
-        sheet.getCell('E13').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('B15').value = "Nível";
-        sheet.getCell('B15').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B15').alignment = { horizontal: 'center' };
-        sheet.getCell('B15').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('C15').value = "Código do perfil";
-        sheet.getCell('C15').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('C15').alignment = { horizontal: 'center' };
-        sheet.getCell('C15').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        
-        sheet.getCell('B16').value = selectedRoleInfo?.level || "";
-        sheet.getCell('B16').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('C16').value = selectedRoleInfo?.role_code || "";
-        sheet.getCell('C16').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.mergeCells('E15:F15');
-        sheet.getCell('E15').value = "Setor";
-        sheet.getCell('E15').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E15').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('E15').alignment = { horizontal: 'center' };
-        sheet.getCell('E15').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('E16:F16');
-        sheet.getCell('E16').value = sector;
-        sheet.getCell('E16').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('E18').value = "Centro de custo";
-        sheet.getCell('E18').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E18').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('E18').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('F18').value = selectedCcName;
-        sheet.getCell('F18').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('B20').value = "GESTÃO";
-        sheet.getCell('E20').value = "CONTRATO";
-
-        sheet.mergeCells('B21:C21');
-        sheet.getCell('B21').value = "Requisição da Vaga";
-        sheet.getCell('B21').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B21').alignment = { horizontal: 'center' };
-        sheet.getCell('B21').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('B22:C22');
-        sheet.getCell('B22').value = requestedBy;
-        sheet.getCell('B22').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('E21').value = "Modalidade";
-        sheet.getCell('E21').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E21').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('E21').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('F21').value = selectedRoleInfo?.modality || "";
-        sheet.getCell('F21').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('E22').value = "Remuneração";
-        sheet.getCell('E22').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E22').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('E22').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-         sheet.getCell('F22').value = selectedRoleInfo ? formatCurrency(selectedSalaryValue || 0) : "";
-        sheet.getCell('F22').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.mergeCells('B24:C24');
-        sheet.getCell('B24').value = "Horário / Escala";
-        sheet.getCell('B24').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B24').alignment = { horizontal: 'center' };
-        sheet.getCell('B24').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('B25:C25');
-        sheet.getCell('B25').value = selectedSchedule;
-        sheet.getCell('B25').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        
-        sheet.getCell('B26').value = "Razão";
-        sheet.getCell('B26').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
-        sheet.getCell('B26').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('C26').value = finalReason;
-        sheet.getCell('C26').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        
-        sheet.getCell('B27').value = "Substituição de";
-        sheet.getCell('B27').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
-        sheet.getCell('B27').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('C27').value = replacementOf;
-        sheet.getCell('C27').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.mergeCells('E24:F24');
-        sheet.getCell('E24').value = "Benefícios";
-        sheet.getCell('E24').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E24').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('E24').alignment = { horizontal: 'center' };
-        sheet.getCell('E24').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('E25:F26');
-        sheet.getCell('E25').value = newBenefitsText;
-        sheet.getCell('E25').alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
-        sheet.getCell('E25').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.mergeCells('B28:C28');
-        sheet.getCell('B28').value = "Justificativa/Observações:";
-        sheet.getCell('B28').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B28').alignment = { horizontal: 'center' };
-        sheet.getCell('B28').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        
-        sheet.mergeCells('B29:F32');
-        sheet.getCell('B29').value = justification;
-        sheet.getCell('B29').alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
-        sheet.getCell('B29').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('B34').value = "Verificado por";
-        sheet.getCell('B34').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('B34').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('B34').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('B35:C35');
-        sheet.getCell('B35').value = currentUser || "Você";
-        sheet.getCell('B35').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('E34').value = "Vigência";
-        sheet.getCell('E34').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E34').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('E34').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('E35:F35');
-        sheet.getCell('E35').value = new Date().toLocaleDateString('pt-BR');
-        sheet.getCell('E35').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('B37').value = "ASSINATURAS";
-        sheet.getCell('B37').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B37').alignment = { horizontal: 'center' };
-        sheet.getCell('B37').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        
-        sheet.mergeCells('B38:F45');
-        sheet.getCell('B38').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        
-        sheet.getCell('B44').value = "____________________________________";
-        sheet.getCell('B44').alignment = { horizontal: 'center' };
-        sheet.getCell('B45').value = "Coordenador/Requisitante";
-        sheet.getCell('B45').alignment = { horizontal: 'center' };
-
-        sheet.getCell('E44').value = "____________________________________";
-        sheet.getCell('E44').alignment = { horizontal: 'center' };
-        sheet.getCell('E45').value = "Diretoria/Presidência";
-        sheet.getCell('E45').alignment = { horizontal: 'center' };
-
-        sheet.getCell('B47').value = "MP criada em";
-        sheet.getCell('C47').value = new Date().toLocaleDateString('pt-BR');
+        const blob = await buildMpContratacaoDocx({
+          candidateName: empName,
+          phone,
+          email,
+          registration: "",
+          role: selectedRoleInfo?.role_name || "",
+          level: selectedRoleInfo?.uses_level ? (selectedRoleInfo.level || "") : "",
+          profileCode: selectedRoleInfo?.role_code || "",
+          location,
+          sector,
+          costCenter: selectedCcName,
+          modality: selectedSalaryInfo?.modality || "",
+          salary: selectedRoleInfo ? formatCurrency(selectedSalaryValue || 0) : "",
+          schedule: selectedSchedule || "",
+          benefits: newBenefitsText,
+          requestedBy: requestedBy || "",
+          reason: reason || "",
+          customReason,
+          replacementOf: replacementOf || "",
+          justification,
+          createdAt: new Date().toLocaleDateString("pt-BR"),
+          logo,
+        });
+        saveAs(blob, `MP_contratacao_${empName.replace(/\s+/g, "_")}.docx`);
       } else {
         // Build Movimentação Layout (ATUAL vs ALTERAÇÃO)
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet("MP", { pageSetup: { paperSize: 9, orientation: 'portrait' } });
         sheet.getColumn(1).width = 3;  
         sheet.getColumn(2).width = 25; 
         sheet.getColumn(3).width = 25; 
@@ -773,15 +583,14 @@ export default function MPGeneratorPage() {
 
         sheet.getCell('B48').value = "MP criada em";
         sheet.getCell('C48').value = new Date().toLocaleDateString('pt-BR');
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        saveAs(blob, `MP_movimentacao_${empName.replace(/\s+/g, '_')}.xlsx`);
       }
-
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      saveAs(blob, `MP_${mpType}_${empName.replace(/\s+/g, '_')}.xlsx`);
 
     } catch (err) {
       console.error(err);
-      alert("Erro ao gerar a planilha.");
+      alert("Erro ao gerar o documento da MP.");
     }
     setIsGenerating(false);
   };
@@ -1392,8 +1201,9 @@ export default function MPGeneratorPage() {
           <Button size="lg" onClick={onGenerate} disabled={isGenerating || !isFormValid()} className="bg-green-600 hover:bg-green-700 text-white shadow-lg">
           {isGenerating ? "Processando..." : (
             <>
-              <FileSpreadsheet className="mr-2 h-5 w-5" /> 
-              Gerar Planilha ({mpType === 'contratacao' ? "Contratação" : "Movimentação"})
+              {mpType === 'contratacao'
+                ? <><FileText className="mr-2 h-5 w-5" /> Gerar MP em Word (Contratação)</>
+                : <><FileSpreadsheet className="mr-2 h-5 w-5" /> Gerar Planilha (Movimentação)</>}
             </>
           )}
         </Button>
@@ -1410,7 +1220,7 @@ export default function MPGeneratorPage() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsUpdateConfirmOpen(false)}>Cancelar</Button>
-            <Button onClick={() => { setIsUpdateConfirmOpen(false); void generateExcel(); }}>Confirmar e Gerar</Button>
+            <Button onClick={() => { setIsUpdateConfirmOpen(false); void generateDocument(); }}>Confirmar e Gerar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
