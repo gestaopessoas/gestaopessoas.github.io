@@ -25,7 +25,7 @@ export function UserProfile() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [userId, setUserId] = useState("");
-  const [permissions, setPermissions] = useState<any>({});
+  const [permissions, setPermissions] = useState<Record<string, unknown>>({});
   
   // Personalização Estendida
   const [customRole, setCustomRole] = useState("Especialista em Gestão de Pessoas");
@@ -216,7 +216,7 @@ export function UserProfile() {
               <DialogDescription className="text-white/80 text-sm truncate">
                 {email} • <span className="font-medium text-white/95">{getStatusText(userStatus)}</span>
               </DialogDescription>
-              <p className="text-xs text-white/70 italic pt-1 truncate">"{userBio}"</p>
+              <p className="text-xs text-white/70 italic pt-1 truncate">&quot;{userBio}&quot;</p>
             </div>
           </div>
         </div>

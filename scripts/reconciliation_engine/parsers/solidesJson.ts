@@ -9,8 +9,19 @@ export interface SolidesEmployee {
   gender?: string;
   role?: string;
   department?: string;
-  raw: any;
+  raw: unknown;
 }
+
+type SolidesRawEmployee = {
+  nome?: string;
+  name?: string;
+  email?: string;
+  telefone?: string;
+  celular?: string;
+  cargo?: string;
+  departamento?: string;
+  informacoes_pessoais?: { data_nascimento?: string; genero?: string };
+};
 
 function normalizeName(name: string): string {
   if (!name) return "";
@@ -32,7 +43,7 @@ export function parseSolidesJson(filePath: string): SolidesEmployee[] {
       return [];
     }
 
-    return data.map((item: any) => {
+    return (data as SolidesRawEmployee[]).map((item) => {
       const nameRaw = item.nome || item.name || "";
       const personalInfo = item.informacoes_pessoais || {};
       return {
@@ -47,8 +58,8 @@ export function parseSolidesJson(filePath: string): SolidesEmployee[] {
         raw: item
       };
     }).filter(e => e.nameNormalized.length > 0);
-  } catch (error: any) {
-    console.error(`[ERROR] Failed to parse JSON at ${filePath}:`, error.message);
+  } catch (error) {
+    console.error(`[ERROR] Failed to parse JSON at ${filePath}:`, error instanceof Error ? error.message : error);
     return [];
   }
 }

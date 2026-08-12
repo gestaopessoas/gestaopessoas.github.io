@@ -12,11 +12,40 @@ import { Button } from "@/components/ui/button";
 import AddInterviewModal from "./AddInterviewModal";
 import { latestInterview, isLockedByInterview } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import { errorMessage } from "@/lib/utils";
 
 type CandidateDetailsSheetProps = {
   candidateId: string | null;
   onClose: () => void;
   onRefresh: () => void;
+};
+
+type CandidateEducation = {
+  id: string;
+  degree: string | null;
+  institution_name: string | null;
+};
+
+type CandidateInterview = {
+  id: string;
+  stage: string;
+  created_at: string;
+  interviewer_name: string | null;
+  workplace_name: string | null;
+  notes: string | null;
+  rejection_reason: string | null;
+};
+
+type CandidateDetails = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  city: string | null;
+  state: string | null;
+  resume_url: string | null;
+  candidate_educations: CandidateEducation[] | null;
+  candidate_interviews: CandidateInterview[] | null;
 };
 
 export default function CandidateDetailsSheet({
@@ -25,7 +54,7 @@ export default function CandidateDetailsSheet({
   onRefresh
 }: CandidateDetailsSheetProps) {
   const [loading, setLoading] = useState(false);
-  const [candidate, setCandidate] = useState<any>(null);
+  const [candidate, setCandidate] = useState<CandidateDetails | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -39,10 +68,10 @@ export default function CandidateDetailsSheet({
 
     const controller = new AbortController();
     let stale = false;
-    setLoading(true);
-    setLoadError(null);
 
     (async () => {
+      setLoading(true);
+      setLoadError(null);
       try {
         const { data, error } = await supabase
           .from("candidates")
@@ -53,11 +82,11 @@ export default function CandidateDetailsSheet({
         if (controller.signal.aborted || stale) return;
         if (error) throw error;
         setCandidate(data);
-      } catch (err: any) {
+      } catch (err) {
         if (controller.signal.aborted || stale) return;
         console.error("Error fetching candidate details:", err);
         setCandidate(null);
-        setLoadError(err?.message || "Falha ao carregar detalhes do candidato.");
+        setLoadError(errorMessage(err, "Falha ao carregar detalhes do candidato."));
       } finally {
         if (!stale) setLoading(false);
       }
@@ -179,7 +208,7 @@ export default function CandidateDetailsSheet({
                 </h3>
                 {candidate.candidate_educations && candidate.candidate_educations.length > 0 ? (
                   <ul className="space-y-3">
-                    {candidate.candidate_educations.map((edu: any) => (
+                    {candidate.candidate_educations.map((edu) => (
                       <li key={edu.id} className="bg-muted/30 p-3 rounded-lg">
                         <p className="font-medium">{edu.degree}</p>
                         <p className="text-sm text-muted-foreground">{edu.institution_name}</p>
@@ -207,8 +236,8 @@ export default function CandidateDetailsSheet({
                 {candidate.candidate_interviews && candidate.candidate_interviews.length > 0 ? (
                   <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent">
                     {candidate.candidate_interviews
-                      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                      .map((interview: any) => (
+                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                      .map((interview) => (
                         <div key={interview.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                           <div className="flex items-center justify-center w-5 h-5 rounded-full border border-white bg-slate-300 group-[.is-active]:bg-primary text-slate-500 group-[.is-active]:text-emerald-50 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2">
                           </div>

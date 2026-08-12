@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-const pdf = require("pdf-parse");
+import pdf from "pdf-parse";
 
 export interface DominioEmployee {
   registrationNumber: string;
@@ -97,8 +97,8 @@ export async function parseDominioPdf(filePath: string): Promise<DominioEmployee
     }
 
     return employees;
-  } catch (error: any) {
-    console.error(`[ERROR] Failed to parse PDF at ${filePath}:`, error.message);
+  } catch (error) {
+    console.error(`[ERROR] Failed to parse PDF at ${filePath}:`, error instanceof Error ? error.message : error);
     return [];
   }
 }

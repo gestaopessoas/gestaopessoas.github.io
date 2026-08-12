@@ -31,7 +31,8 @@ export function parseCustosExcel(filePath: string): CustosEmployee[] {
   const sheet = wb.Sheets[sheetName];
   
   // Leitura crua da planilha
-  const rows: any[] = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+  // header:1 devolve cada linha como array de células cruas.
+  const rows: unknown[][] = xlsx.utils.sheet_to_json(sheet, { header: 1 });
   
   const employees: CustosEmployee[] = [];
 
@@ -51,7 +52,7 @@ export function parseCustosExcel(filePath: string): CustosEmployee[] {
     }
 
     const nameRaw = String(row[3] || "");
-    const baseSal = parseFloat(row[10]) || 0;
+    const baseSal = parseFloat(String(row[10] ?? "")) || 0;
 
     employees.push({
       status: status,

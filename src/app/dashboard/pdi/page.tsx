@@ -86,7 +86,8 @@ export default function PDIPage() {
   };
 
   useEffect(() => {
-    fetchData();
+    const run = async () => { await fetchData(); };
+    run();
   }, []);
 
   const handleCreatePDI = async (e: React.FormEvent) => {

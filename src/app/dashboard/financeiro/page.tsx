@@ -69,7 +69,8 @@ export default function FinanceiroPage() {
   };
 
   useEffect(() => {
-    loadData();
+    const run = async () => { await loadData(); };
+    run();
   }, [month, year]);
 
   const handleSaveSnapshot = async () => {

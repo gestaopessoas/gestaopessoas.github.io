@@ -123,7 +123,10 @@ export default function ColaboradoresPage() {
   // Trocar de aba muda o tamanho da página: manter o índice antigo apontaria para um intervalo inválido.
   const changeTab = (tab: typeof activeTab) => { setActiveTab(tab); setPage(0); };
 
-  const [query, setQuery] = useState("");
+  // `?query=` na URL já entra como busca inicial, sem um render extra depois do mount.
+  const [query, setQuery] = useState(() =>
+    typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("query") ?? ""
+  );
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [refresh, setRefresh] = useState(0);
@@ -147,15 +150,12 @@ export default function ColaboradoresPage() {
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
       if (wpRes.data) setWorkplaces(wpRes.data as Entity[]);
       if (rolesRes.data) {
-        setRoles(Array.from(new Set(rolesRes.data.map((d: any) => normalizeRole(d.title)))).sort() as string[]);
+        setRoles(Array.from(new Set(rolesRes.data.map((d) => normalizeRole(d.title)))).sort() as string[]);
       }
       if (salaryRes.data) setSalaryRules(salaryRes.data as SalaryRule[]);
     });
 
     const params = new URLSearchParams(window.location.search);
-    const q = params.get("query");
-    if (q) setQuery(q);
-
     const editId = params.get("edit");
     if (editId) {
       supabase.from("employees").select("*").eq("id", editId).single().then(({ data }) => {
@@ -336,7 +336,7 @@ export default function ColaboradoresPage() {
     }
     const nullableDates = new Set(["birthday", "dismissed_at", "admission_date", "aso_date"]);
     const nullableUuids = new Set(["department_id", "company_id", "cost_center_id", "workplace_id"]);
-    const payload: Record<string, any> = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || nullableUuids.has(key) ? value || null : (value as string).trim() || null]));
+    const payload: Record<string, string | number | null> = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || nullableUuids.has(key) ? value || null : (value as string).trim() || null]));
     payload.name = form.name.trim();
     payload.role = normalizeRole(form.role);
     payload.marital_status = canonicalizeOption(form.marital_status, maritalStatusOptions) || null;
@@ -668,10 +668,10 @@ export default function ColaboradoresPage() {
             emptyMessage="Nenhum colaborador encontrado."
             renderRow={(employee) => {
               const trialInfo = getTrialInfo(employee.admission_date as string | null);
-              const isActive = ["Ativo", "Férias", "Afastado"].includes(employee.status);
+              const isActive = ["Ativo", "Férias", "Afastado"].includes(employee.status ?? "");
               const isIncomplete =
                 (isActive && (!employee.admission_date || !employee.registration_number || !employee.birthday || !employee.cost_center_id || !employee.company_id || !employee.workplace_id))
-                || (["Inativo", "Desligado"].includes(employee.status) && !employee.dismissed_at);
+                || (["Inativo", "Desligado"].includes(employee.status ?? "") && !employee.dismissed_at);
               const lotacao = [employee.companies?.trading_name || employee.companies?.name, employee.workplaces?.name, employee.departments?.name].filter(Boolean).join(" · ");
               return (
                 <tr key={employee.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => startEdit(employee)}>
@@ -960,7 +960,7 @@ export default function ColaboradoresPage() {
         <DialogContent className="max-w-md sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Excluir colaborador</DialogTitle>
-            <DialogDescription>Tem certeza que deseja excluir o colaborador "{confirmDelete?.name}"? Esta ação não pode ser desfeita.</DialogDescription>
+            <DialogDescription>Tem certeza que deseja excluir o colaborador &quot;{confirmDelete?.name}&quot;? Esta ação não pode ser desfeita.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setConfirmDelete(null)} disabled={saving}>Cancelar</Button>

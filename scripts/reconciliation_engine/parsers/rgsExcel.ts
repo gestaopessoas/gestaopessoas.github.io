@@ -9,7 +9,7 @@ export interface RgsEmployee {
   role?: string;
   department?: string;
   admissionDate?: Date;
-  raw: any;
+  raw: unknown;
 }
 
 function normalizeName(name: string): string {
@@ -35,7 +35,8 @@ export function parseRgsExcel(filePath: string): RgsEmployee[] {
   // Leitura com cabeçalhos reais. Precisamos encontrar as colunas.
   // Assumimos que o RGS tem colunas "Nome", "CPF", "Matrícula" etc.
   // Se os nomes das colunas variarem, precisamos mapear ou usar índices aproximados.
-  const rows: any[] = xlsx.utils.sheet_to_json(sheet);
+  // Sem header:1 cada linha vem como objeto com as colunas da planilha.
+  const rows: Record<string, unknown>[] = xlsx.utils.sheet_to_json(sheet);
   
   return rows.map((row) => {
     // Tenta encontrar colunas pelas chaves
@@ -56,7 +57,7 @@ export function parseRgsExcel(filePath: string): RgsEmployee[] {
     const deptRaw = getVal(["setor", "departamento"]);
 
     return {
-      cpf: cpfRaw ? normalizeCpf(cpfRaw) : "",
+      cpf: cpfRaw ? normalizeCpf(String(cpfRaw)) : "",
       name: String(nameRaw || ""),
       nameNormalized: normalizeName(String(nameRaw || "")),
       registrationNumber: regRaw ? String(regRaw) : undefined,

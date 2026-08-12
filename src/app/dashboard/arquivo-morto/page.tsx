@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
 import { Archive, RotateCcw, Search, Package, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 
 type EmployeeArchive = { physical_boxes: { code: string } | null };
 type Employee = { 
@@ -32,37 +32,38 @@ type BoxData = {
   count: number;
 };
 
+type SaveBoxHandler = (employee: Employee, archiveBox: string) => void;
+type ReactivateHandler = (employee: Employee) => void;
+
 const pageSize = 100;
 
 function Pagination({ currentPage, totalPages, onPageChange }: { currentPage: number; totalPages: number; onPageChange: (page: number) => void }) {
   if (totalPages <= 1) return null;
 
-  const pages = useMemo(() => {
-    const result: (number | string)[] = [];
-    const maxVisible = 5;
-    let start = Math.max(0, currentPage - Math.floor(maxVisible / 2));
-    let end = Math.min(totalPages - 1, start + maxVisible - 1);
+  // Cálculo barato e sem hook: memorizar aqui violaria a ordem dos hooks por causa
+  // do early return acima, e a lista tem no máximo 7 itens.
+  const pages: (number | string)[] = [];
+  const maxVisible = 5;
+  let start = Math.max(0, currentPage - Math.floor(maxVisible / 2));
+  const end = Math.min(totalPages - 1, start + maxVisible - 1);
 
-    if (end - start + 1 < maxVisible) {
-      start = Math.max(0, end - maxVisible + 1);
-    }
+  if (end - start + 1 < maxVisible) {
+    start = Math.max(0, end - maxVisible + 1);
+  }
 
-    if (start > 0) {
-      result.push(0);
-      if (start > 1) result.push("...");
-    }
+  if (start > 0) {
+    pages.push(0);
+    if (start > 1) pages.push("...");
+  }
 
-    for (let i = start; i <= end; i++) {
-      result.push(i);
-    }
+  for (let i = start; i <= end; i++) {
+    pages.push(i);
+  }
 
-    if (end < totalPages - 1) {
-      if (end < totalPages - 2) result.push("...");
-      result.push(totalPages - 1);
-    }
-
-    return result;
-  }, [currentPage, totalPages]);
+  if (end < totalPages - 1) {
+    if (end < totalPages - 2) pages.push("...");
+    pages.push(totalPages - 1);
+  }
 
   return (
     <div className="flex items-center justify-center gap-1">
@@ -112,7 +113,8 @@ export default function ArquivoMortoPage() {
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [expandedBoxes, setExpandedBoxes] = useState<string[]>([]);
+  // Na busca toda caixa nasce aberta — guardamos só as que o usuário fechou.
+  const [collapsedBoxes, setCollapsedBoxes] = useState<string[]>([]);
   const [reactivateTarget, setReactivateTarget] = useState<Employee | null>(null);
 
   useEffect(() => {
@@ -137,7 +139,7 @@ export default function ArquivoMortoPage() {
            code: b.code,
            count: Array.isArray(b.employee_archives) 
                   ? b.employee_archives[0]?.count || 0 
-                  : (b.employee_archives as any)?.count || 0
+                  : (b.employee_archives as { count?: number } | null)?.count || 0
         }));
         setBoxes(mappedBoxes);
         setRows([]);
@@ -145,7 +147,7 @@ export default function ArquivoMortoPage() {
         setError("");
       } else {
         // Fetch employees for search
-        let request = sb
+        const request = sb
           .from("employees")
           .select(`
             id, name, cpf, rg, role, unit, dismissed_at,
@@ -218,8 +220,9 @@ export default function ArquivoMortoPage() {
   };
 
   const toggleBox = (box: string) => {
-    setExpandedBoxes(prev => prev.includes(box) ? prev.filter(b => b !== box) : [...prev, box]);
+    setCollapsedBoxes(prev => prev.includes(box) ? prev.filter(b => b !== box) : [...prev, box]);
   };
+  const isBoxExpanded = (box: string) => !collapsedBoxes.includes(box);
 
   const groupedSearchEmployees = rows.reduce((acc, emp) => {
     let box = "Sem Caixa";
@@ -233,12 +236,6 @@ export default function ArquivoMortoPage() {
     acc[box].push(emp);
     return acc;
   }, {} as Record<string, Employee[]>);
-
-  useEffect(() => {
-    if (query && Object.keys(groupedSearchEmployees).length > 0) {
-      setExpandedBoxes(Object.keys(groupedSearchEmployees));
-    }
-  }, [query, rows]);
 
   return <div className="space-y-6">
     <header>
@@ -287,11 +284,11 @@ export default function ArquivoMortoPage() {
                 </div>
               </div>
               <div className="p-2 rounded-full hover:bg-border/50 transition-colors">
-                {expandedBoxes.includes(boxName) ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+                {isBoxExpanded(boxName) ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
               </div>
             </button>
             
-            {expandedBoxes.includes(boxName) && (
+            {isBoxExpanded(boxName) && (
               <div className="border-t border-border overflow-x-auto bg-background/30">
                 <table className="w-full text-sm">
                   <thead className="border-b bg-muted/40 text-left">
@@ -327,7 +324,7 @@ export default function ArquivoMortoPage() {
         <DialogHeader>
           <DialogTitle>Reativar colaborador</DialogTitle>
           <DialogDescription>
-            Deseja reativar <strong>{reactivateTarget?.name}</strong>? O colaborador voltará ao status "Ativo" e será removido do arquivo morto.
+            Deseja reativar <strong>{reactivateTarget?.name}</strong>? O colaborador voltará ao status &quot;Ativo&quot; e será removido do arquivo morto.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -341,27 +338,31 @@ export default function ArquivoMortoPage() {
   </div>;
 }
 
-function LazyBoxRow({ box, onSave, onReactivate }: { box: BoxData, onSave: any, onReactivate: any }) {
+function LazyBoxRow({ box, onSave, onReactivate }: { box: BoxData, onSave: SaveBoxHandler, onReactivate: ReactivateHandler }) {
   const [expanded, setExpanded] = useState(false);
   const [employees, setEmployees] = useState<Employee[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Aberta e ainda sem lista carregada é exatamente o estado "carregando".
+  const loading = expanded && employees === null;
 
   useEffect(() => {
     if (expanded && employees === null) {
-      setLoading(true);
       const sb = createClient();
       sb.from("employee_archives")
         .select(`employees(id, name, cpf, rg, role, unit, dismissed_at)`)
         .eq("box_id", box.id)
         .then(({ data, error }) => {
-           setLoading(false);
            if (!error && data) {
              const emps = data.map(d => ({
-                ...(d.employees as any),
+                // O select traz um objeto (relação to-one), mas os tipos-stub do
+                // supabase o descrevem como array — daí o passo por `unknown`.
+                ...(d.employees as unknown as Employee),
                 employee_archives: [{ physical_boxes: { code: box.code } }]
              })) as Employee[];
              emps.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
              setEmployees(emps);
+           } else {
+             // Sem lista o estado derivado ficaria em "carregando" para sempre.
+             setEmployees([]);
            }
         });
     }

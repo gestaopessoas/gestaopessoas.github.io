@@ -1,20 +1,23 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useSyncExternalStore } from "react"
 
+/**
+ * `matchMedia` é uma store externa do browser — ler por useSyncExternalStore evita
+ * o par useState+useEffect (que renderizava uma vez com o valor errado) e é seguro
+ * na hidratação: no servidor não existe viewport, então o snapshot é `false`.
+ */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false)
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      const media = window.matchMedia(query)
+      media.addEventListener("change", onStoreChange)
+      return () => media.removeEventListener("change", onStoreChange)
+    },
+    [query]
+  )
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
+  const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query])
 
-    const media = window.matchMedia(query)
-    if (media.matches !== matches) setMatches(media.matches)
-
-    const listener = (e: MediaQueryListEvent) => setMatches(e.matches)
-    media.addEventListener("change", listener)
-    return () => media.removeEventListener("change", listener)
-  }, [matches, query])
-
-  return matches
+  return useSyncExternalStore(subscribe, getSnapshot, () => false)
 }

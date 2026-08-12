@@ -9,13 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Upload, FileText, Download } from "lucide-react";
 import { format } from "date-fns";
 
+type PayslipEmployee = { id: string; name: string; cpf: string | null };
+type PayslipFile = { name: string; employee_id: string };
+
 export default function HoleritesPage() {
   const supabase = createClient();
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<PayslipEmployee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [myPayslips, setMyPayslips] = useState<any[]>([]);
+  const [myPayslips, setMyPayslips] = useState<PayslipFile[]>([]);
   const [isHR, setIsHR] = useState(false);
 
   useEffect(() => {
@@ -29,7 +32,7 @@ export default function HoleritesPage() {
 
       if (isUserHR) {
         const { data: emps } = await supabase.from('employees').select('id, name, cpf').in('status', ['Ativo', 'Férias', 'Afastado']);
-        setEmployees(emps || []);
+        setEmployees((emps ?? []) as unknown as PayslipEmployee[]);
       }
 
       // Fetch my payslips (from my folder)

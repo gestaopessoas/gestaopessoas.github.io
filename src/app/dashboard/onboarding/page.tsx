@@ -45,7 +45,8 @@ export default function OnboardingPage() {
   };
 
   useEffect(() => {
-    load();
+    const run = async () => { await load(); };
+    run();
   }, []);
 
   const toggleTask = async (employeeId: string, task: OnboardingTask, currentValue: boolean) => {
@@ -56,7 +57,7 @@ export default function OnboardingPage() {
     const newStatus = { ...currentStatus, [task]: !currentValue };
 
     // Update optimistic UI
-    setEmployees(prev => prev.map(e => e.id === employeeId ? { ...e, onboarding_status: newStatus as any } : e));
+    setEmployees(prev => prev.map(e => e.id === employeeId ? { ...e, onboarding_status: newStatus as Record<OnboardingTask, boolean> } : e));
 
     const supabase = createClient();
     await supabase.from("employees").update({ onboarding_status: newStatus }).eq("id", employeeId);

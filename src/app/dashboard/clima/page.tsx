@@ -76,21 +76,21 @@ export default function ClimaPage() {
     const { data: srvs } = await supabase.from('climate_surveys').select('*').order('created_at', { ascending: false });
     const { data: resps } = await supabase.from('climate_survey_responses').select('*');
 
-    const parsed = (srvs || []).map((s: any) => {
-      const sr = (resps || []).filter((r: any) => r.survey_id === s.id);
+    const parsed = (srvs || []).map((s) => {
+      const sr = (resps || []).filter((r) => r.survey_id === s.id);
       
       let enps = 0;
       let promoters = 0;
       let detractors = 0;
       let neutrals = 0;
       if (sr.length > 0) {
-        promoters = sr.filter((r: any) => r.score != null && Number(r.score) >= 9).length;
-        detractors = sr.filter((r: any) => r.score != null && Number(r.score) <= 6).length;
+        promoters = sr.filter((r) => r.score != null && Number(r.score) >= 9).length;
+        detractors = sr.filter((r) => r.score != null && Number(r.score) <= 6).length;
         neutrals = sr.length - promoters - detractors;
         enps = Math.round(((promoters - detractors) / sr.length) * 100);
       }
 
-      const feedbacks = sr.filter((r: any) => r.feedback && String(r.feedback).trim().length > 0);
+      const feedbacks = sr.filter((r) => r.feedback && String(r.feedback).trim().length > 0);
 
       return { ...s, responsesCount: sr.length, enps, promoters, neutrals, detractors, feedbacks };
     });

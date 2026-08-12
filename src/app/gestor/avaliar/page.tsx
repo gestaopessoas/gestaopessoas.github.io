@@ -112,7 +112,10 @@ export default function PortalGestorPage() {
     setLoading(false);
   }, [supabase]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const run = async () => { await load(); };
+    run();
+  }, [load]);
 
   const current = applications[currentIndex] ?? null;
   const candidate = current?.candidates ?? null;

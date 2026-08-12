@@ -5,6 +5,7 @@ import ReactCrop, { type Crop, centerCrop, makeAspectCrop } from "react-image-cr
 import "react-image-crop/dist/ReactCrop.css";
 import { X, Upload, Check, Loader2, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { errorMessage } from "@/lib/utils";
 
 interface LogoCropperModalProps {
   isOpen: boolean;
@@ -165,7 +166,7 @@ export const LogoCropperModal: React.FC<LogoCropperModalProps> = ({ isOpen, onCl
       // 4. Retorna pro Form principal
       onCropped(publicData.publicUrl);
       
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setErrorMsg("Erro ao fazer upload da imagem. Tente novamente.");
     } finally {

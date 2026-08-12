@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { errorMessage } from "@/lib/utils";
 
 type AddCandidateModalProps = {
   isOpen: boolean;
@@ -75,7 +76,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
         linkedin_url: "",
       });
       onSuccess();
-    } catch (err: any) {
+    } catch (err) {
       setError("Erro inesperado ao cadastrar.");
     } finally {
       setLoading(false);

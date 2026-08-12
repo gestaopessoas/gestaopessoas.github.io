@@ -7,6 +7,8 @@ import { createClient } from "@/utils/supabase/client";
 import { Edit3, HardHat, MapPin, Plus, Search, X, Download, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+type Person = { id: string; name: string };
+
 type Company = {
   id: string;
   name: string;
@@ -38,8 +40,8 @@ const typeStyle: Record<string, string> = {
 export default function ObrasPage() {
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [coordinatorsList, setCoordinatorsList] = useState<{ id: string; name: string }[]>([]);
-  const [directorsList, setDirectorsList] = useState<{ id: string; name: string }[]>([]);
+  const [coordinatorsList, setCoordinatorsList] = useState<Person[]>([]);
+  const [directorsList, setDirectorsList] = useState<Person[]>([]);
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -68,8 +70,8 @@ export default function ObrasPage() {
       }
       setCompanies((companyResult.data ?? []) as Company[]);
       setWorkplaces((workplaceResult.data ?? []) as unknown as Workplace[]);
-      setCoordinatorsList((coordResult.data ?? []) as any[]);
-      setDirectorsList((dirResult.data ?? []) as any[]);
+      setCoordinatorsList((coordResult.data ?? []) as unknown as Person[]);
+      setDirectorsList((dirResult.data ?? []) as unknown as Person[]);
     }
 
     loadWorkplaces();
@@ -79,8 +81,13 @@ export default function ObrasPage() {
     };
   }, []);
 
-  // Preenche diretor responsável automaticamente com base no tipo
-  useEffect(() => {
+  // Preenche diretor responsável automaticamente com base no tipo. Ajuste durante
+  // o render (padrão do React para estado derivado): o campo já sai preenchido,
+  // sem um render intermediário com o select vazio.
+  const directorKey = `${form.type}|${form.responsible_director_id}|${directorsList.length}`;
+  const [lastDirectorKey, setLastDirectorKey] = useState(directorKey);
+  if (lastDirectorKey !== directorKey) {
+    setLastDirectorKey(directorKey);
     if (form.type === "SEDE" && !form.responsible_director_id) {
       const pres = directorsList.find(e => e.name.toLowerCase().includes("presidente"));
       if (pres) setForm((prev) => ({ ...prev, responsible_director_id: pres.id }));
@@ -88,7 +95,7 @@ export default function ObrasPage() {
       const dir = directorsList.find(e => e.name.toLowerCase().includes("diretor comercial"));
       if (dir) setForm((prev) => ({ ...prev, responsible_director_id: dir.id }));
     }
-  }, [form.type, form.responsible_director_id, directorsList]);
+  }
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();

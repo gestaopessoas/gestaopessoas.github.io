@@ -61,7 +61,8 @@ export default function ClubeDescontosPage() {
   }, [supabase]);
 
   useEffect(() => {
-    fetchPartners();
+    const run = async () => { await fetchPartners(); };
+    run();
   }, [fetchPartners]);
 
   // Filtragem local otimizada e sem re-renderizações lentas (useMemo)

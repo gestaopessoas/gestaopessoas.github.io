@@ -9,7 +9,8 @@ import { endOfMonth, format, startOfMonth } from "date-fns";
 export default function TurnoverPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState({ total: 0, desligados: 0, turnover: 0, history: [] as any[] });
+  type DismissedEmployee = { id: string; name: string; dismissed_at: string | null; observation: string | null };
+  const [metrics, setMetrics] = useState({ total: 0, desligados: 0, turnover: 0, history: [] as DismissedEmployee[] });
 
   useEffect(() => {
     async function fetchData() {
@@ -110,7 +111,7 @@ export default function TurnoverPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {metrics.history.map((h: any) => (
+                  {metrics.history.map((h) => (
                     <tr key={h.id} className="hover:bg-muted/50">
                       <td className="px-4 py-3 font-medium">{h.name}</td>
                       <td className="px-4 py-3 tabular-nums">{h.dismissed_at ? format(new Date(h.dismissed_at), 'dd/MM/yyyy') : 'N/D'}</td>

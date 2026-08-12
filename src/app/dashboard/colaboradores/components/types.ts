@@ -12,9 +12,52 @@ export interface Department {
   name: string;
 }
 
-export interface Employee extends Record<string, string | null | any> {
+/**
+ * Linha de `employees` como as telas a consomem. O índice genérico existe porque
+ * o formulário lê/escreve por nome de coluna (`employee[key]`); as colunas
+ * declaradas abaixo vencem o índice e mantêm o tipo real onde ele importa.
+ */
+export interface Employee extends Record<string, unknown> {
   id: string;
   name: string;
+  registration_number?: string | null;
+  profile_code?: string | null;
+  department_id?: string | null;
+  birthday?: string | null;
+  status?: string | null;
+  dismissed_at?: string | null;
+  role?: string | null;
+  senioridade?: string | null;
+  phone?: string | null;
+  email_personal?: string | null;
+  email_corporate?: string | null;
+  contract_type?: string | null;
+  admission_date?: string | null;
+  shirt_size?: string | null;
+  boot_size?: string | null;
+  gender?: string | null;
+  cpf?: string | null;
+  rg?: string | null;
+  ctps?: string | null;
+  ctps_serie?: string | null;
+  pis?: string | null;
+  marital_status?: string | null;
+  cbo?: string | null;
+  aso_date?: string | null;
+  observation?: string | null;
+  unit?: string | null;
+  company_id?: string | null;
+  cost_center_id?: string | null;
+  workplace_id?: string | null;
+  work_schedule_start_1?: string | null;
+  work_schedule_end_1?: string | null;
+  work_schedule_start_2?: string | null;
+  work_schedule_end_2?: string | null;
+  weekly_hours?: string | number | null;
+  work_days?: string | null;
+  base_salary?: string | number | null;
+  variable_salary?: string | number | null;
+  commission?: string | number | null;
   departments?: Entity | null;
   level?: string | null;
   companies?: Entity | null;

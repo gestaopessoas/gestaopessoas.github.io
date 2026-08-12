@@ -19,15 +19,20 @@ export const RedeemModal: React.FC<RedeemModalProps> = ({ partner, isOpen, onClo
   const modalRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
-  // Reset de estado quando abre/fecha
-  useEffect(() => {
+  // Reset de estado quando abre/fecha ou troca de parceiro. Ajuste durante o render
+  // (padrão do React para estado derivado de prop): acontece antes da pintura, sem
+  // o render extra que um efeito causaria.
+  const resetKey = `${isOpen}|${partner?.id ?? ""}`;
+  const [lastResetKey, setLastResetKey] = useState(resetKey);
+  if (lastResetKey !== resetKey) {
+    setLastResetKey(resetKey);
     if (isOpen && partner) {
       setConfirmed(false);
       setIsSubmitting(false);
       setErrorMsg(null);
       setCopied(false);
     }
-  }, [isOpen, partner]);
+  }
 
   // Suporte acessível para fechar via ESC e foco no teclado
   useEffect(() => {

@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
+import { errorMessage } from "@/lib/utils";
 
 export default function RecusaModal({
   isOpen,
@@ -76,9 +77,9 @@ export default function RecusaModal({
 
       onSuccess();
       setReason("");
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setError(err.message || "Ocorreu um erro ao recusar o candidato.");
+      setError(errorMessage(err, "Ocorreu um erro ao recusar o candidato."));
     } finally {
       setSaving(false);
     }

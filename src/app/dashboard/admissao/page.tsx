@@ -174,11 +174,6 @@ export default function AdmissaoDigitalPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetchLegacy();
-    fetchDocs();
-  }, []);
-
   const fetchLegacy = async () => {
     const supabase = createClient();
     const { data, error } = await supabase
@@ -219,6 +214,13 @@ export default function AdmissaoDigitalPage() {
     
     setActiveCandidates(filtered as unknown as ActiveCandidate[]);
   };
+
+  // Depois das declarações: o efeito não pode referenciar `fetchLegacy`/`fetchDocs`
+  // antes de existirem (react-hooks/immutability).
+  useEffect(() => {
+    const run = async () => { await Promise.all([fetchLegacy(), fetchDocs()]); };
+    run();
+  }, []);
 
   const filteredItems = useMemo(() => {
     const term = query.trim().toLowerCase();

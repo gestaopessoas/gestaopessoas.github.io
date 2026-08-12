@@ -24,6 +24,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 type Entity = { id: string; name: string };
 
+type MpHistoryRow = {
+  id: string;
+  created_at: string;
+  mp_type: string;
+  candidate_name: string | null;
+  role_name: string | null;
+  workplace: string | null;
+  salary: number | null;
+  reason: string | null;
+  requested_by: string | null;
+  profiles: { full_name: string | null } | null;
+  employees: { name: string | null } | null;
+};
+
 type Employee = {
   id: string;
   name: string;
@@ -101,7 +115,7 @@ export default function MPGeneratorPage() {
 
   // Form State
   const [mpType, setMpType] = useState<"contratacao" | "movimentacao" | "historico">("contratacao");
-  const [mpHistory, setMpHistory] = useState<any[]>([]);
+  const [mpHistory, setMpHistory] = useState<MpHistoryRow[]>([]);
   const [selectedLogo, setSelectedLogo] = useState("MOOV.png");
   const [selectedWorkplaceId, setSelectedWorkplaceId] = useState("");
   
@@ -192,7 +206,7 @@ export default function MPGeneratorPage() {
         supabase.from("mp_history").select("*, profiles:created_by(full_name), employees:employee_id(name)").order("created_at", { ascending: false })
       ]);
 
-      if (empsRes.data) setEmployees((empsRes.data as any[]).filter(e => e.status === "Ativo" || !e.status));
+      if (empsRes.data) setEmployees((empsRes.data as unknown as Employee[]).filter(e => e.status === "Ativo" || !e.status));
       if (salaryRes.data) setSalaryTable(salaryRes.data as SalaryRow[]);
       if (wpRes.data) setWorkplaces(wpRes.data as Entity[]);
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
@@ -211,15 +225,19 @@ export default function MPGeneratorPage() {
       }
       setWorkSchedules(scheds);
       
-      if (histRes.data) setMpHistory(histRes.data);
+      if (histRes.data) setMpHistory(histRes.data as unknown as MpHistoryRow[]);
 
       setLoading(false);
     };
     fetchData();
   }, []);
 
-  // Handle Obra/Template change
-  useEffect(() => {
+  // Handle Obra/Template change. Ajuste durante o render (padrão do React para
+  // estado derivado): o preenchimento acontece antes da pintura, sem render extra.
+  const workplaceKey = `${selectedWorkplaceId}|${workplaces.length}|${workSchedules.length}`;
+  const [lastWorkplaceKey, setLastWorkplaceKey] = useState(workplaceKey);
+  if (lastWorkplaceKey !== workplaceKey) {
+    setLastWorkplaceKey(workplaceKey);
     if (selectedWorkplaceId) {
       const wp = workplaces.find(w => w.id === selectedWorkplaceId);
       if (wp) {
@@ -245,10 +263,13 @@ export default function MPGeneratorPage() {
         }
       }
     }
-  }, [selectedWorkplaceId, workplaces, workSchedules]);
+  }
 
-  // Handle Employee selection in Movimentação - auto-fill cascata
-  useEffect(() => {
+  // Handle Employee selection in Movimentação - auto-fill cascata (mesmo padrão).
+  const movimentacaoKey = `${mpType}|${selectedEmployeeId}|${employees.length}|${modalities.length}|${rolesForModality.length}|${levelsForRole.length}`;
+  const [lastMovimentacaoKey, setLastMovimentacaoKey] = useState(movimentacaoKey);
+  if (lastMovimentacaoKey !== movimentacaoKey) {
+    setLastMovimentacaoKey(movimentacaoKey);
     if (mpType === "movimentacao" && selectedEmployeeId) {
       const emp = employees.find(e => e.id === selectedEmployeeId);
       if (emp) {
@@ -277,7 +298,7 @@ export default function MPGeneratorPage() {
       setPhone(""); setEmail(""); setSector("");
       // Do not clear location or cost center if they were set by Template
     }
-  }, [selectedEmployeeId, employees, mpType, modalities, rolesForModality, levelsForRole]);
+  }
 
   const toggleArrayItem = (array: string[], setArray: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
     setArray(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]);
@@ -332,7 +353,7 @@ export default function MPGeneratorPage() {
       const { data: histData } = await supabase.from("mp_history")
           .select("*, profiles:created_by(full_name), employees:employee_id(name)")
           .order("created_at", { ascending: false });
-      if (histData) setMpHistory(histData);
+      if (histData) setMpHistory(histData as unknown as MpHistoryRow[]);
 
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("MP", { pageSetup: { paperSize: 9, orientation: 'portrait' } });
@@ -815,7 +836,7 @@ export default function MPGeneratorPage() {
 
       <Tabs 
         value={mpType} 
-        onValueChange={(v) => setMpType(v as any)} 
+        onValueChange={(v) => setMpType(v as "contratacao" | "movimentacao" | "historico")} 
         className="w-full"
       >
         <TabsList className="grid w-full grid-cols-3 max-w-xl mb-8">
@@ -1058,7 +1079,7 @@ export default function MPGeneratorPage() {
                       onCheckedChange={(c) => setUpdateProfile(c as boolean)}
                     />
                     <Label htmlFor="update-profile" className="text-sm cursor-pointer leading-tight font-medium text-yellow-800 dark:text-yellow-200">
-                      Atualizar o perfil no sistema com os "Novos Dados" após gerar a MP.
+                      Atualizar o perfil no sistema com os &quot;Novos Dados&quot; após gerar a MP.
                     </Label>
                   </div>
                 )}

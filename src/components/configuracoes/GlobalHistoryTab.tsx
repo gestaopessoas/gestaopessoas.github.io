@@ -15,8 +15,8 @@ type HistoryEntry = {
   employee_id: string
   change_date: string
   change_type: string
-  old_value: any
-  new_value: any
+  old_value: unknown
+  new_value: unknown
   description: string
   column_name: string
   changed_by: string
@@ -36,7 +36,7 @@ export function GlobalHistoryTab() {
     setLoading(true)
     const supabase = createClient()
     
-    let query = supabase
+    const query = supabase
       .from('employee_history')
       .select(`
         *,
@@ -49,14 +49,15 @@ export function GlobalHistoryTab() {
     const { data, error } = await query
     
     if (!error && data) {
-      setHistory(data as any)
+      setHistory(data as unknown as HistoryEntry[])
     }
     setLoading(false)
   }
 
   useEffect(() => {
-    fetchHistory()
-  }, [])
+    const run = async () => { await fetchHistory(); };
+    run();
+  }, []);
 
   const handleRevert = async () => {
     if (!revertItem || !adminPassword) return

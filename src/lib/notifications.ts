@@ -35,7 +35,7 @@ export type UserPreferences = {
 };
 
 // Types corresponding to the fields fetched from DB
-type EmployeeData = {
+export type EmployeeData = {
   id: string;
   name: string;
   admission_date?: string | null;
@@ -49,7 +49,7 @@ type EmployeeData = {
   dismissed_at?: string | null;
 };
 
-type RgsData = {
+export type RgsData = {
   id: string;
   employee_name?: string | null;
   process_type?: string | null;
@@ -57,7 +57,7 @@ type RgsData = {
   status: string;
 };
 
-type BenefitData = {
+export type BenefitData = {
   employee_id: string;
   benefit_name?: string | null;
 };

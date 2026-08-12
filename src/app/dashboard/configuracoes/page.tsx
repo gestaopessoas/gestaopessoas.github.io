@@ -11,6 +11,7 @@ import { Save, Loader2, DownloadCloud, ShieldAlert, CalendarDays, Link as LinkIc
 import { createClient } from "@/utils/supabase/client"
 import { usePermissions } from "@/hooks/usePermissions"
 import { GlobalHistoryTab } from "@/components/configuracoes/GlobalHistoryTab"
+import { errorMessage } from "@/lib/utils";
 
 const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "central_candidato", "recrutamento", "armarios", "uniformes", "ponto", "rgs", "ilhas", "admissao", "onboarding", "centros_de_custo", "departamentos", "cargos", "empresas", "obras", "beneficios", "treinamentos", "ferias", "holerites", "avaliacoes", "clima", "metas", "pdi", "competencias", "turnover", "analytics", "salarios", "configuracoes", "financeiro"] as const
 const ACTIONS = ["view", "create", "edit", "delete"] as const
@@ -113,8 +114,8 @@ export default function ConfiguracoesPage() {
       });
       
       alert("Configurações salvas com sucesso!");
-    } catch (error: any) {
-      alert("Erro ao salvar: " + error.message);
+    } catch (error) {
+      alert("Erro ao salvar: " + errorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -137,7 +138,7 @@ export default function ConfiguracoesPage() {
         "system_settings", "tests", "time_logs", "training_sessions", "uniform_items", 
         "vacations", "workplaces"
       ];
-      const backupData: Record<string, any> = {};
+      const backupData: Record<string, unknown> = {};
       
       for (const table of tables) {
         const { data, error } = await supabase.from(table).select("*");
@@ -156,8 +157,8 @@ export default function ConfiguracoesPage() {
       link.remove();
       
       alert("Backup gerado com sucesso!");
-    } catch (error: any) {
-      alert("Erro ao gerar backup: " + error.message);
+    } catch (error) {
+      alert("Erro ao gerar backup: " + errorMessage(error));
     } finally {
       setBackingUp(false);
     }

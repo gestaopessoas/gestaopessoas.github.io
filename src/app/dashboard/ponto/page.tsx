@@ -11,10 +11,19 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { saveAs } from "file-saver";
-import { 
-  processRhidTxt, ProcessedRhidResult, EmployeeRecord, 
-  CompanyRecord, WorkplaceRecord, CompanyOutputFile 
+import {
+  processRhidTxt, ProcessedRhidResult, EmployeeRecord,
+  CompanyRecord, WorkplaceRecord, CompanyOutputFile
 } from "./rhidProcessor";
+import { errorMessage } from "@/lib/utils";
+
+type TimeLog = {
+  id: string;
+  timestamp: string;
+  type: string;
+  justification: string | null;
+  employees: { name: string } | null;
+};
 
 export default function PontoPage() {
   const supabase = createClient();
@@ -30,7 +39,7 @@ export default function PontoPage() {
   const [workplaces, setWorkplaces] = useState<WorkplaceRecord[]>([]);
   
   // Espelho state
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<TimeLog[]>([]);
   
   // RHID Import state
   const [referenceMonth, setReferenceMonth] = useState<string>(() => {
@@ -64,9 +73,9 @@ export default function PontoPage() {
         setEmployees((empRes.data || []) as EmployeeRecord[]);
         setCompanies((compRes.data || []) as CompanyRecord[]);
         setWorkplaces((workRes.data || []) as WorkplaceRecord[]);
-        setLogs(logsRes.data || []);
-      } catch (err: any) {
-        setDbError("Erro ao carregar dados oficiais do banco de dados: " + (err?.message || "Erro desconhecido"));
+        setLogs((logsRes.data ?? []) as unknown as TimeLog[]);
+      } catch (err) {
+        setDbError("Erro ao carregar dados oficiais do banco de dados: " + errorMessage(err, "Erro desconhecido"));
       } finally {
         setLoadingDb(false);
       }
@@ -91,8 +100,8 @@ export default function PontoPage() {
         const text = e.target?.result as string;
         const result = processRhidTxt(text, file.name, employees, companies, workplaces);
         setProcessedResult(result);
-      } catch (err: any) {
-        setProcessingError("Erro ao interpretar arquivo: " + (err?.message || "Formato incompatível"));
+      } catch (err) {
+        setProcessingError("Erro ao interpretar arquivo: " + errorMessage(err, "Formato incompatível"));
       }
     };
     reader.onerror = () => setProcessingError("Falha ao ler o arquivo no navegador.");
@@ -169,8 +178,8 @@ export default function PontoPage() {
       setSaveSuccessMessage(
         `Sucesso incrível! ${matchedEmployeesList.length} colaboradores tiveram seus registros arquivados no histórico mês a mês e os horários foram verificados/padronizados conforme a unidade.`
       );
-    } catch (err: any) {
-      alert("Erro ao gravar histórico no banco: " + (err?.message || "Erro desconhecido"));
+    } catch (err) {
+      alert("Erro ao gravar histórico no banco: " + errorMessage(err, "Erro desconhecido"));
     } finally {
       setSavingHistory(false);
     }
@@ -564,7 +573,7 @@ export default function PontoPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {logs.map((log: any) => (
+                    {logs.map((log) => (
                       <tr key={log.id} className="hover:bg-muted/40 transition-colors">
                         <td className="px-4 py-3 font-medium">{log.employees?.name || 'N/D'}</td>
                         <td className="px-4 py-3 tabular-nums font-mono text-xs">{format(new Date(log.timestamp), "dd/MM/yyyy HH:mm:ss")}</td>

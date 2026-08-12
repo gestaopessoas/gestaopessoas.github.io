@@ -25,6 +25,99 @@ type CandidateProfileModalProps = {
   onClose: () => void;
 };
 
+/**
+ * União do que `candidates`, `employees` e `interviews` conseguem devolver — a
+ * mesma ficha é montada a partir de qualquer uma das três origens, então todo
+ * campo é opcional.
+ */
+type ProfilePerson = {
+  id?: string;
+  full_name?: string | null;
+  name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  email_personal?: string | null;
+  email_corporate?: string | null;
+  phone?: string | null;
+  secondary_phone?: string | null;
+  secondary_email?: string | null;
+  role?: string | null;
+  role_interest?: string | null;
+  city?: string | null;
+  state?: string | null;
+  workplace?: string | null;
+  address?: string | null;
+  birth_date?: string | null;
+  birthplace?: string | null;
+  cpf?: string | null;
+  marital_status?: string | null;
+  uniform_size?: string | null;
+  boot_size?: string | null;
+  salary_expectation?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  gender_identity?: string | null;
+  sexual_orientation?: string | null;
+  race_declaration?: string | null;
+  diversity_info?: string | null;
+  personal_info?: string | null;
+  additional_info?: string | null;
+  dependents_notes?: string | null;
+  dependents_count?: number | string | null;
+  has_cnh?: boolean | null;
+  has_dependents?: boolean | null;
+  cnh_categories?: string[] | string | null;
+  search_tags?: string[] | null;
+  behavioral_tags?: string[] | null;
+  resume_url?: string | null;
+  isFromInterview?: boolean;
+};
+
+type ProfileEducation = {
+  id?: string;
+  degree?: string | null;
+  course?: string | null;
+  institution?: string | null;
+  status?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+};
+
+type ProfileExperience = {
+  id?: string;
+  role?: string | null;
+  company?: string | null;
+  current?: boolean;
+  start_date?: string | null;
+  end_date?: string | null;
+  activities?: string | null;
+};
+
+type AssessmentAcademic = ProfileEducation & { start_year?: string | null; end_year?: string | null };
+type AssessmentExperience = ProfileExperience;
+
+type ProfileInterview = {
+  id: string;
+  role?: string | null;
+  status?: string | null;
+  result?: string | null;
+  evaluator?: string | null;
+  interview_date?: string | null;
+  assessment?: {
+    academic_list?: AssessmentAcademic[];
+    experience_list?: AssessmentExperience[];
+    worksite?: string | null;
+    selection_stage?: string | null;
+    tech_knowledge_rating?: number | string | null;
+    communication_rating?: number | string | null;
+    culture_fit?: string | null;
+    strengths?: string | null;
+    improvement_points?: string | null;
+    final_observations?: string | null;
+  } | null;
+};
+
 export function CandidateProfileModal({
   candidateId,
   employeeId,
@@ -35,11 +128,11 @@ export function CandidateProfileModal({
   onClose,
 }: CandidateProfileModalProps) {
   const [activeTab, setActiveTab] = useState<"curriculum" | "behavioral">(initialTab);
-  const [person, setPerson] = useState<any>(null);
+  const [person, setPerson] = useState<ProfilePerson | null>(null);
   const [results, setResults] = useState<BigFiveResult[]>([]);
-  const [interviews, setInterviews] = useState<any[]>([]);
-  const [educations, setEducations] = useState<any[]>([]);
-  const [experiences, setExperiences] = useState<any[]>([]);
+  const [interviews, setInterviews] = useState<ProfileInterview[]>([]);
+  const [educations, setEducations] = useState<ProfileEducation[]>([]);
+  const [experiences, setExperiences] = useState<ProfileExperience[]>([]);
   const [loading, setLoading] = useState(true);
   const [openingResume, setOpeningResume] = useState(false);
 
@@ -88,10 +181,10 @@ export function CandidateProfileModal({
       setLoading(true);
       const supabase = createClient();
       
-      let personData: any = null;
+      let personData: ProfilePerson | null = null;
       let resultsData: BigFiveResult[] = [];
-      let educationsData: any[] = [];
-      let interviewsData: any[] = [];
+      let educationsData: ProfileEducation[] = [];
+      let interviewsData: ProfileInterview[] = [];
 
       // 1. Resolver dados da Pessoa (Candidato, Colaborador ou via Entrevista)
       if (candidateId) {
@@ -180,13 +273,13 @@ export function CandidateProfileModal({
       }
 
       // Extrair formações e experiências estruturadas de assessments de entrevistas
-      const extractedEdu: any[] = [...educationsData];
-      const extractedExp: any[] = [];
+      const extractedEdu: ProfileEducation[] = [...educationsData];
+      const extractedExp: ProfileExperience[] = [];
 
       interviewsData.forEach((int) => {
         if (int.assessment) {
           if (Array.isArray(int.assessment.academic_list)) {
-            int.assessment.academic_list.forEach((ac: any) => {
+            int.assessment.academic_list.forEach((ac) => {
               if (!extractedEdu.some(existing => (existing.course || existing.degree || "").toLowerCase() === (ac.course || "").toLowerCase() && (existing.institution || "").toLowerCase() === (ac.institution || "").toLowerCase())) {
                 extractedEdu.push({
                   id: ac.id || Math.random().toString(),
@@ -201,7 +294,7 @@ export function CandidateProfileModal({
             });
           }
           if (Array.isArray(int.assessment.experience_list)) {
-            int.assessment.experience_list.forEach((ex: any) => {
+            int.assessment.experience_list.forEach((ex) => {
               if (!extractedExp.some(existing => (existing.company || "").toLowerCase() === (ex.company || "").toLowerCase() && (existing.role || "").toLowerCase() === (ex.role || "").toLowerCase())) {
                 extractedExp.push({
                   id: ex.id || Math.random().toString(),
