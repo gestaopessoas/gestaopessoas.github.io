@@ -102,6 +102,13 @@ function isAnalystOrAbove(role: string | undefined): boolean {
   return ANALYST_AND_ABOVE_ROLES.some(k => r.includes(k));
 }
 
+
+const SETORES_POR_LOCAL = {
+  Obras: ['Operacionais (Motoristas, Serventes, Meio Oficiais, Oficiais, etc)'],
+  Engenharia: ['Coordenadores Técnicos de qualidade e técnicos', 'Estagiários de engenharia'],
+  Sede: ['RH', 'Gestão', 'Financeiro', 'Controladoria', 'Contabilidade', 'Comercial', 'Compras', 'Setor técnico', 'Marketing', 'Sac', 'Projetos', 'Planejamento', 'Jurídico', 'Alta direção', 'Ti', 'Outros']
+};
+
 export default function MPGeneratorPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [salaryTable, setSalaryTable] = useState<SalaryRow[]>([]);
