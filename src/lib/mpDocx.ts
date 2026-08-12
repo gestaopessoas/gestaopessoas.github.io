@@ -105,6 +105,46 @@ const box = (value: string, lines = 1) =>
 
 const field = (name: string, value: string, lines = 1) => [label(name), box(value, lines)];
 
+const inlineField = (name: string, value: string, lines = 1) =>
+  new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: noBorders,
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: 35, type: WidthType.PERCENTAGE },
+            borders: noBorders,
+            verticalAlign: VerticalAlign.CENTER,
+            children: [
+              new Paragraph({
+                spacing: { before: 20, after: 20 },
+                children: [text(name, { size: 15, color: LABEL_TEXT })],
+              }),
+            ],
+          }),
+          new TableCell({
+            width: { size: 65, type: WidthType.PERCENTAGE },
+            borders: noBorders,
+            verticalAlign: VerticalAlign.CENTER,
+            children: [
+              new Paragraph({
+                spacing: { after: 40, line: 300 },
+                border: { top: boxBorder, bottom: boxBorder, left: boxBorder, right: boxBorder },
+                shading: { fill: WHITE },
+                children: [
+                  text(value || "", { size: 18 }),
+                  ...Array.from({ length: Math.max(0, lines - 1) }, () => new TextRun({ break: 1 })),
+                ],
+              })
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+
+
 /** Célula de layout: sem bordas, com o fundo cinza do painel da seção. */
 const panelCell = (children: (Paragraph | Table)[], width: number) =>
   new TableCell({
@@ -500,15 +540,15 @@ export function buildMpMovimentacaoDocument(data: MpMovimentacaoData): Document 
     layoutTable([
       new TableRow({
         children: [
-          panelCell([...field("Nome do(a) colaborador(a)", data.candidateName)], 50),
-          panelCell([...field("Telefone", data.phone)], 50),
+          panelCell([...field("Nome do(a) colaborador(a)", data.candidateName)], 70),
+          panelCell([...field("Telefone", data.phone)], 30),
         ],
       }),
       new TableRow({
         children: [
-          panelCell([...field("E-mail", data.email)], 45),
+          panelCell([...field("E-mail", data.email)], 50),
           panelCell([...field("Matrícula", data.registration)], 25),
-          panelCell([...field("Ficha", data.ficha)], 30),
+          panelCell([...field("Ficha", data.ficha)], 25),
         ],
       }),
     ]),
@@ -526,15 +566,15 @@ export function buildMpMovimentacaoDocument(data: MpMovimentacaoData): Document 
               children: [
                 sectionHeader("02", "Dados Atuais"),
                 layoutTable([
-                  new TableRow({ children: [panelCell([...field("Cargo", data.current.role)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Nível", data.current.level)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Local", data.current.location)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Setor", data.current.sector)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Centro de custo", data.current.costCenter)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Código do perfil", data.current.profileCode)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Modalidade", data.current.modality)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Remuneração", data.current.salary)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Benefícios", data.current.benefits, 2)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Cargo", data.current.role)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Nível", data.current.level)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Local", data.current.location)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Setor", data.current.sector)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Centro de custo", data.current.costCenter)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Código do perfil", data.current.profileCode)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Modalidade", data.current.modality)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Remuneração", data.current.salary)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Benefícios", data.current.benefits, 2)], 100)] }),
                 ])
               ]
             }),
@@ -545,15 +585,15 @@ export function buildMpMovimentacaoDocument(data: MpMovimentacaoData): Document 
               children: [
                 sectionHeader("03", "Dados Alterados"),
                 layoutTable([
-                  new TableRow({ children: [panelCell([...field("Cargo", data.newData.role)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Nível", data.newData.level)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Local", data.newData.location)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Setor", data.newData.sector)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Centro de custo", data.newData.costCenter)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Código do perfil", data.newData.profileCode)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Modalidade", data.newData.modality)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Remuneração", data.newData.salary)], 100)] }),
-                  new TableRow({ children: [panelCell([...field("Benefícios", data.newData.benefits, 2)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Cargo", data.newData.role)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Nível", data.newData.level)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Local", data.newData.location)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Setor", data.newData.sector)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Centro de custo", data.newData.costCenter)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Código do perfil", data.newData.profileCode)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Modalidade", data.newData.modality)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Remuneração", data.newData.salary)], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Benefícios", data.newData.benefits, 3)], 100)] }),
                 ])
               ]
             }),
