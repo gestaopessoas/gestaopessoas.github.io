@@ -10,6 +10,20 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import { itemsToText, parseSolidesResume, type ParsedResume } from "@/lib/resumeParser";
+
+// O parser local devolve ParsedResume; a IA devolve os mesmos campos mais alguns
+// que só ela consegue inferir do texto livre.
+type ParsedResumeFields = Partial<ParsedResume> & {
+  is_internal?: boolean;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  has_dependents?: boolean;
+  dependents_count?: number;
+  dependents_notes?: string;
+  uniform_size?: string;
+  boot_size?: string;
+};
 
 // Define a versão para baixar o worker correto do CDN
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -1086,24 +1100,9 @@ Resultado Final: ${form.result || "N/C"}
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const content = await page.getTextContent();
-            // Ordena por Y decrescente (topo→baixo) e X crescente (esq→dir)
-            // para suportar PDFs com layout em duas colunas sem misturar o texto
-            const sorted = [...content.items].sort((a: any, b: any) => {
-              const yDiff = b.transform[5] - a.transform[5];
-              return Math.abs(yDiff) > 2 ? yDiff : a.transform[4] - b.transform[4];
-            });
-            let lastY: number | undefined;
-            let pageText = "";
-            for (const rawItem of sorted) {
-              const item = rawItem as any;
-              if (item.str === undefined) continue;
-              if (lastY !== undefined && item.transform && Math.abs(lastY - item.transform[5]) > 2) {
-                pageText += "\n";
-              }
-              pageText += item.str;
-              if (item.transform) lastY = item.transform[5];
-            }
-            text += pageText + "\n\n";
+            // itemsToText separa as colunas do PDF com TAB (a Sólides usa duas
+            // colunas nos dados pessoais) e descarta os rodapés "1 / 3".
+            text += itemsToText(content.items) + "\n";
           }
           setResumeText(text);
         } catch (err) {
@@ -1121,83 +1120,74 @@ Resultado Final: ${form.result || "N/C"}
     }
   };
 
-  const parseWithoutAI = () => {
-    if (!resumeText.trim()) return;
-    
-    // Expressões regulares baseadas no formato Sólides fornecido
-    const nameMatch = resumeText.match(/^([A-Za-zÀ-ÖØ-öø-ÿ\s]+)/i);
-    const firstLineName = resumeText.split("\n").map(l => l.trim()).filter(Boolean)[0] || "";
-    
-    // Idade: exige espaço antes para não capturar "22" em "22/03/1990" ou "R$2.200"
-    const ageMatch = resumeText.match(/(?<![\d/])\b([1-9][0-9])\s*anos/i);
-    // Cidade: aceita nomes compostos como "São Paulo - SP" (inclui espaços e acentos)
-    const locationMatch = resumeText.match(/([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ\s]*?)\s*-\s*([A-Z]{2})\b/);
-    const locationStr = locationMatch ? `${locationMatch[1].trim()} - ${locationMatch[2]}` : null;
-    const phoneMatch = resumeText.match(/(\(\d{2}\)\s*\d{4,5}-\d{4})/);
-    const emailMatch = resumeText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+)/);
-    
-    // Tenta extrair blocos de texto principais
-    const allHeaders = "(Cargo\\(s\\) de interesse|Experiência profissional|Formação|Cursos e certificações|Habilidades|Idiomas|Informações adicionais|Informações pessoais|Diversidade|Endereço|$)";
-    
-    let professional_summary = "";
-    const resumoMatch = resumeText.match(new RegExp(`Resumo profissional\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
-    if (resumoMatch) professional_summary = resumoMatch[1].trim();
-
-    let additional_info = "";
-    const infoAdicionaisMatch = resumeText.match(new RegExp(`Informações adicionais\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
-    if (infoAdicionaisMatch) additional_info = infoAdicionaisMatch[1].trim();
-
-    let personal_info = "";
-    const personalInfoMatch = resumeText.match(new RegExp(`Informações pessoais\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
-    if (personalInfoMatch) personal_info = personalInfoMatch[1].trim();
-
-    let diversity_info = "";
-    const diversityMatch = resumeText.match(new RegExp(`Diversidade\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
-    if (diversityMatch) diversity_info = diversityMatch[1].trim();
-
-    let experience_summary = "";
-    const expMatch = resumeText.match(new RegExp(`Experiência profissional\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
-    if (expMatch) experience_summary = expMatch[1].trim();
-
-    let educationText = "";
-    const formacaoMatch = resumeText.match(new RegExp(`Formação\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
-    if (formacaoMatch) educationText += "Formação:\n" + formacaoMatch[1].trim() + "\n\n";
-
-    const cursosMatch = resumeText.match(new RegExp(`Cursos e certificações\\s*([\\s\\S]*?)(?=${allHeaders})`, "i"));
-    if (cursosMatch) educationText += "Cursos e certificações:\n" + cursosMatch[1].trim() + "\n\n";
-
-    const parsedSalary1 = resumeText.match(/Pretens.o Salarial\s*(?:R\$)?\s*([\d.,]+)/i);
-    const finalSalary = parsedSalary1 ? ("R$ " + parsedSalary1[1].trim()) : "";
-
+  // Aplica no formulário o currículo lido — pelo parser local ou pela IA.
+  const applyParsedResume = (parsed: ParsedResumeFields) => {
     openNewModal();
     setForm(prev => ({
       ...prev,
-      candidate_name: firstLineName || (nameMatch ? nameMatch[1].trim() : ""),
-      email: emailMatch ? emailMatch[1].trim() : "",
-      phone: phoneMatch ? phoneMatch[1].trim() : "",
-      role: resumeText.match(/Cargo\(s\) de interesse\s*([^\n]+)/i)?.[1]?.trim() || ""
+      candidate_name: parsed.name || "",
+      email: parsed.email || "",
+      phone: parsed.phone || "",
+      role: parsed.role || ""
     }));
-    
     setAssessmentForm(prev => ({
       ...prev,
-      age: ageMatch ? ageMatch[1].trim() : prev.age,
-      location: locationStr ?? (resumeText.match(/Cidade\s*([^\n]+)/i)?.[1]?.trim() || prev.location),
-      professional_summary: professional_summary.trim() || prev.professional_summary,
-      experience_summary: experience_summary || prev.experience_summary,
-      education: educationText.trim() || prev.education,
-      cnh: resumeText.match(/Possui CNH\?\s*(Sim|Não)/i)?.[1] || (resumeText.match(/\bCNH\b/i) ? "Sim" : ""),
-      cnh_category: resumeText.match(/Categoria da CNH\s*([A-Z]+)/i)?.[1] || "",
-      birth_date: resumeText.match(/Data de nascimento\s*(\d{2}\/\d{2}\/\d{4})/i)?.[1] || "",
-      cpf: resumeText.match(/CPF\s*([\d.-]+)/i)?.[1] || "",
-      gender: resumeText.match(/Sexo\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || resumeText.match(/Gênero\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)/i)?.[1] || "",
-      address: resumeText.match(/Endereço\s*([^\n]+)/i)?.[1]?.trim() || prev.address,
-      salary_expectation: finalSalary,
-      additional_info: additional_info.trim() || prev.additional_info,
-      personal_info: personal_info.trim() || prev.personal_info,
-      diversity_info: diversity_info.trim() || prev.diversity_info
+      age: parsed.age || prev.age,
+      location: parsed.location || prev.location,
+      is_internal: typeof parsed.is_internal === "boolean" ? parsed.is_internal : prev.is_internal,
+      education: parsed.education || prev.education,
+      professional_summary: parsed.professional_summary || prev.professional_summary,
+      experience_summary: parsed.experience_summary || prev.experience_summary,
+      cnh: parsed.cnh || prev.cnh,
+      cnh_category: parsed.cnh_category || prev.cnh_category,
+      birth_date: parsed.birth_date || prev.birth_date,
+      cpf: parsed.cpf || prev.cpf,
+      gender: parsed.gender || prev.gender,
+      address: parsed.address || prev.address,
+      marital_status: parsed.marital_status || prev.marital_status,
+      birthplace: parsed.birthplace || prev.birthplace,
+      secondary_phone: parsed.secondary_phone || prev.secondary_phone,
+      secondary_email: parsed.secondary_email || prev.secondary_email,
+      emergency_contact_phone: parsed.emergency_contact_phone || prev.emergency_contact_phone,
+      emergency_contact_name: parsed.emergency_contact_name || prev.emergency_contact_name,
+      salary_expectation: parsed.salary_expectation || prev.salary_expectation,
+      has_cnh: typeof parsed.has_cnh === "boolean" ? parsed.has_cnh : prev.has_cnh,
+      cnh_categories: Array.isArray(parsed.cnh_categories) ? parsed.cnh_categories : prev.cnh_categories,
+      has_dependents: typeof parsed.has_dependents === "boolean" ? parsed.has_dependents : prev.has_dependents,
+      dependents_count: typeof parsed.dependents_count === "number" ? parsed.dependents_count : prev.dependents_count,
+      dependents_notes: parsed.dependents_notes || prev.dependents_notes,
+      uniform_size: parsed.uniform_size || prev.uniform_size,
+      boot_size: parsed.boot_size || prev.boot_size,
+      gender_identity: parsed.gender_identity || prev.gender_identity,
+      sexual_orientation: parsed.sexual_orientation || prev.sexual_orientation,
+      race_declaration: parsed.race_declaration || prev.race_declaration,
+      additional_info: parsed.additional_info || prev.additional_info,
+      personal_info: parsed.personal_info || prev.personal_info,
+      diversity_info: parsed.diversity_info || prev.diversity_info,
+      academic_list: Array.isArray(parsed.academic_list) ? parsed.academic_list.map((item, idx) => ({
+        id: String(Date.now() + idx),
+        course: item.course || "",
+        institution: item.institution || "",
+        start_date: item.start_date || "",
+        end_date: item.end_date || "",
+        in_progress: Boolean(item.in_progress)
+      })) : prev.academic_list || [],
+      experience_list: Array.isArray(parsed.experience_list) ? parsed.experience_list.map((item, idx) => ({
+        id: String(Date.now() + 100 + idx),
+        role: item.role || "",
+        company: item.company || "",
+        start_date: item.start_date || "",
+        end_date: item.end_date || "",
+        is_current: Boolean(item.is_current),
+        description: item.description || ""
+      })) : prev.experience_list || []
     }));
-    
     setIsResumeModalOpen(false);
+  };
+
+  const parseWithoutAI = () => {
+    if (!resumeText.trim()) return;
+    applyParsedResume(parseSolidesResume(resumeText));
   };
 
   const analyzeResume = async () => {
@@ -1275,64 +1265,7 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
       let text = generatedText.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(text);
 
-      openNewModal();
-      setForm(prev => ({
-        ...prev,
-        candidate_name: parsed.name || "",
-        email: parsed.email || "",
-        phone: parsed.phone || "",
-        role: parsed.role || ""
-      }));
-      setAssessmentForm(prev => ({
-        ...prev,
-        age: parsed.age || prev.age,
-        location: parsed.location || prev.location,
-        is_internal: typeof parsed.is_internal === "boolean" ? parsed.is_internal : prev.is_internal,
-        education: parsed.education || prev.education,
-        professional_summary: parsed.professional_summary || prev.professional_summary,
-        experience_summary: parsed.experience_summary || prev.experience_summary,
-        cnh: parsed.cnh || prev.cnh,
-        cnh_category: parsed.cnh_category || prev.cnh_category,
-        birth_date: parsed.birth_date || prev.birth_date,
-        cpf: parsed.cpf || prev.cpf,
-        gender: parsed.gender || prev.gender,
-        address: parsed.address || prev.address,
-        marital_status: parsed.marital_status || prev.marital_status,
-        birthplace: parsed.birthplace || prev.birthplace,
-        secondary_phone: parsed.secondary_phone || prev.secondary_phone,
-        secondary_email: parsed.secondary_email || prev.secondary_email,
-        emergency_contact_phone: parsed.emergency_contact_phone || prev.emergency_contact_phone,
-        emergency_contact_name: parsed.emergency_contact_name || prev.emergency_contact_name,
-        salary_expectation: parsed.salary_expectation || prev.salary_expectation,
-        has_cnh: typeof parsed.has_cnh === "boolean" ? parsed.has_cnh : prev.has_cnh,
-        cnh_categories: Array.isArray(parsed.cnh_categories) ? parsed.cnh_categories : prev.cnh_categories,
-        has_dependents: typeof parsed.has_dependents === "boolean" ? parsed.has_dependents : prev.has_dependents,
-        dependents_count: typeof parsed.dependents_count === "number" ? parsed.dependents_count : prev.dependents_count,
-        dependents_notes: parsed.dependents_notes || prev.dependents_notes,
-        uniform_size: parsed.uniform_size || prev.uniform_size,
-        boot_size: parsed.boot_size || prev.boot_size,
-        gender_identity: parsed.gender_identity || prev.gender_identity,
-        sexual_orientation: parsed.sexual_orientation || prev.sexual_orientation,
-        race_declaration: parsed.race_declaration || prev.race_declaration,
-        academic_list: Array.isArray(parsed.academic_list) ? parsed.academic_list.map((item: any, idx: number) => ({
-          id: String(Date.now() + idx),
-          course: item.course || "",
-          institution: item.institution || "",
-          start_date: item.start_date || "",
-          end_date: item.end_date || "",
-          in_progress: Boolean(item.in_progress)
-        })) : prev.academic_list || [],
-        experience_list: Array.isArray(parsed.experience_list) ? parsed.experience_list.map((item: any, idx: number) => ({
-          id: String(Date.now() + 100 + idx),
-          role: item.role || "",
-          company: item.company || "",
-          start_date: item.start_date || "",
-          end_date: item.end_date || "",
-          is_current: Boolean(item.is_current),
-          description: item.description || ""
-        })) : prev.experience_list || []
-      }));
-      setIsResumeModalOpen(false);
+      applyParsedResume(parsed);
     } catch (e: any) {
       console.error(e);
       alert("Falha na Inteligência Artificial: " + (e.message || "A resposta não estava no formato JSON correto."));
