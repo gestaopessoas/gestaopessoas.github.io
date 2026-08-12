@@ -253,8 +253,6 @@ export default function ColaboradoresPage() {
         if (matchingRules.length === 1) {
           updated.level = matchingRules[0].level!;
           if (matchingRules[0].salary != null) updated.base_salary = formatCurrencyInput(matchingRules[0].salary);
-        } else {
-          updated.level = "";
         }
       } else {
         const leveledRule = candidates.find((rule) => rule.uses_level && rule.level === level);
