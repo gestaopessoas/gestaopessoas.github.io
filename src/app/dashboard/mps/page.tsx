@@ -243,40 +243,6 @@ export default function MPGeneratorPage() {
     fetchData();
   }, []);
 
-  // Handle Obra/Template change. Ajuste durante o render (padrão do React para
-  // estado derivado): o preenchimento acontece antes da pintura, sem render extra.
-  const workplaceKey = `${selectedWorkplaceId}|${workplaces.length}|${workSchedules.length}`;
-  const [lastWorkplaceKey, setLastWorkplaceKey] = useState(workplaceKey);
-  if (lastWorkplaceKey !== workplaceKey) {
-    setLastWorkplaceKey(workplaceKey);
-    if (selectedWorkplaceId) {
-      const wp = workplaces.find(w => w.id === selectedWorkplaceId);
-      if (wp) {
-        setLocation(wp.name);
-        // Try to match logo
-        const wpUpper = wp.name.toUpperCase();
-        if (wpUpper.includes("SEDE")) setSelectedLogo("SEDE.png");
-        else if (wpUpper.includes("CONNECT DUQUE")) setSelectedLogo("Connect Duque.png");
-        else if (wpUpper.includes("MOOV II")) setSelectedLogo("MOOV II.png");
-        else if (wpUpper.includes("MOOV")) setSelectedLogo("MOOV.png");
-        else if (wpUpper.includes("JOY II")) setSelectedLogo("JOY II.png");
-        else if (wpUpper.includes("JOY")) setSelectedLogo("JOY.png");
-        else if (wpUpper.includes("LIFE RG")) setSelectedLogo("Life RG.png");
-        else if (wpUpper.includes("RESERVA")) setSelectedLogo("Reserva Home Club.png");
-        else if (wpUpper.includes("SOLANAS")) setSelectedLogo("Solanas.png");
-        else if (wpUpper.includes("DIRECT")) setSelectedLogo("Direct.png");
-        
-        // Match Schedule
-        if (wpUpper.includes("SEDE") && workSchedules.length > 0) {
-          setSelectedSchedule(workSchedules[0]);
-        } else if (wpUpper.includes("OBRA") && workSchedules.length > 1) {
-          setSelectedSchedule(workSchedules[1]);
-        }
-      }
-    }
-  }
-
-  // Handle Employee selection in Movimentação - auto-fill cascata (mesmo padrão).
   const movimentacaoKey = `${mpType}|${selectedEmployeeId}|${employees.length}|${modalities.length}|${rolesForModality.length}|${levelsForRole.length}`;
   const [lastMovimentacaoKey, setLastMovimentacaoKey] = useState(movimentacaoKey);
   if (lastMovimentacaoKey !== movimentacaoKey) {
@@ -492,23 +458,7 @@ export default function MPGeneratorPage() {
         </div>
       </div>
 
-      <div className="bg-card p-6 rounded-lg border shadow-sm mb-6 flex flex-col md:flex-row gap-4 md:items-end">
-        <div className="flex-1 space-y-2">
-          <Label>Obra / Unidade (Template)</Label>
-          <select 
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-            value={selectedWorkplaceId}
-            onChange={(e) => setSelectedWorkplaceId(e.target.value)}
-          >
-            <option value="">Selecione uma Obra (Opcional)</option>
-            {workplaces.map(w => (
-              <option key={w.id} value={w.id}>{w.name}</option>
-            ))}
-          </select>
-          <p className="text-xs text-muted-foreground">Selecionar a obra preenche automaticamente o Local.</p>
-        </div>
-        
-      </div>
+      
 
       <Tabs 
         value={mpType} 
