@@ -663,7 +663,7 @@ export default function MPGeneratorPage() {
                   </div>
 
                   {/* Campos condicionais para VR/Cesta Básica */}
-                  {(selectedBenefits.includes("VR")) && (
+                  {(selectedBenefits.includes("VR") || selectedBenefits.includes("Cesta Básica")) && (
                     <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-2">
                       <div className="space-y-2">
                         <Label>Nível VR/Cesta</Label>
@@ -844,7 +844,7 @@ export default function MPGeneratorPage() {
                       {/* 1. Modalidade */}
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Modalidade de Contratação</Label>
-                        <Select value={selectedModality || undefined} onValueChange={(val) => selectModality(val || '')}>
+                        <Select key={mpType} value={selectedModality || undefined} onValueChange={(val) => selectModality(val || '')}>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione a modalidade..." />
                           </SelectTrigger>
@@ -859,7 +859,7 @@ export default function MPGeneratorPage() {
                       {/* 2. Cargo (filtrado por modalidade) */}
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Cargo</Label>
-                        <Select value={selectedRoleName || undefined} onValueChange={selectSalaryRole} disabled={!selectedModality || rolesForModality.length === 0}>
+                        <Select key={selectedModality} value={selectedRoleName || undefined} onValueChange={selectSalaryRole} disabled={!selectedModality || rolesForModality.length === 0}>
                           <SelectTrigger>
                             <SelectValue placeholder={!selectedModality ? "Selecione modalidade primeiro" : rolesForModality.length === 0 ? "Nenhum cargo para esta modalidade" : "Selecione o cargo..."} />
                           </SelectTrigger>
@@ -874,7 +874,7 @@ export default function MPGeneratorPage() {
                       {/* 3. Nível (filtrado por modalidade + cargo) */}
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Nível</Label>
-                        <Select value={selectedLevel || undefined} onValueChange={(val) => { setSelectedLevel(val); const match = levelsForRole.find(l => l.level === val); if (match) setSelectedSalaryId(match.id); }} disabled={!selectedRoleName || !selectedRoleUsesLevel}>
+                        <Select key={`${selectedModality}-${selectedRoleName}`} value={selectedLevel || undefined} onValueChange={(val) => { setSelectedLevel(val); const match = levelsForRole.find(l => l.level === val); if (match) setSelectedSalaryId(match.id); }} disabled={!selectedRoleName || !selectedRoleUsesLevel}>
                           <SelectTrigger>
                             <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : !selectedRoleUsesLevel ? "Cargo sem nível" : "Selecione o nível..."} />
                           </SelectTrigger>
@@ -928,7 +928,7 @@ export default function MPGeneratorPage() {
                     </div>
 
                     {/* Campos condicionais para VR/Cesta Básica */}
-                    {(selectedBenefits.includes("VR")) && (
+                    {(selectedBenefits.includes("VR") || selectedBenefits.includes("Cesta Básica")) && (
                       <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-2">
                         <div className="space-y-2">
                           <Label>Nível VR/Cesta</Label>
