@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ACPO Gestão de Pessoas
 
-## Getting Started
+Sistema **ATS (Applicant Tracking System) e Core HR** da ACPO. Plataforma web para gestão completa de recrutamento, seleção, colaboradores, folha salarial, benefícios e operacional de obras.
 
-First, run the development server:
+## Stack
+
+- **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS v4, shadcn/ui
+- **Backend:** Supabase (Postgres 17, Auth, Storage, Realtime)
+- **Deploy:** GitHub Pages (static export)
+- **Dev local:** Docker Compose + Supabase CLI
+
+## Ambiente local
+
+O banco completo (Postgres + Auth + REST + Storage + Realtime + Studio) sobe via Supabase CLI. O app sobe via Docker Compose.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Subir banco local
+npx supabase start
+
+# Subir app (dev com hot reload)
+docker compose up web
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- App: http://localhost:3000
+- Studio (banco): http://localhost:54323
+- Emails (auth): http://localhost:54324
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Para resetar o banco local:
+```bash
+npx supabase db reset
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Variáveis de ambiente
 
-## Learn More
+Crie `.env.local` na raiz (ignorado pelo git) com:
 
-To learn more about Next.js, take a look at the following resources:
+```
+NEXT_PUBLIC_SUPABASE_URL=https://...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+NEXT_PUBLIC_GEMINI_API_KEY=...
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Para dev sem Docker, use `npm run dev` com `.env.local` apontando para produção.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scripts disponíveis
 
-## Deploy on Vercel
+| Comando | Descrição |
+|---------|-----------|
+| `npm run dev` | Dev server local (sem Docker) |
+| `npm run build` | Build static export (`out/`) |
+| `npm run lint` | ESLint |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Estrutura do projeto
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+  app/              → Rotas Next.js
+    dashboard/      → Painel administrativo (~35 módulos)
+    candidato/      → Portal do candidato
+    colaborador/    → Portal do colaborador
+    carreiras/      → Portal público de vagas
+    clube-descontos/→ Parceiros de desconto
+    solicitar-vaga/ → Formulário público
+  components/       → Componentes reutilizáveis
+  hooks/            → Custom hooks
+  lib/              → Utilitários
+  utils/            → Clientes Supabase
+supabase/
+  migrations/       → Schema (baseline + pendentes)
+  migrations_legacy/→ Histórico de migrations aposentadas
+  functions/        → Edge functions
+  seed.sql          → Admin local para dev
+docs/               → ADRs, specs, audits
+scripts/            → Scripts de import/migração
+```
+
+## Arquitetura
+
+- **Static export:** `output: "export"` no `next.config.ts`. Não suporta middleware dinâmico nem route handlers.
+- **Client-side only:** Todo acesso ao Supabase é via `createBrowserClient` no navegador.
+- **Segurança via RLS:** Row Level Security no Postgres. Não há APIs intermediárias.
+- **Baseline de schema:** O schema vem de `supabase/migrations/00000000000000_baseline_producao.sql` (dump de produção). Migrations novas ficam em `supabase/migrations/`.
+
+## Documentação interna
+
+- [docs/docker.md](docs/docker.md) — Setup completo do ambiente local
+- [docs/adr/](docs/adr/) — Decisões arquiteturais (RLS, UI drift, etc.)
+- [DESAFIOS.md](DESAFIOS.md) — Armadilhas e convenções descobertas
+- [docs/auditoria-projeto.md](docs/auditoria-projeto.md) — Auditoria completa do repositório
+
+## Licença
+
+Privado — ACPO Empreendimentos.

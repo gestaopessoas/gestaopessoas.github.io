@@ -1,7 +1,7 @@
 - [x] Ticket 01: Extract notifications lib
 - [x] Ticket 02: Cache de permissões (PermissionsContext)
 - [x] Ticket 03: Promise.all nas queries paralelas
-- [ ] Ticket 04: Quebrar colaboradores/page.tsx
+- [ ] Ticket 04: Quebrar colaboradores/page.tsx (983 linhas — refatoração pendente)
 - [x] Ticket 05: Breadcrumbs dinâmicos
-- [ ] Ticket 06: Busca global (`/` + dialog)
-- [ ] Ticket 07: Dashboard Home (KPIs + Quick Actions)
+- [x] Ticket 06: Busca global (`/` + dialog)
+- [x] Ticket 07: Dashboard Home (KPIs + Quick Actions)
