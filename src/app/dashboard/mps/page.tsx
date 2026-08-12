@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FileSpreadsheet, FileText, ArrowRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { buildMpContratacaoDocx, pngSize } from "@/lib/mpDocx";
+import { buildMpContratacaoDocx, buildMpMovimentacaoDocx, pngSize } from "@/lib/mpDocx";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import {
@@ -110,11 +110,14 @@ export default function MPGeneratorPage() {
   const [workSchedules, setWorkSchedules] = useState<string[]>([]);
   
   const [currentUser, setCurrentUser] = useState("");
+  const [currentUserLevel, setCurrentUserLevel] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
 
   // Form State
+    const [historySearch, setHistorySearch] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
   const [mpType, setMpType] = useState<"contratacao" | "movimentacao" | "historico">("contratacao");
   const [mpHistory, setMpHistory] = useState<MpHistoryRow[]>([]);
   const [selectedLogo, setSelectedLogo] = useState("MOOV.png");
@@ -191,7 +194,7 @@ export default function MPGeneratorPage() {
 
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user) {
-        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', userData.user.id).single();
+        const { data: profile } = await createClient().from('profiles').select('full_name').eq('id', userData.user.id).single();
         if (profile) setCurrentUser(profile.full_name || userData.user.email);
       }
 
@@ -319,7 +322,7 @@ export default function MPGeneratorPage() {
       const supabase = createClient();
 
       if (mpType === "movimentacao" && updateProfile && selectedEmployeeId) {
-        await supabase.from('employees').update({
+        await createClient().from('employees').update({
           phone: phone,
           email_corporate: email,
           unit: location,
@@ -334,12 +337,15 @@ export default function MPGeneratorPage() {
 
       const empName = mpType === "contratacao" ? candidateName : selectedEmployee?.name || "Nao_Selecionado";
       const finalReason = reason === "Outros" ? customReason : reason;
-      const newBenefitsText = selectedBenefits.join(", ");
+      const newBenefitsText = selectedBenefits.map(b => {
+        if (b === "VR" || b === "VA") return `${b} (${vrLevel || "Padrão"} - ${vrLocality || "- "})`;
+        return b;
+      }).join(", ");
       const curBenefitsText = currentBenefits.join(", ");
       const selectedCcName = costCenters.find(c => c.id === costCenterId)?.name || "";
 
       const { data: authData } = await supabase.auth.getUser();
-      await supabase.from('mp_history').insert({
+      await createClient().from('mp_history').insert({
         created_by: authData?.user?.id || null,
         mp_type: mpType,
         employee_id: mpType === 'movimentacao' ? selectedEmployeeId : null,
@@ -351,7 +357,7 @@ export default function MPGeneratorPage() {
         requested_by: requestedBy || null
       });
 
-      const { data: histData } = await supabase.from("mp_history")
+      const { data: histData } = await createClient().from("mp_history")
           .select("*, profiles:created_by(full_name), employees:employee_id(name)")
           .order("created_at", { ascending: false });
       if (histData) setMpHistory(histData as unknown as MpHistoryRow[]);
@@ -392,200 +398,51 @@ export default function MPGeneratorPage() {
         });
         saveAs(blob, `MP_contratacao_${empName.replace(/\s+/g, "_")}.docx`);
       } else {
-        // Build Movimentação Layout (ATUAL vs ALTERAÇÃO)
-        const workbook = new ExcelJS.Workbook();
-        const sheet = workbook.addWorksheet("MP", { pageSetup: { paperSize: 9, orientation: 'portrait' } });
-        sheet.getColumn(1).width = 3;  
-        sheet.getColumn(2).width = 25; 
-        sheet.getColumn(3).width = 25; 
-        sheet.getColumn(4).width = 3;  
-        sheet.getColumn(5).width = 25; 
-        sheet.getColumn(6).width = 25; 
-        sheet.getColumn(7).width = 3;  
-
-        // Header
-        sheet.mergeCells('B2:C4');
+        let logo: { data: ArrayBuffer; width: number; height: number } | undefined;
         if (selectedLogo) {
           try {
-            const response = await fetch(`/logos/${selectedLogo}`);
+            const response = await fetch("https://lffkpsbovlmdifghhndl.supabase.co/storage/v1/object/public/public/logos/" + selectedLogo);
             const arrayBuffer = await response.arrayBuffer();
-            const imageId = workbook.addImage({ buffer: arrayBuffer, extension: 'png' });
-            sheet.addImage(imageId, 'B2:D5');
+            logo = { data: arrayBuffer, ...pngSize(arrayBuffer, 130) };
           } catch (e) { console.error(e); }
         }
-        
-        sheet.mergeCells('E2:F2');
-        const titleCell = sheet.getCell('E2');
-        titleCell.value = "MP\nAlteração de Cargo ou Salário";
-        titleCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        titleCell.font = { bold: true, size: 14 };
 
-        sheet.getCell('E3').value = "Matrícula:";
-        sheet.getCell('E3').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E3').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('F3').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
-        sheet.getCell('E4').value = "Ficha:";
-        sheet.getCell('E4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E4').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('F4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
-
-        sheet.mergeCells('B6:F6');
-        const section1 = sheet.getCell('B6');
-        section1.value = "ALTERAÇÃO DE CARGO OU SALÁRIO";
-        section1.alignment = { horizontal: 'center' };
-        section1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
-        section1.font = { bold: true };
-
-        sheet.getCell('B8').value = "Nome do colaborador";
-        sheet.getCell('B8').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B8').alignment = { horizontal: 'center' };
-        sheet.getCell('B8').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.mergeCells('C8:F8');
-        sheet.getCell('C8').value = empName;
-        sheet.getCell('C8').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        // Headers ATUAL vs ALTERAÇÃO
-        sheet.mergeCells('B10:C10');
-        sheet.getCell('B10').value = "ATUAL";
-        sheet.getCell('B10').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('B10').font = { color: { argb: 'FFFFFFFF' }, bold: true };
-        sheet.getCell('B10').alignment = { horizontal: 'center' };
-        sheet.getCell('B10').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.mergeCells('E10:F10');
-        sheet.getCell('E10').value = "ALTERAÇÃO";
-        sheet.getCell('E10').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } };
-        sheet.getCell('E10').font = { color: { argb: 'FFFFFFFF' }, bold: true };
-        sheet.getCell('E10').alignment = { horizontal: 'center' };
-        sheet.getCell('E10').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        // Fields comparison
-        const addComparison = (row: number, label: string, valAtual: string, valNovo: string) => {
-          sheet.getCell(`B${row}`).value = label;
-          sheet.getCell(`B${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-          sheet.getCell(`B${row}`).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-          sheet.getCell(`C${row}`).value = valAtual;
-          sheet.getCell(`C${row}`).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-          
-          sheet.getCell(`E${row}`).value = label;
-          sheet.getCell(`E${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-          sheet.getCell(`E${row}`).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-          sheet.getCell(`F${row}`).value = valNovo;
-          sheet.getCell(`F${row}`).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        };
-
-        addComparison(12, "Local", selectedEmployee?.unit || "", location);
-        addComparison(14, "Setor", selectedEmployee?.departments?.name || "", sector);
-        addComparison(16, "Centro de custo", selectedEmployee?.cost_centers?.name || "", selectedCcName);
-        addComparison(18, "Cargo", selectedEmployee?.role || "", selectedRoleInfo?.role_name || "");
-        
-        sheet.getCell('B20').value = "Nível";
-        sheet.getCell('B20').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B20').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('C20').value = "Código do Perfil";
-        sheet.getCell('C20').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('C20').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('B21').value = selectedEmployee?.level || "";
-        sheet.getCell('B21').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('C21').value = selectedEmployee?.profile_code || "";
-        sheet.getCell('C21').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('E20').value = "Nível";
-        sheet.getCell('E20').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('E20').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('F20').value = "Código do Perfil";
-        sheet.getCell('F20').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('F20').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('E21').value = selectedRoleInfo?.level || "";
-        sheet.getCell('E21').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('F21').value = selectedRoleInfo?.role_code || "";
-        sheet.getCell('F21').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        addComparison(23, "Modalidade", selectedEmployee?.contract_type || "", selectedRoleInfo?.modality || "");
-         addComparison(25, "Remuneração", selectedEmployee?.base_salary ? formatCurrency(selectedEmployee.base_salary) : "", selectedRoleInfo ? formatCurrency(selectedSalaryValue || 0) : "");
-        addComparison(26, "Horário", "-", selectedSchedule || "");
-        
-        sheet.getCell('B27').value = "Benefícios";
-        sheet.getCell('B27').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B27').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('C27').value = curBenefitsText;
-        sheet.getCell('C27').alignment = { vertical: 'top', wrapText: true };
-        sheet.getCell('C27').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('E27').value = "Benefícios";
-        sheet.getCell('E27').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('E27').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.getCell('F27').value = newBenefitsText;
-        sheet.getCell('F27').alignment = { vertical: 'top', wrapText: true };
-        sheet.getCell('F27').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        // Footer info (Justificativa, etc.)
-        sheet.mergeCells('B29:C29');
-        sheet.getCell('B29').value = "MP Solicitada por:";
-        sheet.getCell('B29').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B29').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('B30:C30');
-        sheet.getCell('B30').value = requestedBy;
-        sheet.getCell('B30').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.mergeCells('E29:F29');
-        sheet.getCell('E29').value = "Razão da Movimentação:";
-        sheet.getCell('E29').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('E29').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('E30:F30');
-        sheet.getCell('E30').value = finalReason;
-        sheet.getCell('E30').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.mergeCells('B32:F32');
-        sheet.getCell('B32').value = "Justificativa/Observações:";
-        sheet.getCell('B32').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B32').alignment = { horizontal: 'center' };
-        sheet.getCell('B32').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('B33:F35');
-        sheet.getCell('B33').value = justification;
-        sheet.getCell('B33').alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
-        sheet.getCell('B33').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('B37').value = "Verificado por";
-        sheet.getCell('B37').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('B37').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('B37').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('C37:D37');
-        sheet.getCell('C37').value = currentUser || "Você";
-        sheet.getCell('C37').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('E37').value = "Vigência";
-        sheet.getCell('E37').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF808080' } };
-        sheet.getCell('E37').font = { color: { argb: 'FFFFFFFF' } };
-        sheet.getCell('E37').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        sheet.mergeCells('F37:G37');
-        sheet.getCell('F37').value = new Date().toLocaleDateString('pt-BR');
-        sheet.getCell('F37').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-
-        sheet.getCell('B39').value = "ASSINATURAS";
-        sheet.getCell('B39').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
-        sheet.getCell('B39').alignment = { horizontal: 'center' };
-        sheet.getCell('B39').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        
-        sheet.mergeCells('B40:F46');
-        sheet.getCell('B40').border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        
-        sheet.getCell('B45').value = "____________________________________";
-        sheet.getCell('B45').alignment = { horizontal: 'center' };
-        sheet.getCell('B46').value = "Coordenador/Requisitante";
-        sheet.getCell('B46').alignment = { horizontal: 'center' };
-
-        sheet.getCell('E45').value = "____________________________________";
-        sheet.getCell('E45').alignment = { horizontal: 'center' };
-        sheet.getCell('E46').value = "Diretoria/Presidência";
-        sheet.getCell('E46').alignment = { horizontal: 'center' };
-
-        sheet.getCell('B48').value = "MP criada em";
-        sheet.getCell('C48').value = new Date().toLocaleDateString('pt-BR');
-        const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        saveAs(blob, `MP_movimentacao_${empName.replace(/\s+/g, '_')}.xlsx`);
+        const blob = await buildMpMovimentacaoDocx({
+          candidateName: empName,
+          phone: selectedEmployee?.phone || "",
+          email: selectedEmployee?.email_corporate || "",
+          registration: "",
+          ficha: "",
+          current: {
+            role: selectedEmployee?.role || "-",
+            level: selectedEmployee?.level || "-",
+            location: selectedEmployee?.unit || "-",
+            sector: selectedEmployee?.departments?.name || "-",
+            costCenter: selectedEmployee?.cost_centers?.name || "-",
+            profileCode: selectedEmployee?.profile_code || "-",
+            modality: selectedEmployee?.contract_type || "-",
+            salary: selectedEmployee?.base_salary ? formatCurrency(selectedEmployee.base_salary) : "-",
+            benefits: currentBenefits.join(", ")
+          },
+          newData: {
+            role: selectedRoleInfo?.role_name || "-",
+            level: selectedRoleInfo?.uses_level ? (selectedRoleInfo.level || "-") : "-",
+            location: location || "-",
+            sector: sector || "-",
+            costCenter: selectedCcName || "-",
+            profileCode: selectedRoleInfo?.role_code || "-",
+            modality: selectedSalaryInfo?.modality || "-",
+            salary: selectedRoleInfo ? formatCurrency(selectedSalaryValue || 0) : "-",
+            benefits: newBenefitsText
+          },
+          reason: reason || "",
+          customReason,
+          justification,
+          requestedBy: requestedBy || "",
+          createdAt: new Date().toLocaleDateString("pt-BR"),
+          logo
+        });
+        saveAs(blob, `MP_movimentacao_${empName.replace(/\s+/g, "_")}.docx`);
       }
 
     } catch (err) {
@@ -600,6 +457,21 @@ export default function MPGeneratorPage() {
     if (mpType === "movimentacao" && !selectedEmployeeId) return false;
     if (!selectedSalaryId) return false;
     return true;
+  };
+
+
+  const canDelete = currentUserLevel >= 75;
+  const deleteMp = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta MP?")) return;
+    try {
+      const { error } = await createClient().from("mp_history").delete().eq("id", id);
+      if (error) throw error;
+      setMpHistory(prev => prev.filter(mp => mp.id !== id));
+      alert("MP excluída com sucesso.");
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao excluir MP.");
+    }
   };
 
   if (loading) return <div className="p-6">Carregando gerador...</div>;
@@ -645,7 +517,7 @@ export default function MPGeneratorPage() {
 
       <Tabs 
         value={mpType} 
-        onValueChange={(v) => setMpType(v as "contratacao" | "movimentacao" | "historico")} 
+        onValueChange={(v) => { setMpType(v as "contratacao" | "movimentacao" | "historico"); setHistoryPage(1); }} 
         className="w-full"
       >
         <TabsList className="grid w-full grid-cols-3 max-w-xl mb-8">
@@ -654,7 +526,7 @@ export default function MPGeneratorPage() {
           <TabsTrigger value="historico">Histórico de MPs</TabsTrigger>
         </TabsList>
         
-        {mpType === "contratacao" ? (
+        {mpType === "contratacao" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6 p-6 border rounded-lg bg-card shadow-sm">
               <h2 className="text-xl font-semibold border-b pb-2">1. Dados do Candidato</h2>
@@ -825,7 +697,7 @@ export default function MPGeneratorPage() {
                   </div>
 
                   {/* Campos condicionais para VR/VA/Cesta Básica */}
-                  {(selectedBenefits.includes("VR") || selectedBenefits.includes("VA") || selectedBenefits.includes("Cesta Básica")) && (
+                  {(selectedBenefits.includes("VR") || selectedBenefits.includes("VA")) && (
                     <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-2">
                       <div className="space-y-2">
                         <Label>Nível VR/VA/Cesta</Label>
@@ -863,7 +735,8 @@ export default function MPGeneratorPage() {
               </div>
             </div>
           </div>
-        ) : (
+        )}
+        {mpType === "movimentacao" && (
           /* MOVIMENTAÇÃO VIEW */
           <div className="space-y-6">
             <div className="p-6 border rounded-lg bg-card shadow-sm">
@@ -1075,7 +948,7 @@ export default function MPGeneratorPage() {
                     </div>
 
                     {/* Campos condicionais para VR/VA/Cesta Básica */}
-                    {(selectedBenefits.includes("VR") || selectedBenefits.includes("VA") || selectedBenefits.includes("Cesta Básica")) && (
+                    {(selectedBenefits.includes("VR") || selectedBenefits.includes("VA")) && (
                       <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-2">
                         <div className="space-y-2">
                           <Label>Nível VR/VA/Cesta</Label>
@@ -1157,7 +1030,15 @@ export default function MPGeneratorPage() {
 
         {mpType === "historico" && (
           <div className="space-y-6 p-6 border rounded-lg bg-card shadow-sm overflow-x-auto">
-            <h2 className="text-xl font-semibold border-b pb-2">Histórico de Movimentações Geradas</h2>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between border-b pb-4">
+              <h2 className="text-xl font-semibold">Histórico de Movimentações Geradas</h2>
+              <input 
+                placeholder="Buscar por requisitante ou candidato..." 
+                value={historySearch} 
+                onChange={(e) => { setHistorySearch(e.target.value); setHistoryPage(1); }} 
+                className="flex h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1169,15 +1050,21 @@ export default function MPGeneratorPage() {
                   <TableHead>Local</TableHead>
                   <TableHead>Salário</TableHead>
                   <TableHead>Motivo</TableHead>
+                  {canDelete && <TableHead className="text-right">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mpHistory.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-6">Nenhuma MP gerada ainda.</TableCell>
-                  </TableRow>
-                ) : (
-                  mpHistory.map((hist) => (
+                {mpHistory
+                  .filter(h => {
+                    if (!historySearch) return true;
+                    const search = historySearch.toLowerCase();
+                    return (h.profiles?.full_name?.toLowerCase().includes(search)) ||
+                           (h.requested_by?.toLowerCase().includes(search)) ||
+                           (h.candidate_name?.toLowerCase().includes(search)) ||
+                           (h.employees?.name?.toLowerCase().includes(search));
+                  })
+                  .slice((historyPage - 1) * 25, historyPage * 25)
+                  .map((hist) => (
                     <TableRow key={hist.id}>
                       <TableCell className="whitespace-nowrap">{new Date(hist.created_at).toLocaleString('pt-BR')}</TableCell>
                       <TableCell>{hist.profiles?.full_name || hist.requested_by || '-'}</TableCell>
@@ -1185,13 +1072,33 @@ export default function MPGeneratorPage() {
                       <TableCell>{hist.mp_type === 'contratacao' ? hist.candidate_name : hist.employees?.name || '-'}</TableCell>
                       <TableCell>{hist.role_name || '-'}</TableCell>
                       <TableCell>{hist.workplace || '-'}</TableCell>
-                      <TableCell>{hist.salary ? formatCurrency(hist.salary) : '-'}</TableCell>
+                      <TableCell>{hist.salary ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(hist.salary) : '-'}</TableCell>
                       <TableCell>{hist.reason || '-'}</TableCell>
+                      {canDelete && (
+                        <TableCell className="text-right">
+                          <button onClick={() => deleteMp(hist.id)} className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-md">
+                            🗑️
+                          </button>
+                        </TableCell>
+                      )}
                     </TableRow>
-                  ))
+                ))}
+                {mpHistory.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={canDelete ? 9 : 8} className="text-center text-muted-foreground py-6">Nenhuma MP gerada ainda.</TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
+            <div className="flex items-center justify-between pt-4">
+              <div className="text-sm text-muted-foreground">
+                Mostrando {Math.min(mpHistory.length, (historyPage - 1) * 25 + 1)} - {Math.min(mpHistory.length, historyPage * 25)} de {mpHistory.length} MPs
+              </div>
+              <div className="flex gap-2">
+                <button disabled={historyPage === 1} onClick={() => setHistoryPage(p => p - 1)} className="px-3 py-1 border rounded-md disabled:opacity-50">Anterior</button>
+                <button disabled={historyPage * 25 >= mpHistory.length} onClick={() => setHistoryPage(p => p + 1)} className="px-3 py-1 border rounded-md disabled:opacity-50">Próxima</button>
+              </div>
+            </div>
           </div>
         )}
       </Tabs>

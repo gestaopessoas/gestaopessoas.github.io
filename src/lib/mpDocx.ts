@@ -393,3 +393,285 @@ export function buildMpContratacaoDocument(data: MpContratacaoData): Document {
 /** Gera o .docx pronto para download. */
 export const buildMpContratacaoDocx = (data: MpContratacaoData): Promise<Blob> =>
   Packer.toBlob(buildMpContratacaoDocument(data));
+
+
+export type MpMovimentacaoData = {
+  candidateName: string;
+  phone: string;
+  email: string;
+  registration: string;
+  ficha: string;
+  current: {
+    role: string;
+    level: string;
+    location: string;
+    sector: string;
+    costCenter: string;
+    profileCode: string;
+    modality: string;
+    salary: string;
+    benefits: string;
+  };
+  newData: {
+    role: string;
+    level: string;
+    location: string;
+    sector: string;
+    costCenter: string;
+    profileCode: string;
+    modality: string;
+    salary: string;
+    benefits: string;
+  };
+  reason: string;
+  customReason: string;
+  justification: string;
+  requestedBy: string;
+  createdAt: string;
+  logo?: { data: ArrayBuffer | Uint8Array; width: number; height: number };
+};
+
+function headerMovimentacao(data: MpMovimentacaoData): (Paragraph | Table)[] {
+  const logoCell = new TableCell({
+    width: { size: 34, type: WidthType.PERCENTAGE },
+    borders: noBorders,
+    verticalAlign: VerticalAlign.CENTER,
+    children: [
+      new Paragraph({
+        children: data.logo
+          ? [
+              new ImageRun({
+                type: "png",
+                data: data.logo.data,
+                transformation: { width: data.logo.width, height: data.logo.height },
+              }),
+            ]
+          : [],
+      }),
+    ],
+  });
+
+  const titleCell = new TableCell({
+    width: { size: 33, type: WidthType.PERCENTAGE },
+    borders: noBorders,
+    verticalAlign: VerticalAlign.CENTER,
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [text("MP", { bold: true, size: 26 })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [text("Movimentação de Pessoal", { size: 16, caps: true, color: LABEL_TEXT })],
+      }),
+    ],
+  });
+
+  const codeCell = new TableCell({
+    width: { size: 33, type: WidthType.PERCENTAGE },
+    borders: noBorders,
+    verticalAlign: VerticalAlign.CENTER,
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        children: [text(MP_CONTROL_CODE, { size: 13, color: LABEL_TEXT })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        children: [text(MP_REVISION, { size: 13, color: LABEL_TEXT })],
+      }),
+    ],
+  });
+
+  return [
+    layoutTable([new TableRow({ children: [logoCell, titleCell, codeCell] })]),
+    goldRule(120, 200),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      heading: HeadingLevel.HEADING_1,
+      spacing: { after: 60 },
+      children: [text("Alteração de Cargo ou Salário", { bold: true, size: 22, caps: true })],
+    }),
+    goldRule(0, 200),
+  ];
+}
+
+/** Monta o documento da MP de Movimentação. */
+export function buildMpMovimentacaoDocument(data: MpMovimentacaoData): Document {
+  const children: ISectionOptions["children"] = [
+    ...headerMovimentacao(data),
+
+    sectionHeader("01", "Identificação"),
+    layoutTable([
+      new TableRow({
+        children: [
+          panelCell([...field("Nome do colaborador", data.candidateName)], 100)
+        ],
+      }),
+    ]),
+    layoutTable([
+      new TableRow({
+        children: [
+          panelCell([...field("Matrícula", data.registration)], 50),
+          panelCell([...field("Ficha", data.ficha)], 50),
+        ],
+      }),
+    ]),
+    spacer(),
+
+    sectionHeader("02", "Comparativo (Atual vs Alteração)"),
+    layoutTable([
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: 50, type: WidthType.PERCENTAGE },
+            borders: noBorders,
+            shading: { fill: "808080" },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 80, after: 80 },
+                children: [text("ATUAL", { bold: true, color: WHITE })],
+              }),
+            ],
+          }),
+          new TableCell({
+            width: { size: 50, type: WidthType.PERCENTAGE },
+            borders: noBorders,
+            shading: { fill: "4F81BD" },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 80, after: 80 },
+                children: [text("ALTERAÇÃO", { bold: true, color: WHITE })],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]),
+    
+    // Comparativo rows
+    layoutTable([
+      new TableRow({
+        children: [
+          panelCell([...field("Local", data.current.location)], 50),
+          panelCell([...field("Local", data.newData.location)], 50),
+        ]
+      }),
+      new TableRow({
+        children: [
+          panelCell([...field("Setor", data.current.sector)], 50),
+          panelCell([...field("Setor", data.newData.sector)], 50),
+        ]
+      }),
+      new TableRow({
+        children: [
+          panelCell([...field("Centro de Custo", data.current.costCenter)], 50),
+          panelCell([...field("Centro de Custo", data.newData.costCenter)], 50),
+        ]
+      }),
+      new TableRow({
+        children: [
+          panelCell([...field("Cargo", data.current.role)], 50),
+          panelCell([...field("Cargo", data.newData.role)], 50),
+        ]
+      }),
+      new TableRow({
+        children: [
+          panelCell([
+            ...field("Nível", data.current.level),
+            ...field("Código do Perfil", data.current.profileCode)
+          ], 50),
+          panelCell([
+            ...field("Nível", data.newData.level),
+            ...field("Código do Perfil", data.newData.profileCode)
+          ], 50),
+        ]
+      }),
+      new TableRow({
+        children: [
+          panelCell([...field("Modalidade", data.current.modality)], 50),
+          panelCell([...field("Modalidade", data.newData.modality)], 50),
+        ]
+      }),
+      new TableRow({
+        children: [
+          panelCell([...field("Remuneração", data.current.salary)], 50),
+          panelCell([...field("Remuneração", data.newData.salary)], 50),
+        ]
+      }),
+      new TableRow({
+        children: [
+          panelCell([...field("Benefícios", data.current.benefits, 2)], 50),
+          panelCell([...field("Benefícios", data.newData.benefits, 2)], 50),
+        ]
+      }),
+    ]),
+    spacer(),
+
+    sectionHeader("03", "Gestão da vaga"),
+    layoutTable([
+      new TableRow({
+        children: [
+          panelCell([
+            ...field("Requisição da vaga (solicitado por)", data.requestedBy),
+            label("Razão da movimentação"),
+            checkbox(data.reason === "Promoção", "Promoção"),
+            checkbox(data.reason === "Mérito", "Mérito"),
+            checkbox(data.reason === "Equiparação Salarial", "Equiparação Salarial"),
+            checkbox(!["Promoção", "Mérito", "Equiparação Salarial"].includes(data.reason), `Outra: ${data.reason === 'Outros' ? data.customReason : data.reason}`),
+          ], 48),
+          panelCell([...field("Justificativa / Observações", data.justification, 10)], 52),
+        ],
+      }),
+    ]),
+    spacer(),
+
+    sectionHeader("04", "Aprovações"),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            signatureCell("Coordenador / Requisitante"),
+            signatureCell("Diretoria / Presidência"),
+          ],
+        }),
+      ],
+    }),
+    spacer(200),
+
+    layoutTable([
+      new TableRow({
+        children: [
+          panelCell([...field("Verificado por", "")], 50),
+          panelCell([...field("Vigência", "____ / ____ / ________")], 50),
+        ],
+      }),
+    ]),
+    goldRule(160, 60),
+    new Paragraph({
+      children: [text(`MP criada em: ${data.createdAt}`, { size: 15, color: LABEL_TEXT })],
+    }),
+  ];
+
+  return new Document({
+    styles: { default: { document: { run: { font: FONT, size: 18 } } } },
+    sections: [
+      {
+        properties: {
+          page: {
+            size: { width: 11906, height: 16838 },
+            margin: { top: 567, bottom: 567, left: 680, right: 680 },
+          },
+        },
+        children,
+      },
+    ],
+  });
+}
+
+/** Gera o .docx pronto para download (Movimentação). */
+export const buildMpMovimentacaoDocx = (data: MpMovimentacaoData): Promise<Blob> =>
+  Packer.toBlob(buildMpMovimentacaoDocument(data));
