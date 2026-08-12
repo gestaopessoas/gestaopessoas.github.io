@@ -70,12 +70,12 @@ export default function ClubeDescontosPage() {
     return partners.filter((p) => {
       const matchesCategory =
         selectedCategory === "Todos" ||
-        p.category.toLowerCase().includes(selectedCategory.toLowerCase());
+        p.category?.toLowerCase().includes(selectedCategory?.toLowerCase() || "") || false;
       const matchesSearch =
         debouncedSearch === "" ||
-        p.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        p.discount_rules.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        p.category.toLowerCase().includes(debouncedSearch.toLowerCase());
+        p.name?.toLowerCase().includes(debouncedSearch?.toLowerCase() || "") ||
+        p.discount_rules?.toLowerCase().includes(debouncedSearch?.toLowerCase() || "") ||
+        p.category?.toLowerCase().includes(debouncedSearch?.toLowerCase() || "") || false;
 
       return matchesCategory && matchesSearch;
     });

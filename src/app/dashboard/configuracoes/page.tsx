@@ -80,7 +80,7 @@ export default function ConfiguracoesPage() {
           if (row.key === 'work_schedules' && Array.isArray(row.value)) setWorkSchedules(row.value)
         })
       }
-      const { data: publicForm } = await supabase.from('public_form_settings').select('value').eq('key', 'job_request_code').single()
+      const { data: publicForm } = await supabase.from('public_form_settings').select('value').eq('key', 'job_request_code').maybeSingle()
       if (publicForm) setJobRequestCode(publicForm.value)
       
       setLoading(false)

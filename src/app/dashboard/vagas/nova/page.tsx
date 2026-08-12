@@ -203,8 +203,8 @@ export default function NovaVagaPage() {
     
     const suggestedTags = profile?.competencies 
       ? behavioralTags.filter(tag => 
-          profile.competencies!.toLowerCase().includes(tag.toLowerCase()) || 
-          profile.competencies!.toLowerCase().includes(tag.split(' ')[0].toLowerCase())
+          profile.competencies?.toLowerCase().includes(tag?.toLowerCase() || "") || 
+          profile.competencies?.toLowerCase().includes(tag?.split(' ')[0]?.toLowerCase() || "")
         )
       : [];
     

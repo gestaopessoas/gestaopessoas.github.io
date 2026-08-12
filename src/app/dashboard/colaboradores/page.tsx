@@ -366,7 +366,7 @@ export default function ColaboradoresPage() {
     }
       
     if (isNew || isDismissed || isPromoted) {
-      const { data: settingsData } = await supabase.from("system_settings").select("value").eq("key", "modules").single();
+      const { data: settingsData } = await supabase.from("system_settings").select("value").eq("key", "modules").maybeSingle();
       const rgsTrackingEnabled = settingsData?.value?.rgs_tracking ?? true;
       
       if (rgsTrackingEnabled) {

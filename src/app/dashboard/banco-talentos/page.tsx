@@ -143,12 +143,12 @@ export default function BancoTalentosPage() {
     const s = search.toLowerCase();
     return candidates.filter(
       (c) =>
-        c.full_name.toLowerCase().includes(s) ||
-        c.email.toLowerCase().includes(s) ||
-        (c.phone && c.phone.toLowerCase().includes(s)) ||
-        c.role_interest.toLowerCase().includes(s) ||
-        c.obras.toLowerCase().includes(s) ||
-        c.tags.some((t) => t.toLowerCase().includes(s))
+        c.full_name?.toLowerCase().includes(s) ||
+        c.email?.toLowerCase().includes(s) ||
+        (c.phone && c.phone?.toLowerCase().includes(s)) ||
+        c.role_interest?.toLowerCase().includes(s) ||
+        c.obras?.toLowerCase().includes(s) ||
+        c.tags?.some((t) => t?.toLowerCase().includes(s)) || false
     );
   }, [candidates, search]);
 

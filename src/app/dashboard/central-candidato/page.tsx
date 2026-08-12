@@ -153,10 +153,10 @@ export default function CentralCandidatoPage() {
     const s = search.toLowerCase();
     return list.filter(
       (c) =>
-        c.full_name.toLowerCase().includes(s) ||
-        c.email.toLowerCase().includes(s) ||
-        (c.phone && c.phone.toLowerCase().includes(s)) ||
-        (c.obra_atual && c.obra_atual.toLowerCase().includes(s))
+        c.full_name?.toLowerCase().includes(s) ||
+        c.email?.toLowerCase().includes(s) ||
+        (c.phone && c.phone?.toLowerCase().includes(s)) ||
+        (c.obra_atual && c.obra_atual?.toLowerCase().includes(s)) || false
     );
   }, [emAcompanhamento, search, activeTab]);
 

@@ -41,7 +41,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         .from("profiles")
         .select("level, permissions")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (!active) return;
       setLevel(data?.level ?? 0);

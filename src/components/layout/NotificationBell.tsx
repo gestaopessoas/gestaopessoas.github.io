@@ -39,7 +39,7 @@ export function NotificationBell() {
       let userPrefs = { trial: true, rgs: true, benefits: true, profile: true };
 
       if (authData.user?.id) {
-        const { data: prof } = await supabase.from('profiles').select('permissions').eq('id', authData.user.id).single();
+        const { data: prof } = await supabase.from('profiles').select('permissions').eq('id', authData.user.id).maybeSingle();
         if (prof?.permissions?._preferences) {
           userPrefs = { ...userPrefs, ...prof.permissions._preferences };
           setPreferences(userPrefs);

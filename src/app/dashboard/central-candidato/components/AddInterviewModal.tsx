@@ -221,7 +221,7 @@ export default function AddInterviewModal({
         // Find workplace id by name
         const wp = workplaces.find(
           (w) =>
-            w.name.trim().toLowerCase() ===
+            w.name?.trim().toLowerCase() ===
             (currentWorkplace || "").trim().toLowerCase()
         );
         if (wp) setWorkplaceId(wp.id);
@@ -292,7 +292,7 @@ export default function AddInterviewModal({
     isLocked &&
       workplaceId &&
       workplaces.find((w) => w.id === workplaceId)?.name
-        .trim()
+        ?.trim()
         .toLowerCase() !== (currentWorkplace || "").trim().toLowerCase() &&
       !UNLOCK_STAGES.includes(stage)
   );

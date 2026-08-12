@@ -56,10 +56,11 @@ export async function fetchKanbanData(jobId: string) {
 
   if (appError) throw new Error("Erro ao carregar aplicações");
 
-  // 3. Fetch all candidates to find suggestions
+  // 3. Fetch all candidates to find suggestions (limit to 300 to avoid OOM or timeout)
   const { data: allCandidates, error: candError } = await supabase
     .from("candidates")
-    .select("id, full_name, first_name, last_name, email, search_tags, behavioral_tags");
+    .select("id, full_name, first_name, last_name, email, search_tags, behavioral_tags")
+    .limit(300);
 
   if (candError) throw new Error("Erro ao carregar banco de talentos");
 
