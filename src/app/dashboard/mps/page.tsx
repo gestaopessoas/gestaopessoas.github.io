@@ -511,7 +511,7 @@ export default function MPGeneratorPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Local</Label>
-                    <Select value={location} onValueChange={setLocation}>
+                    <Select value={location || undefined} onValueChange={(val) => setLocation(val || '')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
@@ -535,7 +535,7 @@ export default function MPGeneratorPage() {
                 
                 <div className="space-y-2">
                   <Label>Setor</Label>
-                  <Select value={sector} onValueChange={setSector}>
+                  <Select value={sector || undefined} onValueChange={(val) => setSector(val || '')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
@@ -550,7 +550,7 @@ export default function MPGeneratorPage() {
                     {/* 1. Modalidade */}
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Modalidade de Contratação</Label>
-                      <Select value={selectedModality || undefined} onValueChange={selectModality}>
+                      <Select value={selectedModality || undefined} onValueChange={(val) => selectModality(val || '')}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione a modalidade..." />
                         </SelectTrigger>
@@ -804,7 +804,7 @@ export default function MPGeneratorPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Local</Label>
-                      <Select value={location} onValueChange={setLocation}>
+                      <Select value={location || undefined} onValueChange={(val) => setLocation(val || '')}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
@@ -828,7 +828,7 @@ export default function MPGeneratorPage() {
 
                   <div className="space-y-2">
                     <Label>Setor</Label>
-                    <Select value={sector} onValueChange={setSector}>
+                    <Select value={sector || undefined} onValueChange={(val) => setSector(val || '')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
@@ -844,7 +844,7 @@ export default function MPGeneratorPage() {
                       {/* 1. Modalidade */}
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Modalidade de Contratação</Label>
-                        <Select value={selectedModality || undefined} onValueChange={selectModality}>
+                        <Select value={selectedModality || undefined} onValueChange={(val) => selectModality(val || '')}>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione a modalidade..." />
                           </SelectTrigger>
