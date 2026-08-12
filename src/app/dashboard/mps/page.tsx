@@ -67,6 +67,7 @@ type SalaryRow = {
   uses_level: boolean;
   salary_experience: number | null;
   salary_after_probation: number | null;
+  seniority: string | null;
 };
 
 type SalaryModality = { modality: string; roles: string[] };
@@ -108,7 +109,6 @@ function isAnalystOrAbove(role: string | undefined): boolean {
 
 export default function MPGeneratorPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [salaryTable, setSalaryTable] = useState<SalaryRow[]>([]);
   const [workplaces, setWorkplaces] = useState<Entity[]>([]);
   const [departments, setDepartments] = useState<Entity[]>([]);
   const [costCenters, setCostCenters] = useState<Entity[]>([]);
@@ -166,21 +166,67 @@ export default function MPGeneratorPage() {
     return employees.find(e => e.id === selectedEmployeeId);
   }, [employees, selectedEmployeeId]);
 
-  const modalities = useMemo(() => {
-    return Array.from(new Set(salaryTable.map(s => s.modality).filter(Boolean)));
-  }, [salaryTable]);
+  const modalities = ["CLT", "PJ"];
+  const [rolesForModality, setRolesForModality] = useState<string[]>([]);
+  const [levelsForRole, setLevelsForRole] = useState<SalaryRow[]>([]);
 
-  const rolesForModality = useMemo(() => {
-    return Array.from(new Set(salaryTable.filter(s => s.modality === selectedModality).map(s => s.role_name).filter(Boolean)));
-  }, [salaryTable, selectedModality]);
+  useEffect(() => {
+    const fetchRoles = async () => {
+      if (!selectedModality) {
+        setRolesForModality([]);
+        return;
+      }
+      const supabase = createClient();
+      let allRoles: string[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data } = await supabase.from("salary_table")
+          .select("role_name")
+          .eq("modality", selectedModality)
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+          .order("role_name");
+        if (data && data.length > 0) {
+          allRoles.push(...data.map((d: any) => d.role_name));
+          if (data.length < pageSize) break;
+          page++;
+        } else {
+          break;
+        }
+      }
+      setRolesForModality(Array.from(new Set(allRoles)).filter(Boolean) as string[]);
+    };
+    fetchRoles();
+  }, [selectedModality]);
 
-  const levelsForRole = useMemo(() => {
-    return salaryTable.filter(s => s.modality === selectedModality && s.role_name === selectedRoleName);
-  }, [salaryTable, selectedModality, selectedRoleName]);
+  useEffect(() => {
+    const fetchLevels = async () => {
+      if (!selectedModality || !selectedRoleName) {
+        setLevelsForRole([]);
+        return;
+      }
+      const supabase = createClient();
+      const { data } = await supabase.from("salary_table")
+        .select("*")
+        .eq("modality", selectedModality)
+        .eq("role_name", selectedRoleName)
+        .order("level");
+      if (data) {
+        const levels = data as SalaryRow[];
+        setLevelsForRole(levels);
+        // If the role doesn't use levels, auto-select the first (and only) ID.
+        const noLevel = levels.find((row) => !row.uses_level);
+        if (noLevel) {
+          setSelectedSalaryId(noLevel.id);
+        }
+      }
+    };
+    fetchLevels();
+  }, [selectedModality, selectedRoleName]);
 
   const selectedSalaryInfo = useMemo(() => {
-    return salaryTable.find(s => s.id === selectedSalaryId) || levelsForRole.find(l => l.level === selectedLevel) || levelsForRole.find(l => !l.uses_level);
-  }, [salaryTable, selectedSalaryId, levelsForRole, selectedLevel]);
+    return levelsForRole.find(s => s.id === selectedSalaryId) || levelsForRole.find(l => l.level === selectedLevel) || levelsForRole.find(l => !l.uses_level);
+  }, [selectedSalaryId, levelsForRole, selectedLevel]);
   const selectedRoleInfo = selectedSalaryInfo;
   const selectedSalaryValue = selectedSalaryInfo?.uses_level ? selectedSalaryInfo.salary : selectedSalaryInfo?.salary_experience;
   const selectedRoleUsesLevel = levelsForRole.some((row) => row.uses_level);
@@ -196,8 +242,7 @@ export default function MPGeneratorPage() {
     if (!roleName) return;
     setSelectedRoleName(roleName);
     setSelectedLevel("");
-    const noLevel = salaryTable.find((row) => row.modality === selectedModality && row.role_name === roleName && !row.uses_level);
-    setSelectedSalaryId(noLevel?.id || "");
+    setSelectedSalaryId("");
   };
 
   useEffect(() => {
@@ -210,12 +255,11 @@ export default function MPGeneratorPage() {
         if (profile) setCurrentUser(profile.full_name || userData.user.email);
       }
 
-      const [empsRes, salaryRes, wpRes, ccRes, settingsRes, histRes, depRes] = await Promise.all([
+      const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes] = await Promise.all([
         supabase.from("employees")
           .select("id, name, phone, email_corporate, unit, cost_center_id, departments(name), cost_centers(name), role, level, contract_type, base_salary, profile_code, status")
           .eq("status", "Ativo") // Somente colaboradores ativos, exclui Arquivo Morto e Inativos
           .order("name"),
-        supabase.from("salary_table").select("*").limit(10000).order("modality").order("role_name").order("level"),
         supabase.from("workplaces").select("id, name").order("name"),
         supabase.from("cost_centers").select("id, name").order("name"),
         supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle(),
@@ -224,7 +268,6 @@ export default function MPGeneratorPage() {
       ]);
 
       if (empsRes.data) setEmployees((empsRes.data as unknown as Employee[]).filter(e => e.status === "Ativo" || !e.status));
-      if (salaryRes.data) setSalaryTable(salaryRes.data as SalaryRow[]);
       if (wpRes.data) setWorkplaces(wpRes.data as Entity[]);
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
       if (depRes.data) setDepartments(depRes.data as Entity[]);
@@ -250,7 +293,7 @@ export default function MPGeneratorPage() {
     fetchData();
   }, []);
 
-  const movimentacaoKey = `${mpType}|${selectedEmployeeId}|${employees.length}|${modalities.length}|${rolesForModality.length}|${levelsForRole.length}`;
+  const movimentacaoKey = `${mpType}|${selectedEmployeeId}|${employees.length}|${rolesForModality.length}|${levelsForRole.length}`;
   const [lastMovimentacaoKey, setLastMovimentacaoKey] = useState(movimentacaoKey);
   if (lastMovimentacaoKey !== movimentacaoKey) {
     setLastMovimentacaoKey(movimentacaoKey);
@@ -580,13 +623,13 @@ export default function MPGeneratorPage() {
                     {/* 3. Nível (filtrado por modalidade + cargo) */}
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Nível</Label>
-                      <Select value={selectedLevel || undefined} onValueChange={(val) => { setSelectedLevel(val); const match = levelsForRole.find(l => l.level === val); if (match) setSelectedSalaryId(match.id); }} disabled={!selectedRoleName || !selectedRoleUsesLevel}>
+                      <Select value={selectedSalaryId || undefined} onValueChange={(val) => { setSelectedSalaryId(val); const match = levelsForRole.find(l => l.id === val); if (match) setSelectedLevel(match.level); }} disabled={!selectedRoleName || !selectedRoleUsesLevel}>
                         <SelectTrigger>
                           <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : !selectedRoleUsesLevel ? "Cargo sem nível" : "Selecione o nível..."} />
                         </SelectTrigger>
                         <SelectContent>
                           {levelsForRole.filter(l => l.uses_level && l.level).map(l => (
-                            <SelectItem key={l.id} value={l.level!}>{l.level} — {formatCurrency(l.salary || 0)}</SelectItem>
+                            <SelectItem key={l.id} value={l.id}>{l.seniority ? `${l.seniority} - ` : ''}{l.level} — {formatCurrency(l.salary || 0)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

@@ -17,13 +17,15 @@ type Company = {
   encargos_pj: number | null;
   encargos_mei: number | null;
   encargos_prolabore: number | null;
+  status: string;
 };
 
-const emptyForm = { cnpj: "", name: "", trading_name: "", dominio_code: "", encargos_clt: "", encargos_pj: "", encargos_mei: "", encargos_prolabore: "" };
+const emptyForm = { cnpj: "", name: "", trading_name: "", dominio_code: "", encargos_clt: "", encargos_pj: "", encargos_mei: "", encargos_prolabore: "", status: "Ativo" };
 
 export default function EmpresasPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [query, setQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("Ativos");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ export default function EmpresasPage() {
 
     const loadCompanies = async () => {
       const supabase = createClient();
-      const { data, error } = await supabase.from("companies").select("id, cnpj, name, trading_name, dominio_code, encargos_clt, encargos_pj, encargos_mei, encargos_prolabore").order("name");
+      const { data, error } = await supabase.from("companies").select("id, cnpj, name, trading_name, dominio_code, encargos_clt, encargos_pj, encargos_mei, encargos_prolabore, status").order("name");
 
       if (!active) return;
       setLoading(false);
@@ -55,9 +57,13 @@ export default function EmpresasPage() {
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return companies;
-    return companies.filter((company) => [company.name, company.trading_name, company.cnpj].some((value) => value?.toLowerCase().includes(term)));
-  }, [companies, query]);
+    let result = companies;
+    if (filterStatus === "Ativos") result = result.filter(c => c.status === "Ativo" || !c.status);
+    else if (filterStatus === "Inativos") result = result.filter(c => c.status === "Inativo");
+
+    if (!term) return result;
+    return result.filter((company) => [company.name, company.trading_name, company.cnpj].some((value) => value?.toLowerCase().includes(term)));
+  }, [companies, query, filterStatus]);
 
   const startNew = () => {
     setEditingId(null);
@@ -75,7 +81,8 @@ export default function EmpresasPage() {
       encargos_clt: company.encargos_clt !== null ? String(company.encargos_clt) : "",
       encargos_pj: company.encargos_pj !== null ? String(company.encargos_pj) : "",
       encargos_mei: company.encargos_mei !== null ? String(company.encargos_mei) : "",
-      encargos_prolabore: company.encargos_prolabore !== null ? String(company.encargos_prolabore) : ""
+      encargos_prolabore: company.encargos_prolabore !== null ? String(company.encargos_prolabore) : "",
+      status: company.status || "Ativo"
     });
     setError("");
   };
@@ -94,6 +101,7 @@ export default function EmpresasPage() {
       encargos_pj: form.encargos_pj ? Number(form.encargos_pj.replace(",", ".")) : 0,
       encargos_mei: form.encargos_mei ? Number(form.encargos_mei.replace(",", ".")) : 0,
       encargos_prolabore: form.encargos_prolabore ? Number(form.encargos_prolabore.replace(",", ".")) : 0,
+      status: form.status,
     };
 
     const supabase = createClient();
@@ -156,7 +164,7 @@ export default function EmpresasPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Metric label="Total de CNPJs" value={companies.length} />
           <Metric label="Com nome fantasia" value={companies.filter((company) => company.trading_name).length} />
-          <Metric label="Ativos" value={companies.length} />
+          <Metric label="Ativos" value={companies.filter((company) => company.status === "Ativo" || !company.status).length} />
         </div>
 
         <form onSubmit={save} className="rounded-lg border bg-card p-4">
@@ -164,11 +172,17 @@ export default function EmpresasPage() {
             <h2 className="font-semibold">{editingId ? "Editar empresa" : "Adicionar empresa"}</h2>
             {editingId && <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={startNew}><X className="h-4 w-4" /></Button>}
           </div>
-          <div className="grid gap-3 md:grid-cols-4 mb-4">
+          <div className="grid gap-3 md:grid-cols-5 mb-4">
             <Field label="CNPJ *"><Input required value={form.cnpj} onChange={(event) => setForm({ ...form, cnpj: event.target.value })} /></Field>
             <Field label="Razão social *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
             <Field label="Nome fantasia"><Input value={form.trading_name} onChange={(event) => setForm({ ...form, trading_name: event.target.value })} /></Field>
             <Field label="Cód. Domínio"><Input value={form.dominio_code} onChange={(event) => setForm({ ...form, dominio_code: event.target.value })} /></Field>
+            <Field label="Status">
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                <option value="Ativo">Ativo</option>
+                <option value="Inativo">Inativo</option>
+              </select>
+            </Field>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
             <Field label="Encargos CLT (%)"><Input type="number" step="0.01" value={form.encargos_clt} onChange={(event) => setForm({ ...form, encargos_clt: event.target.value })} /></Field>
@@ -181,9 +195,16 @@ export default function EmpresasPage() {
           </div>
         </form>
 
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Buscar por CNPJ ou razão social..." className="pl-9 bg-muted/30 border-border/50 h-9 text-sm rounded-md" />
+        <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between mb-4">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Buscar por CNPJ ou razão social..." className="pl-9 bg-muted/30 border-border/50 h-9 text-sm rounded-md" />
+          </div>
+          <div className="flex bg-muted/50 p-1 rounded-md">
+            <Button variant={filterStatus === "Ativos" ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setFilterStatus("Ativos")}>Ativos</Button>
+            <Button variant={filterStatus === "Inativos" ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setFilterStatus("Inativos")}>Inativos</Button>
+            <Button variant={filterStatus === "Todos" ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setFilterStatus("Todos")}>Todos</Button>
+          </div>
         </div>
 
         <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
@@ -195,6 +216,7 @@ export default function EmpresasPage() {
                   <th className="px-4 py-3">Nome fantasia</th>
                   <th className="px-4 py-3">CNPJ</th>
                   <th className="px-4 py-3">Cód. Domínio</th>
+                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
@@ -207,6 +229,11 @@ export default function EmpresasPage() {
                     <td className="px-4 py-3 text-muted-foreground">{company.trading_name || "-"}</td>
                     <td className="px-4 py-3 text-muted-foreground font-mono text-xs tabular-nums">{company.cnpj}</td>
                     <td className="px-4 py-3 text-muted-foreground font-mono text-xs tabular-nums">{company.dominio_code || "-"}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${company.status === 'Inativo' ? 'bg-destructive/10 text-destructive' : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'}`}>
+                        {company.status || "Ativo"}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(company)}>
                         <Edit3 className="h-4 w-4 text-muted-foreground" />
