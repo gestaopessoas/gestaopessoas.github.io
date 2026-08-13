@@ -147,7 +147,7 @@ export default function ArquivoMortoPage() {
         setError("");
       } else {
         // Fetch employees for search
-        const request = sb
+        let request = sb
           .from("employees")
           .select(`
             id, name, cpf, rg, role, unit, dismissed_at,
@@ -155,8 +155,11 @@ export default function ArquivoMortoPage() {
           `, { count: "exact" })
           .eq("status", "Desligado")
           .order("name")
-          .range(page * pageSize, page * pageSize + pageSize - 1)
-          .or(`name.ilike.%${term}%,cpf.ilike.%${term}%,rg.ilike.%${term}%`);
+          .range(page * pageSize, page * pageSize + pageSize - 1);
+        
+        if (term) {
+          request = request.or(`name.ilike."%${term}%",cpf.ilike."%${term}%",rg.ilike."%${term}%"`);
+        }
 
         const { data, error: loadError, count } = await request;
         

@@ -1893,7 +1893,7 @@ ALTER TABLE ONLY "public"."employees" REPLICA IDENTITY FULL;
 ALTER TABLE "public"."employees" OWNER TO "postgres";
 
 
-CREATE OR REPLACE VIEW "public"."employees_arquivo_morto" AS
+CREATE OR REPLACE VIEW "public"."employees_arquivo_morto" WITH (security_invoker = on) AS
  SELECT "id",
     "name",
     "department_id",

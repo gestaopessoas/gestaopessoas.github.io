@@ -202,7 +202,7 @@ export default function ColaboradoresPage() {
       }
       
       const term = query.trim().replace(/[,%()]/g, " ");
-      if (term) request = request.or(`name.ilike.%${term}%,cpf.ilike.%${term}%,rg.ilike.%${term}%,role.ilike.%${term}%`);
+      if (term) request = request.or(`name.ilike."%${term}%",cpf.ilike."%${term}%",rg.ilike."%${term}%",role.ilike."%${term}%"`);
       
       if (advancedFilters.gender) request = request.eq("gender", advancedFilters.gender);
       if (advancedFilters.marital_status) request = request.eq("marital_status", advancedFilters.marital_status);
