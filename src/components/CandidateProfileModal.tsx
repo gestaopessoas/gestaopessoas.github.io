@@ -10,6 +10,7 @@ import {
   Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, 
   Info, Heart, DollarSign, Users, ChevronRight, Edit2, Save, History, FileCheck
 } from "lucide-react";
+import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
 
 type BigFiveResult = {
   id: string;
@@ -856,64 +857,18 @@ export function CandidateProfileModal({
                   <div className="space-y-6 animate-in fade-in duration-200">
                     <h2 className="text-2xl font-bold mb-6">Parecer & Avaliação</h2>
                     {isEditing ? (
-                      <div className="space-y-6">
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <span className="text-sm font-medium">Nota de Conhecimento Técnico (1-5)</span>
-                            <Input 
-                              type="number" min="1" max="5" 
-                              value={assessmentData.tech_knowledge_rating || ""} 
-                              onChange={(e) => handleAssessmentChange('tech_knowledge_rating', e.target.value)} 
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <span className="text-sm font-medium">Nota de Comunicação (1-5)</span>
-                            <Input 
-                              type="number" min="1" max="5" 
-                              value={assessmentData.communication_rating || ""} 
-                              onChange={(e) => handleAssessmentChange('communication_rating', e.target.value)} 
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <span className="text-sm font-medium">Fit Cultural</span>
-                          <Input 
-                            value={assessmentData.culture_fit || ""} 
-                            onChange={(e) => handleAssessmentChange('culture_fit', e.target.value)} 
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <span className="text-sm font-medium">Pontos Fortes (Hard e Soft Skills)</span>
-                          <Textarea 
-                            className="min-h-[100px]"
-                            value={assessmentData.strengths || ""} 
-                            onChange={(e) => handleAssessmentChange('strengths', e.target.value)} 
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <span className="text-sm font-medium">Pontos a Desenvolver</span>
-                          <Textarea 
-                            className="min-h-[100px]"
-                            value={assessmentData.improvement_points || ""} 
-                            onChange={(e) => handleAssessmentChange('improvement_points', e.target.value)} 
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <span className="text-sm font-medium">Observações Finais do Parecer</span>
-                          <Textarea 
-                            className="min-h-[100px]"
-                            value={assessmentData.final_observations || ""} 
-                            onChange={(e) => handleAssessmentChange('final_observations', e.target.value)} 
-                          />
-                        </div>
-                      </div>
+                      <CandidateAssessmentTab 
+                        assessmentData={assessmentData} 
+                        isEditing={true} 
+                        onChange={handleAssessmentChange} 
+                      />
                     ) : (
                       <div className="space-y-4">
                         {interviews.map((int) => {
                           const ass = int.assessment || {};
                           return (
                             <div key={int.id} className="p-6 rounded-xl border bg-card shadow-sm space-y-5">
-                              <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+                              <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4 mb-4">
                                 <div>
                                   <p className="font-bold text-lg text-foreground">{int.role || "Cargo Alvo"}</p>
                                   <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
@@ -936,45 +891,11 @@ export function CandidateProfileModal({
                                   </span>
                                 </div>
                               </div>
-
-                              {(ass.communication_rating || ass.tech_knowledge_rating || ass.culture_fit) && (
-                                <div className="grid grid-cols-3 gap-4 bg-muted/30 p-4 rounded-xl border text-center">
-                                  <div>
-                                    <span className="text-xs text-muted-foreground block font-medium uppercase tracking-wider mb-1">Comunicação</span>
-                                    <span className="font-bold text-foreground text-lg">{ass.communication_rating || "-"} / 5</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-xs text-muted-foreground block font-medium uppercase tracking-wider mb-1">Técnica</span>
-                                    <span className="font-bold text-foreground text-lg">{ass.tech_knowledge_rating || "-"} / 5</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-xs text-muted-foreground block font-medium uppercase tracking-wider mb-1">Fit Cultural</span>
-                                    <span className="font-bold text-primary text-lg">{ass.culture_fit || "-"}</span>
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="grid md:grid-cols-2 gap-4">
-                                {ass.strengths && (
-                                  <div className="p-4 rounded-xl border bg-emerald-500/5 border-emerald-500/20">
-                                    <p className="font-bold text-emerald-700 text-sm mb-2">Pontos Fortes (Destaques)</p>
-                                    <p className="text-sm text-emerald-900/80 whitespace-pre-line leading-relaxed">{ass.strengths}</p>
-                                  </div>
-                                )}
-                                {ass.improvement_points && (
-                                  <div className="p-4 rounded-xl border bg-amber-500/5 border-amber-500/20">
-                                    <p className="font-bold text-amber-700 text-sm mb-2">Pontos a Desenvolver</p>
-                                    <p className="text-sm text-amber-900/80 whitespace-pre-line leading-relaxed">{ass.improvement_points}</p>
-                                  </div>
-                                )}
-                              </div>
-
-                              {ass.final_observations && (
-                                <div className="text-sm bg-muted/20 p-4 rounded-xl border">
-                                  <p className="font-bold mb-2">Parecer Final:</p>
-                                  <p className="text-muted-foreground whitespace-pre-line">{ass.final_observations}</p>
-                                </div>
-                              )}
+                              <CandidateAssessmentTab 
+                                assessmentData={ass} 
+                                isEditing={false} 
+                                onChange={() => {}} 
+                              />
                             </div>
                           );
                         })}

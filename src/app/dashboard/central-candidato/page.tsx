@@ -8,7 +8,6 @@ import { Search, Loader2, Contact, RefreshCw, Plus, Trash2, AlertCircle, Briefca
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
-import AddCandidateModal from "./components/AddCandidateModal";
 import AdvanceStageModal from "./components/AdvanceStageModal";
 import RecusaModal from "./components/RecusaModal";
 import { useRouter } from "next/navigation";
@@ -426,14 +425,41 @@ export default function CentralCandidatoPage() {
         />
       )}
 
-      <AddCandidateModal
-        isOpen={isAddCandidateModalOpen}
-        onClose={() => setIsAddCandidateModalOpen(false)}
-        onSuccess={() => {
-          setIsAddCandidateModalOpen(false);
-          fetchCandidates();
-        }}
-      />
+      {isAddCandidateModalOpen && (
+        <CandidateProfileModal
+          isEditable={true}
+          defaultEditMode={true}
+          initialData={{}}
+          onClose={() => setIsAddCandidateModalOpen(false)}
+          onSave={async (data) => {
+            if (!data.full_name && !data.name) {
+              alert("Nome é obrigatório.");
+              throw new Error("Validation");
+            }
+            if (!data.email) {
+              alert("E-mail é obrigatório.");
+              throw new Error("Validation");
+            }
+            const { error } = await supabase.from("candidates").insert({
+              full_name: data.full_name || data.name,
+              first_name: (data.full_name || data.name || "").split(" ")[0],
+              last_name: (data.full_name || data.name || "").split(" ").slice(1).join(" "),
+              email: data.email,
+              phone: data.phone || null,
+              city: data.city || null,
+              state: data.state || null,
+              role_interest: data.role_interest || data.role || null,
+            });
+            if (error) {
+              if (error.code === '23505') alert("Já existe um candidato com este e-mail.");
+              else alert("Erro ao salvar: " + error.message);
+              throw error;
+            }
+            setIsAddCandidateModalOpen(false);
+            fetchCandidates();
+          }}
+        />
+      )}
 
       <Dialog open={isDeleteModalOpen} onOpenChange={(open) => !open && cancelDelete()}>
         <DialogContent className="sm:max-w-md">

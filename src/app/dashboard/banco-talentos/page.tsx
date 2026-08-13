@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { createClient } from "@/utils/supabase/client";
-import { Search, Loader2, Database, RefreshCw, Trash2, AlertCircle, Edit2, FileText } from "lucide-react";
+import { Search, Loader2, Database, RefreshCw, Trash2, AlertCircle, Edit2, FileText, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
@@ -45,35 +45,19 @@ export default function BancoTalentosPage() {
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [candidateToEdit, setCandidateToEdit] = useState<CandidateEditForm | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  
-  const [worksites, setWorksites] = useState<string[]>([]);
+  const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   
   const { can } = usePermissions();
   const canDelete = can("central_candidato", "delete");
 
   const supabase = createClient();
 
-  useEffect(() => {
-    // As obras vêm de `workplaces`. A versão anterior lia cost_centers.workplace_name,
-    // coluna que não existe — a query falhava calada e a lista ficava sempre vazia.
-    const fetchWorksites = async () => {
-      const { data, error } = await supabase.from('workplaces').select('name').order('name');
-      if (error) {
-        console.error('Erro ao carregar obras:', error);
-        return;
-      }
-      setWorksites(Array.from(new Set((data ?? []).map(d => d.name).filter(Boolean))));
-    };
-    fetchWorksites();
-  }, [supabase]);
+
 
   const fetchCandidates = async () => {
     try {
@@ -173,41 +157,7 @@ export default function BancoTalentosPage() {
     }
   };
   
-  const handleEdit = (c: CandidateRow) => {
-    setCandidateToEdit({
-        id: c.id,
-        full_name: c.full_name,
-        phone: c.phone === "Não informado" ? "" : c.phone,
-        email: c.email,
-        role_interest: c.role_interest === "Não informado" ? "" : c.role_interest,
-        available_worksites: c.raw_data.available_worksites || [],
-        worksite_type: (c.raw_data.available_worksites && c.raw_data.available_worksites.includes("Todas as Obras")) ? "all" : "specific"
-    });
-    setIsEditModalOpen(true);
-  };
 
-  const confirmEdit = async () => {
-      if (!candidateToEdit) return;
-      setSaving(true);
-      const payload = {
-          full_name: candidateToEdit.full_name,
-          phone: candidateToEdit.phone,
-          email: candidateToEdit.email,
-          role_interest: candidateToEdit.role_interest,
-          available_worksites: candidateToEdit.worksite_type === "all" ? ["Todas as Obras"] : candidateToEdit.available_worksites
-      };
-      
-      try {
-          const { error } = await supabase.from("candidates").update(payload).eq("id", candidateToEdit.id);
-          if (error) throw error;
-          setIsEditModalOpen(false);
-          fetchCandidates();
-      } catch (err) {
-          alert("Erro ao salvar: " + errorMessage(err));
-      } finally {
-          setSaving(false);
-      }
-  };
 
   return (
     <div className="space-y-6">
@@ -233,6 +183,10 @@ export default function BancoTalentosPage() {
           </div>
           <Button variant="outline" size="icon" onClick={fetchCandidates}>
             <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button onClick={() => setIsAddCandidateModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo talento
           </Button>
         </div>
       </div>
@@ -305,10 +259,7 @@ export default function BancoTalentosPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => setSelectedCandidateId(candidate.id)} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Ver dossiê / currículo">
-                              <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(candidate)} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Editar">
+                          <Button variant="ghost" size="icon" onClick={() => setSelectedCandidateId(candidate.id)} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Editar / Ver Dossiê">
                               <Edit2 className="h-4 w-4" />
                           </Button>
                           {canDelete && (
@@ -331,11 +282,60 @@ export default function BancoTalentosPage() {
         </div>
       </div>
 
+      {isAddCandidateModalOpen && (
+        <CandidateProfileModal
+          isEditable={true}
+          defaultEditMode={true}
+          initialData={{}}
+          onClose={() => setIsAddCandidateModalOpen(false)}
+          onSave={async (data) => {
+            if (!data.full_name && !data.name) { alert("Nome é obrigatório."); throw new Error("Validation"); }
+            if (!data.email) { alert("E-mail é obrigatório."); throw new Error("Validation"); }
+            const { error } = await supabase.from("candidates").insert({
+              full_name: data.full_name || data.name,
+              first_name: (data.full_name || data.name || "").split(" ")[0],
+              last_name: (data.full_name || data.name || "").split(" ").slice(1).join(" "),
+              email: data.email,
+              phone: data.phone || null,
+              city: data.city || null,
+              state: data.state || null,
+              role_interest: data.role_interest || data.role || null,
+              status: "Banco de Talentos",
+            });
+            if (error) {
+              if (error.code === '23505') alert("Já existe um candidato com este e-mail.");
+              else alert("Erro ao salvar: " + error.message);
+              throw error;
+            }
+            setIsAddCandidateModalOpen(false);
+            fetchCandidates();
+          }}
+        />
+      )}
+
       {selectedCandidateId && (
         <CandidateProfileModal
           candidateId={selectedCandidateId}
           initialTab="curriculum"
+          isEditable={true}
           onClose={() => setSelectedCandidateId(null)}
+          onSave={async (data) => {
+            const { error } = await supabase.from("candidates").update({
+              full_name: data.full_name || data.name,
+              first_name: (data.full_name || data.name || "").split(" ")[0],
+              last_name: (data.full_name || data.name || "").split(" ").slice(1).join(" "),
+              email: data.email,
+              phone: data.phone || null,
+              city: data.city || null,
+              state: data.state || null,
+              role_interest: data.role_interest || data.role || null,
+            }).eq("id", selectedCandidateId);
+            if (error) {
+              alert("Erro ao salvar: " + error.message);
+              throw error;
+            }
+            fetchCandidates();
+          }}
         />
       )}
 
@@ -351,79 +351,6 @@ export default function BancoTalentosPage() {
             <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)} disabled={deleting}>Cancelar</Button>
             <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
               {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Excluir
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Editar Talento</DialogTitle>
-          </DialogHeader>
-          {candidateToEdit && (
-            <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Nome Completo</label>
-                    <Input value={candidateToEdit.full_name} onChange={e => setCandidateToEdit({...candidateToEdit, full_name: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Cargo de Interesse</label>
-                    <Input value={candidateToEdit.role_interest} onChange={e => setCandidateToEdit({...candidateToEdit, role_interest: e.target.value})} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Telefone</label>
-                        <Input value={candidateToEdit.phone} onChange={e => setCandidateToEdit({...candidateToEdit, phone: e.target.value})} />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">E-mail</label>
-                        <Input value={candidateToEdit.email} onChange={e => setCandidateToEdit({...candidateToEdit, email: e.target.value})} />
-                    </div>
-                </div>
-                
-                <div className="space-y-2 pt-2 border-t">
-                  <label className="text-sm font-medium">Disponibilidade de Obras</label>
-                  <select
-                    value={candidateToEdit.worksite_type || 'all'}
-                    onChange={e => setCandidateToEdit({...candidateToEdit, worksite_type: e.target.value as "all" | "specific", available_worksites: []})}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="all">Disponível para Todas as Obras</option>
-                    <option value="specific">Obras Específicas...</option>
-                  </select>
-                </div>
-                
-                {candidateToEdit.worksite_type === 'specific' && (
-                  <div className="space-y-2 p-3 border rounded-md bg-background">
-                    <label className="text-xs text-muted-foreground uppercase">Selecione as obras adequadas ao perfil:</label>
-                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto mt-2">
-                      {worksites.map(w => (
-                        <label key={w} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 p-1 rounded">
-                          <input 
-                            type="checkbox" 
-                            checked={(candidateToEdit.available_worksites || []).includes(w)}
-                            onChange={(e) => {
-                              const current = candidateToEdit.available_worksites || [];
-                              const next = e.target.checked 
-                                ? [...current, w] 
-                                : current.filter((x: string) => x !== w);
-                              setCandidateToEdit({...candidateToEdit, available_worksites: next});
-                            }}
-                            className="rounded border-input"
-                          />
-                          <span className="truncate">{w}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditModalOpen(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={confirmEdit} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Salvar Alterações
             </Button>
           </DialogFooter>
         </DialogContent>
