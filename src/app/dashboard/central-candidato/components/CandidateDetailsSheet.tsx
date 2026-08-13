@@ -81,6 +81,35 @@ export default function CandidateDetailsSheet({
 
         if (controller.signal.aborted || stale) return;
         if (error) throw error;
+
+        if (data && data.email) {
+          const { data: ints } = await supabase.from("interviews").select("email, assessment").eq("email", data.email);
+          if (ints && ints.length > 0) {
+            let extraEdus: any[] = [];
+            ints.forEach(int => {
+              if (int.assessment && Array.isArray(int.assessment.academic_list)) {
+                int.assessment.academic_list.forEach((ac: any) => {
+                  extraEdus.push({
+                    id: ac.id || Math.random().toString(),
+                    degree: ac.course || "Curso Superior / Técnico",
+                    institution_name: ac.institution || "Não informada",
+                    start_date: ac.start_year || ac.start_date || null,
+                    end_date: ac.end_year || ac.end_date || null,
+                  });
+                });
+              }
+            });
+            if (extraEdus.length > 0) {
+              if (!data.candidate_educations) data.candidate_educations = [];
+              extraEdus.forEach(extra => {
+                if (!data.candidate_educations.some((existing: any) => (existing.degree || "").toLowerCase() === (extra.degree || "").toLowerCase() && (existing.institution_name || "").toLowerCase() === (extra.institution_name || "").toLowerCase())) {
+                  data.candidate_educations.push(extra);
+                }
+              });
+            }
+          }
+        }
+
         setCandidate(data);
       } catch (err) {
         if (controller.signal.aborted || stale) return;
