@@ -523,6 +523,12 @@ export function CandidateProfileModal({
                             <span className="font-semibold">{person.marital_status}</span>
                           </div>
                         )}
+                        {person.gender && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
+                            <span className="text-xs text-muted-foreground block">Gênero</span>
+                            <span className="font-semibold">{person.gender}</span>
+                          </div>
+                        )}
                         {person.address && (
                           <div className="p-3 rounded-xl border bg-card shadow-2xs md:col-span-2">
                             <span className="text-xs text-muted-foreground block">Endereço</span>
@@ -557,7 +563,7 @@ export function CandidateProfileModal({
                         )}
                       </div>
                       {person.personal_info && (
-                        <div className="mt-2 text-sm p-3 rounded-xl border bg-muted/20">
+                        <div className="mt-2 text-sm p-3 rounded-xl border bg-card shadow-2xs">
                           <span className="text-xs font-bold block mb-1">Mais Detalhes Pessoais:</span>
                           <p className="text-muted-foreground whitespace-pre-line">{person.personal_info}</p>
                         </div>
@@ -578,6 +584,12 @@ export function CandidateProfileModal({
                               <span className="text-xs text-muted-foreground block">Pretensão Salarial</span>
                               <span className="font-semibold">{person.salary_expectation}</span>
                             </div>
+                          </div>
+                        )}
+                        {person.languages && (
+                          <div className="p-3 rounded-xl border bg-card shadow-2xs md:col-span-2">
+                            <span className="text-xs text-muted-foreground block">Idiomas</span>
+                            <span className="font-semibold">{person.languages}</span>
                           </div>
                         )}
                         {person.has_dependents && (
@@ -606,7 +618,7 @@ export function CandidateProfileModal({
                         )}
                       </div>
                       {person.additional_info && (
-                        <div className="mt-2 text-sm p-3 rounded-xl border bg-muted/20">
+                        <div className="mt-2 text-sm p-3 rounded-xl border bg-card shadow-2xs">
                           <span className="text-xs font-bold block mb-1">Outras Informações Adicionais:</span>
                           <p className="text-muted-foreground whitespace-pre-line">{person.additional_info}</p>
                         </div>
@@ -646,8 +658,8 @@ export function CandidateProfileModal({
                           )}
                         </div>
                         {person.diversity_info && (
-                          <div className="mt-2 text-sm p-3 rounded-lg border bg-muted/20">
-                            <span className="text-xs font-bold block mb-1">Informações Adicionais (Diversidade):</span>
+                          <div className="mt-3 text-sm p-3 rounded-xl border bg-card shadow-2xs">
+                            <span className="text-xs font-bold block mb-1">Outras Informações de Diversidade:</span>
                             <p className="text-muted-foreground whitespace-pre-line">{person.diversity_info}</p>
                           </div>
                         )}
