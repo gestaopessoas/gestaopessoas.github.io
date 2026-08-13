@@ -278,6 +278,11 @@ export function CandidateProfileModal({
 
       interviewsData.forEach((int) => {
         if (int.assessment) {
+          const assess = int.assessment as any;
+          if (personData && !personData.personal_info && assess.personal_info) personData.personal_info = assess.personal_info;
+          if (personData && !personData.additional_info && assess.additional_info) personData.additional_info = assess.additional_info;
+          if (personData && !personData.diversity_info && assess.diversity_info) personData.diversity_info = assess.diversity_info;
+
           if (Array.isArray(int.assessment.academic_list)) {
             int.assessment.academic_list.forEach((ac) => {
               if (!extractedEdu.some(existing => (existing.course || existing.degree || "").toLowerCase() === (ac.course || "").toLowerCase() && (existing.institution || "").toLowerCase() === (ac.institution || "").toLowerCase())) {

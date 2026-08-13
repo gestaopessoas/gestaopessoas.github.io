@@ -97,17 +97,36 @@ export default function CentralCandidatoPage() {
       if (error) throw error;
 
       if (data) {
+        // Busca fallback para escolaridade no JSON assessment da tabela interviews
+        const emails = data.map(c => c.email).filter(Boolean);
+        let interviewsData: any[] = [];
+        if (emails.length > 0) {
+          const { data: ints } = await supabase.from("interviews").select("email, assessment").in("email", emails);
+          if (ints) interviewsData = ints;
+        }
+
         const rows: CandidateRow[] = data.map((c) => {
           const derived = resolveCandidateStatus(c);
           const finalStatus = derived.status;
           const finalChamado = derived.ultimo_chamado;
+
+          let extraDegree = null;
+          if (c.email) {
+            const intMatches = interviewsData.filter(i => i.email === c.email);
+            for (const m of intMatches) {
+              if (m.assessment && Array.isArray(m.assessment.academic_list) && m.assessment.academic_list.length > 0) {
+                extraDegree = m.assessment.academic_list[0].course || "Curso Superior / Técnico";
+                break;
+              }
+            }
+          }
 
           return {
             id: c.id,
             full_name: c.full_name,
             phone: c.phone || "Não informado",
             email: c.email,
-            escolaridade: latestEducationDegree(c.candidate_educations) || "Não informado",
+            escolaridade: latestEducationDegree(c.candidate_educations) || extraDegree || "Não informado",
             status: finalStatus,
             ultimo_chamado: finalChamado,
             obra_atual: derived.obra_atual || c.city || null,
