@@ -282,7 +282,7 @@ export function CandidateProfileModal({
         if (interviewId) {
           intQuery = intQuery.eq("id", interviewId);
         } else if (personEmail && personName) {
-          intQuery = intQuery.or(`email.ilike.${personEmail},candidate_name.ilike.${personName}`);
+          intQuery = intQuery.or(`email.ilike."${personEmail}",candidate_name.ilike."${personName}"`);
         } else if (personEmail) {
           intQuery = intQuery.ilike("email", personEmail);
         } else if (personName) {
