@@ -29,7 +29,7 @@ const fields = [
 ].join(", ");
 
 const emptyForm = {
-  name: "", registration_number: "", profile_code: "", department_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
+  name: "", registration_number: "", profile_code: "", department_id: "", department: "", sector_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "", boot_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
@@ -90,6 +90,8 @@ export default function ColaboradoresPage() {
   const [departments, setDepartments] = useState<Entity[]>([]);
   const [companies, setCompanies] = useState<Entity[]>([]);
   const [costCenters, setCostCenters] = useState<Entity[]>([]);
+  const [sectors, setSectors] = useState<Entity[]>([]);
+  const [jobProfiles, setJobProfiles] = useState<any[]>([]);
   const [workplaces, setWorkplaces] = useState<Entity[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [salaryRules, setSalaryRules] = useState<SalaryRule[]>([]);
@@ -107,7 +109,7 @@ export default function ColaboradoresPage() {
   const [advancedFilters, setAdvancedFilters] = useState({
     gender: "",
     marital_status: "",
-    department_id: "",
+    sector_id: "",
     role: "",
     unit: "",
     status: "",
@@ -204,7 +206,7 @@ export default function ColaboradoresPage() {
       
       if (advancedFilters.gender) request = request.eq("gender", advancedFilters.gender);
       if (advancedFilters.marital_status) request = request.eq("marital_status", advancedFilters.marital_status);
-      if (advancedFilters.department_id) request = request.eq("department_id", advancedFilters.department_id);
+      if (advancedFilters.sector_id) request = request.eq("sector_id", advancedFilters.sector_id);
       if (advancedFilters.role) request = request.ilike("role", `%${advancedFilters.role}%`);
       if (advancedFilters.unit) request = request.ilike("workplaces.name", `%${advancedFilters.unit}%`);
       if (advancedFilters.admission_start) request = request.gte("admission_date", advancedFilters.admission_start);
@@ -224,6 +226,10 @@ export default function ColaboradoresPage() {
 
   const update = (field: keyof EmployeeForm, value: string) => setForm((current) => {
     const updated = { ...current, [field]: value };
+    if (field === "role") {
+      const profile = jobProfiles.find(p => p.title === value);
+      updated.department = profile?.is_operational ? "Direto" : "Indireto";
+    }
 
     if (field === "status" && value !== "Desligado" && value !== "Arquivo Morto") {
       updated.dismissed_at = "";
@@ -886,10 +892,10 @@ export default function ColaboradoresPage() {
             <div className="p-4 overflow-y-auto space-y-4 flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label>Departamento</Label>
-                  <select value={advancedFilters.department_id} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, department_id: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                  <Label>Setor</Label>
+                  <select value={advancedFilters.sector_id} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, sector_id: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                     <option value="">Todos</option>
-                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    {sectors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -943,7 +949,7 @@ export default function ColaboradoresPage() {
             </div>
             <div className="p-4 border-t flex justify-between bg-muted/30">
               <Button variant="ghost" onClick={() => {
-                setAdvancedFilters({ gender: "", marital_status: "", department_id: "", role: "", unit: "", status: "", admission_start: "", admission_end: "" });
+                setAdvancedFilters({ gender: "", marital_status: "", sector_id: "", role: "", unit: "", status: "", admission_start: "", admission_end: "" });
                 setPage(0);
               }}>Limpar Filtros</Button>
               <div className="flex gap-2">

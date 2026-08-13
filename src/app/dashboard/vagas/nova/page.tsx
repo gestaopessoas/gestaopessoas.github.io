@@ -64,7 +64,7 @@ const searchTags = [
 
 const initialForm = {
   profile_id: "",
-  department_id: "",
+  sector_id: "",
   position_title: "",
   unit: "",
   quantity: "1",
@@ -88,7 +88,7 @@ const initialForm = {
 export default function NovaVagaPage() {
   const router = useRouter();
   const [profiles, setProfiles] = useState<JobProfile[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [sectors, setSectors] = useState<Department[]>([]);
   const [salaryTable, setSalaryTable] = useState<SalaryRow[]>([]);
   const [workSchedules, setWorkSchedules] = useState<string[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
@@ -131,7 +131,7 @@ export default function NovaVagaPage() {
       }
 
       setProfiles((profilesResult.data ?? []) as JobProfile[]);
-      setDepartments((departmentsResult.data ?? []) as Department[]);
+      setSectors((departmentsResult.data ?? []) as Department[]);
       setSalaryTable((salaryResult.data ?? []) as SalaryRow[]);
       setCostCenters((costCentersResult.data ?? []) as CostCenter[]);
       setCompanyBenefits((benefitsResult.data ?? []) as {name: string}[]);
@@ -327,7 +327,7 @@ export default function NovaVagaPage() {
           requester_area: "Recursos Humanos",
           requester_phone: requesterContact || "-",
           profile_id: form.profile_id || null,
-          department_id: form.department_id || null,
+          sector_id: form.sector_id || null,
           position_title: form.position_title,
           requested_role: form.position_title,
           unit: form.unit || null,
@@ -356,7 +356,7 @@ export default function NovaVagaPage() {
         .from("job_openings")
         .insert({
           profile_id: form.profile_id || null,
-          department_id: form.department_id || null,
+          sector_id: form.sector_id || null,
           cost_center: form.unit || null,
           contract_type: form.contract_type,
           target_date: form.target_date || null,
@@ -439,10 +439,10 @@ export default function NovaVagaPage() {
               </Field>
               <Field label="Título da vaga *" className="md:col-span-2"><Input required value={form.position_title} onChange={(event) => set("position_title", event.target.value)} /></Field>
               <Field label="Quantidade"><Input type="number" min="1" step="1" value={form.quantity} onChange={(event) => set("quantity", event.target.value.replace(/\D/g, "").slice(0, 4))} /></Field>
-              <Field label="Departamento">
-                <select value={form.department_id} onChange={(event) => set("department_id", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+              <Field label="Setor">
+                <select value={form.sector_id} onChange={(event) => set("sector_id", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   <option value="">Selecione...</option>
-                  {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+                  {sectors.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                 </select>
               </Field>
               <Field label="Unidade / Centro de Custo">

@@ -67,7 +67,7 @@ const sidebarGroups = [
     name: "Administrativo",
     items: [
       { name: "Centros de Custo", href: "/dashboard/centros-de-custo", icon: Briefcase, module: "centros_de_custo" },
-      { name: "Departamentos", href: "/dashboard/departamentos", icon: Briefcase, module: "departamentos" },
+      { name: "Setores", href: "/dashboard/setores", icon: Briefcase, module: "departamentos" },
       { name: "Cargos", href: "/dashboard/cargos", icon: Briefcase, module: "cargos" },
       { name: "Tabela Salarial", href: "/dashboard/configuracoes/tabela-salarial", icon: CircleDollarSign, module: "configuracoes" },
       { name: "Empresas", href: "/dashboard/empresas", icon: LayoutDashboard, module: "empresas" },

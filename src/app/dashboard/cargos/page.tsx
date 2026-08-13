@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { Edit3, Briefcase, Plus, Search, X, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useEffect, useMemo, useState } from "react";
 
 type JobProfile = {
@@ -21,15 +22,17 @@ type JobProfile = {
   knowledge: string | null;
   activities: string | null;
   competencies: string | null;
+  is_operational: boolean;
 };
 
-const emptyForm = { title: "", cbo: "", profile_code: "", min_education: "", desired_education: "", min_experience: "", desired_experience: "", cnh: "", integration_trainings: "", knowledge: "", activities: "", competencies: "" };
+const emptyForm = { title: "", cbo: "", profile_code: "", min_education: "", desired_education: "", min_experience: "", desired_experience: "", cnh: "", integration_trainings: "", knowledge: "", activities: "", competencies: "", is_operational: false };
 
 export default function CargosPage() {
   const [cargos, setCargos] = useState<JobProfile[]>([]);
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -67,6 +70,7 @@ export default function CargosPage() {
     setEditingId(null);
     setForm(emptyForm);
     setError("");
+    setIsModalOpen(true);
   };
 
   const startEdit = (c: JobProfile) => {
@@ -83,9 +87,11 @@ export default function CargosPage() {
       integration_trainings: c.integration_trainings || "",
       knowledge: c.knowledge || "",
       activities: c.activities || "",
-      competencies: c.competencies || ""
+      competencies: c.competencies || "",
+      is_operational: c.is_operational || false
     });
     setError("");
+    setIsModalOpen(true);
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -106,6 +112,7 @@ export default function CargosPage() {
       knowledge: form.knowledge.trim() || null,
       activities: form.activities.trim() || null,
       competencies: form.competencies.trim() || null,
+      is_operational: form.is_operational,
     };
 
     const supabase = createClient();
@@ -125,6 +132,7 @@ export default function CargosPage() {
 
     const saved = result.data as JobProfile;
     setCargos((prev) => editingId ? prev.map((item) => item.id === editingId ? saved : item) : [...prev, saved].sort((a, b) => a.title.localeCompare(b.title)));
+    setIsModalOpen(false);
     startNew();
   };
 
@@ -172,37 +180,55 @@ export default function CargosPage() {
           <Metric label="Total de cargos" value={cargos.length} />
         </div>
 
-        <form onSubmit={save} className="rounded-lg border bg-card p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold">{editingId ? "Editar cargo" : "Adicionar cargo"}</h2>
-            {editingId && <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={startNew}><X className="h-4 w-4" /></Button>}
-          </div>
-          
-          <div className="grid gap-3 md:grid-cols-3 mb-4">
-            <Field label="Nome do Cargo *"><Input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
-            <Field label="CBO"><Input value={form.cbo} onChange={(event) => setForm({ ...form, cbo: event.target.value })} /></Field>
-            <Field label="Código do Perfil *"><Input required value={form.profile_code} onChange={(event) => setForm({ ...form, profile_code: event.target.value })} /></Field>
-          </div>
+        <Dialog open={isModalOpen} onOpenChange={(open) => {
+          setIsModalOpen(open);
+          if (!open) {
+            setEditingId(null);
+            setForm(emptyForm);
+            setError("");
+          }
+        }}>
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingId ? "Editar cargo" : "Adicionar cargo"}</DialogTitle>
+              <DialogDescription>Preencha os detalhes do cargo abaixo.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={save} className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-4 mb-4">
+                <div className="md:col-span-2">
+                  <Field label="Nome do Cargo *"><Input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
+                </div>
+                <Field label="CBO"><Input value={form.cbo} onChange={(event) => setForm({ ...form, cbo: event.target.value })} /></Field>
+                <Field label="Código do Perfil *"><Input required value={form.profile_code} onChange={(event) => setForm({ ...form, profile_code: event.target.value })} /></Field>
+                <div className="md:col-span-4 flex flex-col gap-1.5 pt-2">
+                  <label className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer">
+                    <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" checked={form.is_operational} onChange={(e) => setForm({ ...form, is_operational: e.target.checked })} />
+                    Cargo Operacional?
+                  </label>
+                </div>
+              </div>
 
-          <div className="grid gap-3 md:grid-cols-2 mb-4">
-            <Field label="Escolaridade Mínima"><Input value={form.min_education} onChange={(event) => setForm({ ...form, min_education: event.target.value })} /></Field>
-            <Field label="Escolaridade Desejável"><Input value={form.desired_education} onChange={(event) => setForm({ ...form, desired_education: event.target.value })} /></Field>
-            <Field label="Experiência Mínima"><Input value={form.min_experience} onChange={(event) => setForm({ ...form, min_experience: event.target.value })} /></Field>
-            <Field label="Experiência Desejável"><Input value={form.desired_experience} onChange={(event) => setForm({ ...form, desired_experience: event.target.value })} /></Field>
-          </div>
+              <div className="grid gap-3 md:grid-cols-2 mb-4">
+                <Field label="Escolaridade Mínima"><Input value={form.min_education} onChange={(event) => setForm({ ...form, min_education: event.target.value })} /></Field>
+                <Field label="Escolaridade Desejável"><Input value={form.desired_education} onChange={(event) => setForm({ ...form, desired_education: event.target.value })} /></Field>
+                <Field label="Experiência Mínima"><Input value={form.min_experience} onChange={(event) => setForm({ ...form, min_experience: event.target.value })} /></Field>
+                <Field label="Experiência Desejável"><Input value={form.desired_experience} onChange={(event) => setForm({ ...form, desired_experience: event.target.value })} /></Field>
+              </div>
 
-          <div className="grid gap-3 md:grid-cols-1 mb-4">
-            <Field label="CNH"><Input value={form.cnh} onChange={(event) => setForm({ ...form, cnh: event.target.value })} placeholder="Ex: Categoria B" /></Field>
-            <Field label="Treinamentos de Integração"><Input value={form.integration_trainings} onChange={(event) => setForm({ ...form, integration_trainings: event.target.value })} /></Field>
-            <Field label="Conhecimentos"><textarea value={form.knowledge} onChange={(event) => setForm({ ...form, knowledge: event.target.value })} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
-            <Field label="Atividades"><textarea value={form.activities} onChange={(event) => setForm({ ...form, activities: event.target.value })} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
-            <Field label="Competências"><textarea value={form.competencies} onChange={(event) => setForm({ ...form, competencies: event.target.value })} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
-          </div>
-          
-          <div className="mt-4 flex justify-end">
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
-          </div>
-        </form>
+              <div className="grid gap-3 md:grid-cols-1 mb-4">
+                <Field label="CNH"><Input value={form.cnh} onChange={(event) => setForm({ ...form, cnh: event.target.value })} placeholder="Ex: Categoria B" /></Field>
+                <Field label="Treinamentos de Integração"><Input value={form.integration_trainings} onChange={(event) => setForm({ ...form, integration_trainings: event.target.value })} /></Field>
+                <Field label="Conhecimentos"><textarea value={form.knowledge} onChange={(event) => setForm({ ...form, knowledge: event.target.value })} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
+                <Field label="Atividades"><textarea value={form.activities} onChange={(event) => setForm({ ...form, activities: event.target.value })} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
+                <Field label="Competências"><textarea value={form.competencies} onChange={(event) => setForm({ ...form, competencies: event.target.value })} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
+              </div>
+              
+              <div className="mt-4 flex justify-end">
+                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

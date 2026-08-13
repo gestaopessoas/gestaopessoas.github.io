@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { Edit3, Landmark, Plus, Search, X, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEffect, useMemo, useState } from "react";
 
 type CostCenter = {
@@ -21,6 +22,7 @@ export default function CentrosDeCustoPage() {
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -58,12 +60,14 @@ export default function CentrosDeCustoPage() {
     setEditingId(null);
     setForm(emptyForm);
     setError("");
+    setIsModalOpen(true);
   };
 
   const startEdit = (center: CostCenter) => {
     setEditingId(center.id);
     setForm({ code: center.code, name: center.name, description: center.description ?? "" });
     setError("");
+    setIsModalOpen(true);
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -90,6 +94,7 @@ export default function CentrosDeCustoPage() {
 
     const saved = result.data as CostCenter;
     setCenters((prev) => editingId ? prev.map((item) => item.id === editingId ? saved : item) : [...prev, saved].sort((a, b) => a.code.localeCompare(b.code)));
+    setIsModalOpen(false);
     startNew();
   };
 
@@ -139,20 +144,32 @@ export default function CentrosDeCustoPage() {
           <Metric label="Ativos" value={centers.length} />
         </div>
 
-        <form onSubmit={save} className="rounded-lg border bg-card p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold">{editingId ? "Editar centro" : "Adicionar centro"}</h2>
-            {editingId && <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={startNew}><X className="h-4 w-4" /></Button>}
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Código *"><Input required value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} /></Field>
-            <Field label="Nome *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
-            <Field label="Descrição"><Input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
-          </div>
-          <div className="mt-4 flex justify-end">
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
-          </div>
-        </form>
+        <Dialog open={isModalOpen} onOpenChange={(open) => {
+          setIsModalOpen(open);
+          if (!open) {
+            setEditingId(null);
+            setForm(emptyForm);
+            setError("");
+          }
+        }}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>{editingId ? "Editar centro" : "Adicionar centro"}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={save} className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label="Código *"><Input required value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} /></Field>
+                <Field label="Nome *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
+                <div className="md:col-span-2">
+                  <Field label="Descrição"><Input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
