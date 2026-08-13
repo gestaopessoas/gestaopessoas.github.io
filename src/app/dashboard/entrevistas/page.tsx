@@ -2124,11 +2124,15 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
                 <div className="space-y-5 flex-1 overflow-y-auto pr-1">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <Label>Idade / Nascimento</Label>
+                      <Label>Idade</Label>
                       <Input 
                         value={assessmentForm.age || ''} 
-                        onChange={e => setAssessmentForm({...assessmentForm, age: e.target.value})} 
-                        placeholder="Ex: 33 anos" 
+                        onChange={e => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+                          setAssessmentForm({...assessmentForm, age: val});
+                        }} 
+                        placeholder="Ex: 33" 
+                        maxLength={2}
                       />
                     </div>
                     <div className="space-y-1">
