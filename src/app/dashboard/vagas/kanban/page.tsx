@@ -138,10 +138,16 @@ function KanbanContent() {
                     >
                       <div className="font-medium text-sm mb-1">{c.name}</div>
                       <div className="text-xs text-muted-foreground truncate mb-2">{c.email}</div>
-                      
-                      {c.match_score > 0 && (
-                        <div className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${c.match_score >= 70 ? 'bg-emerald-500/10 text-emerald-600' : c.match_score >= 40 ? 'bg-amber-500/10 text-amber-600' : 'bg-zinc-500/10 text-zinc-600'}`}>
-                          {c.match_score}% Match
+                      {c.match_result && c.match_result.score > 0 && (
+                        <div className={`inline-flex flex-col items-start gap-0.5 px-2 py-1 rounded border text-[10px] font-medium ${
+                          c.match_result.score >= 70 
+                            ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' 
+                            : c.match_result.score >= 40 
+                              ? 'bg-amber-500/10 text-amber-700 border-amber-500/20' 
+                              : 'bg-zinc-500/10 text-zinc-700 border-zinc-500/20'
+                        }`}>
+                          <span className="font-bold">{c.match_result.score}% Match</span>
+                          <span className="text-[9px] opacity-80">{c.match_result.matches} de {c.match_result.total} Palavras-chave</span>
                         </div>
                       )}
                     </div>

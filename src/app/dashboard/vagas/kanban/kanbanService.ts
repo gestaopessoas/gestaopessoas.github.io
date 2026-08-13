@@ -1,5 +1,5 @@
 import { createClient } from "@/utils/supabase/client";
-import { calculateMatchScore } from "@/utils/matchScore";
+import { calculateMatchScore, MatchResult } from "@/utils/matchScore";
 
 export type KanbanCandidate = {
   id: string;
@@ -7,7 +7,7 @@ export type KanbanCandidate = {
   name: string;
   email: string;
   status: string;
-  match_score: number;
+  match_result: MatchResult;
   tags: string[];
 };
 
@@ -79,7 +79,7 @@ export async function fetchKanbanData(jobId: string) {
       name: c.full_name || [c.first_name, c.last_name].filter(Boolean).join(" ") || "Sem nome",
       email: c.email,
       status: app.status,
-      match_score: calculateMatchScore(cTags, jobTags),
+      match_result: calculateMatchScore(cTags, jobTags),
       tags: cTags
     });
   });
@@ -88,18 +88,18 @@ export async function fetchKanbanData(jobId: string) {
   allCandidates?.forEach(c => {
     if (appliedCandidateIds.has(c.id)) return;
     const cTags = [...(c.search_tags || []), ...(c.behavioral_tags || [])];
-    const score = calculateMatchScore(cTags, jobTags);
-    if (score > 0) {
+    const resultScore = calculateMatchScore(cTags, jobTags);
+    if (resultScore.score > 0) {
       result.push({
         id: c.id,
         name: c.full_name || [c.first_name, c.last_name].filter(Boolean).join(" ") || "Sem nome",
         email: c.email,
         status: "Sugestões", // virtual status for kanban
-        match_score: score,
+        match_result: resultScore,
         tags: cTags
       });
     }
   });
 
-  return result.sort((a, b) => b.match_score - a.match_score);
+  return result.sort((a, b) => b.match_result.score - a.match_result.score);
 }
