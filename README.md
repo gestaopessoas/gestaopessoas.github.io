@@ -1,6 +1,6 @@
-# ACPO Gestão de Pessoas
+# G&G - Gente e Gestão
 
-Sistema **ATS (Applicant Tracking System) e Core HR** da ACPO. Plataforma web para gestão completa de recrutamento, seleção, colaboradores, folha salarial, benefícios e operacional de obras.
+Sistema **ATS (Applicant Tracking System) e Core HR**. Plataforma web para gestão completa de recrutamento, seleção, colaboradores, folha salarial, benefícios e operacional .
 
 ## Stack
 
@@ -90,4 +90,4 @@ scripts/            → Scripts de import/migração
 
 ## Licença
 
-Privado — ACPO Empreendimentos.
+Creative free.
