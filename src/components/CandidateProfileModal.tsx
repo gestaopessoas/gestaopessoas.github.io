@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
-import { X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, Info, Heart, DollarSign, Users } from "lucide-react";
+import { X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, Info, Heart, DollarSign, Users, Trash2 } from "lucide-react";
 
 type BigFiveResult = {
   id: string;
@@ -97,6 +97,17 @@ type ProfileExperience = {
 type AssessmentAcademic = ProfileEducation & { start_year?: string | null; end_year?: string | null };
 type AssessmentExperience = ProfileExperience;
 
+type CandidateInterview = {
+  id: string;
+  candidate_id: string;
+  stage: string;
+  workplace_name?: string | null;
+  interviewer_name?: string | null;
+  created_at: string;
+  notes?: string | null;
+  rejection_reason?: string | null;
+};
+
 type ProfileInterview = {
   id: string;
   role?: string | null;
@@ -131,9 +142,11 @@ export function CandidateProfileModal({
   const [person, setPerson] = useState<ProfilePerson | null>(null);
   const [results, setResults] = useState<BigFiveResult[]>([]);
   const [interviews, setInterviews] = useState<ProfileInterview[]>([]);
+  const [candidateInterviews, setCandidateInterviews] = useState<CandidateInterview[]>([]);
   const [educations, setEducations] = useState<ProfileEducation[]>([]);
   const [experiences, setExperiences] = useState<ProfileExperience[]>([]);
   const [loading, setLoading] = useState(true);
+  const [retryTick, setRetryTick] = useState(0);
   const [openingResume, setOpeningResume] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
@@ -185,6 +198,7 @@ export function CandidateProfileModal({
       let resultsData: BigFiveResult[] = [];
       let educationsData: ProfileEducation[] = [];
       let interviewsData: ProfileInterview[] = [];
+      let candidateInterviewsData: CandidateInterview[] = [];
 
       // 1. Resolver dados da Pessoa (Candidato, Colaborador ou via Entrevista)
       if (candidateId) {
@@ -250,7 +264,13 @@ export function CandidateProfileModal({
         if (data) resultsData = data;
       }
 
-      // 3. Buscar formações (candidate_educations)
+      // 3. Buscar histórico de etapas (candidate_interviews)
+      if (targetCandId) {
+        const { data } = await supabase.from("candidate_interviews").select("*").eq("candidate_id", targetCandId).order("created_at", { ascending: false });
+        if (data) candidateInterviewsData = data;
+      }
+
+      // 4. Buscar formações (candidate_educations)
       if (targetCandId) {
         const { data } = await supabase.from("candidate_educations").select("*").eq("candidate_id", targetCandId).order("start_date", { ascending: false });
         if (data) educationsData = data;
@@ -323,6 +343,7 @@ export function CandidateProfileModal({
       setEducations(extractedEdu);
       setExperiences(extractedExp);
       setInterviews(interviewsData);
+      setCandidateInterviews(candidateInterviewsData);
       setLoading(false);
     };
 

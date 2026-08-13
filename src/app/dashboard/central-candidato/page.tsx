@@ -7,7 +7,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Search, Loader2, Contact, RefreshCw, Plus, Trash2, AlertCircle, Briefcase, CheckCircle2, Users, UserCheck, Funnel, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import CandidateDetailsSheet from "./components/CandidateDetailsSheet";
+import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import AddCandidateModal from "./components/AddCandidateModal";
 import AdvanceStageModal from "./components/AdvanceStageModal";
 import RecusaModal from "./components/RecusaModal";
@@ -416,11 +416,15 @@ export default function CentralCandidatoPage() {
         </div>
       </div>
 
-      <CandidateDetailsSheet 
-        candidateId={selectedCandidateId} 
-        onClose={() => setSelectedCandidateId(null)} 
-        onRefresh={fetchCandidates}
-      />
+      {selectedCandidateId && (
+        <CandidateProfileModal 
+          candidateId={selectedCandidateId} 
+          onClose={() => {
+            setSelectedCandidateId(null);
+            fetchCandidates();
+          }} 
+        />
+      )}
 
       <AddCandidateModal
         isOpen={isAddCandidateModalOpen}
