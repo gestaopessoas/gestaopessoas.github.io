@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
-import { X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, Info, Heart, DollarSign, Users, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, 
+  Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, 
+  Info, Heart, DollarSign, Users, ChevronRight, Edit2, Save, History, FileCheck
+} from "lucide-react";
 
 type BigFiveResult = {
   id: string;
@@ -15,21 +21,6 @@ type BigFiveResult = {
   neuroticism_score: number | null;
 };
 
-type CandidateProfileModalProps = {
-  candidateId?: string | null;
-  employeeId?: string | null;
-  interviewId?: string | null;
-  email?: string | null;
-  candidateName?: string | null;
-  initialTab?: "curriculum" | "behavioral";
-  onClose: () => void;
-};
-
-/**
- * União do que `candidates`, `employees` e `interviews` conseguem devolver — a
- * mesma ficha é montada a partir de qualquer uma das três origens, então todo
- * campo é opcional.
- */
 type ProfilePerson = {
   id?: string;
   full_name?: string | null;
@@ -52,17 +43,16 @@ type ProfilePerson = {
   birthplace?: string | null;
   cpf?: string | null;
   marital_status?: string | null;
+  gender?: string | null;
   uniform_size?: string | null;
   boot_size?: string | null;
   salary_expectation?: string | null;
+  languages?: string | null;
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
   gender_identity?: string | null;
   sexual_orientation?: string | null;
   race_declaration?: string | null;
-  diversity_info?: string | null;
-  personal_info?: string | null;
-  additional_info?: string | null;
   dependents_notes?: string | null;
   dependents_count?: number | string | null;
   has_cnh?: boolean | null;
@@ -129,6 +119,21 @@ type ProfileInterview = {
   } | null;
 };
 
+type CandidateProfileModalProps = {
+  candidateId?: string | null;
+  employeeId?: string | null;
+  interviewId?: string | null;
+  email?: string | null;
+  candidateName?: string | null;
+  initialTab?: "curriculum" | "assessment" | "behavioral" | "history";
+  onClose: () => void;
+  isEditable?: boolean;
+  defaultEditMode?: boolean;
+  initialData?: Partial<ProfilePerson>;
+  initialAssessmentData?: any;
+  onSave?: (data: ProfilePerson, assessmentData: any) => Promise<void>;
+};
+
 export function CandidateProfileModal({
   candidateId,
   employeeId,
@@ -137,16 +142,25 @@ export function CandidateProfileModal({
   candidateName,
   initialTab = "curriculum",
   onClose,
+  isEditable = false,
+  defaultEditMode = false,
+  initialData,
+  initialAssessmentData,
+  onSave
 }: CandidateProfileModalProps) {
-  const [activeTab, setActiveTab] = useState<"curriculum" | "behavioral">(initialTab);
-  const [person, setPerson] = useState<ProfilePerson | null>(null);
+  const [activeTab, setActiveTab] = useState<"curriculum" | "assessment" | "behavioral" | "history">(initialTab);
+  const [person, setPerson] = useState<ProfilePerson | null>(initialData ? (initialData as ProfilePerson) : null);
+  const [formData, setFormData] = useState<ProfilePerson>(initialData || {});
+  const [assessmentData, setAssessmentData] = useState<any>(initialAssessmentData || {});
+  const [isEditing, setIsEditing] = useState(defaultEditMode);
+  const [isSaving, setIsSaving] = useState(false);
+  
   const [results, setResults] = useState<BigFiveResult[]>([]);
   const [interviews, setInterviews] = useState<ProfileInterview[]>([]);
   const [candidateInterviews, setCandidateInterviews] = useState<CandidateInterview[]>([]);
   const [educations, setEducations] = useState<ProfileEducation[]>([]);
   const [experiences, setExperiences] = useState<ProfileExperience[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [retryTick, setRetryTick] = useState(0);
+  const [loading, setLoading] = useState(!initialData);
   const [openingResume, setOpeningResume] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
@@ -165,28 +179,47 @@ export function CandidateProfileModal({
     window.open(data.signedUrl, "_blank");
   };
 
+  const handleChange = (field: keyof ProfilePerson, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAssessmentChange = (field: string, value: any) => {
+    setAssessmentData((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = async () => {
+    if (onSave) {
+      setIsSaving(true);
+      await onSave(formData, assessmentData);
+      setPerson({ ...person, ...formData });
+      setIsSaving(false);
+      setIsEditing(false);
+    }
+  };
+
   // Fecha com ESC
   useEffect(() => {
-    if (!candidateId && !employeeId && !interviewId && !email && !candidateName) return;
+    if (!candidateId && !employeeId && !interviewId && !email && !candidateName && !initialData) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [candidateId, employeeId, interviewId, email, candidateName, onClose]);
+  }, [candidateId, employeeId, interviewId, email, candidateName, initialData, onClose]);
 
   // Foco
   useEffect(() => {
-    if (!candidateId && !employeeId && !interviewId && !email && !candidateName) return;
+    if (!candidateId && !employeeId && !interviewId && !email && !candidateName && !initialData) return;
     restoreRef.current = document.activeElement as HTMLElement | null;
     const t = window.setTimeout(() => panelRef.current?.focus(), 0);
     return () => {
       window.clearTimeout(t);
       restoreRef.current?.focus?.();
     };
-  }, [candidateId, employeeId, interviewId, email, candidateName]);
+  }, [candidateId, employeeId, interviewId, email, candidateName, initialData]);
 
   useEffect(() => {
+    if (initialData) return;
     if (!candidateId && !employeeId && !interviewId && !email && !candidateName) return;
     
     let active = true;
@@ -200,7 +233,7 @@ export function CandidateProfileModal({
       let interviewsData: ProfileInterview[] = [];
       let candidateInterviewsData: CandidateInterview[] = [];
 
-      // 1. Resolver dados da Pessoa (Candidato, Colaborador ou via Entrevista)
+      // 1. Resolver dados da Pessoa
       if (candidateId) {
         const { data } = await supabase.from("candidates").select("*").eq("id", candidateId).maybeSingle();
         if (data) personData = data;
@@ -219,7 +252,7 @@ export function CandidateProfileModal({
         if (data) personData = data;
       }
 
-      // Se ainda não achou na tabela candidates/employees, mas temos interviewId ou nome/email, buscar em interviews
+      // Se ainda não achou, buscar em interviews
       if (!personData && (interviewId || email || candidateName)) {
         let query = supabase.from("interviews").select("*");
         if (interviewId) query = query.eq("id", interviewId);
@@ -264,19 +297,19 @@ export function CandidateProfileModal({
         if (data) resultsData = data;
       }
 
-      // 3. Buscar histórico de etapas (candidate_interviews)
+      // 3. Buscar histórico de etapas
       if (targetCandId) {
         const { data } = await supabase.from("candidate_interviews").select("*").eq("candidate_id", targetCandId).order("created_at", { ascending: false });
         if (data) candidateInterviewsData = data;
       }
 
-      // 4. Buscar formações (candidate_educations)
+      // 4. Buscar formações
       if (targetCandId) {
         const { data } = await supabase.from("candidate_educations").select("*").eq("candidate_id", targetCandId).order("start_date", { ascending: false });
         if (data) educationsData = data;
       }
 
-      // 4. Buscar entrevistas (tabela interviews) do colaborador/candidato
+      // 5. Buscar entrevistas
       if (personEmail || personName || interviewId) {
         let intQuery = supabase.from("interviews").select("*").order("interview_date", { ascending: false });
         if (interviewId) {
@@ -292,19 +325,15 @@ export function CandidateProfileModal({
         if (data) interviewsData = data;
       }
 
-      // Extrair formações e experiências estruturadas de assessments de entrevistas
+      // Extrair formações e experiências
       const extractedEdu: ProfileEducation[] = [...educationsData];
       const extractedExp: ProfileExperience[] = [];
 
       interviewsData.forEach((int) => {
         if (int.assessment) {
           const assess = int.assessment as any;
-          if (personData && !personData.personal_info && assess.personal_info) personData.personal_info = assess.personal_info;
-          if (personData && !personData.additional_info && assess.additional_info) personData.additional_info = assess.additional_info;
-          if (personData && !personData.diversity_info && assess.diversity_info) personData.diversity_info = assess.diversity_info;
-
-          if (Array.isArray(int.assessment.academic_list)) {
-            int.assessment.academic_list.forEach((ac) => {
+          if (Array.isArray(assess.academic_list)) {
+            assess.academic_list.forEach((ac: any) => {
               if (!extractedEdu.some(existing => (existing.course || existing.degree || "").toLowerCase() === (ac.course || "").toLowerCase() && (existing.institution || "").toLowerCase() === (ac.institution || "").toLowerCase())) {
                 extractedEdu.push({
                   id: ac.id || Math.random().toString(),
@@ -318,8 +347,8 @@ export function CandidateProfileModal({
               }
             });
           }
-          if (Array.isArray(int.assessment.experience_list)) {
-            int.assessment.experience_list.forEach((ex) => {
+          if (Array.isArray(assess.experience_list)) {
+            assess.experience_list.forEach((ex: any) => {
               if (!extractedExp.some(existing => (existing.company || "").toLowerCase() === (ex.company || "").toLowerCase() && (existing.role || "").toLowerCase() === (ex.role || "").toLowerCase())) {
                 extractedExp.push({
                   id: ex.id || Math.random().toString(),
@@ -339,6 +368,12 @@ export function CandidateProfileModal({
       if (!active) return;
       
       setPerson(personData);
+      if (interviewsData.length > 0 && interviewsData[0].assessment) {
+        setAssessmentData(interviewsData[0].assessment);
+      } else {
+        setAssessmentData({});
+      }
+      setFormData(personData || {});
       setResults(resultsData);
       setEducations(extractedEdu);
       setExperiences(extractedExp);
@@ -349,9 +384,9 @@ export function CandidateProfileModal({
 
     loadProfile();
     return () => { active = false; };
-  }, [candidateId, employeeId, interviewId, email, candidateName]);
+  }, [candidateId, employeeId, interviewId, email, candidateName, initialData]);
 
-  if (!candidateId && !employeeId && !interviewId && !email && !candidateName) return null;
+  if (!candidateId && !employeeId && !interviewId && !email && !candidateName && !initialData) return null;
 
   return (
     <div
@@ -364,7 +399,7 @@ export function CandidateProfileModal({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-background shadow-2xl border outline-none animate-in fade-in zoom-in-95 duration-200"
+        className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-background shadow-2xl border outline-none animate-in fade-in zoom-in-95 duration-200"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b px-6 py-4 bg-muted/30">
@@ -374,460 +409,603 @@ export function CandidateProfileModal({
             </div>
             <div>
               <h2 className="text-lg font-bold">Perfil do Colaborador / Candidato</h2>
-              <p className="text-xs text-muted-foreground">Visão unificada do histórico profissional, entrevistas e comportamental</p>
+              <p className="text-xs text-muted-foreground">Visão unificada de informações e histórico</p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-muted">
-            <X className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center space-x-3">
+            {isEditable && !isEditing && (
+              <Button onClick={() => setIsEditing(true)} variant="outline" size="sm" className="gap-2">
+                <Edit2 className="h-4 w-4" /> Editar Perfil
+              </Button>
+            )}
+            {isEditing && (
+              <Button onClick={handleSave} size="sm" className="gap-2" disabled={isSaving}>
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-muted">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        {/* Content (Sidebar Layout) */}
+        <div className="flex flex-1 overflow-hidden">
           {loading ? (
-            <div className="flex h-64 items-center justify-center text-muted-foreground">
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
               <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
               <span>Carregando dossiê completo...</span>
             </div>
           ) : !person ? (
-            <div className="flex h-64 flex-col items-center justify-center text-muted-foreground">
+            <div className="flex h-full w-full flex-col items-center justify-center text-muted-foreground">
               <p className="text-lg font-medium">Perfil não encontrado.</p>
               <p className="text-sm">Verifique se o candidato ou colaborador possui registro no sistema.</p>
             </div>
           ) : (
-            <div className="grid gap-8 lg:grid-cols-3">
-              {/* Coluna Esquerda: Cartão Resumo */}
-              <div className="space-y-6 lg:col-span-1 border-r pr-2">
-                <div className="p-5 rounded-xl bg-card border shadow-xs space-y-4">
-                  <h3 className="text-2xl font-bold text-primary tracking-tight">
-                    {person.full_name || person.name || [person.first_name, person.last_name].filter(Boolean).join(" ")}
-                  </h3>
-                  <div className="space-y-2.5 text-sm text-muted-foreground">
-                    {(person.role_interest || person.role) && (
-                      <div className="flex items-center gap-2.5"><Briefcase className="h-4 w-4 text-primary shrink-0" /> <span className="font-medium text-foreground">{person.role_interest || person.role}</span></div>
-                    )}
-                    {(person.city || person.state || person.workplace) && (
-                      <div className="flex items-center gap-2.5"><MapPin className="h-4 w-4 text-primary shrink-0" /> {[person.city, person.state, person.workplace].filter(Boolean).join(", ")}</div>
-                    )}
-                    {(person.email || person.email_corporate || person.email_personal) && (
-                      <div className="flex items-center gap-2.5 break-all"><Mail className="h-4 w-4 text-primary shrink-0" /> {person.email || person.email_corporate || person.email_personal}</div>
-                    )}
-                    {person.phone && (
-                      <div className="flex items-center gap-2.5"><Phone className="h-4 w-4 text-primary shrink-0" /> {person.phone}</div>
+            <>
+              {/* Left Sidebar */}
+              <div className="w-80 border-r bg-muted/10 flex flex-col h-full overflow-y-auto">
+                {/* Profile Card */}
+                <div className="p-6 border-b bg-card">
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-bold text-primary tracking-tight leading-tight">
+                      {isEditing ? (
+                        <Input 
+                          value={formData.full_name || formData.name || ""} 
+                          onChange={(e) => handleChange(formData.full_name !== undefined ? 'full_name' : 'name', e.target.value)}
+                          placeholder="Nome completo"
+                        />
+                      ) : (
+                        formData.full_name || formData.name || [formData.first_name, formData.last_name].filter(Boolean).join(" ")
+                      )}
+                    </h3>
+                    <div className="space-y-2.5 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2.5">
+                        <Briefcase className="h-4 w-4 text-primary shrink-0" />
+                        {isEditing ? (
+                          <Input 
+                            value={formData.role_interest || formData.role || ""} 
+                            onChange={(e) => handleChange(formData.role_interest !== undefined ? 'role_interest' : 'role', e.target.value)}
+                            placeholder="Cargo"
+                            className="h-7 text-xs"
+                          />
+                        ) : (
+                          <span className="font-medium text-foreground">{formData.role_interest || formData.role || "Cargo não informado"}</span>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2.5 break-all">
+                        <Mail className="h-4 w-4 text-primary shrink-0" />
+                        {isEditing ? (
+                          <Input 
+                            value={formData.email || formData.email_personal || ""} 
+                            onChange={(e) => handleChange('email', e.target.value)}
+                            placeholder="E-mail"
+                            className="h-7 text-xs"
+                          />
+                        ) : (
+                          formData.email || formData.email_corporate || formData.email_personal || "Sem e-mail"
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <Phone className="h-4 w-4 text-primary shrink-0" />
+                        {isEditing ? (
+                          <Input 
+                            value={formData.phone || ""} 
+                            onChange={(e) => handleChange('phone', e.target.value)}
+                            placeholder="Telefone"
+                            className="h-7 text-xs"
+                          />
+                        ) : (
+                          formData.phone || "Sem telefone"
+                        )}
+                      </div>
+                    </div>
+                    {person.resume_url && !isEditing && (
+                      <Button variant="outline" size="sm" className="mt-4 w-full border-primary/20 hover:bg-primary/5 text-primary font-medium" onClick={openResume} disabled={openingResume}>
+                        {openingResume ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Paperclip className="h-4 w-4 mr-2" />}
+                        Ver Currículo PDF
+                      </Button>
                     )}
                   </div>
-                  {person.resume_url && (
-                    <Button variant="outline" size="sm" className="mt-4 w-full border-primary/20 hover:bg-primary/5 text-primary font-medium" onClick={openResume} disabled={openingResume}>
-                      {openingResume ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Paperclip className="h-4 w-4 mr-2" />}
-                      Ver Currículo Anexo (PDF)
-                    </Button>
-                  )}
                 </div>
 
-                <div className="space-y-3 p-4 rounded-xl border bg-muted/20">
-                  <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
-                    <Award className="h-4 w-4 text-primary" /> Tags e Competências
-                  </h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {person.search_tags?.map((tag: string) => (
-                      <span key={tag} className="rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">{tag}</span>
-                    ))}
-                    {person.behavioral_tags?.map((tag: string) => (
-                      <span key={tag} className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{tag}</span>
-                    ))}
-                    {(!person.search_tags?.length && !person.behavioral_tags?.length) && (
-                      <span className="text-xs text-muted-foreground">Nenhuma tag ou expectativa cadastrada</span>
-                    )}
-                  </div>
-                </div>
-
-                {candidateId && !person.search_tags?.includes("Central do Candidato") && !person.search_tags?.includes("Aprovado na Entrevista") && (
-                  <Button 
-                    variant="secondary" 
-                    className="w-full shadow-xs" 
-                    onClick={async () => {
-                      const supabase = createClient();
-                      const newTags = [...(person.search_tags || []), "Central do Candidato"];
-                      await supabase.from("candidates").update({ search_tags: newTags }).eq("id", candidateId);
-                      setPerson({ ...person, search_tags: newTags });
-                      alert("Candidato movido para Em Processo na Central do Candidato!");
-                    }}
+                {/* Vertical Navigation */}
+                <div className="p-4 space-y-1">
+                  <button
+                    onClick={() => setActiveTab("curriculum")}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "curriculum" ? "bg-primary text-primary-foreground shadow-md" : "hover:bg-muted text-muted-foreground hover:text-foreground"}`}
                   >
-                    Mover p/ Central do Candidato
-                  </Button>
-                )}
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-4 w-4" />
+                      Currículo & Pessoal
+                    </div>
+                    {activeTab === "curriculum" && <ChevronRight className="h-4 w-4 opacity-50" />}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("assessment")}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "assessment" ? "bg-primary text-primary-foreground shadow-md" : "hover:bg-muted text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileCheck className="h-4 w-4" />
+                      Parecer / Avaliação
+                    </div>
+                    {activeTab === "assessment" && <ChevronRight className="h-4 w-4 opacity-50" />}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("behavioral")}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "behavioral" ? "bg-primary text-primary-foreground shadow-md" : "hover:bg-muted text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Sparkles className="h-4 w-4" />
+                      Teste Comportamental
+                      {!isEditing && results.length > 0 && (
+                        <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] ${activeTab === "behavioral" ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"}`}>
+                          {results.length}
+                        </span>
+                      )}
+                    </div>
+                    {activeTab === "behavioral" && <ChevronRight className="h-4 w-4 opacity-50" />}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("history")}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === "history" ? "bg-primary text-primary-foreground shadow-md" : "hover:bg-muted text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <History className="h-4 w-4" />
+                      Histórico
+                    </div>
+                    {activeTab === "history" && <ChevronRight className="h-4 w-4 opacity-50" />}
+                  </button>
+                </div>
               </div>
 
-              {/* Coluna Direita: Abas e Detalhamento */}
-              <div className="space-y-6 lg:col-span-2">
-                {/* Seletor de Abas */}
-                <div className="flex border-b space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("curriculum")}
-                    className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-                      activeTab === "curriculum"
-                        ? "border-primary text-primary font-semibold"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <FileText className="h-4 w-4" />
-                    Currículo & Entrevistas
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("behavioral")}
-                    className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-                      activeTab === "behavioral"
-                        ? "border-primary text-primary font-semibold"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    Teste Comportamental (Big Five)
-                    {results.length > 0 && <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary">{results.length}</span>}
-                  </button>
-                </div>
-
-                {/* Conteúdo da Aba: Currículo & Entrevistas */}
+              {/* Right Content Area */}
+              <div className="flex-1 overflow-y-auto p-8 bg-muted/5">
                 {activeTab === "curriculum" && (
-                  <div className="space-y-8 animate-in fade-in duration-200">
-                    {/* Dados Pessoais & Contato */}
-                    <div className="space-y-4">
-                      <h3 className="text-base font-bold flex items-center gap-2 text-foreground border-b pb-2">
-                        <Contact className="h-5 w-5 text-primary" />
-                        Dados Pessoais & Contato
-                      </h3>
-                      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 text-sm">
-                        {person.cpf && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
-                            <span className="text-xs text-muted-foreground block">CPF</span>
-                            <span className="font-semibold">{person.cpf}</span>
-                          </div>
-                        )}
-                        {person.birth_date && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
-                            <span className="text-xs text-muted-foreground block">Data de Nascimento</span>
-                            <span className="font-semibold">{new Date(person.birth_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
-                          </div>
-                        )}
-                        {person.birthplace && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
-                            <span className="text-xs text-muted-foreground block">Naturalidade</span>
-                            <span className="font-semibold">{person.birthplace}</span>
-                          </div>
-                        )}
-                        {person.marital_status && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
-                            <span className="text-xs text-muted-foreground block">Estado Civil</span>
-                            <span className="font-semibold">{person.marital_status}</span>
-                          </div>
-                        )}
-                        {person.gender && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
-                            <span className="text-xs text-muted-foreground block">Gênero</span>
-                            <span className="font-semibold">{person.gender}</span>
-                          </div>
-                        )}
-                        {person.address && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs md:col-span-2">
-                            <span className="text-xs text-muted-foreground block">Endereço</span>
-                            <span className="font-semibold">{person.address}</span>
-                          </div>
-                        )}
-                        {person.secondary_phone && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
-                            <span className="text-xs text-muted-foreground block">Telefone Secundário</span>
-                            <span className="font-semibold">{person.secondary_phone}</span>
-                          </div>
-                        )}
-                        {person.secondary_email && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
-                            <span className="text-xs text-muted-foreground block">E-mail Secundário</span>
-                            <span className="font-semibold break-all">{person.secondary_email}</span>
-                          </div>
-                        )}
-                        {(person.emergency_contact_name || person.emergency_contact_phone) && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs md:col-span-2">
-                            <span className="text-xs text-muted-foreground block">Contato de Emergência</span>
-                            <span className="font-semibold">
-                              {person.emergency_contact_name} {person.emergency_contact_phone && `- ${person.emergency_contact_phone}`}
-                            </span>
-                          </div>
-                        )}
-                        {person.has_cnh && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
-                            <span className="text-xs text-muted-foreground block">CNH</span>
-                            <span className="font-semibold">Sim {person.cnh_categories && `(Categoria ${person.cnh_categories})`}</span>
-                          </div>
-                        )}
-                      </div>
-                      {person.personal_info && (
-                        <div className="mt-2 text-sm p-3 rounded-xl border bg-card shadow-2xs">
-                          <span className="text-xs font-bold block mb-1">Mais Detalhes Pessoais:</span>
-                          <p className="text-muted-foreground whitespace-pre-line">{person.personal_info}</p>
+                  <div className="space-y-6 animate-in fade-in duration-200">
+                    <h2 className="text-2xl font-bold mb-6">Currículo & Dados Pessoais</h2>
+                    
+                    {/* Dados Pessoais & Contato (Accordion) */}
+                    <details open className="group rounded-xl border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden">
+                      <summary className="flex cursor-pointer items-center justify-between font-bold text-foreground p-5 border-b">
+                        <div className="flex items-center gap-2">
+                          <Contact className="h-5 w-5 text-primary" />
+                          Dados Pessoais & Contato
                         </div>
-                      )}
-                    </div>
-
-                    {/* Informações Adicionais */}
-                    <div className="space-y-4">
-                      <h3 className="text-base font-bold flex items-center gap-2 text-foreground border-b pb-2">
-                        <Info className="h-5 w-5 text-primary" />
-                        Informações Adicionais
-                      </h3>
-                      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 text-sm">
-                        {person.salary_expectation && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs flex items-center gap-2">
-                            <DollarSign className="h-4 w-4 text-primary shrink-0" />
-                            <div>
-                              <span className="text-xs text-muted-foreground block">Pretensão Salarial</span>
-                              <span className="font-semibold">{person.salary_expectation}</span>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
+                      </summary>
+                      <div className="p-5 grid gap-4 sm:grid-cols-2 md:grid-cols-3 text-sm">
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">CPF</span>
+                          {isEditing ? (
+                            <Input value={formData.cpf || ""} onChange={(e) => handleChange('cpf', e.target.value)} />
+                          ) : (
+                            <span className="font-semibold">{formData.cpf || "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Data de Nascimento</span>
+                          {isEditing ? (
+                            <Input type="date" value={formData.birth_date || ""} onChange={(e) => handleChange('birth_date', e.target.value)} />
+                          ) : (
+                            <span className="font-semibold">{formData.birth_date ? new Date(formData.birth_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Naturalidade</span>
+                          {isEditing ? (
+                            <Input value={formData.birthplace || ""} onChange={(e) => handleChange('birthplace', e.target.value)} />
+                          ) : (
+                            <span className="font-semibold">{formData.birthplace || "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Estado Civil</span>
+                          {isEditing ? (
+                            <select 
+                              value={formData.marital_status || ""} 
+                              onChange={(e) => handleChange('marital_status', e.target.value)}
+                              className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            >
+                              <option value="">Selecione...</option>
+                              <option value="Solteiro(a)">Solteiro(a)</option>
+                              <option value="Casado(a)">Casado(a)</option>
+                              <option value="Divorciado(a)">Divorciado(a)</option>
+                              <option value="Viúvo(a)">Viúvo(a)</option>
+                              <option value="União Estável">União Estável</option>
+                            </select>
+                          ) : (
+                            <span className="font-semibold">{formData.marital_status || "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Gênero</span>
+                          {isEditing ? (
+                            <Input value={formData.gender || ""} onChange={(e) => handleChange('gender', e.target.value)} />
+                          ) : (
+                            <span className="font-semibold">{formData.gender || "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5 md:col-span-3">
+                          <span className="text-xs text-muted-foreground block font-medium">Endereço (Cidade, UF, Logradouro)</span>
+                          {isEditing ? (
+                            <div className="grid grid-cols-3 gap-2">
+                              <Input placeholder="Cidade" value={formData.city || ""} onChange={(e) => handleChange('city', e.target.value)} />
+                              <Input placeholder="Estado" value={formData.state || ""} onChange={(e) => handleChange('state', e.target.value)} />
+                              <Input placeholder="Endereço Completo" value={formData.address || ""} onChange={(e) => handleChange('address', e.target.value)} className="col-span-3" />
                             </div>
-                          </div>
-                        )}
-                        {person.languages && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs md:col-span-2">
-                            <span className="text-xs text-muted-foreground block">Idiomas</span>
-                            <span className="font-semibold">{person.languages}</span>
-                          </div>
-                        )}
-                        {person.has_dependents && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
+                          ) : (
+                            <span className="font-semibold">{[formData.city, formData.state, formData.address].filter(Boolean).join(", ") || "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Telefone Secundário</span>
+                          {isEditing ? (
+                            <Input value={formData.secondary_phone || ""} onChange={(e) => handleChange('secondary_phone', e.target.value)} />
+                          ) : (
+                            <span className="font-semibold">{formData.secondary_phone || "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">E-mail Secundário</span>
+                          {isEditing ? (
+                            <Input type="email" value={formData.secondary_email || ""} onChange={(e) => handleChange('secondary_email', e.target.value)} />
+                          ) : (
+                            <span className="font-semibold break-all">{formData.secondary_email || "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Possui CNH?</span>
+                          {isEditing ? (
                             <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4 text-primary shrink-0" />
-                              <div>
-                                <span className="text-xs text-muted-foreground block">Dependentes</span>
-                                <span className="font-semibold">Sim ({person.dependents_count || 'Não informado'})</span>
-                              </div>
-                            </div>
-                            {person.dependents_notes && (
-                              <p className="text-[11px] text-muted-foreground mt-1 bg-muted/30 p-1.5 rounded">{person.dependents_notes}</p>
-                            )}
-                          </div>
-                        )}
-                        {(person.uniform_size || person.boot_size) && (
-                          <div className="p-3 rounded-xl border bg-card shadow-2xs">
-                            <span className="text-xs text-muted-foreground block">Tamanhos (EPIs)</span>
-                            <span className="font-semibold">
-                              {person.uniform_size && `Uniforme: ${person.uniform_size}`}
-                              {person.uniform_size && person.boot_size && ' / '}
-                              {person.boot_size && `Botina: ${person.boot_size}`}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      {person.additional_info && (
-                        <div className="mt-2 text-sm p-3 rounded-xl border bg-card shadow-2xs">
-                          <span className="text-xs font-bold block mb-1">Outras Informações Adicionais:</span>
-                          <p className="text-muted-foreground whitespace-pre-line">{person.additional_info}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Diversidade */}
-                    {(person.gender_identity || person.sexual_orientation || person.race_declaration || person.diversity_info) && (
-                      <details className="group space-y-4 rounded-xl border bg-card shadow-2xs p-4 [&_summary::-webkit-details-marker]:hidden">
-                        <summary className="flex cursor-pointer items-center justify-between font-bold text-foreground">
-                          <div className="flex items-center gap-2">
-                            <Heart className="h-5 w-5 text-primary" />
-                            Diversidade
-                          </div>
-                          <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-1 rounded-full group-open:hidden">
-                            Mostrar dados sensíveis
-                          </span>
-                        </summary>
-                        <div className="pt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 text-sm border-t mt-3">
-                          {person.gender_identity && (
-                            <div className="p-3 rounded-lg border bg-muted/20">
-                              <span className="text-xs text-muted-foreground block">Autodeclaração de Gênero</span>
-                              <span className="font-semibold">{person.gender_identity}</span>
-                            </div>
-                          )}
-                          {person.sexual_orientation && (
-                            <div className="p-3 rounded-lg border bg-muted/20">
-                              <span className="text-xs text-muted-foreground block">Orientação Sexual</span>
-                              <span className="font-semibold">{person.sexual_orientation}</span>
-                            </div>
-                          )}
-                          {person.race_declaration && (
-                            <div className="p-3 rounded-lg border bg-muted/20">
-                              <span className="text-xs text-muted-foreground block">Autodeclaração de Raça</span>
-                              <span className="font-semibold">{person.race_declaration}</span>
-                            </div>
-                          )}
-                        </div>
-                        {person.diversity_info && (
-                          <div className="mt-3 text-sm p-3 rounded-xl border bg-card shadow-2xs">
-                            <span className="text-xs font-bold block mb-1">Outras Informações de Diversidade:</span>
-                            <p className="text-muted-foreground whitespace-pre-line">{person.diversity_info}</p>
-                          </div>
-                        )}
-                      </details>
-                    )}
-
-                    {/* Formação Acadêmica */}
-                    <div className="space-y-4">
-                      <h3 className="text-base font-bold flex items-center gap-2 text-foreground border-b pb-2">
-                        <GraduationCap className="h-5 w-5 text-primary" />
-                        Formação Acadêmica
-                      </h3>
-                      {educations.length === 0 ? (
-                        <p className="text-sm text-muted-foreground italic pl-2">Nenhum registro acadêmico detalhado.</p>
-                      ) : (
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {educations.map((edu, i) => (
-                            <div key={i} className="p-4 rounded-xl border bg-card text-sm space-y-1 shadow-2xs">
-                              <p className="font-bold text-foreground">{edu.degree || edu.course || "Formação Acadêmica"}</p>
-                              <p className="text-xs text-muted-foreground font-medium">{edu.institution || "Instituição não informada"}</p>
-                              <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t mt-2">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-muted text-foreground font-medium">{edu.status || "Concluído"}</span>
-                                <span>{[edu.start_date, edu.end_date].filter(Boolean).join(" até ")}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Histórico Profissional */}
-                    <div className="space-y-4">
-                      <h3 className="text-base font-bold flex items-center gap-2 text-foreground border-b pb-2">
-                        <Building2 className="h-5 w-5 text-primary" />
-                        Histórico Profissional
-                      </h3>
-                      {experiences.length === 0 ? (
-                        <p className="text-sm text-muted-foreground italic pl-2">Nenhuma experiência profissional estruturada registrada.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {experiences.map((exp, i) => (
-                            <div key={i} className="p-4 rounded-xl border bg-card text-sm space-y-2 shadow-2xs">
-                              <div className="flex items-center justify-between">
-                                <p className="font-bold text-foreground text-base">{exp.role || "Cargo / Função"}</p>
-                                <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${exp.current ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
-                                  {exp.current ? "Atual" : [exp.start_date, exp.end_date].filter(Boolean).join(" - ")}
-                                </span>
-                              </div>
-                              <p className="text-xs font-semibold text-primary">{exp.company || "Empresa"}</p>
-                              {exp.activities && (
-                                <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-md border border-muted/50">{exp.activities}</p>
+                              <select 
+                                value={formData.has_cnh ? "true" : "false"} 
+                                onChange={(e) => handleChange('has_cnh', e.target.value === "true")}
+                                className="flex h-10 w-24 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              >
+                                <option value="false">Não</option>
+                                <option value="true">Sim</option>
+                              </select>
+                              {formData.has_cnh && (
+                                <Input placeholder="Categoria(s)" value={Array.isArray(formData.cnh_categories) ? formData.cnh_categories.join(", ") : formData.cnh_categories || ""} onChange={(e) => handleChange('cnh_categories', e.target.value)} className="flex-1" />
                               )}
                             </div>
-                          ))}
+                          ) : (
+                            <span className="font-semibold">{formData.has_cnh ? `Sim ${formData.cnh_categories ? `(Cat: ${formData.cnh_categories})` : ''}` : "Não"}</span>
+                          )}
                         </div>
-                      )}
-                    </div>
+                        <div className="space-y-1.5 md:col-span-2">
+                          <span className="text-xs text-muted-foreground block font-medium">Contato de Emergência</span>
+                          {isEditing ? (
+                            <div className="flex gap-2">
+                              <Input placeholder="Nome" value={formData.emergency_contact_name || ""} onChange={(e) => handleChange('emergency_contact_name', e.target.value)} />
+                              <Input placeholder="Telefone" value={formData.emergency_contact_phone || ""} onChange={(e) => handleChange('emergency_contact_phone', e.target.value)} />
+                            </div>
+                          ) : (
+                            <span className="font-semibold">
+                              {formData.emergency_contact_name || formData.emergency_contact_phone ? 
+                                `${formData.emergency_contact_name || ''} ${formData.emergency_contact_phone ? `- ${formData.emergency_contact_phone}` : ''}` 
+                                : "-"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </details>
 
-                    {/* Histórico de Avaliações / Entrevistas */}
-                    <div className="space-y-4">
-                      <h3 className="text-base font-bold flex items-center gap-2 text-foreground border-b pb-2">
-                        <CheckCircle2 className="h-5 w-5 text-primary" />
-                        Avaliações de Entrevistas & Parecer RH
-                      </h3>
-                      {interviews.length === 0 ? (
-                        <p className="text-sm text-muted-foreground italic pl-2">Nenhuma entrevista ou avaliação técnica registrada para este colaborador/candidato.</p>
-                      ) : (
-                        <div className="space-y-4">
-                          {interviews.map((int) => {
-                            const ass = int.assessment || {};
-                            return (
-                              <div key={int.id} className="p-5 rounded-xl border bg-card shadow-xs space-y-4">
-                                <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-                                  <div>
-                                    <p className="font-bold text-base text-foreground">{int.role || "Cargo Alvo"}</p>
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                                      <Calendar className="h-3 w-3" /> Data: {int.interview_date ? new Date(int.interview_date + 'T12:00:00').toLocaleDateString('pt-BR') : 'N/I'} — Entrevistado por: <span className="font-medium text-foreground">{int.evaluator || "RH / Gestão de Pessoas"}</span>
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {ass.selection_stage && (
-                                      <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold">
-                                        Fase: {ass.selection_stage}
-                                      </span>
-                                    )}
-                                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                                      int.result === "Aprovado" || int.result === "Contratado" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" :
-                                      int.result === "Reprovado" ? "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300" :
-                                      "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                                    }`}>
-                                      {int.result || int.status}
-                                    </span>
-                                  </div>
+                    {/* Experiência Profissional (Accordion) */}
+                    <details className="group rounded-xl border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden">
+                      <summary className="flex cursor-pointer items-center justify-between font-bold text-foreground p-5 border-b">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-5 w-5 text-primary" />
+                          Experiência Profissional
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
+                      </summary>
+                      <div className="p-5">
+                        {experiences.length === 0 ? (
+                          <p className="text-sm text-muted-foreground italic">Nenhuma experiência profissional registrada.</p>
+                        ) : (
+                          <div className="space-y-4">
+                            {experiences.map((exp, i) => (
+                              <div key={i} className="p-4 rounded-xl border bg-muted/30 text-sm space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="font-bold text-foreground text-base">{exp.role || "Cargo / Função"}</p>
+                                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${exp.current ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
+                                    {exp.current ? "Atual" : [exp.start_date, exp.end_date].filter(Boolean).join(" - ")}
+                                  </span>
                                 </div>
-
-                                {/* Notas / Pontuações */}
-                                {(ass.communication_rating || ass.tech_knowledge_rating || ass.culture_fit) && (
-                                  <div className="grid grid-cols-3 gap-3 bg-muted/30 p-3 rounded-lg border text-center text-xs">
-                                    <div>
-                                      <span className="text-muted-foreground block">Comunicação</span>
-                                      <span className="font-bold text-foreground text-sm">{ass.communication_rating || "N/A"} / 5</span>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground block">Conhecimento Técnico</span>
-                                      <span className="font-bold text-foreground text-sm">{ass.tech_knowledge_rating || "N/A"} / 5</span>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground block">Fit Cultural (Alinhamento)</span>
-                                      <span className="font-bold text-primary text-sm">{ass.culture_fit || "N/A"}</span>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Pontos Fortes / A Melhorar */}
-                                <div className="grid sm:grid-cols-2 gap-3 text-xs">
-                                  {ass.strengths && (
-                                    <div className="p-3 rounded-lg border bg-emerald-500/5 border-emerald-500/20">
-                                      <p className="font-bold text-emerald-700 dark:text-emerald-400 mb-1">Pontos Fortes (Destaques):</p>
-                                      <p className="text-muted-foreground whitespace-pre-line leading-relaxed">{ass.strengths}</p>
-                                    </div>
-                                  )}
-                                  {ass.improvement_points && (
-                                    <div className="p-3 rounded-lg border bg-amber-500/5 border-amber-500/20">
-                                      <p className="font-bold text-amber-700 dark:text-amber-400 mb-1">Pontos a Desenvolver / Observações:</p>
-                                      <p className="text-muted-foreground whitespace-pre-line leading-relaxed">{ass.improvement_points}</p>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {ass.final_observations && (
-                                  <div className="text-xs bg-muted/20 p-3 rounded-lg border">
-                                    <p className="font-bold mb-1">Parecer Final do Entrevistador:</p>
-                                    <p className="text-muted-foreground whitespace-pre-line">{ass.final_observations}</p>
-                                  </div>
+                                <p className="text-xs font-semibold text-primary">{exp.company || "Empresa"}</p>
+                                {exp.activities && (
+                                  <p className="text-xs text-muted-foreground whitespace-pre-wrap">{exp.activities}</p>
                                 )}
                               </div>
-                            );
-                          })}
+                            ))}
+                          </div>
+                        )}
+                        {!isEditing && (
+                          <p className="text-xs text-muted-foreground mt-4 italic">* A edição de experiências diretamente na ficha ainda não está disponível.</p>
+                        )}
+                      </div>
+                    </details>
+
+                    {/* Formação Acadêmica (Accordion) */}
+                    <details className="group rounded-xl border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden">
+                      <summary className="flex cursor-pointer items-center justify-between font-bold text-foreground p-5 border-b">
+                        <div className="flex items-center gap-2">
+                          <GraduationCap className="h-5 w-5 text-primary" />
+                          Formação Acadêmica
                         </div>
-                      )}
-                    </div>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
+                      </summary>
+                      <div className="p-5">
+                        {educations.length === 0 ? (
+                          <p className="text-sm text-muted-foreground italic">Nenhum registro acadêmico.</p>
+                        ) : (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {educations.map((edu, i) => (
+                              <div key={i} className="p-4 rounded-xl border bg-muted/30 text-sm space-y-1">
+                                <p className="font-bold text-foreground">{edu.degree || edu.course || "Formação Acadêmica"}</p>
+                                <p className="text-xs text-muted-foreground font-medium">{edu.institution || "Instituição não informada"}</p>
+                                <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-2 border-t mt-2">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-muted text-foreground font-medium">{edu.status || "Concluído"}</span>
+                                  <span>{[edu.start_date, edu.end_date].filter(Boolean).join(" até ")}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </details>
+
+                    {/* Diversidade & Info Adicional (Accordion) */}
+                    <details className="group rounded-xl border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden">
+                      <summary className="flex cursor-pointer items-center justify-between font-bold text-foreground p-5 border-b">
+                        <div className="flex items-center gap-2">
+                          <Heart className="h-5 w-5 text-primary" />
+                          Diversidade & Info Adicional
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
+                      </summary>
+                      <div className="p-5 grid gap-4 sm:grid-cols-2 md:grid-cols-3 text-sm">
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Autodeclaração de Gênero</span>
+                          {isEditing ? (
+                            <Input value={formData.gender_identity || ""} onChange={(e) => handleChange('gender_identity', e.target.value)} />
+                          ) : (
+                            <span className="font-semibold">{formData.gender_identity || "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Orientação Sexual</span>
+                          {isEditing ? (
+                            <Input value={formData.sexual_orientation || ""} onChange={(e) => handleChange('sexual_orientation', e.target.value)} />
+                          ) : (
+                            <span className="font-semibold">{formData.sexual_orientation || "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Autodeclaração de Raça</span>
+                          {isEditing ? (
+                            <Input value={formData.race_declaration || ""} onChange={(e) => handleChange('race_declaration', e.target.value)} />
+                          ) : (
+                            <span className="font-semibold">{formData.race_declaration || "-"}</span>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Pretensão Salarial</span>
+                          {isEditing ? (
+                            <Input value={formData.salary_expectation || ""} onChange={(e) => handleChange('salary_expectation', e.target.value)} />
+                          ) : (
+                            <span className="font-semibold">{formData.salary_expectation || "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Idiomas</span>
+                          {isEditing ? (
+                            <Input value={formData.languages || ""} onChange={(e) => handleChange('languages', e.target.value)} />
+                          ) : (
+                            <span className="font-semibold">{formData.languages || "-"}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Tamanho Uniforme / Botina</span>
+                          {isEditing ? (
+                            <div className="flex gap-2">
+                              <Input placeholder="Uniforme" value={formData.uniform_size || ""} onChange={(e) => handleChange('uniform_size', e.target.value)} />
+                              <Input placeholder="Botina" value={formData.boot_size || ""} onChange={(e) => handleChange('boot_size', e.target.value)} />
+                            </div>
+                          ) : (
+                            <span className="font-semibold">
+                              {formData.uniform_size || formData.boot_size ? 
+                                `${formData.uniform_size ? `Uniforme: ${formData.uniform_size}` : ''} ${formData.boot_size ? `Botina: ${formData.boot_size}` : ''}` 
+                                : "-"}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5 md:col-span-3">
+                          <span className="text-xs text-muted-foreground block font-medium">Possui Dependentes?</span>
+                          {isEditing ? (
+                            <div className="flex items-center gap-2">
+                              <select 
+                                value={formData.has_dependents ? "true" : "false"} 
+                                onChange={(e) => handleChange('has_dependents', e.target.value === "true")}
+                                className="flex h-10 w-24 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              >
+                                <option value="false">Não</option>
+                                <option value="true">Sim</option>
+                              </select>
+                              {formData.has_dependents && (
+                                <Input placeholder="Qtd. e observações (ex: 2 filhos menores)" value={formData.dependents_notes || ""} onChange={(e) => handleChange('dependents_notes', e.target.value)} className="flex-1" />
+                              )}
+                            </div>
+                          ) : (
+                            <span className="font-semibold">
+                              {formData.has_dependents ? `Sim. ${formData.dependents_notes || ''}` : "Não"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </details>
                   </div>
                 )}
 
-                {/* Conteúdo da Aba: Mapeamento Big Five */}
+                {activeTab === "assessment" && (
+                  <div className="space-y-6 animate-in fade-in duration-200">
+                    <h2 className="text-2xl font-bold mb-6">Parecer & Avaliação</h2>
+                    {isEditing ? (
+                      <div className="space-y-6">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <span className="text-sm font-medium">Nota de Conhecimento Técnico (1-5)</span>
+                            <Input 
+                              type="number" min="1" max="5" 
+                              value={assessmentData.tech_knowledge_rating || ""} 
+                              onChange={(e) => handleAssessmentChange('tech_knowledge_rating', e.target.value)} 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <span className="text-sm font-medium">Nota de Comunicação (1-5)</span>
+                            <Input 
+                              type="number" min="1" max="5" 
+                              value={assessmentData.communication_rating || ""} 
+                              onChange={(e) => handleAssessmentChange('communication_rating', e.target.value)} 
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <span className="text-sm font-medium">Fit Cultural</span>
+                          <Input 
+                            value={assessmentData.culture_fit || ""} 
+                            onChange={(e) => handleAssessmentChange('culture_fit', e.target.value)} 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <span className="text-sm font-medium">Pontos Fortes (Hard e Soft Skills)</span>
+                          <Textarea 
+                            className="min-h-[100px]"
+                            value={assessmentData.strengths || ""} 
+                            onChange={(e) => handleAssessmentChange('strengths', e.target.value)} 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <span className="text-sm font-medium">Pontos a Desenvolver</span>
+                          <Textarea 
+                            className="min-h-[100px]"
+                            value={assessmentData.improvement_points || ""} 
+                            onChange={(e) => handleAssessmentChange('improvement_points', e.target.value)} 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <span className="text-sm font-medium">Observações Finais do Parecer</span>
+                          <Textarea 
+                            className="min-h-[100px]"
+                            value={assessmentData.final_observations || ""} 
+                            onChange={(e) => handleAssessmentChange('final_observations', e.target.value)} 
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {interviews.map((int) => {
+                          const ass = int.assessment || {};
+                          return (
+                            <div key={int.id} className="p-6 rounded-xl border bg-card shadow-sm space-y-5">
+                              <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+                                <div>
+                                  <p className="font-bold text-lg text-foreground">{int.role || "Cargo Alvo"}</p>
+                                  <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
+                                    <Calendar className="h-4 w-4" /> 
+                                    Data: {int.interview_date ? new Date(int.interview_date + 'T12:00:00').toLocaleDateString('pt-BR') : 'N/I'} — Avaliador: <span className="font-medium text-foreground">{int.evaluator || "RH"}</span>
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {ass.selection_stage && (
+                                    <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold">
+                                      {ass.selection_stage}
+                                    </span>
+                                  )}
+                                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                    int.result === "Aprovado" || int.result === "Contratado" ? "bg-emerald-100 text-emerald-800" :
+                                    int.result === "Reprovado" ? "bg-rose-100 text-rose-800" :
+                                    "bg-amber-100 text-amber-800"
+                                  }`}>
+                                    {int.result || int.status}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {(ass.communication_rating || ass.tech_knowledge_rating || ass.culture_fit) && (
+                                <div className="grid grid-cols-3 gap-4 bg-muted/30 p-4 rounded-xl border text-center">
+                                  <div>
+                                    <span className="text-xs text-muted-foreground block font-medium uppercase tracking-wider mb-1">Comunicação</span>
+                                    <span className="font-bold text-foreground text-lg">{ass.communication_rating || "-"} / 5</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground block font-medium uppercase tracking-wider mb-1">Técnica</span>
+                                    <span className="font-bold text-foreground text-lg">{ass.tech_knowledge_rating || "-"} / 5</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground block font-medium uppercase tracking-wider mb-1">Fit Cultural</span>
+                                    <span className="font-bold text-primary text-lg">{ass.culture_fit || "-"}</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="grid md:grid-cols-2 gap-4">
+                                {ass.strengths && (
+                                  <div className="p-4 rounded-xl border bg-emerald-500/5 border-emerald-500/20">
+                                    <p className="font-bold text-emerald-700 text-sm mb-2">Pontos Fortes (Destaques)</p>
+                                    <p className="text-sm text-emerald-900/80 whitespace-pre-line leading-relaxed">{ass.strengths}</p>
+                                  </div>
+                                )}
+                                {ass.improvement_points && (
+                                  <div className="p-4 rounded-xl border bg-amber-500/5 border-amber-500/20">
+                                    <p className="font-bold text-amber-700 text-sm mb-2">Pontos a Desenvolver</p>
+                                    <p className="text-sm text-amber-900/80 whitespace-pre-line leading-relaxed">{ass.improvement_points}</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              {ass.final_observations && (
+                                <div className="text-sm bg-muted/20 p-4 rounded-xl border">
+                                  <p className="font-bold mb-2">Parecer Final:</p>
+                                  <p className="text-muted-foreground whitespace-pre-line">{ass.final_observations}</p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {activeTab === "behavioral" && (
                   <div className="space-y-6 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between border-b pb-2">
-                      <h3 className="text-base font-bold text-foreground">Histórico Mapeamento Big Five (BFI-44)</h3>
-                      <span className="text-xs font-semibold text-muted-foreground px-2 py-1 bg-muted rounded-md">{results.length} avaliação(ões)</span>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-bold">Teste Comportamental (Big Five)</h2>
+                      <span className="text-sm font-semibold text-muted-foreground px-3 py-1 bg-card border rounded-md shadow-sm">{results.length} avaliações</span>
                     </div>
 
                     {results.length === 0 ? (
-                      <div className="rounded-xl border border-dashed p-10 text-center text-muted-foreground space-y-2">
-                        <Sparkles className="h-8 w-8 mx-auto text-muted-foreground/40" />
-                        <p className="font-medium text-foreground">Nenhum mapeamento de personalidade concluído</p>
-                        <p className="text-xs">Solicite ao candidato o envio do teste BFI-44 via Kanban de Vagas ou Central do Candidato.</p>
+                      <div className="rounded-xl border border-dashed p-10 text-center text-muted-foreground space-y-3 bg-card/50">
+                        <Sparkles className="h-10 w-10 mx-auto text-muted-foreground/40" />
+                        <p className="font-medium text-foreground text-lg">Nenhum mapeamento concluído</p>
+                        <p className="text-sm max-w-md mx-auto">O candidato ainda não respondeu ao teste de perfil comportamental BFI-44.</p>
                       </div>
                     ) : (
                       <div className="space-y-6">
                         {results.map((res, idx) => (
-                          <div key={res.id} className="relative rounded-xl border bg-card p-5 shadow-sm space-y-5">
-                            {idx === 0 && <span className="absolute -top-3 right-4 rounded-full bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm">Mais Recente</span>}
-                            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground pb-2 border-b">
+                          <div key={res.id} className="relative rounded-xl border bg-card p-6 shadow-sm space-y-6">
+                            {idx === 0 && <span className="absolute -top-3 right-6 rounded-full bg-primary px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-sm">Mais Recente</span>}
+                            <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground pb-3 border-b">
                               <Calendar className="h-4 w-4 text-primary" /> Realizado em: {new Date(res.created_at).toLocaleDateString('pt-BR')}
                             </div>
                             
-                            <div className="space-y-4">
+                            <div className="space-y-5">
                               <BigFiveBar label="Abertura a Experiências (O)" score={res.openness_score} color="bg-blue-500" />
                               <BigFiveBar label="Conscienciosidade (C)" score={res.conscientiousness_score} color="bg-emerald-500" />
                               <BigFiveBar label="Extroversão (E)" score={res.extraversion_score} color="bg-amber-500" />
@@ -840,16 +1018,55 @@ export function CandidateProfileModal({
                     )}
                   </div>
                 )}
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t px-6 py-3.5 bg-muted/20">
-          <Button variant="outline" onClick={onClose} className="min-w-24 font-medium">
-            Fechar
-          </Button>
+                {activeTab === "history" && (
+                  <div className="space-y-6 animate-in fade-in duration-200">
+                    <h2 className="text-2xl font-bold mb-6">Histórico de Etapas</h2>
+                    {candidateInterviews.length === 0 ? (
+                      <div className="rounded-xl border border-dashed p-10 text-center text-muted-foreground bg-card/50">
+                        <History className="h-8 w-8 mx-auto mb-3 opacity-50" />
+                        <p className="font-medium text-foreground">Nenhum histórico de etapas registrado na Central.</p>
+                      </div>
+                    ) : (
+                      <div className="relative border-l-2 border-muted ml-3 space-y-8 pb-4">
+                        {candidateInterviews.map((ci, idx) => (
+                          <div key={ci.id} className="relative pl-6">
+                            <div className="absolute w-3.5 h-3.5 bg-primary rounded-full -left-[9px] top-1.5 ring-4 ring-background" />
+                            <div className="bg-card border rounded-xl p-4 shadow-sm space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-base text-foreground">{ci.stage}</span>
+                                <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
+                                  {new Date(ci.created_at).toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+                              {(ci.workplace_name || ci.interviewer_name) && (
+                                <p className="text-sm text-muted-foreground flex gap-3">
+                                  {ci.workplace_name && <span><Building2 className="inline h-3.5 w-3.5 mr-1" /> {ci.workplace_name}</span>}
+                                  {ci.interviewer_name && <span><User className="inline h-3.5 w-3.5 mr-1" /> {ci.interviewer_name}</span>}
+                                </p>
+                              )}
+                              {ci.notes && (
+                                <div className="mt-2 text-sm bg-muted/40 p-3 rounded-lg border">
+                                  <span className="font-semibold block mb-1">Observações:</span>
+                                  {ci.notes}
+                                </div>
+                              )}
+                              {ci.rejection_reason && (
+                                <div className="mt-2 text-sm bg-rose-500/10 text-rose-800 p-3 rounded-lg border border-rose-500/20">
+                                  <span className="font-semibold block mb-1">Motivo Reprovação / Desistência:</span>
+                                  {ci.rejection_reason}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -861,11 +1078,11 @@ function BigFiveBar({ label, score, color }: { label: string; score: number | nu
   
   return (
     <div>
-      <div className="mb-1.5 flex justify-between text-xs">
+      <div className="mb-2 flex justify-between text-sm">
         <span className="font-bold text-foreground">{label}</span>
         <span className="font-bold text-primary">{score ? score.toFixed(1) : "N/A"} / 5.0</span>
       </div>
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary">
+      <div className="h-3 w-full overflow-hidden rounded-full bg-secondary">
         {score !== null && (
           <div 
             className={`h-full rounded-full ${color} transition-all duration-700`} 
@@ -873,7 +1090,7 @@ function BigFiveBar({ label, score, color }: { label: string; score: number | nu
           />
         )}
       </div>
-      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground/80 font-medium">
+      <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground font-medium">
         <span>Baixo (1)</span>
         <span>Médio (3)</span>
         <span>Alto (5)</span>
@@ -881,3 +1098,4 @@ function BigFiveBar({ label, score, color }: { label: string; score: number | nu
     </div>
   );
 }
+

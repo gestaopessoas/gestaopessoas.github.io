@@ -61,9 +61,6 @@ export type ParsedResume = {
   race_declaration: string;
   sexual_orientation: string;
   gender_identity: string;
-  additional_info: string;
-  personal_info: string;
-  diversity_info: string;
   academic_list: ParsedAcademic[];
   experience_list: ParsedExperience[];
 };
@@ -348,15 +345,6 @@ export function parseSolidesResume(text: string): ParsedResume {
   });
 
   const sectionLines = (name: string) => sections[norm(name)] ?? [];
-  // Para os blocos de texto livre, ignora o que já virou campo estruturado.
-  const freeText = (name: string) => {
-    const key = norm(name);
-    const kept = lines.filter(
-      (line, index) =>
-        !consumed.has(index) && (sections[key] ?? []).includes(line) && !line.includes("\t"),
-    );
-    return kept.join("\n").trim();
-  };
 
   const headerLines = lines.slice(0, lines.findIndex((line) => SECTION_KEYS.has(norm(line))) + 1 || 6);
   const name = clean(headerLines[0]);
@@ -438,9 +426,6 @@ export function parseSolidesResume(text: string): ParsedResume {
     race_declaration: fields.race || "",
     sexual_orientation: fields.sexual_orientation || "",
     gender_identity: fields.gender_identity || "",
-    additional_info: freeText("Informações adicionais"),
-    personal_info: freeText("Informações pessoais"),
-    diversity_info: freeText("Diversidade"),
     academic_list,
     experience_list: parseExperiences(sectionLines("Experiência profissional")),
   };

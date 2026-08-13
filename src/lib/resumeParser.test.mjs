@@ -125,9 +125,6 @@ const expected = {
   gender_identity: "Cisgênero",
   address: "Rua Álvaro Chaves, Centro, Pelotas, Rio Grande do Sul, 96010-760, Brasil",
   role: "",
-  additional_info: "",
-  personal_info: "",
-  diversity_info: "",
 }
 
 for (const [key, value] of Object.entries(expected)) {

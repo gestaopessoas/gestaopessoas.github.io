@@ -23,6 +23,7 @@ type ParsedResumeFields = Partial<ParsedResume> & {
   dependents_count?: number;
   dependents_notes?: string;
   uniform_size?: string;
+  languages?: string;
   boot_size?: string;
 };
 
@@ -111,9 +112,6 @@ type Assessment = {
   sexual_orientation?: string;
   race_declaration?: string;
   languages?: string;
-  additional_info?: string;
-  personal_info?: string;
-  diversity_info?: string;
 };
 
 type Interview = {
@@ -958,9 +956,6 @@ Resultado Final: ${form.result || "N/C"}
       <div class="section-title">Resumo Curricular / Formação & Experiências</div>
       ${assessmentForm.professional_summary ? `<div style="margin-bottom:12px"><b>Resumo Profissional:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.professional_summary}</p></div>` : ''}
       ${assessmentForm.address ? `<div style="margin-bottom:12px"><b>Endereço:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.address}</p></div>` : ''}
-      ${assessmentForm.personal_info ? `<div style="margin-bottom:12px"><b>Informações Pessoais:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.personal_info}</p></div>` : ''}
-      ${assessmentForm.diversity_info ? `<div style="margin-bottom:12px"><b>Diversidade:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.diversity_info}</p></div>` : ''}
-      ${assessmentForm.additional_info ? `<div style="margin-bottom:12px"><b>Informações Adicionais:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.additional_info}</p></div>` : ''}
       ${assessmentForm.academic_list && assessmentForm.academic_list.length > 0 ? `
       <div style="margin-bottom:14px">
         <b style="font-size:13px;color:#334155">Formação Acadêmica & Cursos:</b>
@@ -1040,8 +1035,7 @@ Resultado Final: ${form.result || "N/C"}
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleModalSave = async (formData: any, assessmentData: any) => {
     setSaving(true);
     setError("");
     const supabase = createClient();
@@ -1050,23 +1044,28 @@ Resultado Final: ${form.result || "N/C"}
       ...Object.fromEntries(
         Object.entries(form).map(([key, value]) => [key, value.trim() || null])
       ),
-      birth_date: assessmentForm.birth_date || null,
-      cpf: assessmentForm.cpf || null,
-      marital_status: assessmentForm.marital_status || null,
-      birthplace: assessmentForm.birthplace || null,
-      gender: assessmentForm.gender || null,
-      gender_identity: assessmentForm.gender_identity || null,
-      sexual_orientation: assessmentForm.sexual_orientation || null,
-      race_declaration: assessmentForm.race_declaration || null,
-      salary_expectation: assessmentForm.salary_expectation || null,
-      has_cnh: assessmentForm.has_cnh ?? null,
-      cnh_category: assessmentForm.cnh_category || null,
-      languages: assessmentForm.languages || null,
-      has_dependents: assessmentForm.has_dependents ?? null,
-      dependents_count: assessmentForm.dependents_count ?? null,
-      uniform_size: assessmentForm.uniform_size || null,
-      boot_size: assessmentForm.boot_size || null,
-      assessment: assessmentForm,
+      candidate_name: formData.full_name || formData.name || form.candidate_name,
+      email: formData.email,
+      phone: formData.phone,
+      role: formData.role_interest || formData.role || form.role,
+      birth_date: formData.birth_date || null,
+      cpf: formData.cpf || null,
+      marital_status: formData.marital_status || null,
+      birthplace: formData.birthplace || null,
+      gender: formData.gender || null,
+      gender_identity: formData.gender_identity || null,
+      sexual_orientation: formData.sexual_orientation || null,
+      race_declaration: formData.race_declaration || null,
+      salary_expectation: formData.salary_expectation || null,
+      has_cnh: formData.has_cnh ?? null,
+      cnh_category: formData.cnh_categories ? (Array.isArray(formData.cnh_categories) ? formData.cnh_categories[0] : formData.cnh_categories) : null,
+      languages: formData.languages || null,
+      has_dependents: formData.has_dependents ?? null,
+      dependents_count: formData.dependents_count ?? null,
+      dependents_notes: formData.dependents_notes || null,
+      uniform_size: formData.uniform_size || null,
+      boot_size: formData.boot_size || null,
+      assessment: { ...assessmentForm, ...assessmentData },
       updated_at: new Date().toISOString()
     };
     
@@ -1089,8 +1088,6 @@ Resultado Final: ${form.result || "N/C"}
     }
     
     if (isSuccess) {
-      // Se Aprovado ou Banco de Talentos, joga pra central do candidato automaticamente
-      // O payload nasce de Object.fromEntries, então o TS perde os nomes das colunas.
       const payloadAny = payload as unknown as Record<string, any>;
       if ((payloadAny.result === "Aprovado" || payloadAny.result === "Banco de Talentos") && payloadAny.candidate_name) {
         const parts = payloadAny.candidate_name.split(" ");
@@ -1103,36 +1100,30 @@ Resultado Final: ${form.result || "N/C"}
           email: payloadAny.email || `${parts[0]?.toLowerCase() || 'candidato'}@sememail.com`,
           phone: payloadAny.phone,
           role_interest: payloadAny.role,
-          city: assessmentForm.worksite || "",
-          available_worksites: assessmentForm.worksite_type === "all" ? ["Todas as Obras"] : (assessmentForm.available_worksites || []),
-          search_tags: [tag, assessmentForm.selection_stage || "Importado de Entrevistas"].filter(Boolean),
-          birth_date: assessmentForm.birth_date || null,
-          cpf: assessmentForm.cpf || null,
-          marital_status: assessmentForm.marital_status || null,
-          birthplace: assessmentForm.birthplace || null,
-          gender_identity: assessmentForm.gender_identity || null,
-          sexual_orientation: assessmentForm.sexual_orientation || null,
-          race_declaration: assessmentForm.race_declaration || null,
-          salary_expectation: assessmentForm.salary_expectation || null,
-          has_cnh: assessmentForm.has_cnh ?? null,
-          cnh_categories: assessmentForm.cnh_category ? [assessmentForm.cnh_category] : [],
-          languages: assessmentForm.languages || null,
-          has_dependents: assessmentForm.has_dependents ?? null,
-          dependents_count: assessmentForm.dependents_count ?? null,
-          uniform_size: assessmentForm.uniform_size || null,
-          boot_size: assessmentForm.boot_size || null
+          city: assessmentData.worksite || "",
+          available_worksites: assessmentData.worksite_type === "all" ? ["Todas as Obras"] : (assessmentData.available_worksites || []),
+          search_tags: [tag, assessmentData.selection_stage || "Importado de Entrevistas"].filter(Boolean),
+          birth_date: formData.birth_date || null,
+          cpf: formData.cpf || null,
+          marital_status: formData.marital_status || null,
+          birthplace: formData.birthplace || null,
+          gender_identity: formData.gender_identity || null,
+          sexual_orientation: formData.sexual_orientation || null,
+          race_declaration: formData.race_declaration || null,
+          salary_expectation: formData.salary_expectation || null,
+          has_cnh: formData.has_cnh ?? null,
+          cnh_categories: formData.cnh_categories ? [formData.cnh_categories] : [],
+          languages: formData.languages || null,
+          has_dependents: formData.has_dependents ?? null,
+          dependents_count: formData.dependents_count ?? null,
+          uniform_size: formData.uniform_size || null,
+          boot_size: formData.boot_size || null
         });
-        
-        if (insertError) {
-          console.error("Erro ao enviar para candidatos:", insertError);
-        } else {
-          alert(`Candidato Movido para a Central do Candidato como ${payloadAny.result}!`);
-        }
+        if (insertError) console.error("Erro ao enviar para candidatos:", insertError);
       }
       setIsModalOpen(false); 
       loadInterviews();
     }
-    
     setSaving(false);
   };
   
@@ -1211,9 +1202,7 @@ Resultado Final: ${form.result || "N/C"}
       gender_identity: parsed.gender_identity || prev.gender_identity,
       sexual_orientation: parsed.sexual_orientation || prev.sexual_orientation,
       race_declaration: parsed.race_declaration || prev.race_declaration,
-      additional_info: parsed.additional_info || prev.additional_info,
-      personal_info: parsed.personal_info || prev.personal_info,
-      diversity_info: parsed.diversity_info || prev.diversity_info,
+      languages: parsed.languages || prev.languages,
       academic_list: Array.isArray(parsed.academic_list) ? parsed.academic_list.map((item, idx) => ({
         id: String(Date.now() + idx),
         course: item.course || "",
@@ -1277,7 +1266,6 @@ Resultado Final: ${form.result || "N/C"}
   "gender_identity": "Autodeclaração de gênero",
   "sexual_orientation": "Orientação sexual",
   "race_declaration": "Autodeclaração de raça/cor",
-  "additional_info": "Outras informações adicionais relevantes do candidato",
 
   "academic_list": [
     {
@@ -1630,1067 +1618,23 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
       </div>
 
       {/* Modal Entrevista */}
+      {/* Modal Nova/Editar Entrevista */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-background w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between p-4 border-b shrink-0">
-              <div>
-                <h2 className="text-lg font-semibold">{editingId ? "Editar Entrevista & Avaliação" : "Registrar Nova Entrevista"}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {editingId ? "Altere dados do candidato ou adicione o parecer da entrevista." : "Preencha os dados do candidato e da entrevista."}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {editingId && (
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setViewingCandidateProfile({ interviewId: editingId, email: form.email, name: form.candidate_name })}
-                    className="gap-1.5 text-xs text-primary border-primary/20 hover:bg-primary/5 shadow-xs"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    Ver Dossiê / Currículo Completo
-                  </Button>
-                )}
-                <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="border-b px-6 flex gap-6 shrink-0">
-              <button 
-                onClick={() => setActiveTab("dados")}
-                className={`py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${activeTab === "dados" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-              >
-                Dados Básicos
-              </button>
-              <button 
-                type="button"
-                onClick={() => setActiveTab("avaliacao")}
-                className={`py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${activeTab === "avaliacao" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-              >
-                Parecer / Avaliação
-              </button>
-              <button 
-                type="button"
-                onClick={() => setActiveTab("curriculo")}
-                className={`py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${activeTab === "curriculo" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-              >
-                Currículo / Perfil
-              </button>
-            </div>
-
-            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col">
-              {activeTab === "dados" && (
-                <div className="grid grid-cols-2 gap-4 flex-1">
-                  <div className="space-y-1 col-span-2">
-                    <Label>Nome do Candidato <span className="text-red-500">*</span></Label>
-                    <Input 
-                      required 
-                      value={form.candidate_name} 
-                      onChange={e => setForm({...form, candidate_name: e.target.value})} 
-                      placeholder="Ex: João da Silva" 
-                    />
-                  </div>
-                  
-                  <div className="space-y-1 col-span-2 md:col-span-1">
-                    <Label>Cargo Alvo</Label>
-                    <select 
-                      value={form.role} 
-                      onChange={e => setForm({...form, role: e.target.value})}
-                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="">Selecione um cargo...</option>
-                      {Array.from(new Set([...roles, form.role].filter(Boolean))).map(r => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1 col-span-2 md:col-span-1">
-                    <Label>Telefone</Label>
-                    <Input 
-                      value={form.phone} 
-                      onChange={e => setForm({...form, phone: e.target.value})} 
-                      placeholder="(XX) XXXXX-XXXX" 
-                    />
-                  </div>
-
-                  <div className="space-y-1 col-span-2">
-                    <Label>E-mail</Label>
-                    <Input 
-                      type="email"
-                      value={form.email} 
-                      onChange={e => setForm({...form, email: e.target.value})} 
-                      placeholder="joao@email.com" 
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label>Data da Entrevista <span className="text-red-500">*</span></Label>
-                    <Input 
-                      type="date"
-                      required
-                      value={form.interview_date} 
-                      onChange={e => setForm({...form, interview_date: e.target.value})} 
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label>Horário</Label>
-                    <Input 
-                      type="time"
-                      value={form.interview_time} 
-                      onChange={e => setForm({...form, interview_time: e.target.value})} 
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label>Status</Label>
-                    <select 
-                      value={form.status} 
-                      onChange={e => setForm({...form, status: e.target.value})}
-                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="Aguardando">Aguardando</option>
-                      <option value="Confirmado">Confirmado</option>
-                      <option value="Compareceu">Compareceu</option>
-                      <option value="Desistente">Desistente</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label>Resultado da entrevista com a GP</Label>
-                    <select 
-                      value={form.result} 
-                      onChange={e => setForm({...form, result: e.target.value})}
-                      className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="N/C">N/C (Não Concluído)</option>
-                      <option value="Aprovado">Aprovado</option>
-                      <option value="Reprovado">Reprovado</option>
-                      <option value="Desistente">Desistente</option>
-                      <option value="Banco de Talentos">Banco de Talentos</option>
-                      <option value="Avaliação Comportamental">Avaliação Comportamental</option>
-                    </select>
-                  </div>
-                  
-                  {form.result === "Avaliação Comportamental" && (
-                    <div className="col-span-2 p-4 mt-2 border rounded-md bg-muted/50 flex flex-col space-y-2">
-                      <Label>Link para Avaliação Comportamental (Big 5)</Label>
-                      <p className="text-xs text-muted-foreground">Copie o link abaixo e envie ao candidato para a realização do teste.</p>
-                      <div className="flex items-center gap-2">
-                        <Input 
-                          readOnly 
-                          value={`https://gestaopessoas.github.io/colaborador/teste-personalidade?session=${editingId || 'novo-candidato'}`} 
-                          className="bg-background text-sm font-mono"
-                        />
-                        <Button 
-                          type="button"
-                          variant="secondary"
-                          onClick={() => {
-                            navigator.clipboard.writeText(`https://gestaopessoas.github.io/colaborador/teste-personalidade?session=${editingId || 'novo-candidato'}`);
-                            alert("Link copiado!");
-                          }}
-                        >
-                          Copiar
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-            )}
-            
-            {activeTab === "dados" && (form.result === "Aprovado" || form.result === "Banco de Talentos") && (
-              <div className="px-6 py-4 bg-muted/30 border-t space-y-4">
-                <div className="space-y-2">
-                  <Label>Disponibilidade de Obra / Sede</Label>
-                  <select
-                    value={assessmentForm.worksite_type || 'all'}
-                    onChange={e => setAssessmentForm({...assessmentForm, worksite_type: e.target.value as "all" | "specific", available_worksites: []})}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                  >
-                    <option value="all">Disponível para Todas as Obras</option>
-                    <option value="specific">Obras Específicas...</option>
-                  </select>
-                </div>
-                
-                {assessmentForm.worksite_type === 'specific' && (
-                  <div className="space-y-2 p-3 border rounded-md bg-background">
-                    <Label className="text-xs text-muted-foreground uppercase">Selecione as obras adequadas ao perfil:</Label>
-                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto mt-2">
-                      {worksites.map(w => (
-                        <label key={w} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 p-1 rounded">
-                          <input 
-                            type="checkbox" 
-                            checked={(assessmentForm.available_worksites || []).includes(w)}
-                            onChange={(e) => {
-                              const current = assessmentForm.available_worksites || [];
-                              const next = e.target.checked 
-                                ? [...current, w] 
-                                : current.filter((x: string) => x !== w);
-                              setAssessmentForm({...assessmentForm, available_worksites: next});
-                            }}
-                            className="rounded border-input"
-                          />
-                          <span className="truncate">{w}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === "avaliacao" && (
-                <div className="space-y-5 flex-1">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <Label>Obra / Sede</Label>
-                      <Input value={assessmentForm.worksite || ''} onChange={e => setAssessmentForm({...assessmentForm, worksite: e.target.value})} placeholder="Ex: Obra A" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Fase do Processo</Label>
-                      <select value={assessmentForm.selection_stage || ''} onChange={e => setAssessmentForm({...assessmentForm, selection_stage: e.target.value})} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm">
-                        <option value="">Selecione a fase unificada...</option>
-                        <option value="Triagem">Triagem</option>
-                        <option value="Entrevista RH">Entrevista RH (Gestão de Pessoas)</option>
-                        <option value="Entrevista Gestor">Entrevista Gestor</option>
-                        <option value="Testagem Psicológica">Testagem Psicológica</option>
-                        <option value="Coleta de Documentos & Exames">Coleta de Documentos & Exames</option>
-                        <option value="Proposta / Aguardando Contratação">Proposta / Aguardando Contratação</option>
-                        <option value="Contratado">Contratado</option>
-                        <option value="Banco de Talentos">Banco de Talentos</option>
-                        <option value="Reprovado">Reprovado</option>
-                        <option value="Desistente">Desistente</option>
-                        <option value="Outros">Outros</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Teste Psicológico Realizado?</Label>
-                      <select 
-                        value={assessmentForm.psychological_test} 
-                        onChange={e => setAssessmentForm({...assessmentForm, psychological_test: e.target.value})}
-                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="Não">Não</option>
-                        <option value="Sim">Sim</option>
-                      </select>
-                    </div>
-
-                                        {assessmentForm.psychological_test === "Sim" && (
-                      <div className="space-y-4 md:col-span-2 p-5 bg-muted/30 rounded-lg border border-border/50">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-base font-semibold">Testes Psicológicos</Label>
-                          <Button type="button" size="sm" variant="outline" onClick={() => setAssessmentForm(p => ({...p, tests_list: [...(p.tests_list || []), { test_name: "G36", score: "" }]}))}>
-                            <Plus className="h-4 w-4 mr-2" /> Adicionar Teste
-                          </Button>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 border-b border-border/50 pb-4">
-                          <div className="space-y-1">
-                            <Label>Idade do Candidato</Label>
-                            <Input type="number" placeholder="Ex: 25" value={assessmentForm.age || ''} onChange={e => setAssessmentForm({...assessmentForm, age: e.target.value})} />
-                          </div>
-                          <div className="space-y-1">
-                            <Label>Escolaridade</Label>
-                            <select value={assessmentForm.education || 'Ensino Médio'} onChange={e => setAssessmentForm({...assessmentForm, education: e.target.value})} className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm">
-                              <option value="Ensino Fundamental">Ensino Fundamental</option>
-                              <option value="Ensino Médio">Ensino Médio</option>
-                              <option value="Ensino Superior">Ensino Superior</option>
-                              <option value="Pós-graduação">Pós-graduação</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          {(assessmentForm.tests_list || []).map((t, index) => {
-                            const isNeo = t.test_name.includes("NEO");
-                            return (
-                            <div key={index} className="flex flex-col space-y-3 p-3 border border-border/50 bg-background rounded-md relative">
-                              <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100" onClick={() => {
-                                const list = [...(assessmentForm.tests_list || [])];
-                                list.splice(index, 1);
-                                setAssessmentForm(p => ({...p, tests_list: list}));
-                              }}>
-                                <X className="h-4 w-4" />
-                              </Button>
-                              <div className="flex flex-col md:flex-row gap-3 pr-8">
-                                <div className="flex-1 space-y-1">
-                                  <Label>Nome do Teste</Label>
-                                  <select value={t.test_name} onChange={e => {
-                                      const list = [...(assessmentForm.tests_list || [])];
-                                      const newTest = e.target.value;
-                                      list[index] = { ...list[index], test_name: newTest };
-                                      if (newTest.includes("NEO")) list[index].factors = {N:"", E:"", O:"", A:"", C:""};
-                                      
-                                      const opts = TEST_OPTIONS[newTest];
-                                      if (opts && opts.length > 0) {
-                                        list[index].table_name = opts[0].table_name;
-                                        list[index].demographic_type = opts[0].demographic_type;
-                                        list[index].demographic_value = opts[0].demographic_value;
-                                      } else {
-                                        list[index].table_name = ""; list[index].demographic_type = ""; list[index].demographic_value = "";
-                                      }
-                                      setAssessmentForm(p => ({...p, tests_list: list}));
-                                    }}
-                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm">
-                                    <option value="G36">G36 (Inteligência/Lógico)</option>
-                                    <option value="TEALT">TEALT (Atenção Alternada)</option>
-                                    <option value="TEADI">TEADI (Atenção Dividida)</option>
-                                    <option value="TEACO-FF">TEACO-FF (Atenção Concentrada)</option>
-                                    <option value="NEO PI-R">NEO PI-R (Personalidade)</option>
-                                    <option value="NEO FFI-R">NEO FFI-R (Personalidade)</option>
-                                    <option value="Palográfico">Palográfico</option>
-                                  </select>
-                                </div>
-                                <div className="flex-[2] space-y-1">
-                                  <Label>Tabela Normativa</Label>
-                                  <select value={t.table_name + "|" + t.demographic_type + "|" + t.demographic_value} onChange={e => {
-                                      const [tb, dt, dv] = e.target.value.split('|');
-                                      const list = [...(assessmentForm.tests_list || [])];
-                                      list[index] = { ...list[index], table_name: tb, demographic_type: dt, demographic_value: dv };
-                                      setAssessmentForm(p => ({...p, tests_list: list}));
-                                    }}
-                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm truncate">
-                                    {(TEST_OPTIONS[t.test_name] || []).map((opt, i) => (
-                                      <option key={i} value={`${opt.table_name}|${opt.demographic_type}|${opt.demographic_value}`}>
-                                        {opt.label}
-                                      </option>
-                                    ))}
-                                    {!(TEST_OPTIONS[t.test_name] || []).length && <option value="||">Nenhuma tabela (Teste não cadastrado)</option>}
-                                  </select>
-                                </div>
-                                {!isNeo && (
-                                  <div className="flex-1 space-y-1">
-                                    <Label>Pontuação (Acertos)</Label>
-                                    <Input type="number" placeholder="Ex: 45" value={t.score} onChange={e => {
-                                      const list = [...(assessmentForm.tests_list || [])];
-                                      list[index].score = e.target.value;
-                                      setAssessmentForm(p => ({...p, tests_list: list}));
-                                    }} />
-                                  </div>
-                                )}
-                              </div>
-                              {isNeo && (
-                                <div className="grid grid-cols-5 gap-2 mt-2 pt-2 border-t border-border/30">
-                                  {(["N", "E", "O", "A", "C"] as const).map(f => (
-                                    <div key={f} className="space-y-1">
-                                      <Label title={f === 'N' ? 'Neuroticismo' : f === 'E' ? 'Extroversão' : f === 'O' ? 'Abertura' : f === 'A' ? 'Amabilidade' : 'Conscienciosidade'} className="cursor-help">Fator {f}</Label>
-                                      <Input type="number" placeholder="0" value={t.factors?.[f] || ''} onChange={e => {
-                                        const list = [...(assessmentForm.tests_list || [])];
-                                        const factors = { ...(list[index].factors ?? {}) };
-                                        factors[f] = e.target.value;
-                                        list[index] = { ...list[index], factors };
-                                        setAssessmentForm(p => ({...p, tests_list: list}));
-                                      }} className="h-8 px-2" />
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )})}
-                          {(assessmentForm.tests_list || []).length === 0 && (
-                            <div className="text-sm text-muted-foreground text-center py-4 border-2 border-dashed rounded-md">
-                              Nenhum teste adicionado. Clique no botão acima para adicionar.
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex items-end pt-2">
-                          <Button type="button" onClick={handleGenerateTestText} disabled={isGeneratingTest || (assessmentForm.tests_list || []).length === 0} className="w-full font-medium">
-                            {isGeneratingTest ? "Calculando e Gerando Parecer..." : "Calcular Classificação & Gerar Parecer (IA)"}
-                          </Button>
-                        </div>
-
-                        <div className="space-y-1 pt-2">
-                          <Label>Resultado Final dos Testes (Gerado)</Label>
-                          <Textarea 
-                            placeholder="O parecer detalhado aparecerá aqui após o cálculo..."
-                            value={assessmentForm.tests_details || ''}
-                            onChange={(e) => setAssessmentForm({ ...assessmentForm, tests_details: e.target.value })}
-                            className="min-h-[120px]"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-1">
-                      <Label>Avaliação Técnica</Label>
-                      <select 
-                        value={assessmentForm.technical} 
-                        onChange={e => setAssessmentForm({...assessmentForm, technical: e.target.value})}
-                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="">Selecione...</option>
-                        <option value="Excelente">Excelente (Domina o assunto)</option>
-                        <option value="Boa">Boa (Tem conhecimento sólido)</option>
-                        <option value="Básica">Básica (Precisa de treinamento)</option>
-                        <option value="Insuficiente">Insuficiente (Não atende aos requisitos)</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label>Comunicação</Label>
-                      <select 
-                        value={assessmentForm.communication} 
-                        onChange={e => setAssessmentForm({...assessmentForm, communication: e.target.value})}
-                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="">Selecione...</option>
-                        <option value="Excelente">Excelente (Articulado e claro)</option>
-                        <option value="Boa">Boa (Comunica-se bem)</option>
-                        <option value="Razoável">Razoável (Um pouco retraído)</option>
-                        <option value="Ruim">Ruim (Dificuldade de expressão)</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label>Fit Cultural (Aderência)</Label>
-                      <select 
-                        value={assessmentForm.cultural_fit} 
-                        onChange={e => setAssessmentForm({...assessmentForm, cultural_fit: e.target.value})}
-                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="">Selecione...</option>
-                        <option value="Alta">Alta (Total aderência aos valores)</option>
-                        <option value="Média">Média (Aderência parcial)</option>
-                        <option value="Baixa">Baixa (Pouca aderência aos valores)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Pontos Fortes</Label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {PREDEFINED_STRENGTHS.map(item => {
-                        const checked = (assessmentForm.strengths || "").includes(item);
-                        return (
-                          <div key={item} className="flex items-center space-x-2">
-                            <Checkbox 
-                              id={`strength-${item}`} 
-                              checked={checked}
-                              onCheckedChange={() => setAssessmentForm(prev => ({...prev, strengths: toggleListItem(prev.strengths, item)}))}
-                            />
-                            <Label htmlFor={`strength-${item}`} className="text-sm font-normal cursor-pointer leading-tight">{item}</Label>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">Pontos a Desenvolver</Label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {PREDEFINED_WEAKNESSES.map(item => {
-                        const checked = (assessmentForm.weaknesses || "").includes(item);
-                        return (
-                          <div key={item} className="flex items-center space-x-2">
-                            <Checkbox 
-                              id={`weakness-${item}`} 
-                              checked={checked}
-                              onCheckedChange={() => setAssessmentForm(prev => ({...prev, weaknesses: toggleListItem(prev.weaknesses, item)}))}
-                            />
-                            <Label htmlFor={`weakness-${item}`} className="text-sm font-normal cursor-pointer leading-tight">{item}</Label>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 border-t pt-4 mt-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base font-medium">Parecer Final / Observações</Label>
-                      <Button type="button" size="sm" variant="outline" onClick={generateParecerText} className="gap-2 text-primary border-primary/50 hover:bg-primary/10">
-                        <span className="text-lg leading-none">🪄</span> Gerar Parecer
-                      </Button>
-                    </div>
-                    <Textarea 
-                      value={assessmentForm.observations} 
-                      onChange={e => setAssessmentForm({...assessmentForm, observations: e.target.value})}
-                      placeholder="O texto gerado aparecerá aqui. Você também pode digitar manualmente..."
-                      className="resize-none min-h-[100px]"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "curriculo" && (
-                <div className="space-y-5 flex-1 overflow-y-auto pr-1">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <Label>Idade</Label>
-                      <Input 
-                        value={assessmentForm.age || ''} 
-                        onChange={e => {
-                          const val = e.target.value.replace(/\D/g, '').slice(0, 2);
-                          setAssessmentForm({...assessmentForm, age: val});
-                        }} 
-                        placeholder="Ex: 33" 
-                        maxLength={2}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Cidade / Estado</Label>
-                      <Input 
-                        value={assessmentForm.location || ''} 
-                        onChange={e => setAssessmentForm({...assessmentForm, location: e.target.value})} 
-                        placeholder="Ex: Pelotas - RS" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Tipo de Candidato</Label>
-                      <select 
-                        value={assessmentForm.is_internal ? "interno" : "externo"} 
-                        onChange={e => setAssessmentForm({...assessmentForm, is_internal: e.target.value === "interno"})}
-                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="externo">Candidato Externo</option>
-                        <option value="interno">Candidato Interno</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Escolaridade / Resumo Formação</Label>
-                      <Input 
-                        value={assessmentForm.education || ''} 
-                        onChange={e => setAssessmentForm({...assessmentForm, education: e.target.value})} 
-                        placeholder="Ex: Formado em Psicologia" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 pt-2">
-                    <Label className="text-sm font-medium">Endereço Completo</Label>
-                    <Input 
-                      value={assessmentForm.address || ''} 
-                      onChange={e => setAssessmentForm({...assessmentForm, address: e.target.value})}
-                      placeholder="Ex: Rua XYZ, Centro, Pelotas - RS"
-                    />
-                  </div>
-
-                  <div className="space-y-4 pt-4 border-t">
-                    <Label className="text-sm font-semibold text-foreground">Informações Pessoais</Label>
-                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Data de Nascimento</Label>
-                        <Input 
-                          type="date"
-                          value={assessmentForm.birth_date || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, birth_date: e.target.value})}
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">CPF</Label>
-                        <Input 
-                          value={assessmentForm.cpf || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, cpf: e.target.value})}
-                          placeholder="000.000.000-00"
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Estado Civil</Label>
-                        <select 
-                          value={assessmentForm.marital_status || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, marital_status: e.target.value})}
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        >
-                          <option value="">Selecione...</option>
-                          <option value="Solteiro(a)">Solteiro(a)</option>
-                          <option value="Casado(a)">Casado(a)</option>
-                          <option value="Divorciado(a)">Divorciado(a)</option>
-                          <option value="Viúvo(a)">Viúvo(a)</option>
-                          <option value="União Estável">União Estável</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Naturalidade (Cidade/Estado)</Label>
-                        <Input 
-                          value={assessmentForm.birthplace || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, birthplace: e.target.value})}
-                          placeholder="Ex: Pelotas/RS"
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Gênero</Label>
-                        <select 
-                          value={assessmentForm.gender || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, gender: e.target.value})}
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        >
-                          <option value="">Selecione...</option>
-                          <option value="Masculino">Masculino</option>
-                          <option value="Feminino">Feminino</option>
-                          <option value="Outro">Outro</option>
-                          <option value="Prefiro não informar">Prefiro não informar</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 pt-4 border-t">
-                    <Label className="text-sm font-semibold text-foreground">Diversidade</Label>
-                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Identidade de Gênero</Label>
-                        <select 
-                          value={assessmentForm.gender_identity || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, gender_identity: e.target.value})}
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        >
-                          <option value="">Selecione...</option>
-                          <option value="Cisgênero">Cisgênero</option>
-                          <option value="Transgênero">Transgênero</option>
-                          <option value="Não-binário">Não-binário</option>
-                          <option value="Prefiro não informar">Prefiro não informar</option>
-                          <option value="Outro">Outro</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Orientação Sexual</Label>
-                        <select 
-                          value={assessmentForm.sexual_orientation || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, sexual_orientation: e.target.value})}
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        >
-                          <option value="">Selecione...</option>
-                          <option value="Heterossexual">Heterossexual</option>
-                          <option value="Homossexual">Homossexual</option>
-                          <option value="Bissexual">Bissexual</option>
-                          <option value="Pansexual">Pansexual</option>
-                          <option value="Assexual">Assexual</option>
-                          <option value="Prefiro não informar">Prefiro não informar</option>
-                          <option value="Outro">Outro</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Raça/Cor</Label>
-                        <select 
-                          value={assessmentForm.race_declaration || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, race_declaration: e.target.value})}
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        >
-                          <option value="">Selecione...</option>
-                          <option value="Branca">Branca</option>
-                          <option value="Preta">Preta</option>
-                          <option value="Parda">Parda</option>
-                          <option value="Amarela">Amarela</option>
-                          <option value="Indígena">Indígena</option>
-                          <option value="Prefiro não informar">Prefiro não informar</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 pt-4 border-t">
-                    <Label className="text-sm font-semibold text-foreground">Informações Adicionais</Label>
-                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Pretensão Salarial</Label>
-                        <Input 
-                          value={assessmentForm.salary_expectation || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, salary_expectation: e.target.value})}
-                          placeholder="Ex: R$ 2.500,00"
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">CNH</Label>
-                        <div className="flex gap-2">
-                          <select 
-                            value={assessmentForm.has_cnh === true ? "Sim" : assessmentForm.has_cnh === false ? "Não" : ""} 
-                            onChange={e => setAssessmentForm({...assessmentForm, has_cnh: e.target.value === "Sim" ? true : e.target.value === "Não" ? false : undefined})}
-                            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                          >
-                            <option value="">...</option>
-                            <option value="Sim">Sim</option>
-                            <option value="Não">Não</option>
-                          </select>
-                          <Input 
-                            value={assessmentForm.cnh_category || ''} 
-                            onChange={e => setAssessmentForm({...assessmentForm, cnh_category: e.target.value.toUpperCase()})}
-                            placeholder="Cat. (Ex: AB)"
-                            className="h-9 text-sm flex-1"
-                            disabled={assessmentForm.has_cnh === false}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Idiomas</Label>
-                        <Input 
-                          value={assessmentForm.languages || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, languages: e.target.value})}
-                          placeholder="Ex: Inglês Intermediário"
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Filhos / Dependentes</Label>
-                        <div className="flex gap-2">
-                          <select 
-                            value={assessmentForm.has_dependents === true ? "Sim" : assessmentForm.has_dependents === false ? "Não" : ""} 
-                            onChange={e => setAssessmentForm({...assessmentForm, has_dependents: e.target.value === "Sim" ? true : e.target.value === "Não" ? false : undefined})}
-                            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                          >
-                            <option value="">...</option>
-                            <option value="Sim">Sim</option>
-                            <option value="Não">Não</option>
-                          </select>
-                          <Input 
-                            type="number"
-                            min="0"
-                            value={assessmentForm.dependents_count || ''} 
-                            onChange={e => setAssessmentForm({...assessmentForm, dependents_count: parseInt(e.target.value) || 0})}
-                            placeholder="Qtd"
-                            className="h-9 text-sm flex-1"
-                            disabled={assessmentForm.has_dependents === false}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Tamanho Uniforme</Label>
-                        <Input 
-                          value={assessmentForm.uniform_size || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, uniform_size: e.target.value.toUpperCase()})}
-                          placeholder="Ex: M / 42"
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Tamanho Calçado/Bota</Label>
-                        <Input 
-                          value={assessmentForm.boot_size || ''} 
-                          onChange={e => setAssessmentForm({...assessmentForm, boot_size: e.target.value})}
-                          placeholder="Ex: 40"
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2 mt-2">
-                      <Label className="text-xs text-muted-foreground">Outras Informações Adicionais</Label>
-                      <Textarea 
-                        value={assessmentForm.additional_info || ''} 
-                        onChange={e => setAssessmentForm({...assessmentForm, additional_info: e.target.value})}
-                        placeholder="Anotações extras..."
-                        className="resize-none min-h-[50px] text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 pt-2">
-                    <Label className="text-sm font-medium">Resumo Profissional</Label>
-                    <Textarea 
-                      value={assessmentForm.professional_summary || ''} 
-                      onChange={e => setAssessmentForm({...assessmentForm, professional_summary: e.target.value})}
-                      placeholder="Resumo das principais qualificações e objetivos teóricos ou de carreira..."
-                      className="resize-none min-h-[90px]"
-                    />
-                  </div>
-
-                  {/* FORMAÇÃO ACADÊMICA E CURSOS */}
-                  <div className="space-y-3 pt-3 border-t">
-                    <div className="flex justify-between items-center">
-                      <Label className="text-sm font-semibold text-foreground">Formação Acadêmica & Cursos</Label>
-                      <Button 
-                        type="button" 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => setAssessmentForm(p => ({
-                          ...p, 
-                          academic_list: [
-                            ...(p.academic_list || []), 
-                            { id: String(Date.now()), course: "", institution: "", start_date: "", end_date: "", in_progress: false }
-                          ]
-                        }))}
-                        className="h-8 gap-1.5 text-xs font-medium border-primary/30 text-primary hover:bg-primary/10"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Adicionar Formação
-                      </Button>
-                    </div>
-
-                    {(assessmentForm.academic_list || []).length === 0 ? (
-                      <div className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg bg-muted/10">
-                        Nenhuma formação cadastrada. Clique em &quot;+ Adicionar Formação&quot; para registrar cursos e graduações do candidato.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {(assessmentForm.academic_list || []).map((ac, idx) => (
-                          <div key={ac.id || idx} className="p-3.5 border rounded-lg bg-muted/20 space-y-3 relative group">
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1 space-y-1">
-                                <Label className="text-xs text-muted-foreground">Graduação / Curso</Label>
-                                <Input 
-                                  value={ac.course || ""} 
-                                  onChange={e => {
-                                    const list = [...(assessmentForm.academic_list || [])];
-                                    list[idx] = { ...list[idx], course: e.target.value };
-                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
-                                  }}
-                                  placeholder="Ex: Psicologia Clínica e Organizacional"
-                                  className="h-9 font-medium"
-                                />
-                              </div>
-                              <div className="flex-1 space-y-1">
-                                <Label className="text-xs text-muted-foreground">Instituição</Label>
-                                <Input 
-                                  value={ac.institution || ""} 
-                                  onChange={e => {
-                                    const list = [...(assessmentForm.academic_list || [])];
-                                    list[idx] = { ...list[idx], institution: e.target.value };
-                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
-                                  }}
-                                  placeholder="Ex: UFPEL / PUCRS"
-                                  className="h-9"
-                                />
-                              </div>
-                              <div className="pt-5">
-                                <Button 
-                                  type="button" 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  onClick={() => {
-                                    const list = (assessmentForm.academic_list || []).filter((_, i) => i !== idx);
-                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
-                                  }}
-                                  className="h-9 w-9 text-destructive hover:bg-destructive/10 shrink-0"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="w-1/3 space-y-1">
-                                <Label className="text-xs text-muted-foreground">Data de Início</Label>
-                                <Input 
-                                  value={ac.start_date || ""} 
-                                  onChange={e => {
-                                    const list = [...(assessmentForm.academic_list || [])];
-                                    list[idx] = { ...list[idx], start_date: e.target.value };
-                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
-                                  }}
-                                  placeholder="Ex: 2011 ou 03/2011"
-                                  className="h-8 text-xs"
-                                />
-                              </div>
-                              <div className="w-1/3 space-y-1">
-                                <Label className="text-xs text-muted-foreground">Data de Finalização</Label>
-                                <Input 
-                                  value={ac.end_date || ""} 
-                                  disabled={ac.in_progress}
-                                  onChange={e => {
-                                    const list = [...(assessmentForm.academic_list || [])];
-                                    list[idx] = { ...list[idx], end_date: e.target.value };
-                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
-                                  }}
-                                  placeholder={ac.in_progress ? "Em andamento" : "Ex: 2015 ou 12/2015"}
-                                  className="h-8 text-xs disabled:opacity-50"
-                                />
-                              </div>
-                              <div className="flex items-center space-x-2 pt-5">
-                                <Checkbox 
-                                  id={`in-progress-${idx}`} 
-                                  checked={Boolean(ac.in_progress)}
-                                  onCheckedChange={(checked) => {
-                                    const list = [...(assessmentForm.academic_list || [])];
-                                    list[idx] = { ...list[idx], in_progress: Boolean(checked), end_date: checked ? "" : list[idx].end_date };
-                                    setAssessmentForm(p => ({ ...p, academic_list: list }));
-                                  }}
-                                />
-                                <Label htmlFor={`in-progress-${idx}`} className="text-xs cursor-pointer font-normal text-muted-foreground">
-                                  Em andamento
-                                </Label>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* HISTÓRICO PROFISSIONAL E EXPERIÊNCIAS */}
-                  <div className="space-y-3 pt-3 border-t">
-                    <div className="flex justify-between items-center">
-                      <Label className="text-sm font-semibold text-foreground">Histórico Profissional / Experiências</Label>
-                      <Button 
-                        type="button" 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => setAssessmentForm(p => ({
-                          ...p, 
-                          experience_list: [
-                            ...(p.experience_list || []), 
-                            { id: String(Date.now()), role: "", company: "", start_date: "", end_date: "", is_current: false, description: "" }
-                          ]
-                        }))}
-                        className="h-8 gap-1.5 text-xs font-medium border-primary/30 text-primary hover:bg-primary/10"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Adicionar Experiência
-                      </Button>
-                    </div>
-
-                    {(assessmentForm.experience_list || []).length === 0 ? (
-                      <div className="space-y-3">
-                        <div className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg bg-muted/10">
-                          Nenhum histórico profissional estruturado. Clique em &quot;+ Adicionar Experiência&quot; para incluir cargos, empresas e períodos.
-                        </div>
-                        {assessmentForm.experience_summary && (
-                          <div className="space-y-1 pt-1">
-                            <Label className="text-xs text-muted-foreground">Resumo Legado / Anotações Gerais de Experiência</Label>
-                            <Textarea 
-                              value={assessmentForm.experience_summary || ""} 
-                              onChange={e => setAssessmentForm({...assessmentForm, experience_summary: e.target.value})}
-                              placeholder="Descreva os cargos, empresas, períodos e principais atividades desenvolvidas..."
-                              className="resize-none min-h-[90px] text-xs"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {(assessmentForm.experience_list || []).map((ex, idx) => (
-                          <div key={ex.id || idx} className="p-4 border rounded-lg bg-muted/20 space-y-3 relative group">
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1 space-y-1">
-                                <Label className="text-xs text-muted-foreground">Cargo / Função</Label>
-                                <Input 
-                                  value={ex.role || ""} 
-                                  onChange={e => {
-                                    const list = [...(assessmentForm.experience_list || [])];
-                                    list[idx] = { ...list[idx], role: e.target.value };
-                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
-                                  }}
-                                  placeholder="Ex: Psicólogo Clínico / Responsável Técnico"
-                                  className="h-9 font-medium"
-                                />
-                              </div>
-                              <div className="flex-1 space-y-1">
-                                <Label className="text-xs text-muted-foreground">Empresa / Instituição</Label>
-                                <Input 
-                                  value={ex.company || ""} 
-                                  onChange={e => {
-                                    const list = [...(assessmentForm.experience_list || [])];
-                                    list[idx] = { ...list[idx], company: e.target.value };
-                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
-                                  }}
-                                  placeholder="Ex: Vínculos Centro Especializado de Saúde"
-                                  className="h-9"
-                                />
-                              </div>
-                              <div className="pt-5">
-                                <Button 
-                                  type="button" 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  onClick={() => {
-                                    const list = (assessmentForm.experience_list || []).filter((_, i) => i !== idx);
-                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
-                                  }}
-                                  className="h-9 w-9 text-destructive hover:bg-destructive/10 shrink-0"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="w-1/3 space-y-1">
-                                <Label className="text-xs text-muted-foreground">Data de Início (Mês/Ano)</Label>
-                                <Input 
-                                  value={ex.start_date || ""} 
-                                  onChange={e => {
-                                    const list = [...(assessmentForm.experience_list || [])];
-                                    list[idx] = { ...list[idx], start_date: e.target.value };
-                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
-                                  }}
-                                  placeholder="Ex: 08/2022"
-                                  className="h-8 text-xs"
-                                />
-                              </div>
-                              <div className="w-1/3 space-y-1">
-                                <Label className="text-xs text-muted-foreground">Data de Saída / Conclusão</Label>
-                                <Input 
-                                  value={ex.end_date || ""} 
-                                  disabled={ex.is_current}
-                                  onChange={e => {
-                                    const list = [...(assessmentForm.experience_list || [])];
-                                    list[idx] = { ...list[idx], end_date: e.target.value };
-                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
-                                  }}
-                                  placeholder={ex.is_current ? "Atualmente no cargo" : "Ex: 05/2024"}
-                                  className="h-8 text-xs disabled:opacity-50"
-                                />
-                              </div>
-                              <div className="flex items-center space-x-2 pt-5">
-                                <Checkbox 
-                                  id={`is-current-${idx}`} 
-                                  checked={Boolean(ex.is_current)}
-                                  onCheckedChange={(checked) => {
-                                    const list = [...(assessmentForm.experience_list || [])];
-                                    list[idx] = { ...list[idx], is_current: Boolean(checked), end_date: checked ? "" : list[idx].end_date };
-                                    setAssessmentForm(p => ({ ...p, experience_list: list }));
-                                  }}
-                                />
-                                <Label htmlFor={`is-current-${idx}`} className="text-xs cursor-pointer font-normal text-muted-foreground">
-                                  Atual / Até o momento
-                                </Label>
-                              </div>
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs text-muted-foreground">Descrição das Atividades & Conquistas</Label>
-                              <Textarea 
-                                value={ex.description || ""}
-                                onChange={e => {
-                                  const list = [...(assessmentForm.experience_list || [])];
-                                  list[idx] = { ...list[idx], description: e.target.value };
-                                  setAssessmentForm(p => ({ ...p, experience_list: list }));
-                                }}
-                                placeholder="Descreva as responsabilidades e atividades no cargo (ex: Psicoterapia de orientação analítica, gestão do quadro...)"
-                                className="resize-none min-h-[70px] text-xs"
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center gap-2 pt-4 border-t mt-auto shrink-0 flex-wrap">
-                <div className="flex items-center gap-2">
-                  {editingId && activeTab === "avaliacao" && (
-                    <>
-                      <Button type="button" variant="secondary" onClick={exportParecer} className="gap-2">
-                        <FileText className="h-4 w-4" />
-                        Exportar .txt
-                      </Button>
-                      <Button type="button" variant="outline" onClick={printParecer} className="gap-2 text-primary border-primary/50 hover:bg-primary/10">
-                        🖨️ Imprimir / PDF
-                      </Button>
-                    </>
-                  )}
-                  {editingId && (
-                    <Button type="button" variant="destructive" onClick={() => handleDelete(editingId)} className="gap-2">
-                      <Trash2 className="h-4 w-4" />
-                      Excluir
-                    </Button>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-                  <Button type="submit" disabled={saving}>
-                    {saving ? "Salvando..." : "Salvar Entrevista"}
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
+        <CandidateProfileModal 
+          interviewId={editingId || null}
+          initialData={!editingId ? {
+            full_name: form.candidate_name,
+            email: form.email,
+            phone: form.phone,
+            role_interest: form.role,
+            ...assessmentForm
+          } : undefined}
+          initialAssessmentData={!editingId ? assessmentForm : undefined}
+          isEditable={true}
+          defaultEditMode={true}
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleModalSave}
+        />
       )}
       {/* Modal Leitura Currículo */}
       {isResumeModalOpen && (
