@@ -8,9 +8,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { 
   X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, 
   Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, 
-  Info, Heart, DollarSign, Users, ChevronRight, Edit2, Save, History, FileCheck
+  Info, Heart, DollarSign, Users, ChevronRight, Edit2, Save, History, FileCheck, FileUp
 } from "lucide-react";
 import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
+import * as pdfjsLib from "pdfjs-dist";
+import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
+
+if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+}
 
 type BigFiveResult = {
   id: string;
@@ -155,6 +161,97 @@ export function CandidateProfileModal({
   const [assessmentData, setAssessmentData] = useState<any>(initialAssessmentData || {});
   const [isEditing, setIsEditing] = useState(defaultEditMode);
   const [isSaving, setIsSaving] = useState(false);
+  const [isParsingCv, setIsParsingCv] = useState(false);
+
+  const handleCVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsParsingCv(true);
+    let text = "";
+
+    try {
+      if (file.type === "application/pdf") {
+        const reader = new FileReader();
+        text = await new Promise<string>((resolve, reject) => {
+          reader.onload = async () => {
+            try {
+              const typedarray = new Uint8Array(reader.result as ArrayBuffer);
+              const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+              let extracted = "";
+              for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                extracted += itemsToText(content.items) + "\n";
+              }
+              resolve(extracted);
+            } catch (err) {
+              reject(err);
+            }
+          };
+          reader.onerror = reject;
+          reader.readAsArrayBuffer(file);
+        });
+      } else if (file.type === "text/plain") {
+        const reader = new FileReader();
+        text = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsText(file);
+        });
+      }
+
+      if (!text) throw new Error("Texto vazio");
+
+      let parsed = null;
+      try {
+        const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+        if (!apiKey) throw new Error("Chave não configurada");
+
+        const prompt = `Extraia os seguintes dados do currículo abaixo e retorne APENAS um JSON válido, sem crases, sem markdown, no formato:
+{ "name": "Nome", "email": "Email", "phone": "Telefone", "role": "Cargo", "city": "Cidade", "state": "Estado" }
+Texto:
+${text.substring(0, 5000)}`;
+
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1 }
+          })
+        });
+
+        if (!res.ok) throw new Error("Erro na API Gemini");
+        const json = await res.json();
+        let rawStr = json.candidates[0].content.parts[0].text;
+        rawStr = rawStr.replace(/```json\n?|\n?```/g, "").trim();
+        parsed = JSON.parse(rawStr);
+        
+      } catch (aiError) {
+        console.warn("Erro na IA, usando analisador local", aiError);
+        parsed = parseSolidesResume(text);
+      }
+
+      if (parsed) {
+        setFormData(prev => ({
+          ...prev,
+          full_name: parsed.name || prev.full_name,
+          email: parsed.email || prev.email,
+          phone: parsed.phone || prev.phone,
+          role: parsed.role || prev.role,
+          city: parsed.city || parsed.location?.split("-")[0]?.trim() || prev.city,
+          state: parsed.state || parsed.location?.split("-")[1]?.trim() || prev.state,
+        }));
+      }
+
+    } catch (err) {
+      alert("Erro ao ler o currículo.");
+    } finally {
+      setIsParsingCv(false);
+      e.target.value = '';
+    }
+  };
   
   const [results, setResults] = useState<BigFiveResult[]>([]);
   const [interviews, setInterviews] = useState<ProfileInterview[]>([]);
@@ -420,9 +517,17 @@ export function CandidateProfileModal({
               </Button>
             )}
             {isEditing && (
-              <Button onClick={handleSave} size="sm" className="gap-2" disabled={isSaving}>
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar
-              </Button>
+              <>
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium transition-colors bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 h-9 px-3 rounded-md">
+                  {isParsingCv ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                  Ler Currículo
+                  <input type="file" accept=".pdf,.txt" className="hidden" onChange={handleCVUpload} disabled={isParsingCv} />
+                </label>
+                <Button onClick={handleSave} disabled={isSaving} size="sm" className="gap-2">
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Salvar
+                </Button>
+              </>
             )}
             <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-muted">
               <X className="h-5 w-5" />
