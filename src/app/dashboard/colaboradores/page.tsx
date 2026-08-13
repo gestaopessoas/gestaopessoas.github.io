@@ -64,7 +64,7 @@ const SENIORITY_LEVEL_MAP: Record<string, string[]> = {
   "Diretoria": ["Diretoria"],
 };
 
-const ALL_LEVELS = ["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Nível VIII", "Nível IX", "Nível X", "Nível XI", "Nível XII", "Nível XIII", "Nível XIV", "Nível XV", "Diretoria"];
+const ALL_LEVELS = ["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Nível VIII", "Nível IX", "Nível X", "Nível XI", "Nível XII", "Nível XIII", "Nível XIV", "Nível XV", "Diretoria", "N/A (Não aplicavel)"];
 
 const MIN_AGE_YEARS = 14;
 const todayIso = () => new Date().toISOString().split("T")[0];
