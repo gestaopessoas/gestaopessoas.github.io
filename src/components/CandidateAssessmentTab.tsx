@@ -108,7 +108,7 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
           <SheetTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-8 px-3">
             Ver Roteiro Sugerido
           </SheetTrigger>
-          <SheetContent className="sm:max-w-md overflow-y-auto border-l">
+          <SheetContent className="sm:max-w-md overflow-y-auto border-l z-[100] sm:max-w-[500px]" side="right">
             <SheetHeader className="mb-6">
               <SheetTitle>Roteiro de Entrevista (STAR)</SheetTitle>
               <SheetDescription>
@@ -195,13 +195,16 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
               {SOFT_SKILLS.map(skill => (
                 <div key={skill.id} className="flex items-center justify-between">
                   <span className="text-sm font-medium">{skill.label}</span>
-                  <Input 
-                    type="number" 
-                    min="0" max="5" 
-                    className="w-20"
-                    value={assessmentData[skill.id] || ""} 
-                    onChange={(e) => onChange(skill.id, e.target.value)} 
-                  />
+                  <div className="flex items-center gap-2 w-32">
+                    <Input 
+                      type="range" 
+                      min="0" max="5" step="1"
+                      className="w-full h-2 cursor-pointer p-0 border-0"
+                      value={assessmentData[skill.id] || "0"} 
+                      onChange={(e) => onChange(skill.id, e.target.value)} 
+                    />
+                    <span className="text-xs font-bold w-4 text-center">{assessmentData[skill.id] || "0"}</span>
+                  </div>
                 </div>
               ))}
             </div>
