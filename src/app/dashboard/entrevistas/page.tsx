@@ -110,6 +110,7 @@ type Assessment = {
   gender_identity?: string;
   sexual_orientation?: string;
   race_declaration?: string;
+  languages?: string;
   additional_info?: string;
   personal_info?: string;
   diversity_info?: string;
@@ -128,6 +129,22 @@ type Interview = {
   assessment: Assessment | null;
   created_at: string;
   updated_at?: string;
+  birth_date?: string | null;
+  cpf?: string | null;
+  marital_status?: string | null;
+  birthplace?: string | null;
+  gender?: string | null;
+  gender_identity?: string | null;
+  sexual_orientation?: string | null;
+  race_declaration?: string | null;
+  salary_expectation?: string | null;
+  has_cnh?: boolean | null;
+  cnh_category?: string | null;
+  languages?: string | null;
+  has_dependents?: boolean | null;
+  dependents_count?: number | null;
+  uniform_size?: string | null;
+  boot_size?: string | null;
 };
 
 const statusStyle: Record<string, string> = {
@@ -1033,6 +1050,22 @@ Resultado Final: ${form.result || "N/C"}
       ...Object.fromEntries(
         Object.entries(form).map(([key, value]) => [key, value.trim() || null])
       ),
+      birth_date: assessmentForm.birth_date || null,
+      cpf: assessmentForm.cpf || null,
+      marital_status: assessmentForm.marital_status || null,
+      birthplace: assessmentForm.birthplace || null,
+      gender: assessmentForm.gender || null,
+      gender_identity: assessmentForm.gender_identity || null,
+      sexual_orientation: assessmentForm.sexual_orientation || null,
+      race_declaration: assessmentForm.race_declaration || null,
+      salary_expectation: assessmentForm.salary_expectation || null,
+      has_cnh: assessmentForm.has_cnh ?? null,
+      cnh_category: assessmentForm.cnh_category || null,
+      languages: assessmentForm.languages || null,
+      has_dependents: assessmentForm.has_dependents ?? null,
+      dependents_count: assessmentForm.dependents_count ?? null,
+      uniform_size: assessmentForm.uniform_size || null,
+      boot_size: assessmentForm.boot_size || null,
       assessment: assessmentForm,
       updated_at: new Date().toISOString()
     };
@@ -1058,7 +1091,7 @@ Resultado Final: ${form.result || "N/C"}
     if (isSuccess) {
       // Se Aprovado ou Banco de Talentos, joga pra central do candidato automaticamente
       // O payload nasce de Object.fromEntries, então o TS perde os nomes das colunas.
-      const payloadAny = payload as unknown as Record<string, string | null>;
+      const payloadAny = payload as unknown as Record<string, any>;
       if ((payloadAny.result === "Aprovado" || payloadAny.result === "Banco de Talentos") && payloadAny.candidate_name) {
         const parts = payloadAny.candidate_name.split(" ");
         const tag = payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : "Banco de Talentos";
@@ -1072,7 +1105,22 @@ Resultado Final: ${form.result || "N/C"}
           role_interest: payloadAny.role,
           city: assessmentForm.worksite || "",
           available_worksites: assessmentForm.worksite_type === "all" ? ["Todas as Obras"] : (assessmentForm.available_worksites || []),
-          search_tags: [tag, assessmentForm.selection_stage || "Importado de Entrevistas"].filter(Boolean)
+          search_tags: [tag, assessmentForm.selection_stage || "Importado de Entrevistas"].filter(Boolean),
+          birth_date: assessmentForm.birth_date || null,
+          cpf: assessmentForm.cpf || null,
+          marital_status: assessmentForm.marital_status || null,
+          birthplace: assessmentForm.birthplace || null,
+          gender_identity: assessmentForm.gender_identity || null,
+          sexual_orientation: assessmentForm.sexual_orientation || null,
+          race_declaration: assessmentForm.race_declaration || null,
+          salary_expectation: assessmentForm.salary_expectation || null,
+          has_cnh: assessmentForm.has_cnh ?? null,
+          cnh_categories: assessmentForm.cnh_category ? [assessmentForm.cnh_category] : [],
+          languages: assessmentForm.languages || null,
+          has_dependents: assessmentForm.has_dependents ?? null,
+          dependents_count: assessmentForm.dependents_count ?? null,
+          uniform_size: assessmentForm.uniform_size || null,
+          boot_size: assessmentForm.boot_size || null
         });
         
         if (insertError) {
@@ -1372,7 +1420,26 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
       status: interview.status || "Aguardando",
       result: interview.result || "N/C",
     });
-    setAssessmentForm(interview.assessment || defaultAssessment);
+    const assessment = interview.assessment || defaultAssessment;
+    setAssessmentForm({
+      ...assessment,
+      birth_date: interview.birth_date ?? assessment.birth_date,
+      cpf: interview.cpf ?? assessment.cpf,
+      marital_status: interview.marital_status ?? assessment.marital_status,
+      birthplace: interview.birthplace ?? assessment.birthplace,
+      gender: interview.gender ?? assessment.gender,
+      gender_identity: interview.gender_identity ?? assessment.gender_identity,
+      sexual_orientation: interview.sexual_orientation ?? assessment.sexual_orientation,
+      race_declaration: interview.race_declaration ?? assessment.race_declaration,
+      salary_expectation: interview.salary_expectation ?? assessment.salary_expectation,
+      has_cnh: interview.has_cnh ?? assessment.has_cnh,
+      cnh_category: interview.cnh_category ?? assessment.cnh_category,
+      languages: interview.languages ?? assessment.languages,
+      has_dependents: interview.has_dependents ?? assessment.has_dependents,
+      dependents_count: interview.dependents_count ?? assessment.dependents_count,
+      uniform_size: interview.uniform_size ?? assessment.uniform_size,
+      boot_size: interview.boot_size ?? assessment.boot_size,
+    });
     setActiveTab("dados");
     setIsModalOpen(true);
   };
@@ -2102,35 +2169,215 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
                     />
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2 pt-2">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Informações Pessoais</Label>
-                      <Textarea 
-                        value={assessmentForm.personal_info || ''} 
-                        onChange={e => setAssessmentForm({...assessmentForm, personal_info: e.target.value})}
-                        placeholder="Ex: Nascimento, Gênero, Estado civil..."
-                        className="resize-none min-h-[70px]"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Diversidade</Label>
-                      <Textarea 
-                        value={assessmentForm.diversity_info || ''} 
-                        onChange={e => setAssessmentForm({...assessmentForm, diversity_info: e.target.value})}
-                        placeholder="Ex: Raça/cor, Orientação..."
-                        className="resize-none min-h-[70px]"
-                      />
+                  <div className="space-y-4 pt-4 border-t">
+                    <Label className="text-sm font-semibold text-foreground">Informações Pessoais</Label>
+                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Data de Nascimento</Label>
+                        <Input 
+                          type="date"
+                          value={assessmentForm.birth_date || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, birth_date: e.target.value})}
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">CPF</Label>
+                        <Input 
+                          value={assessmentForm.cpf || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, cpf: e.target.value})}
+                          placeholder="000.000.000-00"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Estado Civil</Label>
+                        <select 
+                          value={assessmentForm.marital_status || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, marital_status: e.target.value})}
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="Solteiro(a)">Solteiro(a)</option>
+                          <option value="Casado(a)">Casado(a)</option>
+                          <option value="Divorciado(a)">Divorciado(a)</option>
+                          <option value="Viúvo(a)">Viúvo(a)</option>
+                          <option value="União Estável">União Estável</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Naturalidade (Cidade/Estado)</Label>
+                        <Input 
+                          value={assessmentForm.birthplace || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, birthplace: e.target.value})}
+                          placeholder="Ex: Pelotas/RS"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Gênero</Label>
+                        <select 
+                          value={assessmentForm.gender || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, gender: e.target.value})}
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="Masculino">Masculino</option>
+                          <option value="Feminino">Feminino</option>
+                          <option value="Outro">Outro</option>
+                          <option value="Prefiro não informar">Prefiro não informar</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2 pt-2">
-                    <Label className="text-sm font-medium">Informações Adicionais</Label>
-                    <Textarea 
-                      value={assessmentForm.additional_info || ''} 
-                      onChange={e => setAssessmentForm({...assessmentForm, additional_info: e.target.value})}
-                      placeholder="Ex: Pretensão salarial, Possui CNH, etc..."
-                      className="resize-none min-h-[70px]"
-                    />
+                  <div className="space-y-4 pt-4 border-t">
+                    <Label className="text-sm font-semibold text-foreground">Diversidade</Label>
+                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Identidade de Gênero</Label>
+                        <select 
+                          value={assessmentForm.gender_identity || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, gender_identity: e.target.value})}
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="Cisgênero">Cisgênero</option>
+                          <option value="Transgênero">Transgênero</option>
+                          <option value="Não-binário">Não-binário</option>
+                          <option value="Prefiro não informar">Prefiro não informar</option>
+                          <option value="Outro">Outro</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Orientação Sexual</Label>
+                        <select 
+                          value={assessmentForm.sexual_orientation || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, sexual_orientation: e.target.value})}
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="Heterossexual">Heterossexual</option>
+                          <option value="Homossexual">Homossexual</option>
+                          <option value="Bissexual">Bissexual</option>
+                          <option value="Pansexual">Pansexual</option>
+                          <option value="Assexual">Assexual</option>
+                          <option value="Prefiro não informar">Prefiro não informar</option>
+                          <option value="Outro">Outro</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Raça/Cor</Label>
+                        <select 
+                          value={assessmentForm.race_declaration || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, race_declaration: e.target.value})}
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="Branca">Branca</option>
+                          <option value="Preta">Preta</option>
+                          <option value="Parda">Parda</option>
+                          <option value="Amarela">Amarela</option>
+                          <option value="Indígena">Indígena</option>
+                          <option value="Prefiro não informar">Prefiro não informar</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t">
+                    <Label className="text-sm font-semibold text-foreground">Informações Adicionais</Label>
+                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Pretensão Salarial</Label>
+                        <Input 
+                          value={assessmentForm.salary_expectation || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, salary_expectation: e.target.value})}
+                          placeholder="Ex: R$ 2.500,00"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">CNH</Label>
+                        <div className="flex gap-2">
+                          <select 
+                            value={assessmentForm.has_cnh === true ? "Sim" : assessmentForm.has_cnh === false ? "Não" : ""} 
+                            onChange={e => setAssessmentForm({...assessmentForm, has_cnh: e.target.value === "Sim" ? true : e.target.value === "Não" ? false : undefined})}
+                            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                          >
+                            <option value="">...</option>
+                            <option value="Sim">Sim</option>
+                            <option value="Não">Não</option>
+                          </select>
+                          <Input 
+                            value={assessmentForm.cnh_category || ''} 
+                            onChange={e => setAssessmentForm({...assessmentForm, cnh_category: e.target.value.toUpperCase()})}
+                            placeholder="Cat. (Ex: AB)"
+                            className="h-9 text-sm flex-1"
+                            disabled={assessmentForm.has_cnh === false}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Idiomas</Label>
+                        <Input 
+                          value={assessmentForm.languages || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, languages: e.target.value})}
+                          placeholder="Ex: Inglês Intermediário"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Filhos / Dependentes</Label>
+                        <div className="flex gap-2">
+                          <select 
+                            value={assessmentForm.has_dependents === true ? "Sim" : assessmentForm.has_dependents === false ? "Não" : ""} 
+                            onChange={e => setAssessmentForm({...assessmentForm, has_dependents: e.target.value === "Sim" ? true : e.target.value === "Não" ? false : undefined})}
+                            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                          >
+                            <option value="">...</option>
+                            <option value="Sim">Sim</option>
+                            <option value="Não">Não</option>
+                          </select>
+                          <Input 
+                            type="number"
+                            min="0"
+                            value={assessmentForm.dependents_count || ''} 
+                            onChange={e => setAssessmentForm({...assessmentForm, dependents_count: parseInt(e.target.value) || 0})}
+                            placeholder="Qtd"
+                            className="h-9 text-sm flex-1"
+                            disabled={assessmentForm.has_dependents === false}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Tamanho Uniforme</Label>
+                        <Input 
+                          value={assessmentForm.uniform_size || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, uniform_size: e.target.value.toUpperCase()})}
+                          placeholder="Ex: M / 42"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Tamanho Calçado/Bota</Label>
+                        <Input 
+                          value={assessmentForm.boot_size || ''} 
+                          onChange={e => setAssessmentForm({...assessmentForm, boot_size: e.target.value})}
+                          placeholder="Ex: 40"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2 mt-2">
+                      <Label className="text-xs text-muted-foreground">Outras Informações Adicionais</Label>
+                      <Textarea 
+                        value={assessmentForm.additional_info || ''} 
+                        onChange={e => setAssessmentForm({...assessmentForm, additional_info: e.target.value})}
+                        placeholder="Anotações extras..."
+                        className="resize-none min-h-[50px] text-sm"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2 pt-2">
