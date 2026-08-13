@@ -27,7 +27,7 @@ export default function AnalyticsPage() {
     const load = async () => {
       const supabase = createClient();
       const [employeeResult, requestResult, candidateResult, applicationResult, openingResult] = await Promise.all([
-        supabase.from("employees").select("id,status,workplaces(name),cost_centers(name)").limit(10000),
+        supabase.from("employees").select("id,status,workplaces(name),cost_centers(name:code)").limit(10000),
         supabase.from("job_requests").select("id,status,urgency,created_at").limit(10000),
         supabase.from("candidates").select("id,created_at,role_interest").limit(10000),
         supabase.from("job_applications").select("id,status,created_at").limit(10000),

@@ -140,7 +140,7 @@ export default function ColaboradoresPage() {
     Promise.all([
       supabase.from("departments").select("id, name").order("name"),
       supabase.from("companies").select("id, name, trading_name, tax_rate_clt, tax_rate_prolabore").order("name"),
-      supabase.from("cost_centers").select("id, name").order("name"),
+      supabase.from("cost_centers").select("id, name:code").order("code"),
       supabase.from("workplaces").select("id, name, type").order("name"),
       supabase.from("job_profiles").select("title"),
       supabase.from("salary_table").select("id, role_name, modality, level, salary, uses_level, salary_experience, salary_after_probation")
@@ -187,7 +187,7 @@ export default function ColaboradoresPage() {
       const supabase = createClient();
       let request = supabase
         .from("employees")
-        .select(`${fields}, departments(name), companies(name, trading_name), cost_centers(name), workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)`, { count: "exact" })
+        .select(`${fields}, departments(name), companies(name, trading_name), cost_centers(name:code), workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)`, { count: "exact" })
         .order("name")
         .range(page * pageSize, page * pageSize + pageSize - 1);
       

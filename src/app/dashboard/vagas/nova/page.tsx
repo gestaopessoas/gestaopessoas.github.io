@@ -449,7 +449,7 @@ export default function NovaVagaPage() {
                 <select value={form.unit} onChange={(event) => handleUnitChange(event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                   <option value="">Selecione...</option>
                   {costCenters.map(cc => (
-                    <option key={cc.id} value={cc.name}>{cc.name} ({cc.code})</option>
+                    <option key={cc.id} value={cc.name}>{cc.code}</option>
                   ))}
                 </select>
               </Field>

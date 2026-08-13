@@ -257,11 +257,11 @@ export default function MPGeneratorPage() {
 
       const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes] = await Promise.all([
         supabase.from("employees")
-          .select("id, name, phone, email_corporate, unit, cost_center_id, departments(name), cost_centers(name), role, level, contract_type, base_salary, profile_code, status")
+          .select("id, name, phone, email_corporate, unit, cost_center_id, departments(name), cost_centers(name:code), role, level, contract_type, base_salary, profile_code, status")
           .eq("status", "Ativo") // Somente colaboradores ativos, exclui Arquivo Morto e Inativos
           .order("name"),
         supabase.from("workplaces").select("id, name").order("name"),
-        supabase.from("cost_centers").select("id, name").order("name"),
+        supabase.from("cost_centers").select("id, name:code").order("code"),
         supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle(),
         supabase.from("mp_history").select("*, profiles:created_by(full_name), employees:employee_id(name)").order("created_at", { ascending: false }),
         supabase.from("departments").select("id, name").order("name")
