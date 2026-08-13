@@ -45,8 +45,8 @@ type Employee = {
   phone?: string;
   email_corporate?: string;
   unit?: string;
-  department_id?: string;
-  departments?: { name: string };
+  sector_id?: string;
+  sectors?: { name: string };
   cost_center_id?: string;
   cost_centers?: { name: string };
   role?: string;
@@ -110,7 +110,7 @@ function isAnalystOrAbove(role: string | undefined): boolean {
 export default function MPGeneratorPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [workplaces, setWorkplaces] = useState<Entity[]>([]);
-  const [departments, setDepartments] = useState<Entity[]>([]);
+  const [sectors, setSectors] = useState<Entity[]>([]);
   const [costCenters, setCostCenters] = useState<Entity[]>([]);
   const [workSchedules, setWorkSchedules] = useState<string[]>([]);
   
@@ -257,20 +257,20 @@ export default function MPGeneratorPage() {
 
       const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes] = await Promise.all([
         supabase.from("employees")
-          .select("id, name, phone, email_corporate, unit, cost_center_id, departments(name), cost_centers(name:code), role, level, contract_type, base_salary, profile_code, status")
+          .select("id, name, phone, email_corporate, unit, cost_center_id, sectors(name), cost_centers(name:code), role, level, contract_type, base_salary, profile_code, status")
           .eq("status", "Ativo") // Somente colaboradores ativos, exclui Arquivo Morto e Inativos
           .order("name"),
         supabase.from("workplaces").select("id, name").order("name"),
         supabase.from("cost_centers").select("id, name:code").order("code"),
         supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle(),
         supabase.from("mp_history").select("*, profiles:created_by(full_name), employees:employee_id(name)").order("created_at", { ascending: false }),
-        supabase.from("departments").select("id, name").order("name")
+        supabase.from("sectors").select("id, name").order("name")
       ]);
 
       if (empsRes.data) setEmployees((empsRes.data as unknown as Employee[]).filter(e => e.status === "Ativo" || !e.status));
       if (wpRes.data) setWorkplaces(wpRes.data as Entity[]);
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
-      if (depRes.data) setDepartments(depRes.data as Entity[]);
+      if (depRes.data) setSectors(depRes.data as Entity[]);
       let scheds: string[] = [];
       if (Array.isArray(settingsRes.data?.value)) scheds = settingsRes.data.value;
       else if (typeof settingsRes.data?.value === "string") { try { scheds = JSON.parse(settingsRes.data.value); } catch {} }
@@ -303,7 +303,7 @@ export default function MPGeneratorPage() {
         setPhone(emp.phone || "");
         setEmail(emp.email_corporate || "");
         setLocation(emp.unit || location);
-        setSector(emp.departments?.name || "");
+        setSector(emp.sectors?.name || "");
         setCostCenterId(emp.cost_center_id || "");
 
         // Auto-match to salary table cascata
@@ -440,7 +440,7 @@ export default function MPGeneratorPage() {
             role: selectedEmployee?.role || "-",
             level: selectedEmployee?.level || "-",
             location: selectedEmployee?.unit || "-",
-            sector: selectedEmployee?.departments?.name || "-",
+            sector: selectedEmployee?.sectors?.name || "-",
             costCenter: selectedEmployee?.cost_centers?.name || "-",
             profileCode: selectedEmployee?.profile_code || "-",
             modality: selectedEmployee?.contract_type || "-",
@@ -583,7 +583,7 @@ export default function MPGeneratorPage() {
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {departments.map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
+                      {sectors.map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -796,7 +796,7 @@ export default function MPGeneratorPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Setor</Label>
-                    <Input value={selectedEmployee?.departments?.name || "-"} readOnly />
+                    <Input value={selectedEmployee?.sectors?.name || "-"} readOnly />
                   </div>
                   
                   <div className="space-y-2">
@@ -876,7 +876,7 @@ export default function MPGeneratorPage() {
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments.map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
+                        {sectors.map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
