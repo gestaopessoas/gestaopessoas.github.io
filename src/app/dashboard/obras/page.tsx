@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, HardHat, MapPin, Plus, Search, X, Download, Printer } from "lucide-react";
+import { Edit3, HardHat, MapPin, Plus, Search, X, Download, Printer, Archive } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useEffect, useMemo, useState } from "react";
 
 type Person = { id: string; name: string };
@@ -23,6 +24,7 @@ type Workplace = {
   address: string | null;
   coordinator_id?: string | null;
   responsible_director_id?: string | null;
+  status?: string | null;
   companies?: { name: string | null; trading_name?: string | null } | { name: string | null; trading_name?: string | null }[] | null;
   coordinator?: { name: string | null } | null;
   responsible_director?: { name: string | null } | null;
@@ -45,6 +47,8 @@ export default function ObrasPage() {
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [archiveId, setArchiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -57,7 +61,7 @@ export default function ObrasPage() {
       // ponytail: ilike para pegar "Diretor", "Diretor Comercial", "Diretor de Engenharia", etc. — exclui "Direto" pq não termina com "diretor"
       const [companyResult, workplaceResult, coordResult, dirResult] = await Promise.all([
         supabase.from("companies").select("id, name, trading_name").order("name"),
-        supabase.from("workplaces").select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").order("name"),
+        supabase.from("workplaces").select("id, company_id, name, type, address, coordinator_id, responsible_director_id, status, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").eq("status", "Ativo").order("name"),
         supabase.from("employees").select("id, name").eq("status", "Ativo").ilike("role", "%coordenador%").order("name"),
         supabase.from("employees").select("id, name").eq("status", "Ativo").ilike("role", "%diretor%").order("name"),
       ]);
@@ -112,6 +116,7 @@ export default function ObrasPage() {
     setEditingId(null);
     setForm(emptyForm);
     setError("");
+    setIsModalOpen(true);
   };
 
   const startEdit = (workplace: Workplace) => {
@@ -125,6 +130,7 @@ export default function ObrasPage() {
       responsible_director_id: workplace.responsible_director_id ?? "",
     });
     setError("");
+    setIsModalOpen(true);
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -143,8 +149,8 @@ export default function ObrasPage() {
 
     const supabase = createClient();
     const result = editingId
-      ? await supabase.from("workplaces").update(payload).eq("id", editingId).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single()
-      : await supabase.from("workplaces").insert(payload).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single();
+      ? await supabase.from("workplaces").update(payload).eq("id", editingId).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, status, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single()
+      : await supabase.from("workplaces").insert(payload).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, status, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single();
 
     setSaving(false);
     if (result.error) {
@@ -154,7 +160,22 @@ export default function ObrasPage() {
 
     const saved = result.data as unknown as Workplace;
     setWorkplaces((prev) => editingId ? prev.map((item) => item.id === editingId ? saved : item) : [...prev, saved].sort((a, b) => a.name.localeCompare(b.name)));
+    setIsModalOpen(false);
     startNew();
+  };
+
+  const archiveWorkplace = async () => {
+    if (!archiveId) return;
+    setSaving(true);
+    const supabase = createClient();
+    const { error } = await supabase.from("workplaces").update({ status: "Inativo" }).eq("id", archiveId);
+    setSaving(false);
+    if (error) {
+      setError(`Não foi possível arquivar a unidade: ${error.message}`);
+      return;
+    }
+    setWorkplaces(prev => prev.filter(w => w.id !== archiveId));
+    setArchiveId(null);
   };
 
   const exportToCsv = () => {
@@ -204,42 +225,68 @@ export default function ObrasPage() {
           <Metric label="Sedes/filiais" value={workplaces.filter((workplace) => workplace.type !== "OBRA").length} />
         </div>
 
-        <form onSubmit={save} className="rounded-lg border bg-card p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold">{editingId ? "Editar unidade" : "Adicionar unidade"}</h2>
-            {editingId && <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={startNew}><X className="h-4 w-4" /></Button>}
-          </div>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            <Field label="Nome *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
-            <Field label="Tipo">
-              <select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                {["OBRA", "SEDE", "FILIAL", "PLANTÃO DE VENDAS"].map((type) => <option key={type}>{type}</option>)}
-              </select>
-            </Field>
-            <Field label="Empresa vinculada">
-              <select value={form.company_id} onChange={(event) => setForm({ ...form, company_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                <option value="">Sem vínculo</option>
-                {companies.map((company) => <option key={company.id} value={company.id}>{company.trading_name || company.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Coordenador">
-              <select value={form.coordinator_id} onChange={(event) => setForm({ ...form, coordinator_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                <option value="">Selecione...</option>
-                {coordinatorsList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Diretor Responsável">
-              <select value={form.responsible_director_id} onChange={(event) => setForm({ ...form, responsible_director_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                <option value="">Selecione...</option>
-                {directorsList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Localização"><Input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>
-          </div>
-          <div className="mt-4 flex justify-end">
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
-          </div>
-        </form>
+        <Dialog open={isModalOpen} onOpenChange={(open) => {
+          setIsModalOpen(open);
+          if (!open) {
+            setEditingId(null);
+            setForm(emptyForm);
+            setError("");
+          }
+        }}>
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingId ? "Editar unidade" : "Adicionar unidade"}</DialogTitle>
+              <DialogDescription>Preencha os detalhes da unidade abaixo.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={save} className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <Field label="Nome *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
+                <Field label="Tipo">
+                  <select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    {["OBRA", "SEDE", "FILIAL", "PLANTÃO DE VENDAS"].map((type) => <option key={type}>{type}</option>)}
+                  </select>
+                </Field>
+                <Field label="Empresa vinculada">
+                  <select value={form.company_id} onChange={(event) => setForm({ ...form, company_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Sem vínculo</option>
+                    {companies.map((company) => <option key={company.id} value={company.id}>{company.trading_name || company.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Coordenador">
+                  <select value={form.coordinator_id} onChange={(event) => setForm({ ...form, coordinator_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Selecione...</option>
+                    {coordinatorsList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Diretor Responsável">
+                  <select value={form.responsible_director_id} onChange={(event) => setForm({ ...form, responsible_director_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Selecione...</option>
+                    {directorsList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Localização"><Input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={archiveId !== null} onOpenChange={(open) => { if (!open) setArchiveId(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirmar arquivamento</DialogTitle>
+              <DialogDescription>Tem certeza que deseja arquivar esta unidade? Ela não aparecerá mais na lista principal.</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setArchiveId(null)} disabled={saving}>Cancelar</Button>
+              <Button type="button" variant="destructive" disabled={saving} onClick={archiveWorkplace}>
+                {saving ? "Arquivando..." : "Arquivar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -255,7 +302,6 @@ export default function ObrasPage() {
                   <th className="px-4 py-3">Tipo</th>
                   <th className="px-4 py-3">Responsáveis</th>
                   <th className="px-4 py-3">Localização</th>
-                  <th className="px-4 py-3">Empresa vinculada</th>
                   <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
@@ -280,10 +326,9 @@ export default function ObrasPage() {
                         <MapPin className="h-3 w-3 shrink-0" /> {workplace.address || "-"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{companyName(workplace) || "-"}</td>
                     <td className="px-4 py-3 text-right">
-                      <Button variant="ghost" size="icon" className="h-7 w-7 mr-1" onClick={() => window.open(`/dashboard/obras/termo-uniforme?id=${workplace.id}`, '_blank')} title="Imprimir Lista de Uniformes">
-                        <Printer className="h-4 w-4 text-muted-foreground" />
+                      <Button variant="ghost" size="icon" className="h-7 w-7 mr-1" onClick={() => setArchiveId(workplace.id)} title="Arquivar">
+                        <Archive className="h-4 w-4 text-muted-foreground" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(workplace)} title="Editar">
                         <Edit3 className="h-4 w-4 text-muted-foreground" />
