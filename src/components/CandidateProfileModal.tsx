@@ -16,6 +16,7 @@ import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
 import { usePermissions } from "@/hooks/usePermissions";
 import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
 import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
+import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -568,7 +569,7 @@ ${text.substring(0, 8000)}`;
 
       // 5. Buscar entrevistas
       if (personEmail || personName || interviewId) {
-        let intQuery = supabase.from("interviews").select("*").order("interview_date", { ascending: false });
+        let intQuery = supabase.from("interviews").select("*, interview_assessments(interview_assessment_values(field,item_index,value))").order("interview_date", { ascending: false });
         if (interviewId) {
           intQuery = intQuery.eq("id", interviewId);
         } else if (personEmail && personName) {
@@ -579,7 +580,10 @@ ${text.substring(0, 8000)}`;
           intQuery = intQuery.ilike("candidate_name", personName);
         }
         const { data } = await intQuery;
-        if (data) interviewsData = data;
+        if (data) interviewsData = data.map((interview: any) => ({
+          ...interview,
+          assessment: rowsToAssessment(interview.interview_assessments?.interview_assessment_values ?? []),
+        }));
       }
 
       // Extrair formações e experiências

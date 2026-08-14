@@ -19,6 +19,7 @@ import {
   BUCKET_LABELS,
 } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { canDisplayCandidateContacts } from "@/lib/candidateHistory.mjs";
+import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 import {
   Dialog,
   DialogContent,
@@ -104,7 +105,7 @@ export default function CentralCandidatoPage() {
         const emails = data.map(c => c.email).filter(Boolean);
         let interviewsData: any[] = [];
         if (emails.length > 0) {
-          const { data: ints } = await supabase.from("interviews").select("email, assessment").in("email", emails);
+          const { data: ints } = await supabase.from("interviews").select("email, interview_assessments(interview_assessment_values(field,item_index,value))").in("email", emails);
           if (ints) interviewsData = ints;
         }
 
@@ -117,8 +118,9 @@ export default function CentralCandidatoPage() {
           if (c.email) {
             const intMatches = interviewsData.filter(i => i.email === c.email);
             for (const m of intMatches) {
-              if (m.assessment && Array.isArray(m.assessment.academic_list) && m.assessment.academic_list.length > 0) {
-                extraDegree = m.assessment.academic_list[0].course || "Curso Superior / Técnico";
+              const assessment: any = rowsToAssessment(m.interview_assessments?.interview_assessment_values ?? []);
+              if (Array.isArray(assessment.academic_list) && assessment.academic_list.length > 0) {
+                extraDegree = assessment.academic_list[0].course || "Curso Superior / Técnico";
                 break;
               }
             }

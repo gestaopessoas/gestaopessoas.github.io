@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { errorMessage } from "@/lib/utils";
 import { itemsToText, parseSolidesResume, type ParsedResume } from "@/lib/resumeParser";
+import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 
 // O parser local devolve ParsedResume; a IA devolve os mesmos campos mais alguns
 // que só ela consegue inferir do texto livre.
@@ -762,7 +763,7 @@ export default function EntrevistasPage() {
     setLoading(true);
     const supabase = createClient();
     const [{ data, error }, { data: profilesData }, { data: workplacesData }] = await Promise.all([
-      supabase.from("interviews").select("*").order("interview_date", { ascending: false, nullsFirst: false }),
+      supabase.from("interviews").select("*, interview_assessments(interview_assessment_values(field,item_index,value))").order("interview_date", { ascending: false, nullsFirst: false }),
       supabase.from("job_profiles").select("title"),
       supabase.from("workplaces").select("name").order("name")
     ]);
@@ -772,7 +773,10 @@ export default function EntrevistasPage() {
       setError("Não foi possível carregar as entrevistas.");
       return;
     }
-    setInterviews((data ?? []) as Interview[]);
+    setInterviews((data ?? []).map((interview: any) => ({
+      ...interview,
+      assessment: rowsToAssessment(interview.interview_assessments?.interview_assessment_values ?? []),
+    })) as Interview[]);
     if (profilesData) {
       const allRoles = [...profilesData.map(r => r.title), ...((data ?? []).map((i) => i.role))].filter(Boolean);
       const uniqueRoles = Array.from(new Set(allRoles)).sort();
@@ -1063,11 +1067,11 @@ Resultado Final: ${form.result || "N/C"}
       dependents_count: formData.dependents_count ?? null,
       uniform_size: formData.uniform_size || null,
       boot_size: formData.boot_size || null,
-      assessment: { ...assessmentForm, ...assessmentData, dependents_notes: formData.dependents_notes || null },
       updated_at: new Date().toISOString()
     };
     
     let isSuccess = false;
+    let savedInterviewId = editingId;
     
     if (editingId) {
       let query = supabase.from("interviews").update(payload).eq("id", editingId);
@@ -1080,9 +1084,24 @@ Resultado Final: ${form.result || "N/C"}
       else if (!data || data.length === 0) setError("Conflito: A entrevista foi modificada por outro usuário. Por favor, cancele e abra novamente.");
       else { isSuccess = true; }
     } else {
-      const { error: saveError } = await supabase.from("interviews").insert(payload);
+      const { data, error: saveError } = await supabase.from("interviews").insert(payload).select("id").single();
       if (saveError) setError("Erro ao salvar entrevista: " + saveError.message);
-      else { isSuccess = true; }
+      else { savedInterviewId = data.id; isSuccess = true; }
+    }
+
+    if (isSuccess && savedInterviewId) {
+      const { data: assessment, error: assessmentError } = await supabase
+        .from("interview_assessments")
+        .upsert({ interview_id: savedInterviewId }, { onConflict: "interview_id" })
+        .select("id")
+        .single();
+      if (assessmentError) { setError("Erro ao salvar avaliação: " + assessmentError.message); isSuccess = false; }
+      else {
+        const { error: clearError } = await supabase.from("interview_assessment_values").delete().eq("assessment_id", assessment.id);
+        const values = assessmentToRows({ ...assessmentForm, ...assessmentData, dependents_notes: formData.dependents_notes || null }).map((value) => ({ ...value, assessment_id: assessment.id }));
+        const { error: valuesError } = values.length ? await supabase.from("interview_assessment_values").insert(values) : { error: null };
+        if (clearError || valuesError) { setError("Erro ao salvar avaliação: " + (clearError || valuesError)?.message); isSuccess = false; }
+      }
     }
     
     if (isSuccess) {

@@ -1,26 +1,37 @@
-# Plano de implementação: issues abertas #11–#15
+# Plano de implementação: avaliações relacionais e remoção de JSON persistente
 
 ## Visão geral
 
-Implementar as cinco issues abertas que permaneceram no backlog: ajustes de senioridade, cartões de experiência, MPs de contratação e alteração, e a reformulação do Portal de Carreiras.
+Substituir o JSON persistido no parecer/avaliação de entrevistas por tabelas relacionais, permitindo edição no próprio modal. Em seguida, migrar os demais dados operacionais JSON por domínio, sem remover dados de auditoria, logs, respostas brutas de teste ou configurações antes de uma decisão explícita de retenção.
 
-## Ordem de execução
+## Decisões de arquitetura
 
-1. #14 — Senioridade: opções adicionais (pequena e isolada).
-2. #11 — Cartões de experiência de 90 dias (regra de negócio e limpeza pontual validada contra a base).
-3. #12 — MP de contratação (campos, dados persistidos e documento gerado).
-4. #13 — MP de alteração (preenchimento automático, campos específicos e documento).
-5. #15 — Portal de Carreiras (dados públicos, candidatura em modal e fluxo para teste PSI).
+- `interview_assessments` guarda os campos de uma avaliação e tem relação 1:1 com `interviews`.
+- Listas de formação, experiência e testes ficam em tabelas filhas, com chaves estrangeiras para a avaliação.
+- A aplicação deixa de escrever em `interviews.assessment`; os dados existentes são migrados antes da remoção da coluna.
+- Auditoria, snapshots, respostas brutas de teste e preferências/configurações serão tratados em fases separadas, pois não representam formulários de negócio equivalentes.
 
-## Critérios transversais
+## Fases
 
-- A interface e as consultas refletem as colunas e valores reais do Supabase.
-- Toda alteração de schema entra como nova migration; RLS permanece fail-closed.
-- Cada fase passa lint, testes focados e build antes de ser considerada concluída.
-- A limpeza pontual da issue #11 só será aplicada após listar e confirmar os registros-alvo.
+### Fase 1: Parecer e avaliação de entrevista
+
+- [ ] Criar tabelas relacionais, RLS e índices para avaliação, formações, experiências e testes.
+- [ ] Migrar dados de `interviews.assessment` sem perda de registros.
+- [ ] Atualizar a tela de entrevistas e o modal para carregar, editar e salvar nas novas tabelas.
+- [ ] Remover a escrita em JSON e validar edição de uma entrevista existente.
+
+### Fase 2: Dados operacionais JSON
+
+- [ ] Migrar tags de candidatos, benefícios por nível, status de onboarding e métricas de treinamento para modelos relacionais.
+- [ ] Migrar perfis ideais Big Five de cargos e requisições para campos/tabelas relacionais.
+- [ ] Atualizar consultas, filtros e formulários desses domínios.
+
+### Fase 3: Registros técnicos e históricos
+
+- [ ] Definir retenção e modelo para auditoria, snapshots, vetores, respostas brutas, permissões e configurações.
+- [ ] Substituir somente os campos aprovados e manter compatibilidade de backup.
 
 ## Riscos
 
-- As issues #12 e #13 compartilharem o mesmo gerador de MP; serão implementadas e verificadas como um fluxo coerente.
-- A issue #15 depende das policies e RPCs públicas existentes; o fallback atual pode estar ocultando um problema de acesso.
-- O uso de endereço de e-mail gratuito no Brevo é aceitável apenas como solução provisória de entrega, não altera a implementação das issues.
+- A remoção imediata de todos os JSONB afetaria auditorias, backups e integrações públicas.
+- Cada domínio requer migração de dados, política RLS e validação independente para evitar perda de informação.
