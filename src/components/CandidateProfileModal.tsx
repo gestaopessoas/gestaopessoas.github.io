@@ -14,7 +14,7 @@ import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
 import * as pdfjsLib from "pdfjs-dist";
 import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
 import { usePermissions } from "@/hooks/usePermissions";
-import { buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
+import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -178,15 +178,37 @@ export function CandidateProfileModal({
   
   const handleSaveHistory = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetCandId = getCandidateHistoryTargetId({ candidateId, resolvedCandidateId });
-    if (!targetCandId) {
-      alert("Não foi possível registrar o histórico porque esta entrevista não está vinculada a um candidato cadastrado.");
-      return;
-    }
-    
     setIsSavingHistory(true);
     const supabase = createClient();
     try {
+      let targetCandId = getCandidateHistoryTargetId({ candidateId, resolvedCandidateId });
+      if (!targetCandId) {
+        const candidateRecord = buildCandidateFromInterviewProfile(person || {});
+        if (!candidateRecord) {
+          throw new Error("a entrevista precisa ter nome e e-mail para criar o cadastro do candidato.");
+        }
+
+        const { data: existingCandidate, error: lookupError } = await supabase
+          .from("candidates")
+          .select("id")
+          .eq("email", candidateRecord.email)
+          .maybeSingle();
+        if (lookupError) throw lookupError;
+
+        if (existingCandidate) {
+          targetCandId = existingCandidate.id;
+        } else {
+          const { data: createdCandidate, error: createError } = await supabase
+            .from("candidates")
+            .insert(candidateRecord)
+            .select("id")
+            .single();
+          if (createError) throw createError;
+          targetCandId = createdCandidate.id;
+        }
+        setResolvedCandidateId(targetCandId);
+      }
+
       const { error } = await supabase.from("candidate_interviews").insert([
         buildCandidateHistoryRecord({ candidateId: targetCandId, ...historyForm })
       ]);

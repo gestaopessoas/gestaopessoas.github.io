@@ -26,6 +26,23 @@ export function getCandidateHistoryTargetId({ candidateId, resolvedCandidateId }
   return candidateId || resolvedCandidateId || null;
 }
 
+export function buildCandidateFromInterviewProfile(profile = {}) {
+  const fullName = String(profile.full_name || profile.name || "").trim();
+  const email = String(profile.email || "").trim().toLowerCase();
+  if (!fullName || !email) return null;
+
+  const [firstName, ...lastNameParts] = fullName.split(/\s+/);
+  return {
+    full_name: fullName,
+    first_name: firstName,
+    last_name: lastNameParts.join(" ") || "Não informado",
+    email,
+    phone: profile.phone || null,
+    city: profile.city || null,
+    role_interest: profile.role_interest || profile.role || null,
+  };
+}
+
 export function canDisplayCandidateContacts(interviews = []) {
   if (!Array.isArray(interviews) || interviews.length === 0) return true;
   const latest = [...interviews].sort(

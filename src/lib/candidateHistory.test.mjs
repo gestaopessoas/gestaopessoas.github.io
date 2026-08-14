@@ -1,4 +1,4 @@
-import { buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "./candidateHistory.mjs";
+import { buildCandidateHistoryRecord, buildCandidateFromInterviewProfile, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "./candidateHistory.mjs";
 
 const record = buildCandidateHistoryRecord({
   candidateId: "candidate-1",
@@ -46,4 +46,18 @@ if (getCandidateHistoryTargetId({ candidateId: null, resolvedCandidateId: "candi
 }
 if (getCandidateHistoryTargetId({ candidateId: null, resolvedCandidateId: null }) !== null) {
   throw new Error("An unresolved interview must not produce a history candidate ID");
+}
+
+const candidateFromInterview = buildCandidateFromInterviewProfile({
+  full_name: "Maria da Silva",
+  email: "MARIA@EXAMPLE.COM ",
+  phone: "11999999999",
+  city: "São Paulo",
+  role_interest: "Engenheira",
+});
+if (candidateFromInterview?.first_name !== "Maria" || candidateFromInterview?.last_name !== "da Silva" || candidateFromInterview?.email !== "maria@example.com") {
+  throw new Error("The interview profile must create a valid candidate record");
+}
+if (buildCandidateFromInterviewProfile({ full_name: "Maria da Silva" }) !== null) {
+  throw new Error("A candidate record must not be created without the required email");
 }
