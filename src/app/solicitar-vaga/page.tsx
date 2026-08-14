@@ -124,6 +124,13 @@ export default function SolicitarVagaPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("token")?.trim();
+    if (!token) return;
+    setAccessCode(token);
+    setAuthorized(true);
+  }, []);
+
+  useEffect(() => {
     if (!authorized) return;
 
     const supabase = createClient();

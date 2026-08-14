@@ -28,6 +28,8 @@ const data = {
   justification: "Vaga aberta por desligamento.",
   createdAt: "12/08/2026",
   generatedBy: "Carla Rockenbach",
+  verifiedBy: "João Revisor",
+  effectiveDate: "20/08/2026",
 }
 
 const buffer = await Packer.toBuffer(buildMpContratacaoDocument(data))
@@ -55,6 +57,8 @@ for (const value of [
   data.replacementOf,
   data.justification,
   data.generatedBy,
+  data.verifiedBy,
+  data.effectiveDate,
   MP_REVISION,
 ]) {
   assert.ok(plain.includes(value), `valor ausente no docx: ${value}`)
@@ -117,10 +121,12 @@ const mov = await Packer.toBuffer(
     requestedBy: "Bruno Souza",
     createdAt: "14/08/2026",
     generatedBy: "Carla Rockenbach",
+    verifiedBy: "João Revisor",
+    effectiveDate: "20/08/2026",
   }),
 )
 const movPlain = (await (await JSZip.loadAsync(mov)).file("word/document.xml").async("string")).replace(/<[^>]+>/g, "")
-for (const value of ["Ficha", "678", "DADOS ATUAIS", "DADOS ALTERADOS", "Carla Rockenbach", MP_REVISION]) {
+for (const value of ["Ficha", "678", "DADOS ATUAIS", "DADOS ALTERADOS", "Carla Rockenbach", "João Revisor", "20/08/2026", MP_REVISION]) {
   assert.ok(movPlain.includes(value), `valor ausente na MP de movimentação: ${value}`)
 }
 

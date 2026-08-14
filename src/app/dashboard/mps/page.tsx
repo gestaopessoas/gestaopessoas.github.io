@@ -43,6 +43,8 @@ type MpHistoryRow = {
 type Employee = {
   id: string;
   name: string;
+  registration_number?: string;
+  ficha?: string;
   phone?: string;
   email_corporate?: string;
   unit?: string;
@@ -91,8 +93,7 @@ const availableReasonsContratacao = [
   "Substituição", "Aumento de quadro", "Outros"
 ];
 const availableReasonsMovimentacao = [
-  "Promoção", "Transferência de local", "Alteração de salário",
-  "Inclusão / Alteração de benefício", "Outros"
+  "Promoção", "Progressão Horizontal", "Reajuste Anual", "Enquadramento"
 ];
 
 const availableBenefits = [
@@ -164,6 +165,7 @@ export default function MPGeneratorPage() {
 
   const [selectedBenefits, setSelectedBenefits] = useState<string[]>([]);
   const [justification, setJustification] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState("");
 
   // === CASCATA SALARIAL ===
   const [selectedModality, setSelectedModality] = useState<string | null>("");
@@ -281,7 +283,7 @@ export default function MPGeneratorPage() {
 
       const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes, benefitsRes] = await Promise.all([
         supabase.from("employees")
-          .select("id, name, phone, email_corporate, unit, cost_center_id, sectors(name), cost_centers(name:code), role, level, contract_type, base_salary, profile_code, status, employee_benefits(benefit_name)")
+          .select("id, name, registration_number, ficha, phone, email_corporate, unit, cost_center_id, sectors(name), cost_centers(name:code), role, level, contract_type, base_salary, profile_code, status, employee_benefits(benefit_name)")
           .eq("status", "Ativo") // Somente colaboradores ativos, exclui Arquivo Morto e Inativos
           .order("name"),
         supabase.from("workplaces").select("id, name").order("name"),
@@ -451,6 +453,8 @@ export default function MPGeneratorPage() {
           justification,
           createdAt: new Date().toLocaleDateString("pt-BR"),
           generatedBy: currentUser,
+          verifiedBy: currentUser,
+          effectiveDate: effectiveDate ? effectiveDate.split("-").reverse().join("/") : "",
           logo,
         });
         saveAs(blob, `MP_contratacao_${empName.replace(/\s+/g, "_")}.docx`);
@@ -468,8 +472,8 @@ export default function MPGeneratorPage() {
           candidateName: empName,
           phone: selectedEmployee?.phone || "",
           email: selectedEmployee?.email_corporate || "",
-          registration: "",
-          ficha: "",
+          registration: selectedEmployee?.registration_number || "",
+          ficha: selectedEmployee?.ficha || "",
           current: {
             role: selectedEmployee?.role || "-",
             level: selectedEmployee?.level || "-",
@@ -498,6 +502,8 @@ export default function MPGeneratorPage() {
           requestedBy: requestedBy || "",
           createdAt: new Date().toLocaleDateString("pt-BR"),
           generatedBy: currentUser,
+          verifiedBy: currentUser,
+          effectiveDate: effectiveDate ? effectiveDate.split("-").reverse().join("/") : "",
           logo
         });
         saveAs(blob, `MP_movimentacao_${empName.replace(/\s+/g, "_")}.docx`);
@@ -726,7 +732,7 @@ export default function MPGeneratorPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Razão da Movimentação</Label>
+                    <Label>Razão da Contratação</Label>
                     <Select value={reason || ""} onValueChange={setReason}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione..." />
@@ -771,6 +777,10 @@ export default function MPGeneratorPage() {
                 <div className="space-y-2">
                   <Label>Justificativa / Observações</Label>
                   <Textarea value={justification} onChange={e => setJustification(e.target.value)} rows={2} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Vigência</Label>
+                  <Input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
                 </div>
               </div>
             </div>
@@ -1045,7 +1055,7 @@ export default function MPGeneratorPage() {
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableReasonsContratacao.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                      {availableReasonsMovimentacao.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1061,6 +1071,10 @@ export default function MPGeneratorPage() {
               <div className="space-y-2">
                 <Label>Justificativa / Observações</Label>
                 <Textarea value={justification} onChange={e => setJustification(e.target.value)} rows={3} />
+              </div>
+              <div className="space-y-2">
+                <Label>Vigência</Label>
+                <Input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
               </div>
             </div>
           </div>

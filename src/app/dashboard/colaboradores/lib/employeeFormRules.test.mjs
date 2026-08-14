@@ -13,8 +13,21 @@ import {
   maskCurrencyInput,
   levelFieldOptions,
 } from "./employeeFormRules.mjs";
+import * as employeeFormRules from "./employeeFormRules.mjs";
 
 const ALL_LEVELS = ["", "Nível I", "Nível VI", "Nível XI", "Diretoria"];
+
+test("oferece as opções adicionais de senioridade", () => {
+  assert.deepEqual(employeeFormRules.SENIORITY_OPTIONS, [
+    "",
+    "Júnior",
+    "Pleno",
+    "Sênior",
+    "Diretoria",
+    "Não Enquadrado",
+    "Não Aplicável",
+  ]);
+});
 
 test("aceita CPF com dígitos verificadores corretos, com ou sem máscara", () => {
   assert.equal(isValidCpf("529.982.247-25"), true);
@@ -107,6 +120,7 @@ test("confere os campos críticos devolvidos pelo banco", () => {
     profile_code: "C-0100",
     company_id: "company-1",
     workplace_id: "workplace-1",
+    ficha: "F-001",
     marital_status: "Casado(a)",
     status: "Ativo",
   };
@@ -114,6 +128,7 @@ test("confere os campos críticos devolvidos pelo banco", () => {
   assert.equal(criticalFieldsMatch(expected, { ...expected }), true);
   assert.equal(criticalFieldsMatch(expected, { ...expected, profile_code: null }), false);
   assert.equal(criticalFieldsMatch(expected, { ...expected, rg: "1234567890123" }), false);
+  assert.equal(criticalFieldsMatch(expected, { ...expected, ficha: null }), false);
 });
 
 test("RG mantém somente os primeiros 15 dígitos e preserva zeros à esquerda", () => {

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { SENIORITY_OPTIONS } from "@/app/dashboard/colaboradores/lib/employeeFormRules.mjs";
 
 type AssessmentData = any;
 
@@ -23,6 +24,8 @@ const HARD_SKILLS = [
   { id: "planning_quality", label: "Planejamento / Qualidade" },
   { id: "business_vision", label: "Visão de Negócio" },
 ];
+
+const ASSESSMENT_SENIORITY_OPTIONS = ["Estagiário", ...SENIORITY_OPTIONS.filter(Boolean), "Especialista"];
 
 const SOFT_SKILLS = [
   { id: "communication", label: "Comunicação" },
@@ -266,11 +269,7 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
                   onChange={(e) => onChange('seniority_expected', e.target.value)}
                 >
                   <option value="">Selecione</option>
-                  <option value="Estagiário">Estagiário</option>
-                  <option value="Júnior">Júnior</option>
-                  <option value="Pleno">Pleno</option>
-                  <option value="Sênior">Sênior</option>
-                  <option value="Especialista">Especialista</option>
+                  {ASSESSMENT_SENIORITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
                 </select>
               ) : (
                 <span className="font-semibold">{assessmentData.seniority_expected || "-"}</span>
@@ -285,11 +284,7 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
                   onChange={(e) => onChange('seniority_evaluated', e.target.value)}
                 >
                   <option value="">Selecione</option>
-                  <option value="Estagiário">Estagiário</option>
-                  <option value="Júnior">Júnior</option>
-                  <option value="Pleno">Pleno</option>
-                  <option value="Sênior">Sênior</option>
-                  <option value="Especialista">Especialista</option>
+                  {ASSESSMENT_SENIORITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
                 </select>
               ) : (
                 <span className="font-semibold">{assessmentData.seniority_evaluated || "-"}</span>

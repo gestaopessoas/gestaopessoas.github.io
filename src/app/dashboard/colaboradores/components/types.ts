@@ -21,6 +21,7 @@ export interface Employee extends Record<string, unknown> {
   id: string;
   name: string;
   registration_number?: string | null;
+  ficha?: string | null;
   profile_code?: string | null;
   department_id?: string | null;
   department?: string | null;
@@ -69,7 +70,7 @@ export interface Employee extends Record<string, unknown> {
 }
 
 export const emptyForm = {
-  name: "", registration_number: "", profile_code: "", department_id: "", department: "", sector_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", level: "", phone: "",
+  name: "", registration_number: "", ficha: "", profile_code: "", department_id: "", department: "", sector_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "", boot_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
@@ -86,5 +87,5 @@ export const MONTHS = [
 
 export const pageSize = 1000;
 export const fields = [
-  "id", "name", "registration_number", "department_id", "department", "sector_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
+  "id", "name", "registration_number", "ficha", "department_id", "department", "sector_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
 ].join(", ");

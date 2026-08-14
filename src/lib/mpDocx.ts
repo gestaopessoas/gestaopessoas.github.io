@@ -67,6 +67,8 @@ export type MpContratacaoData = {
   createdAt: string;
   /** Usuário logado que gerou a MP. */
   generatedBy: string;
+  verifiedBy: string;
+  effectiveDate: string;
   /** Logo da unidade, já baixado pela página. */
   logo?: { data: ArrayBuffer | Uint8Array; width: number; height: number };
 };
@@ -538,8 +540,8 @@ export function buildMpContratacaoDocument(data: MpContratacaoData): Document {
     layoutTable([
       new TableRow({
         children: [
-          panelCell([...field("Verificado por", "", "userCheck")], 50),
-          panelCell([...field("Vigência", "____ / ____ / ________", "calendar")], 50),
+          panelCell([...field("Verificado por", data.verifiedBy, "userCheck")], 50),
+          panelCell([...field("Vigência", data.effectiveDate || "____ / ____ / ________", "calendar")], 50),
         ],
       }),
     ]),
@@ -633,6 +635,8 @@ export type MpMovimentacaoData = {
   createdAt: string;
   /** Usuário logado que gerou a MP. */
   generatedBy: string;
+  verifiedBy: string;
+  effectiveDate: string;
   logo?: { data: ArrayBuffer | Uint8Array; width: number; height: number };
 };
 
@@ -777,10 +781,9 @@ export function buildMpMovimentacaoDocument(data: MpMovimentacaoData): Document 
           panelCell([
             label("Razão da movimentação", "clipboard"),
             checkbox(data.reason === "Promoção", "Promoção"),
-            checkbox(data.reason === "Transferência de local", "Transferência de local"),
-            checkbox(data.reason === "Alteração de salário", "Alteração de salário"),
-            checkbox(data.reason === "Inclusão / Alteração de benefício", "Inclusão / Alteração de benefício"),
-            checkbox(!["Promoção", "Transferência de local", "Alteração de salário", "Inclusão / Alteração de benefício"].includes(data.reason), `Outra: ${data.reason === 'Outros' ? data.customReason : (['Promoção', 'Transferência de local', 'Alteração de salário', 'Inclusão / Alteração de benefício'].includes(data.reason) ? '' : data.reason)}`),
+            checkbox(data.reason === "Progressão Horizontal", "Progressão Horizontal"),
+            checkbox(data.reason === "Reajuste Anual", "Reajuste Anual"),
+            checkbox(data.reason === "Enquadramento", "Enquadramento"),
           ], 48),
           panelCell([...field("Justificativa / Observações", data.justification, "message", 8)], 52),
         ],
@@ -805,8 +808,8 @@ export function buildMpMovimentacaoDocument(data: MpMovimentacaoData): Document 
     cardTable([
       new TableRow({
         children: [
-          panelCell([inlineField("Verificado por:", "", "userCheck")], 50),
-          panelCell([inlineField("Vigência:", "____ / ____ / ________", "calendar")], 50),
+          panelCell([inlineField("Verificado por:", data.verifiedBy, "userCheck")], 50),
+          panelCell([inlineField("Vigência:", data.effectiveDate || "____ / ____ / ________", "calendar")], 50),
         ],
       }),
     ]),

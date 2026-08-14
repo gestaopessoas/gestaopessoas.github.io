@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, CheckCircle2, MapPin, Send, Paperclip } from "lucide-react";
+import { Briefcase, MapPin, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type Career = {
@@ -37,19 +38,24 @@ const emptyCandidate = {
   city: "",
   state: "",
   linkedin_url: "",
+  birth_date: "",
+  cpf: "",
+  address: "",
+  salary_expectation: "",
+  has_cnh: false,
+  is_pcd: false,
+  pcd_description: "",
 };
 
 export default function CarreirasPage() {
   const [careers, setCareers] = useState<Career[]>([]);
   const [query, setQuery] = useState("");
   const [selectedJob, setSelectedJob] = useState<Career | null>(null);
+  const [isApplicationOpen, setIsApplicationOpen] = useState(false);
   const [candidate, setCandidate] = useState(emptyCandidate);
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
-  const [resumeWarning, setResumeWarning] = useState("");
 
   useEffect(() => {
     const supabase = createClient();
@@ -124,6 +130,13 @@ export default function CarreirasPage() {
           city: candidate.city.trim() || null,
           state: candidate.state.trim() || null,
           linkedin_url: candidate.linkedin_url.trim() || null,
+          birth_date: candidate.birth_date || null,
+          cpf: candidate.cpf.trim() || null,
+          address: candidate.address.trim() || null,
+          salary_expectation: candidate.salary_expectation.trim() || null,
+          has_cnh: candidate.has_cnh,
+          is_pcd: candidate.is_pcd,
+          pcd_description: candidate.is_pcd ? candidate.pcd_description.trim() || null : null,
           role_interest: selectedJob.profile?.title || null,
           search_tags: [selectedJob.profile?.title, selectedJob.department, selectedJob.cost_center].filter(Boolean),
         })
@@ -139,18 +152,6 @@ export default function CarreirasPage() {
       return;
     }
 
-    setResumeWarning("");
-    if (resumeFile) {
-      const safeName = resumeFile.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-      const path = `${candidateData.id}/${Date.now()}-${safeName}`;
-      const { error: uploadError } = await supabase.storage.from("resumes").upload(path, resumeFile);
-      if (uploadError) {
-        setResumeWarning("Não foi possível anexar o currículo, mas sua candidatura foi enviada. Você pode reenviar o currículo depois com o RH.");
-      } else {
-        await supabase.from("candidates").update({ resume_url: path }).eq("id", candidateData.id);
-      }
-    }
-
     const { error: applicationError } = await supabase
       .from("job_applications")
       .insert({ candidate_id: candidateData.id, job_opening_id: selectedJob.id, status: "Nova Aplicação" });
@@ -161,9 +162,9 @@ export default function CarreirasPage() {
       return;
     }
 
-    setSent(true);
+    setIsApplicationOpen(false);
     setCandidate(emptyCandidate);
-    setResumeFile(null);
+    window.location.assign(`/candidato/teste-personalidade?candidate_id=${candidateData.id}`);
   };
 
   return (
@@ -208,7 +209,7 @@ export default function CarreirasPage() {
                     <Requirement title="Mínimo" text={[career.profile?.min_education, career.profile?.min_experience].filter(Boolean).join(" · ")} />
                     <Requirement title="Desejável" text={[career.profile?.desired_education, career.profile?.desired_experience, career.profile?.knowledge].filter(Boolean).join(" · ")} />
                   </div>
-                  <Button className="mt-4" variant={selectedJob?.id === career.id ? "default" : "outline"} onClick={() => { setSelectedJob(career); setSent(false); }}>
+                  <Button className="mt-4" variant="outline" onClick={() => { setSelectedJob(career); setError(""); setIsApplicationOpen(true); }}>
                     Candidatar-se
                   </Button>
                 </CardContent>
@@ -217,22 +218,16 @@ export default function CarreirasPage() {
           </div>
         </div>
 
-        <aside className="h-fit rounded-lg border bg-card p-5">
-          {sent ? (
-            <div className="text-center">
-              <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-emerald-500" />
-              <h2 className="text-lg font-semibold">Candidatura enviada</h2>
-              <p className="mt-2 text-sm text-muted-foreground">Recebemos seus dados. O RH vai avaliar a aderência ao perfil.</p>
-              {resumeWarning && (
-                <p className="mt-3 rounded-md bg-warning/10 p-2 text-xs text-warning">{resumeWarning}</p>
-              )}
-            </div>
-          ) : (
-            <form onSubmit={submit} className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Enviar candidatura</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{selectedJob ? selectedJob.profile?.title : "Selecione uma vaga para começar."}</p>
-              </div>
+      </section>
+
+      <Dialog open={isApplicationOpen} onOpenChange={setIsApplicationOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Candidatar-se a {selectedJob?.profile?.title || "esta vaga"}</DialogTitle>
+            <DialogDescription>Preencha seus dados. Ao concluir, você seguirá diretamente para o teste PSI.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submit} className="space-y-4">
+              {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
               <Field label="Nome completo *"><Input required disabled={!selectedJob} value={candidate.full_name} onChange={(event) => setCandidate({ ...candidate, full_name: event.target.value })} /></Field>
               <Field label="E-mail *"><Input required disabled={!selectedJob} type="email" value={candidate.email} onChange={(event) => setCandidate({ ...candidate, email: event.target.value })} /></Field>
               <Field label="Telefone"><Input disabled={!selectedJob} value={candidate.phone} onChange={(event) => setCandidate({ ...candidate, phone: event.target.value })} /></Field>
@@ -241,26 +236,24 @@ export default function CarreirasPage() {
                 <Field label="UF"><Input disabled={!selectedJob} value={candidate.state} onChange={(event) => setCandidate({ ...candidate, state: event.target.value })} /></Field>
               </div>
               <Field label="LinkedIn"><Input disabled={!selectedJob} value={candidate.linkedin_url} onChange={(event) => setCandidate({ ...candidate, linkedin_url: event.target.value })} /></Field>
-              <Field label="Currículo (PDF ou Word)">
-                <div className="flex items-center gap-2">
-                  <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <Input
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    disabled={!selectedJob}
-                    onChange={(event) => setResumeFile(event.target.files?.[0] || null)}
-                  />
-                </div>
-                {resumeFile && <p className="text-xs text-muted-foreground">{resumeFile.name}</p>}
-              </Field>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Data de nascimento"><Input type="date" value={candidate.birth_date} onChange={(event) => setCandidate({ ...candidate, birth_date: event.target.value })} /></Field>
+                <Field label="CPF"><Input inputMode="numeric" value={candidate.cpf} onChange={(event) => setCandidate({ ...candidate, cpf: event.target.value })} /></Field>
+              </div>
+              <Field label="Endereço"><Input value={candidate.address} onChange={(event) => setCandidate({ ...candidate, address: event.target.value })} /></Field>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Pretensão salarial"><Input value={candidate.salary_expectation} onChange={(event) => setCandidate({ ...candidate, salary_expectation: event.target.value })} /></Field>
+                <Field label="Possui CNH?"><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.has_cnh ? "sim" : "nao"} onChange={(event) => setCandidate({ ...candidate, has_cnh: event.target.value === "sim" })}><option value="nao">Não</option><option value="sim">Sim</option></select></Field>
+              </div>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={candidate.is_pcd} onChange={(event) => setCandidate({ ...candidate, is_pcd: event.target.checked })} /> Pessoa com deficiência (PcD)</label>
+              {candidate.is_pcd && <Field label="Descrição PcD"><Input value={candidate.pcd_description} onChange={(event) => setCandidate({ ...candidate, pcd_description: event.target.value })} /></Field>}
               <Button type="submit" className="w-full" disabled={!selectedJob || saving}>
                 <Send className="mr-2 h-4 w-4" />
                 {saving ? "Enviando..." : "Enviar candidatura"}
               </Button>
-            </form>
-          )}
-        </aside>
-      </section>
+          </form>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

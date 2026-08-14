@@ -15,7 +15,8 @@ import { StatsCards } from "./components/StatsCards";
 import { DocumentsCell, EmployeeTable, Pagination, SearchBar } from "./components/EmployeeTable";
 import { MONTHS, type Employee, type Entity } from "./components/types";
 import { normalizeRole } from "./lib/normalizeRole.mjs";
-import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, isValidCpf, levelFieldOptions, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput } from "./lib/employeeFormRules.mjs";
+import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, isValidCpf, levelFieldOptions, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput, SENIORITY_OPTIONS } from "./lib/employeeFormRules.mjs";
+import { openTrialPeriods } from "./lib/trialPeriodRules.mjs";
 import { exportBirthdaysPdf } from "./birthdaysPdf";
 
 type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
@@ -26,11 +27,11 @@ const AGGREGATE_PAGE_SIZE = 1000;
 const AGGREGATE_TABS = ["aniversarios", "experiencia"];
 
 const fields = [
-  "id", "name", "registration_number", "profile_code", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
+  "id", "name", "registration_number", "ficha", "profile_code", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
 ].join(", ");
 
 const emptyForm = {
-  name: "", registration_number: "", profile_code: "", department_id: "", department: "", sector_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
+  name: "", registration_number: "", ficha: "", profile_code: "", department_id: "", department: "", sector_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "", boot_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
@@ -136,6 +137,7 @@ export default function ColaboradoresPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [completedTrialIds, setCompletedTrialIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const supabase = createClient();
@@ -181,6 +183,18 @@ export default function ColaboradoresPage() {
       supabase.from("employees").select("status, birthday, admission_date, aso_date").limit(10000)
     );
     request.then(({ data }) => setStatsRows((data ?? []) as unknown as Employee[]));
+  }, [refresh]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.from("employee_trial_reviews").select("employee_id").then(({ data, error: loadError }) => {
+      if (loadError) {
+        // A migration e o deploy podem ocorrer em momentos diferentes; a tela segue funcional até a tabela existir.
+        setCompletedTrialIds(new Set());
+        return;
+      }
+      setCompletedTrialIds(new Set((data ?? []).map((row) => row.employee_id)));
+    });
   }, [refresh]);
 
   useEffect(() => {
@@ -411,23 +425,27 @@ export default function ColaboradoresPage() {
     setRefresh(v => v + 1);
   };
 
-  const getTrialInfo = (admissionDateStr: string | null) => {
-    if (!admissionDateStr) return null;
-    const admission = parseISO(admissionDateStr);
-    if (!isValid(admission)) return null;
-    const today = new Date();
-    const daysElapsed = differenceInDays(today, admission);
-    const daysRemaining = 90 - daysElapsed;
-    
-    if (daysRemaining < 0) return null;
-    return { daysRemaining, isWarning: daysRemaining <= 7, admission };
-  };
+  const inProbation = openTrialPeriods(employees, completedTrialIds).map((trialInfo) => ({
+    employee: employees.find((employee) => employee.id === trialInfo.id)!,
+    trialInfo,
+  }));
 
-  const inProbation = employees
-    .filter(e => e.status === "Ativo")
-    .map(e => ({ employee: e, trialInfo: getTrialInfo(e.admission_date as string | null) }))
-    .filter(item => item.trialInfo !== null)
-    .sort((a, b) => a.trialInfo!.daysRemaining - b.trialInfo!.daysRemaining);
+  const markTrialAsCompleted = async (employeeId: string) => {
+    setSaving(true);
+    setError("");
+    const supabase = createClient();
+    const { data: authData } = await supabase.auth.getUser();
+    const { error: completionError } = await supabase
+      .from("employee_trial_reviews")
+      .insert({ employee_id: employeeId, completed_by: authData.user?.id ?? null });
+
+    setSaving(false);
+    if (completionError && completionError.code !== "23505") {
+      setError(`Não foi possível concluir a experiência: ${completionError.message}`);
+      return;
+    }
+    setCompletedTrialIds((current) => new Set([...current, employeeId]));
+  };
 
   const salaryChangeAlerts = employees.flatMap((employee) => {
     if (employee.status !== "Ativo") return [];
@@ -575,6 +593,7 @@ export default function ColaboradoresPage() {
             <Section title="Identificação">
               <Field label="Nome completo *" span><Input required value={form.name} onChange={(e) => update("name", e.target.value)} /></Field>
               <Field label="Matrícula"><Input value={form.registration_number} onChange={(e) => update("registration_number", e.target.value)} /></Field>
+              <Field label="Ficha"><Input value={form.ficha} onChange={(e) => update("ficha", e.target.value)} /></Field>
               <Field label="Código do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} /></Field>
               <Field label="CPF"><Input inputMode="numeric" value={form.cpf} onChange={(e) => { setCpfError(""); update("cpf", maskCpf(e.target.value)); }} placeholder="000.000.000-00" aria-invalid={!!cpfError} />{cpfError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{cpfError}</p>}</Field>
               <Field label="RG"><Input inputMode="numeric" maxLength={15} value={form.rg} onChange={(e) => update("rg", sanitizeRgInput(e.target.value))} placeholder="Somente números (até 15 dígitos)" /></Field>
@@ -590,7 +609,7 @@ export default function ColaboradoresPage() {
               <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={statusOptions} /></Field>
               <Field label="Cargo *"><select required value={form.role} onChange={(e) => update("role", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Selecione...</option>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
               {showSeniority && (
-                <Field label="Senioridade"><Select value={form.senioridade} onChange={(value) => update("senioridade", value)} options={["", "Júnior", "Pleno", "Sênior", "Diretoria"]} /></Field>
+                <Field label="Senioridade"><Select value={form.senioridade} onChange={(value) => update("senioridade", value)} options={SENIORITY_OPTIONS} /></Field>
               )}
               <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={levelDisplayOptions} /></Field>
               <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.trading_name || c.name}</option>)}</select></Field>
@@ -853,7 +872,7 @@ export default function ColaboradoresPage() {
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
             <div>
               <h2 className="text-lg font-semibold flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /> Fim de Experiência</h2>
-              <p className="text-sm text-muted-foreground">Colaboradores dentro dos 90 dias iniciais, ordenados por proximidade do término.</p>
+              <p className="text-sm text-muted-foreground">Exibe os cartões até a conclusão manual, inclusive após o prazo de 90 dias.</p>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <span className="font-medium text-primary">{inProbation.length}</span> em experiência
@@ -881,15 +900,21 @@ export default function ColaboradoresPage() {
               <div key={e.id} className={`flex flex-col justify-between rounded-md border p-4 shadow-sm ${trialInfo!.isWarning ? "bg-red-50/50 border-red-200 dark:bg-red-950/30 dark:border-red-900" : "bg-background"}`}>
                 <div className="mb-3">
                   <div className="font-semibold text-base">{e.name}</div>
-                  <div className="text-xs text-muted-foreground">Admissão: {trialInfo!.admission.toLocaleDateString("pt-BR")}</div>
+                  <div className="text-xs text-muted-foreground">Fim da experiência: {new Date(`${trialInfo!.endDate}T12:00:00`).toLocaleDateString("pt-BR")}</div>
                   <div className="text-xs text-muted-foreground mt-1">{String(e.role ?? "-")}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Centro de custo: {e.cost_centers?.name || "Não informado"}</div>
                 </div>
-                <div className="flex items-center justify-between pt-3 border-t">
-                  <div className="text-xs font-medium text-muted-foreground">Tempo restante:</div>
+                <div className="flex items-center justify-between gap-3 pt-3 border-t">
+                  <div className="text-xs font-medium text-muted-foreground">{trialInfo!.isOverdue ? "Prazo vencido:" : "Tempo restante:"}</div>
                   <div className={`rounded-full px-2.5 py-1 text-xs font-bold ${trialInfo!.isWarning ? "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300" : "bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-300"}`}>
-                    {trialInfo!.daysRemaining} {trialInfo!.daysRemaining === 1 ? 'dia' : 'dias'}
+                    {trialInfo!.isOverdue
+                      ? `${Math.abs(trialInfo!.daysRemaining)} ${Math.abs(trialInfo!.daysRemaining) === 1 ? "dia" : "dias"} em atraso`
+                      : `${trialInfo!.daysRemaining} ${trialInfo!.daysRemaining === 1 ? "dia" : "dias"}`}
                   </div>
                 </div>
+                <Button className="mt-3 w-full" size="sm" variant="outline" disabled={saving} onClick={() => void markTrialAsCompleted(e.id)}>
+                  Marcar como realizado
+                </Button>
               </div>
             ))}
           </div>

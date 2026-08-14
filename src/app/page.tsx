@@ -43,11 +43,6 @@ export default function Home() {
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             </Link>
-            <Link href="/solicitar-vaga">
-              <Button size="lg" variant="outline" className="font-semibold border-border hover:bg-muted transition-all">
-                Solicitar nova vaga
-              </Button>
-            </Link>
             <Link href="/carreiras">
               <Button size="lg" variant="ghost" className="font-semibold text-muted-foreground hover:text-foreground transition-all">
                 Portal de carreiras
