@@ -21,7 +21,7 @@ type Employee = {
   name: string;
   role: string | null;
   admission_date: string | null;
-  onboarding_status: Record<OnboardingTask, boolean> | null;
+  employee_onboarding_tasks?: { task_code: OnboardingTask; completed: boolean }[];
 };
 
 export default function OnboardingPage() {
@@ -34,7 +34,7 @@ export default function OnboardingPage() {
     // Puxa colaboradores ativos, ordenados pelos mais recentes primeiro
     const { data, error } = await supabase
       .from("employees")
-      .select("id, name, role, admission_date, onboarding_status")
+      .select("id, name, role, admission_date, employee_onboarding_tasks(task_code,completed)")
       .eq("status", "Ativo")
       .order("admission_date", { ascending: false, nullsFirst: false });
     
@@ -53,14 +53,14 @@ export default function OnboardingPage() {
     const employee = employees.find(e => e.id === employeeId);
     if (!employee) return;
 
-    const currentStatus = employee.onboarding_status || {};
+    const currentStatus = Object.fromEntries((employee.employee_onboarding_tasks ?? []).map((item) => [item.task_code, item.completed]));
     const newStatus = { ...currentStatus, [task]: !currentValue };
 
     // Update optimistic UI
-    setEmployees(prev => prev.map(e => e.id === employeeId ? { ...e, onboarding_status: newStatus as Record<OnboardingTask, boolean> } : e));
+    setEmployees(prev => prev.map(e => e.id === employeeId ? { ...e, employee_onboarding_tasks: Object.entries(newStatus).map(([task_code, completed]) => ({ task_code: task_code as OnboardingTask, completed })) } : e));
 
     const supabase = createClient();
-    await supabase.from("employees").update({ onboarding_status: newStatus }).eq("id", employeeId);
+    await supabase.from("employee_onboarding_tasks").upsert({ employee_id: employeeId, task_code: task, completed: !currentValue, updated_at: new Date().toISOString() });
   };
 
   const filtered = employees.filter(e => {
@@ -78,7 +78,7 @@ export default function OnboardingPage() {
     const admission = new Date(e.admission_date);
     const diffDays = Math.floor((today.getTime() - admission.getTime()) / (1000 * 60 * 60 * 24));
     
-    const status = (e.onboarding_status || {}) as Record<OnboardingTask, boolean>;
+    const status = Object.fromEntries((e.employee_onboarding_tasks ?? []).map((item) => [item.task_code, item.completed])) as Record<OnboardingTask, boolean>;
     const isCompleted = TASKS.every(t => status[t.id]);
     
     return diffDays <= 60 || !isCompleted;
@@ -124,7 +124,7 @@ export default function OnboardingPage() {
               {loading && <tr><td colSpan={TASKS.length + 2} className="p-8 text-center text-muted-foreground">Carregando integrações...</td></tr>}
               {!loading && visibleEmployees.length === 0 && <tr><td colSpan={TASKS.length + 2} className="p-8 text-center text-muted-foreground">Nenhuma integração pendente.</td></tr>}
               {!loading && visibleEmployees.map(employee => {
-                const status = employee.onboarding_status || {} as Record<OnboardingTask, boolean>;
+                const status = Object.fromEntries((employee.employee_onboarding_tasks ?? []).map((item) => [item.task_code, item.completed])) as Record<OnboardingTask, boolean>;
                 const completedCount = TASKS.filter(t => status[t.id]).length;
                 const progress = Math.round((completedCount / TASKS.length) * 100);
                 
