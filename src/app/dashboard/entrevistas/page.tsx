@@ -536,8 +536,6 @@ export default function EntrevistasPage() {
   const [assessmentForm, setAssessmentForm] = useState<Assessment>(defaultAssessment);
   const [movingToTalents, setMovingToTalents] = useState(false);
   
-  // Resume Modal State
-  const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   // Os provedores salvos já valem no primeiro render — evita renderizar uma vez
   // com os defaults e sobrescrever logo depois.
@@ -795,7 +793,6 @@ export default function EntrevistasPage() {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setIsModalOpen(false);
-        setIsResumeModalOpen(false);
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -1221,7 +1218,6 @@ Resultado Final: ${form.result || "N/C"}
         description: item.description || ""
       })) : prev.experience_list || []
     }));
-    setIsResumeModalOpen(false);
   };
 
   const parseWithoutAI = () => {
@@ -1497,10 +1493,6 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
               <Download className="mr-2 h-4 w-4" />
               Exportar Excel
             </Button>
-            <Button variant="secondary" onClick={() => { setResumeText(""); setIsResumeModalOpen(true); }} className="gap-2">
-              <FileText className="h-4 w-4" />
-              Ler Currículo
-            </Button>
             <Button onClick={openNewModal} className="gap-2">
               <Plus className="h-4 w-4" />
               Nova Entrevista
@@ -1636,59 +1628,7 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
           onSave={handleModalSave}
         />
       )}
-      {/* Modal Leitura Currículo */}
-      {isResumeModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-background w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <div>
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  Ler Currículo
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => setIsKeyModalOpen(true)}>
-                    <Key className="h-4 w-4" />
-                  </Button>
-                </h2>
-                <p className="text-sm text-muted-foreground">Cole o texto do currículo (Ex: da Sólides ou outro formato) para preencher os dados via IA.</p>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => setIsResumeModalOpen(false)}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="flex justify-between items-center px-4 pt-4 border-b pb-4 bg-muted/5">
-              <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-primary hover:underline">
-                <FileUp className="h-4 w-4" />
-                Carregar de um arquivo (PDF, TXT)
-                <input type="file" accept=".pdf,.txt" className="hidden" onChange={handleFileUpload} />
-              </label>
-            </div>
-            <div className="p-4 space-y-4">
-              <Textarea
-                className="min-h-[300px] text-sm"
-                placeholder="Cole o texto do currículo aqui ou faça o upload de um PDF..."
-                value={resumeText}
-                onChange={e => setResumeText(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-between p-4 border-t gap-2 bg-muted/10 items-center">
-              <Button variant="ghost" className="text-muted-foreground text-xs" onClick={parseWithoutAI} disabled={!resumeText.trim()}>
-                Analisar sem IA (Padrão Sólides)
-              </Button>
-              <div className="flex gap-2">
-                <Button variant="ghost" onClick={() => setIsResumeModalOpen(false)}>Cancelar</Button>
-                <Button 
-                  onClick={analyzeResume} 
-                  disabled={!resumeText.trim() || isAnalyzingResume}
-                  className="gap-2 text-primary border-primary hover:bg-primary/10"
-                  variant="outline"
-                >
-                  <span className="text-lg leading-none">🪄</span> 
-                  {isAnalyzingResume ? "Analisando..." : "Analisar via IA"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Modal Gerenciar Chaves de IA */}
       {isKeyModalOpen && (

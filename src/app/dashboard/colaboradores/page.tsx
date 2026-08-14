@@ -16,6 +16,7 @@ import { DocumentsCell, EmployeeTable, Pagination, SearchBar } from "./component
 import { MONTHS, type Employee, type Entity } from "./components/types";
 import { normalizeRole } from "./lib/normalizeRole.mjs";
 import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, isValidCpf, levelFieldOptions, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput } from "./lib/employeeFormRules.mjs";
+import { exportBirthdaysPdf } from "./birthdaysPdf";
 
 type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
 
@@ -773,10 +774,23 @@ export default function ColaboradoresPage() {
               <p className="text-sm text-muted-foreground">Celebre as datas especiais da sua equipe.</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={exportBirthdaysCsv} disabled={birthdaysThisMonth.length === 0}>
-                <Download className="mr-2 h-4 w-4" />
-                Exportar
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button variant="outline" onClick={exportBirthdaysCsv} disabled={birthdaysThisMonth.length === 0}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar Excel
+                </Button>
+                <Button variant="default" onClick={() => exportBirthdaysPdf(MONTHS[selectedMonth], birthdaysThisMonth.map(b => ({
+                  name: b.employee.name,
+                  role: String(b.employee.role || "-"),
+                  department: String(b.employee.departments?.name || b.employee.unit || b.employee.workplace || "-"),
+                  day: b.info.day,
+                  age: differenceInYears(new Date(), b.info.date),
+                  birthDateStr: b.info.date.toLocaleDateString("pt-BR", { timeZone: "UTC" })
+                })))} disabled={birthdaysThisMonth.length === 0}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar PDF (Estilizado)
+                </Button>
+              </div>
               <Label className="text-nowrap ml-2">Mês:</Label>
               <select 
                 value={selectedMonth} 

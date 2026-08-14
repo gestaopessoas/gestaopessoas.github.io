@@ -352,9 +352,9 @@ export function parseSolidesResume(text: string): ParsedResume {
   // Cidade/UF só dentro de uma linha: com \s a regex atravessava a quebra e
   // colava a linha da idade ("anosPelotas - RS").
   const locationMatch = lines
-    .map((line) => line.trim().match(/^([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ .']*?)\s*-\s*([A-Z]{2})$/))
+    .map((line) => line.trim().match(/^([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ .']*?)\s*[-/,]\s*([A-Z]{2})$/i))
     .find(Boolean);
-  const phoneMatch = text.match(/(\(\d{2}\)\s*\d{4,5}-\d{4})/);
+  const phoneMatch = text.match(/(\(?\d{2}\)?\s*(?:9\s*)?\d{4,5}[-\s]?\d{4})/);
   const emailMatch = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]{2,})/);
 
   // Cargo pretendido: linha do cabeçalho que não é nome, idade, cidade, telefone ou e-mail.
@@ -395,7 +395,7 @@ export function parseSolidesResume(text: string): ParsedResume {
 
   const city = fields.city || "";
   const location = locationMatch
-    ? `${locationMatch[1].trim()} - ${locationMatch[2]}`
+    ? `${locationMatch[1].trim()} - ${locationMatch[2].toUpperCase()}`
     : city;
 
   return {

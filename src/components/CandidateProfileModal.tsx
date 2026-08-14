@@ -13,6 +13,7 @@ import {
 import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
 import * as pdfjsLib from "pdfjs-dist";
 import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
+import { usePermissions } from "@/hooks/usePermissions";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -162,6 +163,48 @@ export function CandidateProfileModal({
   const [isEditing, setIsEditing] = useState(defaultEditMode);
   const [isSaving, setIsSaving] = useState(false);
   const [isParsingCv, setIsParsingCv] = useState(false);
+  
+  const { level } = usePermissions();
+  
+  const [isAddingHistory, setIsAddingHistory] = useState(false);
+  const [historyForm, setHistoryForm] = useState({ stage: "", reason: "", notes: "" });
+  const [isSavingHistory, setIsSavingHistory] = useState(false);
+  
+  const handleSaveHistory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetCandId = candidateId || person?.id;
+    if (!targetCandId) return;
+    
+    setIsSavingHistory(true);
+    const supabase = createClient();
+    try {
+      let finalNotes = "";
+      if (historyForm.reason) finalNotes += `[Motivo]\n${historyForm.reason}\n\n`;
+      if (historyForm.notes) finalNotes += `[Feedback Interno]\n${historyForm.notes}\n\n`;
+
+      const { error } = await supabase.from("candidate_interviews").insert([
+        {
+          candidate_id: targetCandId,
+          stage: historyForm.stage,
+          rejection_reason: historyForm.reason || null,
+          notes: finalNotes.trim() || null,
+        }
+      ]);
+
+      if (error) throw error;
+      
+      // Reload history
+      const { data } = await supabase.from("candidate_interviews").select("*").eq("candidate_id", targetCandId).order("created_at", { ascending: false });
+      if (data) setCandidateInterviews(data);
+      
+      setIsAddingHistory(false);
+      setHistoryForm({ stage: "", reason: "", notes: "" });
+    } catch (err) {
+      alert("Erro ao salvar histórico.");
+    } finally {
+      setIsSavingHistory(false);
+    }
+  };
 
   const handleCVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -208,10 +251,20 @@ export function CandidateProfileModal({
         const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
         if (!apiKey) throw new Error("Chave não configurada");
 
-        const prompt = `Extraia os seguintes dados do currículo abaixo e retorne APENAS um JSON válido, sem crases, sem markdown, no formato:
-{ "name": "Nome", "email": "Email", "phone": "Telefone", "role": "Cargo", "city": "Cidade", "state": "Estado" }
+        const prompt = `Extraia os seguintes dados do currículo abaixo e retorne APENAS um JSON válido, sem crases, sem markdown. Capture o máximo de detalhes possível, incluindo formação e experiências profissionais se presentes.
+Formato esperado:
+{
+  "name": "Nome completo",
+  "email": "Email principal",
+  "phone": "Telefone com DDD",
+  "role": "Cargo atual ou objetivo",
+  "city": "Cidade",
+  "state": "Estado",
+  "academic_list": [{ "course": "Curso", "institution": "Instituição", "start_date": "YYYY", "end_date": "YYYY", "in_progress": boolean }],
+  "experience_list": [{ "role": "Cargo", "company": "Empresa", "start_date": "YYYY", "end_date": "YYYY", "is_current": boolean, "description": "Descrição" }]
+}
 Texto:
-${text.substring(0, 5000)}`;
+${text.substring(0, 8000)}`;
 
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
           method: "POST",
@@ -234,15 +287,44 @@ ${text.substring(0, 5000)}`;
       }
 
       if (parsed) {
-        setFormData(prev => ({
-          ...prev,
-          full_name: parsed.name || prev.full_name,
-          email: parsed.email || prev.email,
-          phone: parsed.phone || prev.phone,
-          role: parsed.role || prev.role,
-          city: parsed.city || parsed.location?.split("-")[0]?.trim() || prev.city,
-          state: parsed.state || parsed.location?.split("-")[1]?.trim() || prev.state,
-        }));
+        let shouldApply = true;
+        
+        // Verifica se é uma pessoa diferente (se o form já tiver nome e o parsed for consideravelmente diferente)
+        if (formData.full_name && parsed.name) {
+          const currentFirstName = formData.full_name.split(" ")[0].toLowerCase();
+          const parsedFirstName = parsed.name.split(" ")[0].toLowerCase();
+          if (currentFirstName !== parsedFirstName) {
+            const confirmed = window.confirm(`O currículo extraído pertence a "${parsed.name}".\n\nDeseja SUBSTITUIR os dados do registro atual pelo currículo enviado?\n\n(Se deseja cadastrar um candidato novo, clique em Cancelar, feche esta janela e clique em Novo Candidato)`);
+            if (!confirmed) {
+              shouldApply = false;
+            }
+          }
+        }
+
+        if (shouldApply) {
+          setFormData(prev => ({
+            ...prev,
+            full_name: parsed.name || prev.full_name,
+            email: parsed.email || prev.email,
+            phone: parsed.phone || prev.phone,
+            role: parsed.role || prev.role,
+            city: parsed.city || parsed.location?.split("-")[0]?.trim() || prev.city,
+            state: parsed.state || parsed.location?.split("-")[1]?.trim() || prev.state,
+          }));
+          
+          if (parsed.academic_list && parsed.academic_list.length > 0) {
+            setAssessmentData((prev: any) => ({
+              ...prev,
+              academic_list: parsed.academic_list
+            }));
+          }
+          if (parsed.experience_list && parsed.experience_list.length > 0) {
+            setAssessmentData((prev: any) => ({
+              ...prev,
+              experience_list: parsed.experience_list
+            }));
+          }
+        }
       }
 
     } catch (err) {
@@ -1057,7 +1139,78 @@ ${text.substring(0, 5000)}`;
 
                 {activeTab === "history" && (
                   <div className="space-y-6 animate-in fade-in duration-200">
-                    <h2 className="text-2xl font-bold mb-6">Histórico de Etapas</h2>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-bold">Histórico de Etapas</h2>
+                      {isEditable && (
+                        <Button onClick={() => setIsAddingHistory(!isAddingHistory)} variant={isAddingHistory ? "outline" : "default"} size="sm">
+                          {isAddingHistory ? "Cancelar" : "Registrar Mudança de Etapa"}
+                        </Button>
+                      )}
+                    </div>
+
+                    {isAddingHistory && (
+                      <form onSubmit={handleSaveHistory} className="bg-card border rounded-xl p-6 shadow-sm space-y-4 mb-6 relative">
+                        <h3 className="font-semibold mb-2">Novo Registro de Etapa</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Nova Etapa *</label>
+                            <select 
+                              required 
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              value={historyForm.stage}
+                              onChange={e => setHistoryForm(prev => ({ ...prev, stage: e.target.value }))}
+                            >
+                              <option value="">Selecione...</option>
+                              {level >= 2 ? (
+                                <>
+                                  <option value="Em entrevista">Em entrevista</option>
+                                  <option value="Processo de MPs">Processo de MPs</option>
+                                  <option value="Coleta de documentos">Coleta de documentos</option>
+                                  <option value="Aguardando ASO">Aguardando ASO</option>
+                                  <option value="Banco de talentos">Banco de talentos</option>
+                                </>
+                              ) : (
+                                <>
+                                  <option value="Banco de talentos">Banco de talentos</option>
+                                  <option value="Em proposta">Em proposta</option>
+                                </>
+                              )}
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Motivo</label>
+                            <select 
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              value={historyForm.reason}
+                              onChange={e => setHistoryForm(prev => ({ ...prev, reason: e.target.value }))}
+                            >
+                              <option value="">Selecione...</option>
+                              <option value="Avanço de Etapa">Avanço de Etapa</option>
+                              <option value="Reprovação Técnica">Reprovação Técnica</option>
+                              <option value="Fit Cultural">Fit Cultural</option>
+                              <option value="Desistência">Desistência</option>
+                              <option value="Outros">Outros</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Feedback Interno</label>
+                          <Textarea 
+                            className="min-h-[100px]"
+                            placeholder="Descreva observações, comportamento na entrevista, etc..."
+                            value={historyForm.notes}
+                            onChange={e => setHistoryForm(prev => ({ ...prev, notes: e.target.value }))}
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                          <Button type="button" variant="ghost" onClick={() => setIsAddingHistory(false)}>Cancelar</Button>
+                          <Button type="submit" disabled={isSavingHistory || !historyForm.stage}>
+                            {isSavingHistory ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                            Salvar Registro
+                          </Button>
+                        </div>
+                      </form>
+                    )}
                     {candidateInterviews.length === 0 ? (
                       <div className="rounded-xl border border-dashed p-10 text-center text-muted-foreground bg-card/50">
                         <History className="h-8 w-8 mx-auto mb-3 opacity-50" />
