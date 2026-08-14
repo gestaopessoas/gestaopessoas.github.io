@@ -468,7 +468,7 @@ ${text.substring(0, 8000)}`;
         return;
       }
 
-      const targetCandId = personData.id && !personData.isFromInterview ? personData.id : candidateId;
+      const targetCandId = personData.id || candidateId;
       const targetEmpId = employeeId || (personData.role && !personData.role_interest ? personData.id : null);
       const personEmail = personData.email || email;
       const personName = personData.full_name || personData.name || candidateName;
@@ -1141,7 +1141,7 @@ ${text.substring(0, 8000)}`;
                   <div className="space-y-6 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-2xl font-bold">Histórico de Etapas</h2>
-                      {isEditable && (
+                      {["RH", "Gestor", "Desenvolvedor", "Gerente"].includes(level || "") && (
                         <Button onClick={() => setIsAddingHistory(!isAddingHistory)} variant={isAddingHistory ? "outline" : "default"} size="sm">
                           {isAddingHistory ? "Cancelar" : "Registrar Mudança de Etapa"}
                         </Button>
