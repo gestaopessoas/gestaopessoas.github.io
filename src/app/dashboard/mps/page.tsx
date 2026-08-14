@@ -92,6 +92,9 @@ const availableBenefits = [
   "VT", "VR", "Cesta Básica", "Plano de Saúde", "Plano Odontológico", "Seguro de Vida"
 ];
 
+// Mesma ordem usada em tipos-beneficios; as chaves de level_values não ordenam sozinhas.
+const VR_LEVEL_ORDER = ["Inicial", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+
 // Cargos considerados "Analista ou acima" para Req da Vaga
 const ANALYST_AND_ABOVE_ROLES = [
   "analista", "coordenador", "gerente", "diretor", "supervisor",
@@ -113,6 +116,8 @@ export default function MPGeneratorPage() {
   const [sectors, setSectors] = useState<Entity[]>([]);
   const [costCenters, setCostCenters] = useState<Entity[]>([]);
   const [workSchedules, setWorkSchedules] = useState<string[]>([]);
+  // Níveis do Vale Refeição vêm do cadastro (company_benefits.level_values), não de lista fixa.
+  const [vrLevels, setVrLevels] = useState<{ level: string; value: number }[]>([]);
   
   const [currentUser, setCurrentUser] = useState("");
   const [currentUserLevel, setCurrentUserLevel] = useState(0);
@@ -125,7 +130,8 @@ export default function MPGeneratorPage() {
   const [historyPage, setHistoryPage] = useState(1);
   const [mpType, setMpType] = useState<"contratacao" | "movimentacao" | "historico">("contratacao");
   const [mpHistory, setMpHistory] = useState<MpHistoryRow[]>([]);
-  const [selectedLogo, setSelectedLogo] = useState("MOOV.png");
+  // Logo institucional ACPO, o mesmo dos formulários impressos de referência.
+  const [selectedLogo, setSelectedLogo] = useState("SEDE.png");
   const [selectedWorkplaceId, setSelectedWorkplaceId] = useState("");
   
   // Contratação state
@@ -251,11 +257,12 @@ export default function MPGeneratorPage() {
 
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user) {
-        const { data: profile } = await createClient().from('profiles').select('full_name').eq('id', userData.user.id).single();
-        if (profile) setCurrentUser(profile.full_name || userData.user.email);
+        const { data: profile } = await createClient().from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle();
+        // O nome vai impresso na MP; sem perfil cadastrado, cai no e-mail.
+        setCurrentUser(profile?.full_name || userData.user.email || "");
       }
 
-      const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes] = await Promise.all([
+      const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes, benefitsRes] = await Promise.all([
         supabase.from("employees")
           .select("id, name, phone, email_corporate, unit, cost_center_id, sectors(name), cost_centers(name:code), role, level, contract_type, base_salary, profile_code, status")
           .eq("status", "Ativo") // Somente colaboradores ativos, exclui Arquivo Morto e Inativos
@@ -264,7 +271,8 @@ export default function MPGeneratorPage() {
         supabase.from("cost_centers").select("id, name:code").order("code"),
         supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle(),
         supabase.from("mp_history").select("*, profiles:created_by(full_name), employees:employee_id(name)").order("created_at", { ascending: false }),
-        supabase.from("sectors").select("id, name").order("name")
+        supabase.from("sectors").select("id, name").order("name"),
+        supabase.from("company_benefits").select("name, level_values")
       ]);
 
       if (empsRes.data) setEmployees((empsRes.data as unknown as Employee[]).filter(e => e.status === "Ativo" || !e.status));
@@ -287,6 +295,14 @@ export default function MPGeneratorPage() {
       setWorkSchedules(scheds);
       
       if (histRes.data) setMpHistory(histRes.data as unknown as MpHistoryRow[]);
+
+      const vr = (benefitsRes.data as { name: string; level_values: Record<string, number> | null }[] | null)
+        ?.find(b => b.name.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleUpperCase("pt-BR").includes("REFEICAO"));
+      setVrLevels(
+        Object.entries(vr?.level_values ?? {})
+          .map(([level, value]) => ({ level, value: Number(value) }))
+          .sort((a, b) => VR_LEVEL_ORDER.indexOf(a.level) - VR_LEVEL_ORDER.indexOf(b.level))
+      );
 
       setLoading(false);
     };
@@ -361,7 +377,8 @@ export default function MPGeneratorPage() {
       const empName = mpType === "contratacao" ? candidateName : selectedEmployee?.name || "Nao_Selecionado";
       const finalReason = reason === "Outros" ? customReason : reason;
       const newBenefitsText = selectedBenefits.map(b => {
-        if (b === "VR") return `${b} (${vrLevel || "Padrão"} - ${vrLocality || "- "})`;
+        if (b === "VR") return vrLevel ? `${b} - Nível ${vrLevel}` : b;
+        if (b === "Cesta Básica" && vrLocality) return `${b} ${vrLocality}`;
         return b;
       }).join(", ");
       const curBenefitsText = currentBenefits.join(", ");
@@ -392,7 +409,7 @@ export default function MPGeneratorPage() {
           try {
             const response = await fetch(`/logos/${selectedLogo}`);
             const arrayBuffer = await response.arrayBuffer();
-            logo = { data: arrayBuffer, ...pngSize(arrayBuffer, 130) };
+            logo = { data: arrayBuffer, ...pngSize(arrayBuffer, 143) };
           } catch (e) { console.error(e); }
         }
 
@@ -417,6 +434,7 @@ export default function MPGeneratorPage() {
           replacementOf: replacementOf || "",
           justification,
           createdAt: new Date().toLocaleDateString("pt-BR"),
+          generatedBy: currentUser,
           logo,
         });
         saveAs(blob, `MP_contratacao_${empName.replace(/\s+/g, "_")}.docx`);
@@ -424,9 +442,9 @@ export default function MPGeneratorPage() {
         let logo: { data: ArrayBuffer; width: number; height: number } | undefined;
         if (selectedLogo) {
           try {
-            const response = await fetch("https://lffkpsbovlmdifghhndl.supabase.co/storage/v1/object/public/public/logos/" + selectedLogo);
+            const response = await fetch(`/logos/${selectedLogo}`);
             const arrayBuffer = await response.arrayBuffer();
-            logo = { data: arrayBuffer, ...pngSize(arrayBuffer, 130) };
+            logo = { data: arrayBuffer, ...pngSize(arrayBuffer, 143) };
           } catch (e) { console.error(e); }
         }
 
@@ -463,6 +481,7 @@ export default function MPGeneratorPage() {
           justification,
           requestedBy: requestedBy || "",
           createdAt: new Date().toLocaleDateString("pt-BR"),
+          generatedBy: currentUser,
           logo
         });
         saveAs(blob, `MP_movimentacao_${empName.replace(/\s+/g, "_")}.docx`);
@@ -709,15 +728,15 @@ export default function MPGeneratorPage() {
                   {(selectedBenefits.includes("VR") || selectedBenefits.includes("Cesta Básica")) && (
                     <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-2">
                       <div className="space-y-2">
-                        <Label>Nível VR/Cesta</Label>
+                        <Label>Nível do VR</Label>
                         <Select value={vrLevel} onValueChange={setVrLevel}>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione o nível..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Padrão">Padrão</SelectItem>
-                            <SelectItem value="Gerencial">Gerencial</SelectItem>
-                            <SelectItem value="Diretoria">Diretoria</SelectItem>
+                            {vrLevels.map(l => (
+                              <SelectItem key={l.level} value={l.level}>{l.level} — {formatCurrency(l.value)}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -974,15 +993,15 @@ export default function MPGeneratorPage() {
                     {(selectedBenefits.includes("VR") || selectedBenefits.includes("Cesta Básica")) && (
                       <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-2">
                         <div className="space-y-2">
-                          <Label>Nível VR/Cesta</Label>
+                          <Label>Nível do VR</Label>
                           <Select value={vrLevel} onValueChange={setVrLevel}>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione o nível..." />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Padrão">Padrão</SelectItem>
-                              <SelectItem value="Gerencial">Gerencial</SelectItem>
-                              <SelectItem value="Diretoria">Diretoria</SelectItem>
+                              {vrLevels.map(l => (
+                                <SelectItem key={l.level} value={l.level}>{l.level} — {formatCurrency(l.value)}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
