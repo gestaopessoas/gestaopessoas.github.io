@@ -17,7 +17,12 @@ const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "central_candi
 const ACTIONS = ["view", "create", "edit", "delete"] as const
 
 type UserPerms = Record<string, Record<string, boolean>>
-type ProfileRow = { id: string; name: string | null; level: number; permissions: UserPerms | null }
+type ProfileRow = { id: string; name: string | null; level: number; permissions: UserPerms }
+type SettingEntry = { path: string[]; value_text: string | null; value_boolean: boolean | null }
+
+function readSettingFlags(entries: SettingEntry[]) {
+  return Object.fromEntries(entries.filter((entry) => entry.path.length === 1).map((entry) => [entry.path[0], entry.value_boolean === true]));
+}
 
 export default function ConfiguracoesPage() {
   const [modules, setModules] = useState({ ats: true, admissao: true, pdi: true, gestor: true, rgs_tracking: true, financeiro: false })
@@ -40,8 +45,15 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     async function loadProfiles() {
-      const { data } = await supabase.from('profiles').select('id, name, level, permissions')
-      setProfiles((data as ProfileRow[]) ?? [])
+      const { data } = await supabase.from('profiles').select('id, name, level, profile_permissions(module_key, action_key, allowed)')
+      setProfiles((data ?? []).map((profile) => {
+        const permissions: UserPerms = {};
+        for (const item of profile.profile_permissions ?? []) {
+          permissions[item.module_key] ??= {};
+          permissions[item.module_key][item.action_key] = item.allowed;
+        }
+        return { id: profile.id, name: profile.name, level: profile.level ?? 0, permissions };
+      }))
       setProfilesLoading(false)
     }
     loadProfiles()
@@ -59,25 +71,28 @@ export default function ConfiguracoesPage() {
 
   async function saveProfile(profile: ProfileRow) {
     setSavingProfileId(profile.id)
-    const { error } = await supabase.from('profiles').update({
-      level: profile.level,
-      permissions: profile.permissions ?? {},
-    }).eq('id', profile.id)
+    const { error } = await supabase.from('profiles').update({ level: profile.level }).eq('id', profile.id)
+    if (!error) {
+      await supabase.from('profile_permissions').delete().eq('profile_id', profile.id)
+      const rows = Object.entries(profile.permissions).flatMap(([module_key, actions]) => Object.entries(actions).map(([action_key, allowed]) => ({ profile_id: profile.id, module_key, action_key, allowed })))
+      if (rows.length) await supabase.from('profile_permissions').insert(rows)
+    }
     setSavingProfileId(null)
     if (error) alert("Erro ao salvar usuário: " + error.message)
   }
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('system_settings').select('key, value, pause_history_tracking').in('key', ['modules', 'permissions', 'work_schedules'])
+      const { data } = await supabase.from('system_settings').select('key, pause_history_tracking, system_setting_entries(path, value_text, value_boolean)').in('key', ['modules', 'permissions', 'work_schedules'])
       if (data) {
         data.forEach(row => {
+          const entries = (row.system_setting_entries ?? []) as SettingEntry[];
           if (row.key === 'modules') {
-            setModules(row.value)
+            setModules((previous) => ({ ...previous, ...readSettingFlags(entries) }))
             setPauseHistory(row.pause_history_tracking || false)
           }
-          if (row.key === 'permissions') setPermissions(row.value)
-          if (row.key === 'work_schedules' && Array.isArray(row.value)) setWorkSchedules(row.value)
+          if (row.key === 'permissions') setPermissions((previous) => ({ ...previous, ...readSettingFlags(entries) }))
+          if (row.key === 'work_schedules') setWorkSchedules(entries.sort((a, b) => Number(a.path[0]) - Number(b.path[0])).map((entry) => entry.value_text ?? ''))
         })
       }
       const { data: publicForm } = await supabase.from('public_form_settings').select('value').eq('key', 'job_request_code').maybeSingle()
@@ -92,9 +107,9 @@ export default function ConfiguracoesPage() {
     setSaving(true)
     try {
       const { error: settingsError } = await supabase.from('system_settings').upsert([
-        { key: 'modules', value: modules, pause_history_tracking: pauseHistory },
-        { key: 'permissions', value: permissions, pause_history_tracking: pauseHistory },
-        { key: 'work_schedules', value: workSchedules, pause_history_tracking: pauseHistory }
+        { key: 'modules', pause_history_tracking: pauseHistory },
+        { key: 'permissions', pause_history_tracking: pauseHistory },
+        { key: 'work_schedules', pause_history_tracking: pauseHistory }
       ], { onConflict: 'key' });
       
       if (settingsError) throw new Error(settingsError.message);
@@ -105,12 +120,22 @@ export default function ConfiguracoesPage() {
       );
       if (publicFormError) throw new Error(publicFormError.message);
 
+      const { error: entriesError } = await supabase.from('system_setting_entries').delete().in('setting_key', ['modules', 'permissions', 'work_schedules']);
+      if (entriesError) throw new Error(entriesError.message);
+      const entries = [
+        ...Object.entries(modules).map(([key, value]) => ({ setting_key: 'modules', path: [key], value_type: 'boolean', value_boolean: value })),
+        ...Object.entries(permissions).map(([key, value]) => ({ setting_key: 'permissions', path: [key], value_type: 'boolean', value_boolean: value })),
+        ...workSchedules.map((value, index) => ({ setting_key: 'work_schedules', path: [String(index)], value_type: 'string', value_text: value })),
+      ];
+      if (entries.length) {
+        const { error } = await supabase.from('system_setting_entries').insert(entries);
+        if (error) throw new Error(error.message);
+      }
       await supabase.from('system_audit_logs').insert({
         action_type: 'UPDATE_SETTINGS',
         entity_name: 'system_settings',
         user_identifier: 'Administrador',
-        ip_address: 'browser',
-        details: { modules, permissions, pauseHistory, workSchedules }
+        ip_address: 'browser'
       });
       
       alert("Configurações salvas com sucesso!");

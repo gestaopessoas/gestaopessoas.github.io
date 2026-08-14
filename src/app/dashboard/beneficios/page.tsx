@@ -33,7 +33,7 @@ type AuditLog = {
   employee_id: string;
   action_type: string;
   benefit_details: string;
-  previous_payload?: unknown;
+  restore_items?: Benefit[];
   performed_by?: string;
   created_at: string;
   employee_name?: string;
@@ -47,7 +47,7 @@ const FALLBACK_AUDIT_LOGS: AuditLog[] = [
     employee_id: "e-demo-1",
     action_type: "REMOVE_BENEFIT",
     benefit_details: "Exclusão de Plano SulClínica e OdontoPrev por Demissão (Corte Pós-Demissão)",
-    previous_payload: [
+    restore_items: [
       { employee_id: "e-demo-1", benefit_name: "SulClínica", value: 350, benefit_type: "SulClínica" },
       { employee_id: "e-demo-1", benefit_name: "OdontoPrev", value: 45, benefit_type: "OdontoPrev" }
     ],
@@ -60,7 +60,6 @@ const FALLBACK_AUDIT_LOGS: AuditLog[] = [
     employee_id: "e-demo-2",
     action_type: "IGNORE_INCLUSION",
     benefit_details: "Elegibilidade de Inclusão ao Plano de Saúde Ignorada no painel",
-    previous_payload: { employee_id: "e-demo-2" },
     created_at: new Date(Date.now() - 172800000).toISOString(),
     employee_name: "Carlos Eduardo Mendes (Demonstração)",
     employee_department: "Tecnologia / TI"
@@ -80,6 +79,20 @@ export default function BeneficiosPage() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [undoingId, setUndoingId] = useState<string | null>(null);
+
+  const registerAudit = async (payload: Omit<AuditLog, "id" | "created_at" | "restore_items">, restoreItems: Benefit[] = []) => {
+    const { data, error } = await supabase.from("benefit_audit_logs").insert(payload).select("id").single();
+    if (error) throw error;
+    if (!restoreItems.length) return;
+    const entries = restoreItems.flatMap((item, index) => [
+      { audit_log_id: data.id, path: [String(index), "employee_id"], value_type: "string", value_text: item.employee_id },
+      { audit_log_id: data.id, path: [String(index), "benefit_name"], value_type: "string", value_text: item.benefit_name ?? item.benefit_type },
+      { audit_log_id: data.id, path: [String(index), "benefit_type"], value_type: "string", value_text: item.benefit_type },
+      { audit_log_id: data.id, path: [String(index), "value"], value_type: "number", value_number: item.value },
+    ]);
+    const { error: entriesError } = await supabase.from("benefit_audit_log_entries").insert(entries);
+    if (entriesError) throw entriesError;
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -110,7 +123,7 @@ export default function BeneficiosPage() {
     // Fetch de registros da tabela de auditoria benefit_audit_logs
     const { data: audits, error: auditError } = await supabase
       .from("benefit_audit_logs")
-      .select("*")
+      .select("*, benefit_audit_log_entries(path, value_text, value_number)")
       .order("created_at", { ascending: false });
 
     const empsList: Employee[] = (emps || []).map((e: Record<string, unknown>) => {
@@ -150,7 +163,17 @@ export default function BeneficiosPage() {
           employee_id: String(a.employee_id || ""),
           action_type: String(a.action_type || ""),
           benefit_details: String(a.benefit_details || ""),
-          previous_payload: a.previous_payload,
+          restore_items: Object.values(((a.benefit_audit_log_entries ?? []) as { path: string[]; value_text: string | null; value_number: number | null }[]).reduce((items: Record<string, Benefit>, entry) => {
+            const [index, field] = entry.path;
+            if (index === undefined || !field) return items;
+            const item = items[index] ?? { employee_id: "", benefit_type: "", value: 0 };
+            if (field === "value") item.value = Number(entry.value_number ?? 0);
+            else if (field === "employee_id") item.employee_id = entry.value_text ?? "";
+            else if (field === "benefit_name") item.benefit_name = entry.value_text ?? "";
+            else if (field === "benefit_type") item.benefit_type = entry.value_text ?? "";
+            items[index] = item;
+            return items;
+          }, {})),
           performed_by: a.performed_by ? String(a.performed_by) : undefined,
           created_at: String(a.created_at || ""),
           employee_name: emp ? emp.name : `Colaborador (${String(a.employee_id || "").slice(0, 8)})`,
@@ -237,9 +260,8 @@ export default function BeneficiosPage() {
       employee_id: employeeId,
       action_type: "IGNORE_INCLUSION",
       benefit_details: `Elegibilidade de inclusão de plano ignorada no painel (${emp?.name || "Colaborador"})`,
-      previous_payload: { employee_id: employeeId, employee_name: emp?.name, employee_department: emp?.department },
     };
-      await supabase.from("benefit_audit_logs").insert(auditPayload);
+      await registerAudit(auditPayload);
       await supabase.from("benefit_ignores").insert({ employee_id: employeeId });
     await fetchData();
   };
@@ -255,9 +277,8 @@ export default function BeneficiosPage() {
       employee_id: employeeId,
       action_type: "REMOVE_BENEFIT",
       benefit_details: `Corte Pós-Demissão: excluídos ${empBens.length} benefício(s) de ${emp?.name || "Ex-colaborador"}`,
-      previous_payload: empBens,
     };
-      await supabase.from("benefit_audit_logs").insert(auditPayload);
+      await registerAudit(auditPayload, empBens);
     await supabase.from("employee_benefits").delete().eq("employee_id", employeeId);
     await fetchData();
   };
@@ -272,14 +293,11 @@ export default function BeneficiosPage() {
       return;
     setLoading(true);
     const inserts = elegiveisPlanos.map((emp) => ({ employee_id: emp.id }));
-    const auditInserts = elegiveisPlanos.map((emp) => ({
+    await Promise.all(elegiveisPlanos.map((emp) => registerAudit({
       employee_id: emp.id,
       action_type: "IGNORE_ALL",
       benefit_details: `Inclusão em massa ignorada no painel para ${emp.name}`,
-      previous_payload: { employee_id: emp.id, employee_name: emp.name, employee_department: emp.department },
-    }));
-
-      await supabase.from("benefit_audit_logs").insert(auditInserts);
+    })));
       await supabase.from("benefit_ignores").insert(inserts);
     await fetchData();
   };
@@ -301,11 +319,11 @@ export default function BeneficiosPage() {
         employee_id: emp.id,
         action_type: "REMOVE_ALL_BENEFIT",
         benefit_details: `Corte em massa pós-demissão: excluídos benefícios de ${emp.name}`,
-        previous_payload: empBens,
+        restoreItems: empBens,
       };
     });
 
-      await supabase.from("benefit_audit_logs").insert(auditInserts);
+    await Promise.all(auditInserts.map(({ restoreItems, ...payload }) => registerAudit(payload, restoreItems)));
     await supabase.from("employee_benefits").delete().in("employee_id", ids);
     await fetchData();
   };
@@ -333,16 +351,12 @@ export default function BeneficiosPage() {
         setIgnores((prev) => prev.filter((id) => id !== log.employee_id));
         alert(`✅ Ignoração desfeita com sucesso! O colaborador "${log.employee_name}" voltou para Inclusão Pendente.`);
       } else if (log.action_type.includes("REMOVE")) {
-        // Desfazer corte: re-informa o snapshot de benefícios salva em previous_payload na tabela employee_benefits
-        if (Array.isArray(log.previous_payload) && log.previous_payload.length > 0) {
-          const itemsToRestore = log.previous_payload.map((item: unknown) => {
-            const b = item as Record<string, unknown>;
-            return {
-              employee_id: log.employee_id,
-              benefit_name: String(b.benefit_name || b.benefit_type || "Plano Restaurado"),
-              value: Number(b.value || 0),
-            };
-          });
+        if (log.restore_items?.length) {
+          const itemsToRestore = log.restore_items.map((item) => ({
+            employee_id: log.employee_id,
+            benefit_name: item.benefit_name || item.benefit_type || "Plano Restaurado",
+            value: item.value,
+          }));
           await supabase.from("employee_benefits").insert(itemsToRestore);
         }
         alert(`✅ Corte desfeito com sucesso! Os benefícios de "${log.employee_name}" foram devidamente restaurados.`);

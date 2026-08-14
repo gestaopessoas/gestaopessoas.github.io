@@ -129,7 +129,6 @@ export default function FinanceiroPage() {
       action_type: "REVERT_FINANCIAL_SNAPSHOT",
       entity_name: "financial_snapshots",
       user_identifier: user.user.email,
-      details: { month, year }
     });
 
     setReverting(false);

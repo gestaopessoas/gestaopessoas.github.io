@@ -288,7 +288,7 @@ export default function MPGeneratorPage() {
           .order("name"),
         supabase.from("workplaces").select("id, name").order("name"),
         supabase.from("cost_centers").select("id, name:code").order("code"),
-        supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle(),
+        supabase.from("system_setting_entries").select("path, value_text").eq("setting_key", "work_schedules").order("path"),
         supabase.from("mp_history").select("*, profiles:created_by(full_name), employees:employee_id(name)").order("created_at", { ascending: false }),
         supabase.from("sectors").select("id, name").order("name"),
         supabase.from("company_benefits").select("*").order("name")
@@ -299,9 +299,7 @@ export default function MPGeneratorPage() {
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
       if (depRes.data) setSectors(depRes.data as Entity[]);
       if (benefitsRes.data) setCatalogBenefits(benefitsRes.data as unknown as Benefit[]);
-      let scheds: string[] = [];
-      if (Array.isArray(settingsRes.data?.value)) scheds = settingsRes.data.value;
-      else if (typeof settingsRes.data?.value === "string") { try { scheds = JSON.parse(settingsRes.data.value); } catch {} }
+      let scheds: string[] = (settingsRes.data ?? []).sort((a, b) => Number(a.path[0]) - Number(b.path[0])).map((entry) => entry.value_text ?? "");
       if (!scheds || !scheds.length) {
         scheds = [
           "Administrativo (Seg-Sex 08:00-17:48)",

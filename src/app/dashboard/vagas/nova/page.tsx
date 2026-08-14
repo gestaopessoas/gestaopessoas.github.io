@@ -117,7 +117,7 @@ export default function NovaVagaPage() {
         supabase.from("job_profiles").select("id, profile_code, title, min_education, desired_education, min_experience, desired_experience, cnh, knowledge, competencies").order("title"),
         supabase.from("departments").select("id, name").order("name"),
         supabase.from("salary_table").select("*").order("role_name"),
-        supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle(),
+        supabase.from("system_setting_entries").select("path, value_text").eq("setting_key", "work_schedules").order("path"),
         supabase.from("cost_centers").select("id, name, code").order("name"),
         supabase.from("company_benefits").select("name").order("name"),
       ]);
@@ -135,9 +135,7 @@ export default function NovaVagaPage() {
       setSalaryTable((salaryResult.data ?? []) as SalaryRow[]);
       setCostCenters((costCentersResult.data ?? []) as CostCenter[]);
       setCompanyBenefits((benefitsResult.data ?? []) as {name: string}[]);
-      let scheds: string[] = [];
-      if (Array.isArray(settingsResult.data?.value)) scheds = settingsResult.data.value;
-      else if (typeof settingsResult.data?.value === "string") { try { scheds = JSON.parse(settingsResult.data.value); } catch {} }
+      let scheds: string[] = (settingsResult.data ?? []).sort((a, b) => Number(a.path[0]) - Number(b.path[0])).map((entry) => entry.value_text ?? "");
       if (!scheds || !scheds.length) {
         scheds = [
           "Administrativo (Seg-Sex 08:00-17:48)",

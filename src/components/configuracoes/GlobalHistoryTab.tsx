@@ -15,8 +15,7 @@ type HistoryEntry = {
   employee_id: string
   change_date: string
   change_type: string
-  old_value: unknown
-  new_value: unknown
+  employee_history_value_entries?: { value_side: string; path: string[]; value_text: string | null; value_number: number | null; value_boolean: boolean | null }[]
   description: string
   column_name: string
   changed_by: string
@@ -41,7 +40,8 @@ export function GlobalHistoryTab() {
       .select(`
         *,
         profiles!changed_by(name),
-        employees!employee_id(name)
+        employees!employee_id(name),
+        employee_history_value_entries(value_side, path, value_text, value_number, value_boolean)
       `)
       .order('change_date', { ascending: false })
       .limit(100)
@@ -92,9 +92,16 @@ export function GlobalHistoryTab() {
       return
     }
 
+    const oldValue = (revertItem.employee_history_value_entries ?? []).find((entry) => entry.value_side === 'old' && entry.path.length === 0);
+    const value = oldValue?.value_text ?? oldValue?.value_number ?? oldValue?.value_boolean;
+    if (value === undefined) {
+      alert("Este histórico possui valores compostos e não pode ser revertido automaticamente.");
+      setReverting(false);
+      return;
+    }
     const { error: updateError } = await supabase
       .from('employees')
-      .update({ [revertItem.column_name]: revertItem.old_value })
+      .update({ [revertItem.column_name]: value })
       .eq('id', revertItem.employee_id)
 
     if (updateError) {
@@ -114,6 +121,12 @@ export function GlobalHistoryTab() {
     h.description?.toLowerCase().includes(search.toLowerCase()) ||
     h.change_type?.toLowerCase().includes(search.toLowerCase())
   )
+
+  const displayValue = (item: HistoryEntry | null, side: 'old' | 'new') => {
+    const entries = (item?.employee_history_value_entries ?? []).filter((entry) => entry.value_side === side);
+    if (!entries.length) return 'Nada';
+    return entries.map((entry) => `${entry.path.length ? `${entry.path.join(' · ')}: ` : ''}${entry.value_text ?? entry.value_number ?? entry.value_boolean ?? 'Nada'}`).join(' | ');
+  }
 
   return (
     <Card className="border-border/60 shadow-sm">
@@ -207,11 +220,11 @@ export function GlobalHistoryTab() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <span className="text-muted-foreground block mb-1">Como estava:</span>
-                <span className="font-mono bg-background px-2 py-1 rounded border inline-block w-full">{String(revertItem?.old_value ?? 'Nada')}</span>
+                <span className="font-mono bg-background px-2 py-1 rounded border inline-block w-full">{displayValue(revertItem, 'old')}</span>
               </div>
               <div>
                 <span className="text-muted-foreground block mb-1">Como ficou:</span>
-                <span className="font-mono bg-background px-2 py-1 rounded border inline-block w-full">{String(revertItem?.new_value ?? 'Nada')}</span>
+                <span className="font-mono bg-background px-2 py-1 rounded border inline-block w-full">{displayValue(revertItem, 'new')}</span>
               </div>
             </div>
             <p className="pt-2 text-xs text-muted-foreground">Isso gerará um novo registro automático no histórico revertendo para o valor antigo.</p>

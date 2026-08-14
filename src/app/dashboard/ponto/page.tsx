@@ -156,24 +156,31 @@ export default function PontoPage() {
         change_date: new Date().toISOString(),
         change_type: "FECHAMENTO_PONTO",
         description: `Fechamento Mensal RHID ➔ Domínio (${referenceMonth})`,
-        old_value: {
-          situacao: "Arquivo RHID processado no sistema",
-          registros_no_arquivo: emp.recordsCount
-        },
-        new_value: {
-          mes_referencia: referenceMonth,
-          empresa_vinculada: emp.companyName,
-          local_trabalho: emp.workplaceName,
-          horario_aplicado: emp.schedule.display,
-          arquivo_origem: processedResult.fileName
-        }
+        column_name: null,
       }));
 
-      const { error: histError } = await supabase
+      const { data: histories, error: histError } = await supabase
         .from("employee_history")
-        .insert(historyPayload);
+        .insert(historyPayload)
+        .select("id, employee_id");
 
       if (histError) throw histError;
+      const values = (histories ?? []).flatMap((history) => {
+        const employee = matchedEmployeesList.find((item) => item.employeeId === history.employee_id)!;
+        return [
+          { history_id: history.id, value_side: "old", path: ["situacao"], value_type: "string", value_text: "Arquivo RHID processado no sistema" },
+          { history_id: history.id, value_side: "old", path: ["registros_no_arquivo"], value_type: "number", value_number: employee.recordsCount },
+          { history_id: history.id, value_side: "new", path: ["mes_referencia"], value_type: "string", value_text: referenceMonth },
+          { history_id: history.id, value_side: "new", path: ["empresa_vinculada"], value_type: "string", value_text: employee.companyName },
+          { history_id: history.id, value_side: "new", path: ["local_trabalho"], value_type: "string", value_text: employee.workplaceName },
+          { history_id: history.id, value_side: "new", path: ["horario_aplicado"], value_type: "string", value_text: employee.schedule.display },
+          { history_id: history.id, value_side: "new", path: ["arquivo_origem"], value_type: "string", value_text: processedResult.fileName },
+        ];
+      });
+      if (values.length) {
+        const { error } = await supabase.from("employee_history_value_entries").insert(values);
+        if (error) throw error;
+      }
 
       setSaveSuccessMessage(
         `Sucesso incrível! ${matchedEmployeesList.length} colaboradores tiveram seus registros arquivados no histórico mês a mês e os horários foram verificados/padronizados conforme a unidade.`

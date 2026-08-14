@@ -39,13 +39,19 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
       const { data } = await supabase
         .from("profiles")
-        .select("level, permissions")
+        .select("level, profile_permissions(module_key, action_key, allowed)")
         .eq("id", user.id)
         .maybeSingle();
 
       if (!active) return;
       setLevel(data?.level ?? 0);
-      setPermissions((data?.permissions as Permissions) ?? {});
+      const mappedPermissions: Permissions = {};
+      for (const permission of data?.profile_permissions ?? []) {
+        const item = permission as { module_key: string; action_key: string; allowed: boolean };
+        mappedPermissions[item.module_key] ??= {};
+        mappedPermissions[item.module_key][item.action_key] = item.allowed;
+      }
+      setPermissions(mappedPermissions);
       setLoading(false);
     };
 

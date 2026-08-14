@@ -39,9 +39,9 @@ export function NotificationBell() {
       let userPrefs = { trial: true, rgs: true, benefits: true, profile: true };
 
       if (authData.user?.id) {
-        const { data: prof } = await supabase.from('profiles').select('permissions').eq('id', authData.user.id).maybeSingle();
-        if (prof?.permissions?._preferences) {
-          userPrefs = { ...userPrefs, ...prof.permissions._preferences };
+        const { data: prof } = await supabase.from('profile_preferences').select('notify_trial, notify_rgs, notify_benefits, notify_profile').eq('profile_id', authData.user.id).maybeSingle();
+        if (prof) {
+          userPrefs = { ...userPrefs, trial: prof.notify_trial, rgs: prof.notify_rgs, benefits: prof.notify_benefits, profile: prof.notify_profile };
           setPreferences(userPrefs);
         }
       }

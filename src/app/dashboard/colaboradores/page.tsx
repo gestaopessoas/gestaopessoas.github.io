@@ -386,8 +386,8 @@ export default function ColaboradoresPage() {
     }
       
     if (isNew || isDismissed || isPromoted) {
-      const { data: settingsData } = await supabase.from("system_settings").select("value").eq("key", "modules").maybeSingle();
-      const rgsTrackingEnabled = settingsData?.value?.rgs_tracking ?? true;
+      const { data: settingsData } = await supabase.from("system_setting_entries").select("value_boolean").eq("setting_key", "modules").eq("path", '{rgs_tracking}').maybeSingle();
+      const rgsTrackingEnabled = settingsData?.value_boolean ?? true;
       
       if (rgsTrackingEnabled) {
         const rgsType = isNew ? "Contratação" : isDismissed ? "Desligamento" : "Alteração de cargo/local";

@@ -25,7 +25,6 @@ export function UserProfile() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [userId, setUserId] = useState("");
-  const [permissions, setPermissions] = useState<Record<string, unknown>>({});
   
   // Personalização Estendida
   const [customRole, setCustomRole] = useState("Especialista em Gestão de Pessoas");
@@ -48,19 +47,19 @@ export function UserProfile() {
         setEmail(data.user.email);
         setUserId(data.user.id);
         
-        const { data: prof } = await supabase.from('profiles').select('name, permissions').eq('id', data.user.id).maybeSingle();
+        const { data: prof } = await supabase.from('profiles').select('name').eq('id', data.user.id).maybeSingle();
+        const { data: profilePreferences } = await supabase.from('profile_preferences').select('*').eq('profile_id', data.user.id).maybeSingle();
         if (prof) {
           setName(prof.name || data.user.email.split('@')[0]);
-          setPermissions(prof.permissions || {});
-          setPreferences(prof.permissions?._preferences || { trial: true, rgs: true, benefits: true, profile: true });
-          
-          const custom = prof.permissions?._custom_profile || {};
-          if (custom.role) setCustomRole(custom.role);
-          if (custom.phone) setCustomPhone(custom.phone);
-          if (custom.status) setUserStatus(custom.status);
-          if (custom.bio) setUserBio(custom.bio);
+          if (profilePreferences) {
+            setPreferences({ trial: profilePreferences.notify_trial, rgs: profilePreferences.notify_rgs, benefits: profilePreferences.notify_benefits, profile: profilePreferences.notify_profile });
+            if (profilePreferences.custom_role) setCustomRole(profilePreferences.custom_role);
+            if (profilePreferences.custom_phone) setCustomPhone(profilePreferences.custom_phone);
+            if (profilePreferences.availability_status) setUserStatus(profilePreferences.availability_status);
+            if (profilePreferences.bio) setUserBio(profilePreferences.bio);
           // Preferência salva em outro dispositivo passa a valer aqui.
-          if (custom.theme === "light" || custom.theme === "dark" || custom.theme === "system") setTheme(custom.theme);
+            if (profilePreferences.theme === "light" || profilePreferences.theme === "dark" || profilePreferences.theme === "system") setTheme(profilePreferences.theme);
+          }
         }
       }
     };
@@ -74,26 +73,23 @@ export function UserProfile() {
     setError("");
     const supabase = createClient();
     
-    const updatedCustomProfile = {
-      role: customRole,
-      phone: customPhone,
-      status: userStatus,
+    const { error: updateError } = await supabase.from('profile_preferences').upsert({
+      profile_id: userId,
+      notify_trial: preferences.trial,
+      notify_rgs: preferences.rgs,
+      notify_benefits: preferences.benefits,
+      notify_profile: preferences.profile,
+      custom_role: customRole,
+      custom_phone: customPhone,
+      availability_status: userStatus,
       bio: userBio,
-      theme: themePref
-    };
-
-    const updatedPermissions = { 
-      ...permissions, 
-      _preferences: preferences,
-      _custom_profile: updatedCustomProfile
-    };
-
-    const { error: updateError } = await supabase.from('profiles').update({ permissions: updatedPermissions }).eq('id', userId);
+      theme: themePref,
+      updated_at: new Date().toISOString(),
+    });
     setSavingPrefs(false);
     if (updateError) {
       setError("Erro ao salvar personalização e preferências.");
     } else {
-      setPermissions(updatedPermissions);
       setSuccess("Personalização e preferências salvas com sucesso!");
       setTimeout(() => setSuccess(""), 3000);
     }
@@ -114,15 +110,20 @@ export function UserProfile() {
     });
 
     if (userId) {
-      const updatedCustomProfile = {
-        role: customRole,
-        phone: customPhone,
-        status: userStatus,
+      await supabase.from('profiles').update({ name }).eq('id', userId);
+      await supabase.from('profile_preferences').upsert({
+        profile_id: userId,
+        notify_trial: preferences.trial,
+        notify_rgs: preferences.rgs,
+        notify_benefits: preferences.benefits,
+        notify_profile: preferences.profile,
+        custom_role: customRole,
+        custom_phone: customPhone,
+        availability_status: userStatus,
         bio: userBio,
-        theme: themePref
-      };
-      const updatedPermissions = { ...permissions, _custom_profile: updatedCustomProfile };
-      await supabase.from('profiles').update({ name, permissions: updatedPermissions }).eq('id', userId);
+        theme: themePref,
+        updated_at: new Date().toISOString(),
+      });
     }
 
     // Update password se os campos de senha foram preenchidos

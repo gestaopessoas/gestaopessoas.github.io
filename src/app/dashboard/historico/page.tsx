@@ -13,8 +13,7 @@ type EmployeeHistory = {
   id: string
   change_date: string
   change_type: string
-  old_value: unknown
-  new_value: unknown
+  employee_history_value_entries?: { value_side: string; path: string[]; value_text: string | null; value_number: number | null; value_boolean: boolean | null }[]
   description: string
 }
 
@@ -49,7 +48,7 @@ function HistoricoContent() {
 
       const { data: histData } = await supabase
         .from("employee_history")
-        .select("*")
+        .select("*, employee_history_value_entries(value_side, path, value_text, value_number, value_boolean)")
         .eq("employee_id", id)
         .order("change_date", { ascending: false })
 
@@ -91,14 +90,14 @@ function HistoricoContent() {
     }
   }
 
-  function formatValue(val: unknown): string {
-    if (val === null || val === undefined) return "N/A"
-    if (typeof val === 'object') {
-      return Object.entries(val)
-        .map(([k, v]) => `• ${k.replace(/_/g, ' ').toUpperCase()}: ${v}`)
-        .join('\n')
-    }
-    return String(val)
+  function formatValue(record: EmployeeHistory, side: "old" | "new"): string {
+    const entries = (record.employee_history_value_entries ?? []).filter((entry) => entry.value_side === side);
+    if (!entries.length) return "N/A";
+    return entries.map((entry) => {
+      const value = entry.value_text ?? entry.value_number ?? entry.value_boolean ?? "N/A";
+      const label = entry.path.length ? `${entry.path.join(" · ").replace(/_/g, " ").toUpperCase()}: ` : "";
+      return `• ${label}${value}`;
+    }).join("\n");
   }
 
   if (loading) {
@@ -158,13 +157,13 @@ function HistoricoContent() {
                       <div>
                         <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Valor Anterior</span>
                         <div className="mt-1 font-mono text-xs overflow-x-auto whitespace-pre-wrap break-words">
-                          {formatValue(record.old_value)}
+                          {formatValue(record, "old")}
                         </div>
                       </div>
                       <div>
                         <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Novo Valor</span>
                         <div className="mt-1 font-mono text-xs overflow-x-auto whitespace-pre-wrap break-words">
-                          {formatValue(record.new_value)}
+                          {formatValue(record, "new")}
                         </div>
                       </div>
                     </div>
