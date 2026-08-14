@@ -14,7 +14,7 @@ import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
 import * as pdfjsLib from "pdfjs-dist";
 import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
 import { usePermissions } from "@/hooks/usePermissions";
-import { buildCandidateHistoryRecord, canDisplayCandidateContacts } from "@/lib/candidateHistory.mjs";
+import { buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -161,6 +161,7 @@ export function CandidateProfileModal({
 }: CandidateProfileModalProps) {
   const [activeTab, setActiveTab] = useState<"curriculum" | "assessment" | "behavioral" | "history">(initialTab);
   const [person, setPerson] = useState<ProfilePerson | null>(initialData ? (initialData as ProfilePerson) : null);
+  const [resolvedCandidateId, setResolvedCandidateId] = useState<string | null>(candidateId || null);
   const [formData, setFormData] = useState<ProfilePerson>(initialData || {});
   const [assessmentData, setAssessmentData] = useState<any>(initialAssessmentData || {});
   const [isEditing, setIsEditing] = useState(defaultEditMode);
@@ -177,8 +178,11 @@ export function CandidateProfileModal({
   
   const handleSaveHistory = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetCandId = candidateId || person?.id;
-    if (!targetCandId) return;
+    const targetCandId = getCandidateHistoryTargetId({ candidateId, resolvedCandidateId });
+    if (!targetCandId) {
+      alert("Não foi possível registrar o histórico porque esta entrevista não está vinculada a um candidato cadastrado.");
+      return;
+    }
     
     setIsSavingHistory(true);
     const supabase = createClient();
@@ -195,8 +199,8 @@ export function CandidateProfileModal({
       
       setIsAddingHistory(false);
       setHistoryForm({ stage: "", reason: "", notes: "", workplaceName: "", interviewerName: "", candidateFuture: "" });
-    } catch (err) {
-      alert("Erro ao salvar histórico.");
+    } catch (err: any) {
+      alert(`Erro ao salvar histórico: ${err?.message || "tente novamente."}`);
     } finally {
       setIsSavingHistory(false);
     }
@@ -431,6 +435,7 @@ ${text.substring(0, 8000)}`;
       const supabase = createClient();
       
       let personData: ProfilePerson | null = null;
+      let resolvedId: string | null = null;
       let resultsData: BigFiveResult[] = [];
       let educationsData: ProfileEducation[] = [];
       let interviewsData: ProfileInterview[] = [];
@@ -439,7 +444,10 @@ ${text.substring(0, 8000)}`;
       // 1. Resolver dados da Pessoa
       if (candidateId) {
         const { data } = await supabase.from("candidates").select("*").eq("id", candidateId).maybeSingle();
-        if (data) personData = data;
+        if (data) {
+          personData = data;
+          resolvedId = data.id;
+        }
       } else if (employeeId) {
         const { data } = await supabase.from("employees").select("*").eq("id", employeeId).maybeSingle();
         if (data) personData = data;
@@ -447,12 +455,18 @@ ${text.substring(0, 8000)}`;
 
       if (!personData && email) {
         const { data } = await supabase.from("candidates").select("*").eq("email", email).maybeSingle();
-        if (data) personData = data;
+        if (data) {
+          personData = data;
+          resolvedId = data.id;
+        }
       }
 
       if (!personData && candidateName) {
         const { data } = await supabase.from("candidates").select("*").ilike("full_name", candidateName).maybeSingle();
-        if (data) personData = data;
+        if (data) {
+          personData = data;
+          resolvedId = data.id;
+        }
       }
 
       // Se ainda não achou, buscar em interviews
@@ -464,15 +478,25 @@ ${text.substring(0, 8000)}`;
         
         const { data: intData } = await query.limit(1).maybeSingle();
         if (intData) {
-          personData = {
-            id: intData.id,
-            full_name: intData.candidate_name,
-            email: intData.email,
-            phone: intData.phone,
-            role_interest: intData.role,
-            city: intData.assessment?.worksite || "Não especificado",
-            isFromInterview: true
-          };
+          let candidateQuery = supabase.from("candidates").select("*");
+          if (intData.email) candidateQuery = candidateQuery.eq("email", intData.email);
+          else candidateQuery = candidateQuery.ilike("full_name", intData.candidate_name || "");
+          const { data: linkedCandidate } = await candidateQuery.maybeSingle();
+
+          if (linkedCandidate) {
+            personData = linkedCandidate;
+            resolvedId = linkedCandidate.id;
+          } else {
+            personData = {
+              id: intData.id,
+              full_name: intData.candidate_name,
+              email: intData.email,
+              phone: intData.phone,
+              role_interest: intData.role,
+              city: intData.assessment?.worksite || "Não especificado",
+              isFromInterview: true
+            };
+          }
         }
       }
 
@@ -481,7 +505,7 @@ ${text.substring(0, 8000)}`;
         return;
       }
 
-      const targetCandId = personData.id || candidateId;
+      const targetCandId = resolvedId;
       const targetEmpId = employeeId || (personData.role && !personData.role_interest ? personData.id : null);
       const personEmail = personData.email || email;
       const personName = personData.full_name || personData.name || candidateName;
@@ -571,6 +595,7 @@ ${text.substring(0, 8000)}`;
       if (!active) return;
       
       setPerson(personData);
+      setResolvedCandidateId(resolvedId);
       if (interviewsData.length > 0 && interviewsData[0].assessment) {
         setAssessmentData(interviewsData[0].assessment);
       } else {

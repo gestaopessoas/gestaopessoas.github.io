@@ -22,6 +22,10 @@ export function buildCandidateHistoryRecord({
   };
 }
 
+export function getCandidateHistoryTargetId({ candidateId, resolvedCandidateId }) {
+  return candidateId || resolvedCandidateId || null;
+}
+
 export function canDisplayCandidateContacts(interviews = []) {
   if (!Array.isArray(interviews) || interviews.length === 0) return true;
   const latest = [...interviews].sort(

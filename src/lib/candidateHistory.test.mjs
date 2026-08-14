@@ -1,4 +1,4 @@
-import { buildCandidateHistoryRecord, canDisplayCandidateContacts } from "./candidateHistory.mjs";
+import { buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "./candidateHistory.mjs";
 
 const record = buildCandidateHistoryRecord({
   candidateId: "candidate-1",
@@ -36,4 +36,14 @@ if (!canDisplayCandidateContacts([{ candidate_future: "Banco de talentos" }])) {
 }
 if (canDisplayCandidateContacts([{ candidate_future: "Avançar no processo" }])) {
   throw new Error("Contacts must be hidden during an active process");
+}
+
+if (getCandidateHistoryTargetId({ candidateId: "candidate-1", resolvedCandidateId: "candidate-2" }) !== "candidate-1") {
+  throw new Error("An explicit candidate ID must be used for the history record");
+}
+if (getCandidateHistoryTargetId({ candidateId: null, resolvedCandidateId: "candidate-2" }) !== "candidate-2") {
+  throw new Error("The resolved candidate ID must be used for interview profiles");
+}
+if (getCandidateHistoryTargetId({ candidateId: null, resolvedCandidateId: null }) !== null) {
+  throw new Error("An unresolved interview must not produce a history candidate ID");
 }
