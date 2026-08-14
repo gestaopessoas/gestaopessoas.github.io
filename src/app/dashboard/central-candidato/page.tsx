@@ -37,10 +37,11 @@ type CandidateRow = {
   ultimo_chamado: string;
   obra_atual: string | null;
   etapa_atual: string | null;
-  bucket: string;
+  bucket: Bucket;
+  is_new?: boolean;
 };
 
-type Bucket = "todos" | "livre" | "entrevista" | "encaminhado" | "obras" | "proposta" | "documentacao" | "contratacao";
+type Bucket = "todos" | "livre" | "entrevista" | "encaminhado" | "obras" | "proposta" | "documentacao" | "contratacao" | "encerrado";
 
 // Cor por balde para leitura rápida na tabela.
 const BUCKET_STYLE: Record<string, string> = {
@@ -89,7 +90,8 @@ export default function CentralCandidatoPage() {
           search_tags,
           available_worksites,
           candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, created_at),
-          candidate_educations(candidate_id, degree, start_date, end_date)
+          candidate_educations(candidate_id, degree, start_date, end_date),
+          job_applications(id, status)
         `)
         .order('created_at', { ascending: false });
 
@@ -120,6 +122,8 @@ export default function CentralCandidatoPage() {
             }
           }
 
+          const hasNewApplication = Array.isArray(c.job_applications) && c.job_applications.some((app: any) => app.status === "Nova Aplicação");
+
           return {
             id: c.id,
             full_name: c.full_name,
@@ -131,6 +135,7 @@ export default function CentralCandidatoPage() {
             obra_atual: derived.obra_atual || c.city || null,
             etapa_atual: derived.etapa_atual,
             bucket: candidateBucket(finalStatus, derived.etapa_atual),
+            is_new: hasNewApplication,
           };
         });
         setCandidates(rows);
@@ -313,8 +318,14 @@ export default function CentralCandidatoPage() {
                     className="hover:bg-muted/30 transition-colors cursor-pointer group"
                     onClick={() => setSelectedCandidateId(candidate.id)}
                   >
-                    <td className="px-6 py-4 font-medium text-foreground">
+                    <td className="px-6 py-4 font-medium text-foreground relative">
+                      {candidate.is_new && (
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-red-500 shadow-sm" title="Nova Inscrição Não Lida" />
+                      )}
                       {candidate.full_name}
+                      {candidate.is_new && (
+                        <span className="ml-2 inline-flex items-center rounded-md bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-600 ring-1 ring-inset ring-red-500/20">Novo</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">

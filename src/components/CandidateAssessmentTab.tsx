@@ -6,7 +6,7 @@ import { Check, X, AlertTriangle, AlertCircle, CheckCircle2, BookOpen } from "lu
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 
 type AssessmentData = any;
 
@@ -104,17 +104,17 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
           </h3>
           <p className="text-sm text-muted-foreground mt-1">Utilize o método STAR (Situação, Tarefa, Ação, Resultado) para avaliar as competências.</p>
         </div>
-        <Sheet>
-          <SheetTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-8 px-3">
+        <Dialog>
+          <DialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-8 px-3">
             Ver Roteiro Sugerido
-          </SheetTrigger>
-          <SheetContent className="sm:max-w-md overflow-y-auto border-l z-[100] sm:max-w-[500px]" side="right">
-            <SheetHeader className="mb-6">
-              <SheetTitle>Roteiro de Entrevista (STAR)</SheetTitle>
-              <SheetDescription>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md overflow-y-auto z-[100] sm:max-w-[500px]">
+            <DialogHeader className="mb-6">
+              <DialogTitle>Roteiro de Entrevista (STAR)</DialogTitle>
+              <DialogDescription>
                 Faça perguntas baseadas em situações passadas reais. Evite situações hipotéticas ("O que você faria se...").
-              </SheetDescription>
-            </SheetHeader>
+              </DialogDescription>
+            </DialogHeader>
             <div className="space-y-6">
               <div className="bg-muted/30 p-4 rounded-lg border text-sm">
                 <p className="font-bold mb-2">O Método STAR:</p>
@@ -149,8 +149,8 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
                 </div>
               </div>
             </div>
-          </SheetContent>
-        </Sheet>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* 1. GRÁFICOS DE RADAR E NOTAS */}
@@ -163,13 +163,16 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
               {HARD_SKILLS.map(skill => (
                 <div key={skill.id} className="flex items-center justify-between">
                   <span className="text-sm font-medium">{skill.label}</span>
-                  <Input 
-                    type="number" 
-                    min="0" max="5" 
-                    className="w-20"
-                    value={assessmentData[skill.id] || ""} 
-                    onChange={(e) => onChange(skill.id, e.target.value)} 
-                  />
+                  <div className="flex items-center gap-2 w-32">
+                    <Input 
+                      type="range" 
+                      min="0" max="5" step="1"
+                      className="w-full h-2 cursor-pointer p-0 border-0"
+                      value={assessmentData[skill.id] || "0"} 
+                      onChange={(e) => onChange(skill.id, e.target.value)} 
+                    />
+                    <span className="text-xs font-bold w-4 text-center">{assessmentData[skill.id] || "0"}</span>
+                  </div>
                 </div>
               ))}
             </div>

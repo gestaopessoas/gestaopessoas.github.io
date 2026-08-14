@@ -268,6 +268,16 @@ ${text.substring(0, 5000)}`;
     if (!person?.resume_url) return;
     setOpeningResume(true);
     const supabase = createClient();
+    
+    // Marca inscrições novas como lidas
+    if (person.id) {
+      await supabase
+        .from("job_applications")
+        .update({ status: "Currículo Visualizado" })
+        .eq("candidate_id", person.id)
+        .eq("status", "Nova Aplicação");
+    }
+
     const { data, error } = await supabase.storage.from("resumes").createSignedUrl(person.resume_url, 60);
     setOpeningResume(false);
     if (error || !data) {
