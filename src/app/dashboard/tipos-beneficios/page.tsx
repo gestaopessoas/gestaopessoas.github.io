@@ -15,6 +15,11 @@ type Benefit = {
   level_values?: Record<string, number> | null;
 };
 
+const withLevelValues = (benefit: any): Benefit => ({
+  ...benefit,
+  level_values: Object.fromEntries((benefit.company_benefit_levels ?? []).map((level: any) => [level.level_code, Number(level.amount)])),
+});
+
 const LEVELS = ['Inicial', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 
 const emptyForm = { name: "", default_value: "", has_levels: false, level_values: {} as Record<string, string> };
@@ -33,7 +38,7 @@ export default function TiposBeneficiosPage() {
 
     const loadData = async () => {
       const supabase = createClient();
-      const { data, error } = await supabase.from("company_benefits").select("*").order("name");
+      const { data, error } = await supabase.from("company_benefits").select("*, company_benefit_levels(level_code,amount)").order("name");
 
       if (!active) return;
       setLoading(false);
@@ -41,7 +46,7 @@ export default function TiposBeneficiosPage() {
         setError("Não foi possível carregar os benefícios.");
         return;
       }
-      setBenefits((data ?? []) as Benefit[]);
+      setBenefits((data ?? []).map(withLevelValues));
     };
 
     loadData();
@@ -100,7 +105,7 @@ export default function TiposBeneficiosPage() {
     const payload = {
       name: form.name.trim(),
       default_value: form.default_value && !form.has_levels ? parseFloat(form.default_value.replace(',', '.')) : null,
-      level_values: form.has_levels ? parsedLevels : null
+      
     };
 
     const supabase = createClient();
@@ -115,6 +120,11 @@ export default function TiposBeneficiosPage() {
     }
 
     const saved = result.data as Benefit;
+    await supabase.from("company_benefit_levels").delete().eq("benefit_id", saved.id);
+    if (form.has_levels && Object.keys(parsedLevels).length) {
+      await supabase.from("company_benefit_levels").insert(Object.entries(parsedLevels).map(([level_code, amount]) => ({ benefit_id: saved.id, level_code, amount })));
+    }
+    saved.level_values = parsedLevels;
     setBenefits((prev) => editingId ? prev.map((item) => item.id === editingId ? saved : item) : [...prev, saved].sort((a, b) => a.name.localeCompare(b.name)));
     startNew();
   };

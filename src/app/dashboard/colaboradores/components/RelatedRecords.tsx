@@ -450,14 +450,17 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
   const load = useCallback(async () => {
     const supabase = createClient();
     const [cb, b, e, v, x, p] = await Promise.all([
-      supabase.from("company_benefits").select("*").order("name"),
+      supabase.from("company_benefits").select("*, company_benefit_levels(level_code,amount)").order("name"),
       supabase.from("employee_benefits").select("*").eq("employee_id", employeeId).order("created_at"),
       supabase.from("employee_epis").select("*").eq("employee_id", employeeId).order("created_at"),
       supabase.from("vacations").select("*").eq("employee_id", employeeId).order("start_date", { ascending: false }),
       supabase.from("occupational_exams").select("*").eq("employee_id", employeeId).order("exam_date", { ascending: false }),
       supabase.from("employee_promotions").select("*").eq("employee_id", employeeId).order("promotion_date", { ascending: false }),
     ]);
-    setCompanyBenefits((cb.data ?? []) as unknown as CompanyBenefit[]);
+    setCompanyBenefits((cb.data ?? []).map((benefit: any) => ({
+      ...benefit,
+      level_values: Object.fromEntries((benefit.company_benefit_levels ?? []).map((level: any) => [level.level_code, Number(level.amount)])),
+    })) as CompanyBenefit[]);
     setBenefits((b.data ?? []) as RelatedRow[]); 
     setEpis((e.data ?? []) as RelatedRow[]); 
     setVacations((v.data ?? []) as RelatedRow[]); 
