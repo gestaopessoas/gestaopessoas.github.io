@@ -15,6 +15,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
 import { usePermissions } from "@/hooks/usePermissions";
 import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
+import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -142,7 +143,8 @@ type CandidateProfileModalProps = {
   defaultEditMode?: boolean;
   initialData?: Partial<ProfilePerson>;
   initialAssessmentData?: any;
-  onSave?: (data: ProfilePerson, assessmentData: any) => Promise<void>;
+  interviewProgress?: { status: string; result: string };
+  onSave?: (data: ProfilePerson, assessmentData: any, interviewProgress?: { status: string; result: string }) => Promise<void>;
 };
 
 export function CandidateProfileModal({
@@ -157,6 +159,7 @@ export function CandidateProfileModal({
   defaultEditMode = false,
   initialData,
   initialAssessmentData,
+  interviewProgress,
   onSave
 }: CandidateProfileModalProps) {
   const [activeTab, setActiveTab] = useState<"curriculum" | "assessment" | "behavioral" | "history">(initialTab);
@@ -164,6 +167,7 @@ export function CandidateProfileModal({
   const [resolvedCandidateId, setResolvedCandidateId] = useState<string | null>(candidateId || null);
   const [formData, setFormData] = useState<ProfilePerson>(initialData || {});
   const [assessmentData, setAssessmentData] = useState<any>(initialAssessmentData || {});
+  const [progress, setProgress] = useState(() => normalizeInterviewProgress(interviewProgress || { status: "Aguardando", result: "N/C" }));
   const [isEditing, setIsEditing] = useState(defaultEditMode);
   const [isSaving, setIsSaving] = useState(false);
   const [isParsingCv, setIsParsingCv] = useState(false);
@@ -419,12 +423,16 @@ ${text.substring(0, 8000)}`;
   const handleSave = async () => {
     if (onSave) {
       setIsSaving(true);
-      await onSave(formData, assessmentData);
+      await onSave(formData, assessmentData, progress);
       setPerson({ ...person, ...formData });
       setIsSaving(false);
       setIsEditing(false);
     }
   };
+
+  useEffect(() => {
+    if (interviewProgress) setProgress(normalizeInterviewProgress(interviewProgress));
+  }, [interviewProgress]);
 
   // Fecha com ESC
   useEffect(() => {
@@ -827,6 +835,49 @@ ${text.substring(0, 8000)}`;
                 {activeTab === "curriculum" && (
                   <div className="space-y-6 animate-in fade-in duration-200">
                     <h2 className="text-2xl font-bold mb-6">Currículo & Dados Pessoais</h2>
+
+                    {interviewProgress && (
+                      <details open className="group rounded-xl border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden">
+                        <summary className="flex cursor-pointer items-center justify-between font-bold text-foreground p-5 border-b">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-5 w-5 text-primary" />
+                            Situação da Entrevista
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
+                        </summary>
+                        <div className="p-5 grid gap-4 sm:grid-cols-2 text-sm">
+                          <label className="space-y-1.5">
+                            <span className="text-xs text-muted-foreground block font-medium">Status</span>
+                            <select
+                              disabled={!isEditing}
+                              value={progress.status}
+                              onChange={(e) => setProgress(normalizeInterviewProgress({ status: e.target.value, result: progress.result }))}
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              <option value="Aguardando">Aguardando</option>
+                              <option value="Confirmado">Confirmado</option>
+                              <option value="Compareceu">Compareceu</option>
+                              <option value="Desistente">Desistente</option>
+                            </select>
+                          </label>
+                          <label className="space-y-1.5">
+                            <span className="text-xs text-muted-foreground block font-medium">Resultado</span>
+                            <select
+                              disabled={!isEditing}
+                              value={progress.result}
+                              onChange={(e) => setProgress(normalizeInterviewProgress({ status: progress.status, result: e.target.value }))}
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              <option value="N/C">N/C</option>
+                              <option value="Aprovado">Aprovado</option>
+                              <option value="Reprovado">Reprovado</option>
+                              <option value="Banco de Talentos">Banco de Talentos</option>
+                              <option value="Desistente">Desistente</option>
+                            </select>
+                          </label>
+                        </div>
+                      </details>
+                    )}
                     
                     {/* Dados Pessoais & Contato (Accordion) */}
                     <details open className="group rounded-xl border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden">

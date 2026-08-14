@@ -1032,7 +1032,7 @@ Resultado Final: ${form.result || "N/C"}
     }
   };
 
-  const handleModalSave = async (formData: any, assessmentData: any) => {
+  const handleModalSave = async (formData: any, assessmentData: any, interviewProgress?: { status: string; result: string }) => {
     setSaving(true);
     setError("");
     const supabase = createClient();
@@ -1041,6 +1041,8 @@ Resultado Final: ${form.result || "N/C"}
       ...Object.fromEntries(
         Object.entries(form).map(([key, value]) => [key, value.trim() || null])
       ),
+      status: interviewProgress?.status || form.status,
+      result: interviewProgress?.result || form.result,
       candidate_name: formData.full_name || formData.name || form.candidate_name,
       email: formData.email,
       phone: formData.phone,
@@ -1622,6 +1624,7 @@ ${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Infor
             ...assessmentForm
           } : undefined}
           initialAssessmentData={!editingId ? assessmentForm : undefined}
+          interviewProgress={{ status: form.status, result: form.result }}
           isEditable={true}
           defaultEditMode={true}
           onClose={() => setIsModalOpen(false)}
