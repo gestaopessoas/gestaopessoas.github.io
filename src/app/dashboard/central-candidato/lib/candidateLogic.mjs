@@ -9,11 +9,11 @@ export const UNLOCK_STAGES = ["Reprovado", "Desistente", "Banco de Talentos", "C
 // administrativo de obra precisa enxergar. A etapa exata continua visível na linha —
 // o balde existe só para filtrar e contar.
 export const STAGE_BUCKETS = {
-  entrevista: ["Triagem", "Entrevista RH", "Entrevista Gestor", "Testagem Psicológica"],
-  encaminhado: ["Encaminhado - Pool Geral", "Encaminhado - Obra Específica"],
-  obras: ["Aguardando Obra", "Em Avaliação na Obra"],
-  proposta: ["Proposta Pendente", "Proposta em Aprovação RH", "Proposta Aprovada", "Proposta"],
-  documentacao: ["Coleta de Documentos & Exames"],
+  entrevista: ["Triagem", "Entrevista RH", "Entrevista Gestor", "Testagem Psicológica", "Em entrevista"],
+  encaminhado: ["Encaminhado - Pool Geral", "Encaminhado - Obra Específica", "Processo de MPs"],
+  obras: ["Aguardando Obra", "Em Avaliação na Obra", "Em Obra"],
+  proposta: ["Proposta Pendente", "Proposta em Aprovação RH", "Proposta Aprovada", "Proposta", "Em proposta"],
+  documentacao: ["Coleta de Documentos & Exames", "Coleta de documentos", "Aguardando ASO"],
   contratacao: ["Contratado"],
 };
 
@@ -65,6 +65,13 @@ export function deriveCandidateStatus(interviews = []) {
     obra_atual: latest.workplace_name || null,
     ultimo_chamado: `${latest.interviewer_name || "Desconhecido"} - ${latest.workplace_name || "Obra não informada"}`,
   };
+  const future = String(latest.candidate_future || "").trim().toLowerCase();
+  if (future === "livre" || future === "banco de talentos") {
+    return { status: "Banco de Talentos", etapa_atual: null, ...base };
+  }
+  if (future === "encerrar processo") {
+    return { status: "Encerrado", etapa_atual: null, ...base };
+  }
   if (latest.stage === "Contratado") {
     return { status: "Contratado", etapa_atual: null, ...base };
   }

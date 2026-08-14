@@ -18,6 +18,7 @@ import {
   BUCKET_ORDER,
   BUCKET_LABELS,
 } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { canDisplayCandidateContacts } from "@/lib/candidateHistory.mjs";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,7 @@ type CandidateRow = {
   etapa_atual: string | null;
   bucket: Bucket;
   is_new?: boolean;
+  contactsVisible: boolean;
 };
 
 type Bucket = "todos" | "livre" | "entrevista" | "encaminhado" | "obras" | "proposta" | "documentacao" | "contratacao" | "encerrado";
@@ -89,7 +91,7 @@ export default function CentralCandidatoPage() {
           created_at,
           search_tags,
           available_worksites,
-          candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, created_at),
+          candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, candidate_future, created_at),
           candidate_educations(candidate_id, degree, start_date, end_date),
           job_applications(id, status)
         `)
@@ -136,6 +138,7 @@ export default function CentralCandidatoPage() {
             etapa_atual: derived.etapa_atual,
             bucket: candidateBucket(finalStatus, derived.etapa_atual),
             is_new: hasNewApplication,
+            contactsVisible: canDisplayCandidateContacts(c.candidate_interviews),
           };
         });
         setCandidates(rows);
@@ -329,8 +332,14 @@ export default function CentralCandidatoPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span>{candidate.phone}</span>
-                        <span className="text-xs text-muted-foreground">{candidate.email}</span>
+                        {candidate.contactsVisible ? (
+                          <>
+                            <span>{candidate.phone}</span>
+                            <span className="text-xs text-muted-foreground">{candidate.email}</span>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">Contato restrito durante o processo</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">{candidate.escolaridade}</td>

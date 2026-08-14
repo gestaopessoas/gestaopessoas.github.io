@@ -327,7 +327,7 @@ export default function NovaVagaPage() {
           requester_area: "Recursos Humanos",
           requester_phone: requesterContact || "-",
           profile_id: form.profile_id || null,
-          sector_id: form.sector_id || null,
+          department_id: form.sector_id || null,
           position_title: form.position_title,
           requested_role: form.position_title,
           unit: form.unit || null,
@@ -356,7 +356,7 @@ export default function NovaVagaPage() {
         .from("job_openings")
         .insert({
           profile_id: form.profile_id || null,
-          sector_id: form.sector_id || null,
+          department_id: form.sector_id || null,
           cost_center: form.unit || null,
           contract_type: form.contract_type,
           target_date: form.target_date || null,

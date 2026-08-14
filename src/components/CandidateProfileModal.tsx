@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
 import * as pdfjsLib from "pdfjs-dist";
 import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
 import { usePermissions } from "@/hooks/usePermissions";
+import { buildCandidateHistoryRecord, canDisplayCandidateContacts } from "@/lib/candidateHistory.mjs";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -101,6 +102,8 @@ type CandidateInterview = {
   stage: string;
   workplace_name?: string | null;
   interviewer_name?: string | null;
+  candidate_future?: string | null;
+  created_by_name?: string | null;
   created_at: string;
   notes?: string | null;
   rejection_reason?: string | null;
@@ -167,7 +170,9 @@ export function CandidateProfileModal({
   const { level } = usePermissions();
   
   const [isAddingHistory, setIsAddingHistory] = useState(false);
-  const [historyForm, setHistoryForm] = useState({ stage: "", reason: "", notes: "" });
+  const [historyForm, setHistoryForm] = useState({ stage: "", reason: "", notes: "", workplaceName: "", interviewerName: "", candidateFuture: "" });
+  const [workplaceOptions, setWorkplaceOptions] = useState<string[]>([]);
+  const [interviewerOptions, setInterviewerOptions] = useState<string[]>([]);
   const [isSavingHistory, setIsSavingHistory] = useState(false);
   
   const handleSaveHistory = async (e: React.FormEvent) => {
@@ -178,17 +183,8 @@ export function CandidateProfileModal({
     setIsSavingHistory(true);
     const supabase = createClient();
     try {
-      let finalNotes = "";
-      if (historyForm.reason) finalNotes += `[Motivo]\n${historyForm.reason}\n\n`;
-      if (historyForm.notes) finalNotes += `[Feedback Interno]\n${historyForm.notes}\n\n`;
-
       const { error } = await supabase.from("candidate_interviews").insert([
-        {
-          candidate_id: targetCandId,
-          stage: historyForm.stage,
-          rejection_reason: historyForm.reason || null,
-          notes: finalNotes.trim() || null,
-        }
+        buildCandidateHistoryRecord({ candidateId: targetCandId, ...historyForm })
       ]);
 
       if (error) throw error;
@@ -198,13 +194,29 @@ export function CandidateProfileModal({
       if (data) setCandidateInterviews(data);
       
       setIsAddingHistory(false);
-      setHistoryForm({ stage: "", reason: "", notes: "" });
+      setHistoryForm({ stage: "", reason: "", notes: "", workplaceName: "", interviewerName: "", candidateFuture: "" });
     } catch (err) {
       alert("Erro ao salvar histórico.");
     } finally {
       setIsSavingHistory(false);
     }
   };
+
+  useEffect(() => {
+    let active = true;
+    const supabase = createClient();
+
+    Promise.all([
+      supabase.from("workplaces").select("name").eq("status", "Ativo").order("name"),
+      supabase.from("employees").select("name").eq("status", "Ativo").order("name"),
+    ]).then(([workplacesResult, employeesResult]) => {
+      if (!active) return;
+      if (!workplacesResult.error) setWorkplaceOptions((workplacesResult.data ?? []).map((workplace) => workplace.name));
+      if (!employeesResult.error) setInterviewerOptions((employeesResult.data ?? []).map((employee) => employee.name));
+    });
+
+    return () => { active = false; };
+  }, []);
 
   const handleCVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -338,6 +350,7 @@ ${text.substring(0, 8000)}`;
   const [results, setResults] = useState<BigFiveResult[]>([]);
   const [interviews, setInterviews] = useState<ProfileInterview[]>([]);
   const [candidateInterviews, setCandidateInterviews] = useState<CandidateInterview[]>([]);
+  const contactsAreVisible = useMemo(() => canDisplayCandidateContacts(candidateInterviews), [candidateInterviews]);
   const [educations, setEducations] = useState<ProfileEducation[]>([]);
   const [experiences, setExperiences] = useState<ProfileExperience[]>([]);
   const [loading, setLoading] = useState(!initialData);
@@ -674,28 +687,32 @@ ${text.substring(0, 8000)}`;
                       
                       <div className="flex items-center gap-2.5 break-all">
                         <Mail className="h-4 w-4 text-primary shrink-0" />
-                        {isEditing ? (
+                        {isEditing && contactsAreVisible ? (
                           <Input 
                             value={formData.email || formData.email_personal || ""} 
                             onChange={(e) => handleChange('email', e.target.value)}
                             placeholder="E-mail"
                             className="h-7 text-xs"
                           />
-                        ) : (
+                        ) : contactsAreVisible ? (
                           formData.email || formData.email_corporate || formData.email_personal || "Sem e-mail"
+                        ) : (
+                          "Contato restrito durante o processo"
                         )}
                       </div>
                       <div className="flex items-center gap-2.5">
                         <Phone className="h-4 w-4 text-primary shrink-0" />
-                        {isEditing ? (
+                        {isEditing && contactsAreVisible ? (
                           <Input 
                             value={formData.phone || ""} 
                             onChange={(e) => handleChange('phone', e.target.value)}
                             placeholder="Telefone"
                             className="h-7 text-xs"
                           />
-                        ) : (
+                        ) : contactsAreVisible ? (
                           formData.phone || "Sem telefone"
+                        ) : (
+                          "Contato restrito durante o processo"
                         )}
                       </div>
                     </div>
@@ -839,18 +856,22 @@ ${text.substring(0, 8000)}`;
                         </div>
                         <div className="space-y-1.5">
                           <span className="text-xs text-muted-foreground block font-medium">Telefone Secundário</span>
-                          {isEditing ? (
+                          {isEditing && contactsAreVisible ? (
                             <Input value={formData.secondary_phone || ""} onChange={(e) => handleChange('secondary_phone', e.target.value)} />
-                          ) : (
+                          ) : contactsAreVisible ? (
                             <span className="font-semibold">{formData.secondary_phone || "-"}</span>
+                          ) : (
+                            <span className="font-semibold">Contato restrito</span>
                           )}
                         </div>
                         <div className="space-y-1.5">
                           <span className="text-xs text-muted-foreground block font-medium">E-mail Secundário</span>
-                          {isEditing ? (
+                          {isEditing && contactsAreVisible ? (
                             <Input type="email" value={formData.secondary_email || ""} onChange={(e) => handleChange('secondary_email', e.target.value)} />
-                          ) : (
+                          ) : contactsAreVisible ? (
                             <span className="font-semibold break-all">{formData.secondary_email || "-"}</span>
+                          ) : (
+                            <span className="font-semibold">Contato restrito</span>
                           )}
                         </div>
                         <div className="space-y-1.5">
@@ -875,17 +896,19 @@ ${text.substring(0, 8000)}`;
                         </div>
                         <div className="space-y-1.5 md:col-span-2">
                           <span className="text-xs text-muted-foreground block font-medium">Contato de Emergência</span>
-                          {isEditing ? (
+                          {isEditing && contactsAreVisible ? (
                             <div className="flex gap-2">
                               <Input placeholder="Nome" value={formData.emergency_contact_name || ""} onChange={(e) => handleChange('emergency_contact_name', e.target.value)} />
                               <Input placeholder="Telefone" value={formData.emergency_contact_phone || ""} onChange={(e) => handleChange('emergency_contact_phone', e.target.value)} />
                             </div>
-                          ) : (
+                          ) : contactsAreVisible ? (
                             <span className="font-semibold">
                               {formData.emergency_contact_name || formData.emergency_contact_phone ? 
                                 `${formData.emergency_contact_name || ''} ${formData.emergency_contact_phone ? `- ${formData.emergency_contact_phone}` : ''}` 
                                 : "-"}
                             </span>
+                          ) : (
+                            <span className="font-semibold">Contato restrito</span>
                           )}
                         </div>
                       </div>
@@ -1193,6 +1216,46 @@ ${text.substring(0, 8000)}`;
                             </select>
                           </div>
                         </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Obra / Unidade</label>
+                            <Input
+                              list="candidate-history-workplaces"
+                              placeholder="Selecione ou informe a obra/unidade"
+                              value={historyForm.workplaceName}
+                              onChange={e => setHistoryForm(prev => ({ ...prev, workplaceName: e.target.value }))}
+                            />
+                            <datalist id="candidate-history-workplaces">
+                              {workplaceOptions.map((workplace) => <option key={workplace} value={workplace} />)}
+                            </datalist>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Entrevistador</label>
+                            <Input
+                              list="candidate-history-interviewers"
+                              placeholder="Selecione ou informe o entrevistador"
+                              value={historyForm.interviewerName}
+                              onChange={e => setHistoryForm(prev => ({ ...prev, interviewerName: e.target.value }))}
+                            />
+                            <datalist id="candidate-history-interviewers">
+                              {interviewerOptions.map((interviewer) => <option key={interviewer} value={interviewer} />)}
+                            </datalist>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Futuro do Candidato</label>
+                          <select
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            value={historyForm.candidateFuture}
+                            onChange={e => setHistoryForm(prev => ({ ...prev, candidateFuture: e.target.value }))}
+                          >
+                            <option value="">Selecione...</option>
+                            <option value="Livre">Livre</option>
+                            <option value="Banco de talentos">Manter no banco de talentos</option>
+                            <option value="Avançar no processo">Avançar no processo</option>
+                            <option value="Encerrar processo">Encerrar processo</option>
+                          </select>
+                        </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Feedback Interno</label>
                           <Textarea 
@@ -1224,15 +1287,28 @@ ${text.substring(0, 8000)}`;
                             <div className="bg-card border rounded-xl p-4 shadow-sm space-y-2">
                               <div className="flex items-center justify-between">
                                 <span className="font-bold text-base text-foreground">{ci.stage}</span>
-                                <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
-                                  {new Date(ci.created_at).toLocaleDateString('pt-BR')}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  {ci.created_by_name && (
+                                    <span className="group/author relative inline-flex items-center text-muted-foreground">
+                                      <FileText className="h-4 w-4" aria-label="Autor do registro" />
+                                      <span className="pointer-events-none absolute right-0 top-6 z-10 w-max max-w-56 rounded-md bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow transition-opacity delay-[3000ms] group-hover/author:opacity-100">
+                                        Criado por {ci.created_by_name}
+                                      </span>
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
+                                    {new Date(ci.created_at).toLocaleDateString('pt-BR')}
+                                  </span>
+                                </div>
                               </div>
                               {(ci.workplace_name || ci.interviewer_name) && (
                                 <p className="text-sm text-muted-foreground flex gap-3">
                                   {ci.workplace_name && <span><Building2 className="inline h-3.5 w-3.5 mr-1" /> {ci.workplace_name}</span>}
                                   {ci.interviewer_name && <span><User className="inline h-3.5 w-3.5 mr-1" /> {ci.interviewer_name}</span>}
                                 </p>
+                              )}
+                              {ci.candidate_future && (
+                                <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Futuro do candidato:</span> {ci.candidate_future}</p>
                               )}
                               {ci.notes && (
                                 <div className="mt-2 text-sm bg-muted/40 p-3 rounded-lg border">

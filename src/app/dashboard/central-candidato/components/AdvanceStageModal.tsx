@@ -116,6 +116,7 @@ export default function AdvanceStageModal({
         stage: selectedStage,
         notes: finalNotes.trim() || null,
         workplace_name: workplaceName || null,
+        candidate_future: candidateFuture.join(", ") || null,
       });
 
       if (insertError) throw insertError;

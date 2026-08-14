@@ -113,6 +113,16 @@ test("deriveCandidateStatus: ativo -> Em Processo com etapa", () => {
   assert.equal(s.ultimo_chamado, "Maria - Obra Y");
 });
 
+test("candidate_future reflete os filtros da Central", () => {
+  const livre = deriveCandidateStatus([int("Em entrevista", "2026-08-14", { candidate_future: "Livre" })]);
+  assert.equal(livre.status, "Banco de Talentos");
+  assert.equal(candidateBucket(livre.status, livre.etapa_atual), "livre");
+
+  const documentacao = deriveCandidateStatus([int("Coleta de documentos", "2026-08-14", { candidate_future: "Avançar no processo" })]);
+  assert.equal(documentacao.status, "Em Processo");
+  assert.equal(candidateBucket(documentacao.status, documentacao.etapa_atual), "documentacao");
+});
+
 test("latestEducationDegree: último por data; fallback sem datas", () => {
   assert.equal(
     latestEducationDegree([

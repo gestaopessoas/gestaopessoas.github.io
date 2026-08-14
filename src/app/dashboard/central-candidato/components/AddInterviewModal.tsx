@@ -274,6 +274,7 @@ export default function AddInterviewModal({
           workplace_name: finalWorkplaceName,
           rejection_reason: rejectionReason || null,
           notes: finalNotes.trim() || null,
+          candidate_future: candidateFuture.join(", ") || null,
         },
       ]);
 
