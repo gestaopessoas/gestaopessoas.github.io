@@ -782,13 +782,12 @@ export default function ColaboradoresPage() {
                 <Button variant="default" onClick={() => exportBirthdaysPdf(MONTHS[selectedMonth], birthdaysThisMonth.map(b => ({
                   name: b.employee.name,
                   role: String(b.employee.role || "-"),
-                  department: String(b.employee.departments?.name || b.employee.unit || b.employee.workplace || "-"),
                   day: b.info.day,
                   age: differenceInYears(new Date(), b.info.date),
                   birthDateStr: b.info.date.toLocaleDateString("pt-BR", { timeZone: "UTC" })
                 })))} disabled={birthdaysThisMonth.length === 0}>
                   <Download className="mr-2 h-4 w-4" />
-                  Exportar PDF (Estilizado)
+                  Exportar PDF
                 </Button>
               </div>
               <Label className="text-nowrap ml-2">Mês:</Label>

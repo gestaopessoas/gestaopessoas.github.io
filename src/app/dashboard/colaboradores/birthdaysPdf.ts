@@ -4,7 +4,6 @@ import autoTable from "jspdf-autotable";
 export type BirthdayData = {
   name: string;
   role: string;
-  department: string;
   day: number;
   age: number;
   birthDateStr: string;
@@ -67,13 +66,12 @@ export const exportBirthdaysPdf = async (monthName: string, birthdays: BirthdayD
     b.day.toString().padStart(2, "0"),
     b.name,
     b.role,
-    b.department,
     b.age.toString(),
   ]);
 
   autoTable(doc, {
     startY: 45,
-    head: [["Dia", "Colaborador", "Cargo", "Departamento", "Idade"]],
+    head: [["Dia", "Colaborador", "Cargo", "Idade"]],
     body: tableData,
     theme: "plain",
     styles: {
@@ -93,11 +91,10 @@ export const exportBirthdaysPdf = async (monthName: string, birthdays: BirthdayD
     },
     margin: { left: 14, right: 14 },
     columnStyles: {
-      0: { cellWidth: 15, halign: "center" },
-      1: { cellWidth: 60 },
-      2: { cellWidth: 50 },
-      3: { cellWidth: 47 },
-      4: { cellWidth: 15, halign: "center" },
+      0: { cellWidth: 15, halign: "center" }, // Dia
+      1: { cellWidth: 70 }, // Colaborador
+      2: { cellWidth: 77 }, // Cargo
+      3: { cellWidth: 15, halign: "center" }, // Idade
     },
     didDrawPage: function (data) {
       const str = "Página " + doc.getCurrentPageInfo().pageNumber;
