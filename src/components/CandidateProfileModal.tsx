@@ -1141,7 +1141,7 @@ ${text.substring(0, 8000)}`;
                   <div className="space-y-6 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-2xl font-bold">Histórico de Etapas</h2>
-                      {["RH", "Gestor", "Desenvolvedor", "Gerente"].includes(level || "") && (
+                      {(level >= 30 || isEditable) && (
                         <Button onClick={() => setIsAddingHistory(!isAddingHistory)} variant={isAddingHistory ? "outline" : "default"} size="sm">
                           {isAddingHistory ? "Cancelar" : "Registrar Mudança de Etapa"}
                         </Button>

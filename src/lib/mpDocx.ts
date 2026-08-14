@@ -275,16 +275,7 @@ function header(data: MpContratacaoData): (Paragraph | Table)[] {
     width: { size: 33, type: WidthType.PERCENTAGE },
     borders: noBorders,
     verticalAlign: VerticalAlign.CENTER,
-    children: [
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        children: [text(MP_CONTROL_CODE, { size: 13, color: LABEL_TEXT })],
-      }),
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        children: [text(MP_REVISION, { size: 13, color: LABEL_TEXT })],
-      }),
-    ],
+    children: [],
   });
 
   return [
@@ -294,9 +285,9 @@ function header(data: MpContratacaoData): (Paragraph | Table)[] {
       alignment: AlignmentType.CENTER,
       heading: HeadingLevel.HEADING_1,
       spacing: { after: 60 },
-      children: [text("Contratação de novos colaboradores", { bold: true, size: 22, caps: true })],
+      children: [text("FORMULÁRIO DE CONTRATAÇÃO", { bold: true, size: 22, caps: true })],
     }),
-    goldRule(0, 200),
+    spacer(),
   ];
 }
 
@@ -310,7 +301,7 @@ function sectionGestao(data: MpContratacaoData): Table {
       children: [
         panelCell(
           [
-            ...field("Requisição da vaga (solicitado por)", data.requestedBy),
+            ...field("Requisição da vaga (Solicitado por)", data.requestedBy),
             label("Razão da movimentação"),
             checkbox(reason === "Aumento de quadro", "Aumento de quadro"),
             checkbox(reason === "Substituição", "Substituição"),
@@ -352,7 +343,7 @@ export function buildMpContratacaoDocument(data: MpContratacaoData): Document {
       new TableRow({
         children: [
           panelCell([...field("Cargo", data.role)], 34),
-          panelCell([...field("Nível", data.level)], 33),
+          panelCell([...field("Nível (plano de carreira)", data.level)], 33),
           panelCell([...field("Código do perfil", data.profileCode)], 33),
         ],
       }),
@@ -408,9 +399,31 @@ export function buildMpContratacaoDocument(data: MpContratacaoData): Document {
       }),
     ]),
     goldRule(160, 60),
-    new Paragraph({
-      children: [text(`MP criada em: ${data.createdAt}`, { size: 15, color: LABEL_TEXT })],
-    }),
+    layoutTable([
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: 50, type: WidthType.PERCENTAGE },
+            borders: noBorders,
+            children: [
+              new Paragraph({
+                children: [text(`MP criada em: ${data.createdAt}`, { size: 15, color: LABEL_TEXT })],
+              })
+            ]
+          }),
+          new TableCell({
+            width: { size: 50, type: WidthType.PERCENTAGE },
+            borders: noBorders,
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [text("REV.: 04", { size: 15, color: GOLD, bold: true })],
+              })
+            ]
+          }),
+        ],
+      }),
+    ]),
   ];
 
   return new Document({
