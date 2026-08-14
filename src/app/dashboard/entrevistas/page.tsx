@@ -1061,10 +1061,9 @@ Resultado Final: ${form.result || "N/C"}
       languages: formData.languages || null,
       has_dependents: formData.has_dependents ?? null,
       dependents_count: formData.dependents_count ?? null,
-      dependents_notes: formData.dependents_notes || null,
       uniform_size: formData.uniform_size || null,
       boot_size: formData.boot_size || null,
-      assessment: { ...assessmentForm, ...assessmentData },
+      assessment: { ...assessmentForm, ...assessmentData, dependents_notes: formData.dependents_notes || null },
       updated_at: new Date().toISOString()
     };
     
