@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FileSpreadsheet, FileText, ArrowRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { matchesEmployeeBenefit } from "../colaboradores/lib/benefitRules.mjs";
 import { buildMpContratacaoDocx, buildMpMovimentacaoDocx, pngSize } from "@/lib/mpDocx";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -55,6 +56,12 @@ type Employee = {
   base_salary?: number;
   profile_code?: string;
   status?: string;
+  employee_benefits?: { benefit_name: string }[];
+};
+
+type Benefit = {
+  id: string;
+  name: string;
 };
 
 type SalaryRow = {
@@ -141,6 +148,7 @@ export default function MPGeneratorPage() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [updateProfile, setUpdateProfile] = useState(false);
   const [currentBenefits, setCurrentBenefits] = useState<string[]>([]);
+  const [catalogBenefits, setCatalogBenefits] = useState<Benefit[]>([]);
   
   // These states represent the "NOVO" or "ALTERAÇÃO"
   const [phone, setPhone] = useState("");
@@ -157,14 +165,11 @@ export default function MPGeneratorPage() {
   const [selectedBenefits, setSelectedBenefits] = useState<string[]>([]);
   const [justification, setJustification] = useState("");
 
-  // VR/VA Conditional Fields
-  const [vrLevel, setVrLevel] = useState<string | null>("");
-  const [vrLocality, setVrLocality] = useState<string | null>("");
-
   // === CASCATA SALARIAL ===
   const [selectedModality, setSelectedModality] = useState<string | null>("");
   const [selectedRoleName, setSelectedRoleName] = useState<string | null>("");
   const [selectedLevel, setSelectedLevel] = useState<string | null>("");
+  const [selectedSeniority, setSelectedSeniority] = useState<string | null>("");
   const [selectedSalaryId, setSelectedSalaryId] = useState<string | null>("");
   const [selectedSchedule, setSelectedSchedule] = useState<string | null>("");
 
@@ -175,6 +180,16 @@ export default function MPGeneratorPage() {
   const modalities = ["CLT", "PJ"];
   const [rolesForModality, setRolesForModality] = useState<string[]>([]);
   const [levelsForRole, setLevelsForRole] = useState<SalaryRow[]>([]);
+  
+  const senioritiesForRole = useMemo(() => {
+    return Array.from(new Set(levelsForRole.map(l => l.seniority))).filter(Boolean) as string[];
+  }, [levelsForRole]);
+
+  const levelsForSeniority = useMemo(() => {
+    if (senioritiesForRole.length === 0) return levelsForRole;
+    if (!selectedSeniority) return [];
+    return levelsForRole.filter(l => l.seniority === selectedSeniority);
+  }, [levelsForRole, senioritiesForRole, selectedSeniority]);
 
   useEffect(() => {
     const fetchRoles = async () => {
@@ -241,6 +256,7 @@ export default function MPGeneratorPage() {
     setSelectedModality(modality);
     setSelectedRoleName("");
     setSelectedLevel("");
+    setSelectedSeniority("");
     setSelectedSalaryId("");
   };
 
@@ -248,6 +264,7 @@ export default function MPGeneratorPage() {
     if (!roleName) return;
     setSelectedRoleName(roleName);
     setSelectedLevel("");
+    setSelectedSeniority("");
     setSelectedSalaryId("");
   };
 
@@ -264,7 +281,7 @@ export default function MPGeneratorPage() {
 
       const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes, benefitsRes] = await Promise.all([
         supabase.from("employees")
-          .select("id, name, phone, email_corporate, unit, cost_center_id, sectors(name), cost_centers(name:code), role, level, contract_type, base_salary, profile_code, status")
+          .select("id, name, phone, email_corporate, unit, cost_center_id, sectors(name), cost_centers(name:code), role, level, contract_type, base_salary, profile_code, status, employee_benefits(benefit_name)")
           .eq("status", "Ativo") // Somente colaboradores ativos, exclui Arquivo Morto e Inativos
           .order("name"),
         supabase.from("workplaces").select("id, name").order("name"),
@@ -272,13 +289,14 @@ export default function MPGeneratorPage() {
         supabase.from("system_settings").select("value").eq("key", "work_schedules").maybeSingle(),
         supabase.from("mp_history").select("*, profiles:created_by(full_name), employees:employee_id(name)").order("created_at", { ascending: false }),
         supabase.from("sectors").select("id, name").order("name"),
-        supabase.from("company_benefits").select("name, level_values")
+        supabase.from("company_benefits").select("*").order("name")
       ]);
 
       if (empsRes.data) setEmployees((empsRes.data as unknown as Employee[]).filter(e => e.status === "Ativo" || !e.status));
       if (wpRes.data) setWorkplaces(wpRes.data as Entity[]);
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
       if (depRes.data) setSectors(depRes.data as Entity[]);
+      if (benefitsRes.data) setCatalogBenefits(benefitsRes.data as unknown as Benefit[]);
       let scheds: string[] = [];
       if (Array.isArray(settingsRes.data?.value)) scheds = settingsRes.data.value;
       else if (typeof settingsRes.data?.value === "string") { try { scheds = JSON.parse(settingsRes.data.value); } catch {} }
@@ -296,20 +314,12 @@ export default function MPGeneratorPage() {
       
       if (histRes.data) setMpHistory(histRes.data as unknown as MpHistoryRow[]);
 
-      const vr = (benefitsRes.data as { name: string; level_values: Record<string, number> | null }[] | null)
-        ?.find(b => b.name.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleUpperCase("pt-BR").includes("REFEICAO"));
-      setVrLevels(
-        Object.entries(vr?.level_values ?? {})
-          .map(([level, value]) => ({ level, value: Number(value) }))
-          .sort((a, b) => VR_LEVEL_ORDER.indexOf(a.level) - VR_LEVEL_ORDER.indexOf(b.level))
-      );
-
       setLoading(false);
     };
     fetchData();
   }, []);
 
-  const movimentacaoKey = `${mpType}|${selectedEmployeeId}|${employees.length}|${rolesForModality.length}|${levelsForRole.length}`;
+  const movimentacaoKey = `${mpType}|${selectedEmployeeId}|${employees.length}|${rolesForModality.length}|${levelsForRole.length}|${catalogBenefits.length}`;
   const [lastMovimentacaoKey, setLastMovimentacaoKey] = useState(movimentacaoKey);
   if (lastMovimentacaoKey !== movimentacaoKey) {
     setLastMovimentacaoKey(movimentacaoKey);
@@ -335,6 +345,15 @@ export default function MPGeneratorPage() {
             setSelectedLevel(levelMatch.level || "");
             setSelectedSalaryId(levelMatch.id);
           }
+        }
+
+        // Auto-match benefits
+        if (catalogBenefits.length > 0) {
+          const preSelectedBenefits = catalogBenefits.filter(cb => 
+            emp.employee_benefits?.some((eb: any) => matchesEmployeeBenefit(eb.benefit_name, cb.name))
+          ).map(cb => cb.name);
+          setCurrentBenefits(preSelectedBenefits);
+          setSelectedBenefits(preSelectedBenefits);
         }
       }
     } else if (mpType === "contratacao") {
@@ -368,6 +387,7 @@ export default function MPGeneratorPage() {
           cost_center_id: costCenterId || null,
           role: selectedSalaryInfo?.role_name,
           level: selectedSalaryInfo?.uses_level ? selectedSalaryInfo.level : null,
+          senioridade: selectedSeniority || null,
           profile_code: selectedSalaryInfo?.role_code,
           base_salary: selectedSalaryInfo?.uses_level ? selectedSalaryInfo.salary : selectedSalaryInfo?.salary_experience,
           contract_type: selectedSalaryInfo?.modality
@@ -376,11 +396,7 @@ export default function MPGeneratorPage() {
 
       const empName = mpType === "contratacao" ? candidateName : selectedEmployee?.name || "Nao_Selecionado";
       const finalReason = reason === "Outros" ? customReason : reason;
-      const newBenefitsText = selectedBenefits.map(b => {
-        if (b === "VR") return vrLevel ? `${b} - Nível ${vrLevel}` : b;
-        if (b === "Cesta Básica" && vrLocality) return `${b} ${vrLocality}`;
-        return b;
-      }).join(", ");
+      const newBenefitsText = selectedBenefits.join(", ");
       const curBenefitsText = currentBenefits.join(", ");
       const selectedCcName = costCenters.find(c => c.id === costCenterId)?.name || "";
 
@@ -419,7 +435,7 @@ export default function MPGeneratorPage() {
           email,
           registration: "",
           role: selectedRoleInfo?.role_name || "",
-          level: selectedRoleInfo?.uses_level ? (selectedRoleInfo.level || "") : "",
+          level: selectedRoleInfo?.uses_level ? (selectedSeniority ? `${selectedSeniority} - ${selectedRoleInfo.level || ""}` : selectedRoleInfo.level || "") : "",
           profileCode: selectedRoleInfo?.role_code || "",
           location,
           sector,
@@ -467,7 +483,7 @@ export default function MPGeneratorPage() {
           },
           newData: {
             role: selectedRoleInfo?.role_name || "-",
-            level: selectedRoleInfo?.uses_level ? (selectedRoleInfo.level || "-") : "-",
+            level: selectedRoleInfo?.uses_level ? (selectedSeniority ? `${selectedSeniority} - ${selectedRoleInfo.level || "-"}` : selectedRoleInfo.level || "-") : "-",
             location: location || "-",
             sector: sector || "-",
             costCenter: selectedCcName || "-",
@@ -639,16 +655,31 @@ export default function MPGeneratorPage() {
                       </Select>
                     </div>
 
-                    {/* 3. Nível (filtrado por modalidade + cargo) */}
+                    {/* 2.5 Senioridade (filtrada por modalidade + cargo) */}
                     <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Nível</Label>
-                      <Select value={selectedSalaryId || undefined} onValueChange={(val) => { setSelectedSalaryId(val); const match = levelsForRole.find(l => l.id === val); if (match) setSelectedLevel(match.level); }} disabled={!selectedRoleName || !selectedRoleUsesLevel}>
+                      <Label className="text-xs text-muted-foreground">Senioridade</Label>
+                      <Select value={selectedSeniority || undefined} onValueChange={setSelectedSeniority} disabled={!selectedRoleName || senioritiesForRole.length === 0}>
                         <SelectTrigger>
-                          <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : !selectedRoleUsesLevel ? "Cargo sem nível" : "Selecione o nível..."} />
+                          <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : senioritiesForRole.length === 0 ? "Sem senioridade" : "Selecione a senioridade..."} />
                         </SelectTrigger>
                         <SelectContent>
-                          {levelsForRole.filter(l => l.uses_level && l.level).map(l => (
-                            <SelectItem key={l.id} value={l.id}>{l.seniority ? `${l.seniority} - ` : ''}{l.level} — {formatCurrency(l.salary || 0)}</SelectItem>
+                          {senioritiesForRole.map(s => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* 3. Nível (filtrado por modalidade + cargo + senioridade) */}
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Nível</Label>
+                      <Select value={selectedSalaryId || undefined} onValueChange={(val) => { setSelectedSalaryId(val); const match = levelsForRole.find(l => l.id === val); if (match) setSelectedLevel(match.level); }} disabled={!selectedRoleName || !selectedRoleUsesLevel || (senioritiesForRole.length > 0 && !selectedSeniority)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : (senioritiesForRole.length > 0 && !selectedSeniority) ? "Selecione senioridade" : !selectedRoleUsesLevel ? "Cargo sem nível" : "Selecione o nível..."} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {levelsForSeniority.filter(l => l.uses_level && l.level).map(l => (
+                            <SelectItem key={l.id} value={l.id}>{l.level} — {formatCurrency(l.salary || 0)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -694,6 +725,18 @@ export default function MPGeneratorPage() {
                     </Select>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label>Razão da Movimentação</Label>
+                    <Select value={reason || ""} onValueChange={setReason}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableReasonsMovimentacao.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                 {reason === "Outros" && (
                   <div className="space-y-2">
                     <Label>Especificar Razão</Label>
@@ -710,50 +753,19 @@ export default function MPGeneratorPage() {
                 <div className="space-y-3 pt-2">
                   <Label>Benefícios</Label>
                   <div className="grid grid-cols-2 gap-2">
-                    {availableBenefits.map(benefit => (
-                      <div key={benefit} className="flex items-center space-x-2">
+                    {catalogBenefits.map(benefit => (
+                      <div key={benefit.id} className="flex items-center space-x-2">
                         <Checkbox
-                          id={`benefit-${benefit}`}
-                          checked={selectedBenefits.includes(benefit)}
-                          onCheckedChange={() => toggleArrayItem(selectedBenefits, setSelectedBenefits, benefit)}
+                          id={`benefit-${benefit.id}`}
+                          checked={selectedBenefits.includes(benefit.name)}
+                          onCheckedChange={() => toggleArrayItem(selectedBenefits, setSelectedBenefits, benefit.name)}
                         />
-                        <Label htmlFor={`benefit-${benefit}`} className="text-sm font-normal cursor-pointer">
-                          {benefit}
+                        <Label htmlFor={`benefit-${benefit.id}`} className="text-sm font-normal cursor-pointer">
+                          {benefit.name}
                         </Label>
                       </div>
                     ))}
                   </div>
-
-                  {/* Campos condicionais para VR/Cesta Básica */}
-                  {(selectedBenefits.includes("VR") || selectedBenefits.includes("Cesta Básica")) && (
-                    <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-2">
-                      <div className="space-y-2">
-                        <Label>Nível do VR</Label>
-                        <Select value={vrLevel} onValueChange={setVrLevel}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione o nível..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {vrLevels.map(l => (
-                              <SelectItem key={l.level} value={l.level}>{l.level} — {formatCurrency(l.value)}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Localidade VR/Cesta</Label>
-                        <Select value={vrLocality} onValueChange={setVrLocality}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione a localidade..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Pelotas">Pelotas</SelectItem>
-                            <SelectItem value="Rio Grande">Rio Grande</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -839,15 +851,15 @@ export default function MPGeneratorPage() {
                   <Label>Benefícios Atuais (Selecione)</Label>
                   <p className="text-xs text-muted-foreground mb-2">Marque o que o colaborador já recebe hoje:</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {availableBenefits.map(benefit => (
-                      <div key={`cur-${benefit}`} className="flex items-center space-x-2">
+                    {catalogBenefits.map(benefit => (
+                      <div key={`cur-${benefit.id}`} className="flex items-center space-x-2">
                         <Checkbox 
-                          id={`cur-benefit-${benefit}`} 
-                          checked={currentBenefits.includes(benefit)}
-                          onCheckedChange={() => toggleArrayItem(currentBenefits, setCurrentBenefits, benefit)}
+                          id={`cur-benefit-${benefit.id}`} 
+                          checked={currentBenefits.includes(benefit.name)}
+                          onCheckedChange={() => toggleArrayItem(currentBenefits, setCurrentBenefits, benefit.name)}
                         />
-                        <Label htmlFor={`cur-benefit-${benefit}`} className="text-sm font-normal cursor-pointer">
-                          {benefit}
+                        <Label htmlFor={`cur-benefit-${benefit.id}`} className="text-sm font-normal cursor-pointer">
+                          {benefit.name}
                         </Label>
                       </div>
                     ))}
@@ -933,15 +945,30 @@ export default function MPGeneratorPage() {
                         </Select>
                       </div>
 
-                      {/* 3. Nível (filtrado por modalidade + cargo) */}
+                      {/* 2.5 Senioridade (filtrada por modalidade + cargo) */}
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Nível</Label>
-                        <Select key={`${selectedModality}-${selectedRoleName}`} value={selectedLevel || undefined} onValueChange={(val) => { setSelectedLevel(val); const match = levelsForRole.find(l => l.level === val); if (match) setSelectedSalaryId(match.id); }} disabled={!selectedRoleName || !selectedRoleUsesLevel}>
+                        <Label className="text-xs text-muted-foreground">Senioridade</Label>
+                        <Select value={selectedSeniority || undefined} onValueChange={setSelectedSeniority} disabled={!selectedRoleName || senioritiesForRole.length === 0}>
                           <SelectTrigger>
-                            <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : !selectedRoleUsesLevel ? "Cargo sem nível" : "Selecione o nível..."} />
+                            <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : senioritiesForRole.length === 0 ? "Sem senioridade" : "Selecione a senioridade..."} />
                           </SelectTrigger>
                           <SelectContent>
-                            {levelsForRole.filter(l => l.uses_level && l.level).map(l => (
+                            {senioritiesForRole.map(s => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* 3. Nível (filtrado por modalidade + cargo + senioridade) */}
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Nível</Label>
+                        <Select key={`${selectedModality}-${selectedRoleName}`} value={selectedLevel || undefined} onValueChange={(val) => { setSelectedLevel(val); const match = levelsForRole.find(l => l.level === val); if (match) setSelectedSalaryId(match.id); }} disabled={!selectedRoleName || !selectedRoleUsesLevel || (senioritiesForRole.length > 0 && !selectedSeniority)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder={!selectedRoleName ? "Selecione cargo primeiro" : (senioritiesForRole.length > 0 && !selectedSeniority) ? "Selecione senioridade" : !selectedRoleUsesLevel ? "Cargo sem nível" : "Selecione o nível..."} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {levelsForSeniority.filter(l => l.uses_level && l.level).map(l => (
                               <SelectItem key={l.id} value={l.level!}>{l.level} — {formatCurrency(l.salary || 0)}</SelectItem>
                             ))}
                           </SelectContent>
@@ -975,50 +1002,19 @@ export default function MPGeneratorPage() {
                   <div className="space-y-3 pt-6 mt-4 border-t border-blue-200">
                     <Label>Novos Benefícios (Após alteração)</Label>
                     <div className="grid grid-cols-2 gap-2">
-                      {availableBenefits.map(benefit => (
-                        <div key={`new-${benefit}`} className="flex items-center space-x-2">
+                      {catalogBenefits.map(benefit => (
+                        <div key={`new-${benefit.id}`} className="flex items-center space-x-2">
                           <Checkbox
-                            id={`new-benefit-${benefit}`}
-                            checked={selectedBenefits.includes(benefit)}
-                            onCheckedChange={() => toggleArrayItem(selectedBenefits, setSelectedBenefits, benefit)}
+                            id={`benefit-new-${benefit.id}`}
+                            checked={selectedBenefits.includes(benefit.name)}
+                            onCheckedChange={() => toggleArrayItem(selectedBenefits, setSelectedBenefits, benefit.name)}
                           />
-                          <Label htmlFor={`new-benefit-${benefit}`} className="text-sm font-normal cursor-pointer">
-                            {benefit}
+                          <Label htmlFor={`benefit-new-${benefit.id}`} className="text-sm font-normal cursor-pointer">
+                            {benefit.name}
                           </Label>
                         </div>
                       ))}
                     </div>
-
-                    {/* Campos condicionais para VR/Cesta Básica */}
-                    {(selectedBenefits.includes("VR") || selectedBenefits.includes("Cesta Básica")) && (
-                      <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-2">
-                        <div className="space-y-2">
-                          <Label>Nível do VR</Label>
-                          <Select value={vrLevel} onValueChange={setVrLevel}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o nível..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {vrLevels.map(l => (
-                                <SelectItem key={l.level} value={l.level}>{l.level} — {formatCurrency(l.value)}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Localidade VR/Cesta</Label>
-                          <Select value={vrLocality} onValueChange={setVrLocality}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione a localidade..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Pelotas">Pelotas</SelectItem>
-                              <SelectItem value="Rio Grande">Rio Grande</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
