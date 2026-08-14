@@ -20,6 +20,7 @@ import { openTrialPeriods } from "./lib/trialPeriodRules.mjs";
 import { exportBirthdaysPdf } from "./birthdaysPdf";
 
 type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
+type TrialPeriod = { id: string; name: string; daysRemaining: number; endDate: string; isWarning: boolean; isOverdue: boolean };
 
 // Abas de lista paginam no banco. As abas de agregação (aniversários / experiência) calculam
 // no cliente a partir do array carregado, então precisam do conjunto completo de ativos.
@@ -425,7 +426,7 @@ export default function ColaboradoresPage() {
     setRefresh(v => v + 1);
   };
 
-  const inProbation = openTrialPeriods(employees, completedTrialIds).map((trialInfo) => ({
+  const inProbation = (openTrialPeriods(employees, completedTrialIds) as TrialPeriod[]).map((trialInfo) => ({
     employee: employees.find((employee) => employee.id === trialInfo.id)!,
     trialInfo,
   }));
@@ -691,7 +692,7 @@ export default function ColaboradoresPage() {
             loading={loading}
             emptyMessage="Nenhum colaborador encontrado."
             renderRow={(employee) => {
-              const trialInfo = getTrialInfo(employee.admission_date as string | null);
+              const trialInfo = (openTrialPeriods([employee], completedTrialIds) as TrialPeriod[])[0];
               const isActive = ["Ativo", "Férias", "Afastado"].includes(employee.status ?? "");
               const isIncomplete =
                 (isActive && (!employee.admission_date || !employee.registration_number || !employee.birthday || !employee.cost_center_id || !employee.company_id || !employee.workplace_id))
