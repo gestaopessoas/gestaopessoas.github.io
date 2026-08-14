@@ -26,6 +26,21 @@ type TrainingSession = {
   satisfaction_metrics: SatisfactionMetrics | null;
 };
 
+const withSatisfactionMetrics = (session: any): TrainingSession => {
+  const metric = session.training_satisfaction_metrics;
+  const feedback = metric?.training_satisfaction_feedback ?? [];
+  return {
+    ...session,
+    satisfaction_metrics: metric ? {
+      respondents: metric.respondents,
+      average_score: Number(metric.average_score ?? 0),
+      weighted_utilization_score: Number(metric.weighted_utilization_score ?? metric.average_score ?? 0),
+      feedback_likes: feedback.filter((item: any) => item.feedback_type === "like").sort((a: any, b: any) => a.position - b.position).map((item: any) => item.content),
+      feedback_improvements: feedback.filter((item: any) => item.feedback_type === "improvement").sort((a: any, b: any) => a.position - b.position).map((item: any) => item.content),
+    } : null,
+  };
+};
+
 const MONTH_LABELS: Record<string, string> = {
   "2026-01": "Janeiro", "2026-02": "Fevereiro", "2026-03": "Março",
   "2026-04": "Abril",   "2026-05": "Maio",      "2026-06": "Junho",
@@ -48,9 +63,9 @@ export default function TreinamentosPage() {
   const fetchSessions = async () => {
     const { data } = await supabase
       .from("training_sessions")
-      .select("id, theme, training_date, training_time, participant_count, satisfaction_metrics")
+      .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score,training_satisfaction_feedback(feedback_type,content,position))")
       .order("training_date", { ascending: true });
-    setSessions((data as TrainingSession[]) ?? []);
+    setSessions((data ?? []).map(withSatisfactionMetrics));
     setLoading(false);
   };
 
@@ -59,10 +74,10 @@ export default function TreinamentosPage() {
     async function init() {
       const { data } = await supabase
         .from("training_sessions")
-        .select("id, theme, training_date, training_time, participant_count, satisfaction_metrics")
+        .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score,training_satisfaction_feedback(feedback_type,content,position))")
         .order("training_date", { ascending: true });
       if (!ignore) {
-        setSessions((data as TrainingSession[]) ?? []);
+        setSessions((data ?? []).map(withSatisfactionMetrics));
         setLoading(false);
       }
     }
@@ -77,16 +92,17 @@ export default function TreinamentosPage() {
       return;
     }
     setSaving(true);
+    let sessionId = editing.id;
     if (editing.id === "new") {
-      await supabase
+      const { data } = await supabase
         .from("training_sessions")
         .insert({
           theme: editing.theme,
           training_date: editing.training_date,
           training_time: editing.training_time || null,
           participant_count: editing.participant_count ?? null,
-          satisfaction_metrics: editing.satisfaction_metrics,
-        });
+        }).select("id").single();
+      sessionId = data?.id || sessionId;
     } else {
       await supabase
         .from("training_sessions")
@@ -95,9 +111,19 @@ export default function TreinamentosPage() {
           training_date: editing.training_date,
           training_time: editing.training_time || null,
           participant_count: editing.participant_count ?? null,
-          satisfaction_metrics: editing.satisfaction_metrics,
         })
         .eq("id", editing.id);
+    }
+    if (sessionId !== "new") {
+      const metrics = editing.satisfaction_metrics;
+      if (metrics) {
+        const { data: metric } = await supabase.from("training_satisfaction_metrics").upsert({ training_session_id: sessionId, respondents: metrics.respondents, average_score: metrics.average_score, weighted_utilization_score: metrics.weighted_utilization_score }).select("training_session_id").single();
+        if (metric) {
+          await supabase.from("training_satisfaction_feedback").delete().eq("training_session_id", sessionId);
+          const feedback = [...metrics.feedback_likes.map((content, position) => ({ training_session_id: sessionId, feedback_type: "like", content, position })), ...metrics.feedback_improvements.map((content, position) => ({ training_session_id: sessionId, feedback_type: "improvement", content, position }))];
+          if (feedback.length) await supabase.from("training_satisfaction_feedback").insert(feedback);
+        }
+      }
     }
     setSaving(false);
     setEditing(null);
