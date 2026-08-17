@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,8 +52,11 @@ type Employee = {
   sectors?: { name: string };
   cost_center_id?: string;
   cost_centers?: { code: string };
+  company_id?: string;
+  companies?: { name: string; trading_name?: string };
   role?: string;
   level?: string;
+  senioridade?: string;
   contract_type?: string;
   base_salary?: number;
   profile_code?: string;
@@ -121,6 +124,7 @@ export default function MPGeneratorPage() {
   const [workplaces, setWorkplaces] = useState<Entity[]>([]);
   const [sectors, setSectors] = useState<Entity[]>([]);
   const [costCenters, setCostCenters] = useState<Entity[]>([]);
+  const [companies, setCompanies] = useState<Entity[]>([]);
   const [workSchedules, setWorkSchedules] = useState<string[]>([]);
   // Níveis do Vale Refeição vêm do cadastro (company_benefits.level_values), não de lista fixa.
   const [vrLevels, setVrLevels] = useState<{ level: string; value: number }[]>([]);
@@ -160,6 +164,7 @@ export default function MPGeneratorPage() {
   const [location, setLocation] = useState("");
   const [sector, setSector] = useState("");
   const [costCenterId, setCostCenterId] = useState<string | null>("");
+  const [companyId, setCompanyId] = useState<string | null>("");
   
   const [requestedBy, setRequestedBy] = useState<string | null>("");
   const [reason, setReason] = useState<string | null>("");
@@ -284,9 +289,9 @@ export default function MPGeneratorPage() {
         setCurrentUser(profile?.full_name || userData.user.email || "");
       }
 
-      const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes, benefitsRes] = await Promise.all([
+      const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes, benefitsRes, companiesRes] = await Promise.all([
         supabase.from("employees")
-          .select("id, name, registration_number, ficha, phone, email_corporate, unit, cost_center_id, sectors(name), cost_centers(code), role, level, contract_type, base_salary, profile_code, status, employee_benefits(benefit_name, value)")
+          .select("id, name, registration_number, ficha, phone, email_corporate, unit, cost_center_id, sectors(name), cost_centers(code), company_id, companies(name, trading_name), role, level, senioridade, contract_type, base_salary, profile_code, status, employee_benefits(benefit_name, value)")
           .eq("status", "Ativo") // Somente colaboradores ativos, exclui Arquivo Morto e Inativos
           .order("name"),
         supabase.from("workplaces").select("id, name").order("name"),
@@ -294,13 +299,15 @@ export default function MPGeneratorPage() {
         supabase.from("system_setting_entries").select("path, value_text").eq("setting_key", "work_schedules").order("path"),
         supabase.from("mp_history").select("*, profiles:created_by(full_name), employees:employee_id(name)").order("created_at", { ascending: false }),
         supabase.from("sectors").select("id, name").order("name"),
-        supabase.from("company_benefits").select("*, company_benefit_levels(level_code,amount)").order("name")
+        supabase.from("company_benefits").select("*, company_benefit_levels(level_code,amount)").order("name"),
+        supabase.from("companies").select("id, name, trading_name").order("name")
       ]);
 
       if (empsRes.data) setEmployees((empsRes.data as unknown as Employee[]).filter(e => e.status === "Ativo" || !e.status));
       if (wpRes.data) setWorkplaces(wpRes.data as Entity[]);
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
       if (depRes.data) setSectors(depRes.data as Entity[]);
+      if (companiesRes.data) setCompanies((companiesRes.data as unknown as { id: string; name: string; trading_name?: string }[]).map(c => ({ id: c.id, name: c.trading_name || c.name })));
       if (benefitsRes.data) {
         setCatalogBenefits(benefitsRes.data as unknown as Benefit[]);
         type BenefitWithLevels = { name: string; company_benefit_levels?: { level_code: string; amount: number }[] };
@@ -352,63 +359,84 @@ export default function MPGeneratorPage() {
     }
   }
 
-  const movimentacaoKey = `${mpType}|${selectedEmployeeId}|${employees.length}|${rolesForModality.length}|${levelsForRole.length}|${catalogBenefits.length}`;
-  const [lastMovimentacaoKey, setLastMovimentacaoKey] = useState(movimentacaoKey);
-  if (lastMovimentacaoKey !== movimentacaoKey) {
-    setLastMovimentacaoKey(movimentacaoKey);
-    if (mpType === "movimentacao" && selectedEmployeeId) {
-      const emp = employees.find(e => e.id === selectedEmployeeId);
-      if (emp) {
-        setPhone(emp.phone || "");
-        setEmail(emp.email_corporate || "");
-        setLocation(emp.unit || location);
-        setSector(emp.sectors?.name || "");
-        setCostCenterId(emp.cost_center_id || "");
+  // Trava o auto-match de Cargo/Senioridade/Nível a UMA vez por colaborador. Sem essa
+  // trava, qualquer alteração manual na cascata (que recarrega rolesForModality ou
+  // levelsForRole) reexecutava o efeito de baixo e sobrescrevia a escolha do usuário
+  // de volta pro cargo/nível original do colaborador (bug: Setor selecionado sumia
+  // do DOCX, mesmo problema atingia Cargo/Nível/Modalidade).
+  const roleMatchDoneRef = useRef<string | null>(null);
 
-        // Auto-match to salary table cascata
-        if (emp.contract_type && emp.role) {
-          const modalityMatch = modalities.find(m => m.toLowerCase() === emp.contract_type?.toLowerCase());
-          if (modalityMatch) setSelectedModality(modalityMatch);
+  // Preenchimento básico (Local/Setor/Centro de Custo/Empresa/Contato/Benefícios) ao
+  // trocar de colaborador. Roda uma única vez por seleção — não depende da cascata de
+  // Cargo/Nível, então editar a cascata depois não reabre isto nem apaga o que o
+  // usuário já escolheu.
+  useEffect(() => {
+    if (mpType !== "movimentacao" || !selectedEmployeeId) return;
+    const emp = employees.find(e => e.id === selectedEmployeeId);
+    if (!emp) return;
 
-          const roleMatch = rolesForModality.find(r => r.toLowerCase() === emp.role?.toLowerCase());
-          if (roleMatch) setSelectedRoleName(roleMatch);
+    setPhone(emp.phone || "");
+    setEmail(emp.email_corporate || "");
+    setLocation(emp.unit || "");
+    setSector(emp.sectors?.name || "");
+    setCostCenterId(emp.cost_center_id || "");
+    setCompanyId(emp.company_id || "");
 
-          const levelMatch = levelsForRole.find(l => l.uses_level ? l.level === emp.level : !l.uses_level);
-          if (levelMatch) {
-            setSelectedLevel(levelMatch.level || "");
-            setSelectedSalaryId(levelMatch.id);
-            setCurrentProfileCode(levelMatch.role_code || "");
-          }
-        }
-
-        // Auto-match benefits
-        if (catalogBenefits.length > 0) {
-          const preSelectedBenefits = catalogBenefits.filter(cb =>
-            emp.employee_benefits?.some((eb: any) => matchesEmployeeBenefit(eb.benefit_name, cb.name))
-          ).map(cb => cb.name);
-          setCurrentBenefits(preSelectedBenefits);
-          setSelectedBenefits(preSelectedBenefits);
-
-          const vrEntry = emp.employee_benefits?.find(eb => matchesEmployeeBenefit(eb.benefit_name, VR_BENEFIT_NAME));
-          if (vrEntry) {
-            const label = getEmployeeBenefitLevelLabel(vrEntry.benefit_name, VR_BENEFIT_NAME);
-            const level = label ? label.replace(/^Nível\s*/, "") : "";
-            setCurrentVrLevel(level || null);
-            setCurrentVrValue(vrEntry.value ?? null);
-            // "Novo" começa espelhando o "Atual" (mesmo padrão dos demais campos
-            // auto-preenchidos) — evita herdar nível/valor de VR do funcionário anterior.
-            setNewVrLevel(level);
-            setNewVrValue(vrEntry.value ?? null);
-          } else {
-            setCurrentVrLevel(null);
-            setCurrentVrValue(null);
-            setNewVrLevel("");
-            setNewVrValue(null);
-          }
-        }
-      }
+    if (emp.contract_type) {
+      const modalityMatch = modalities.find(m => m.toLowerCase() === emp.contract_type?.toLowerCase());
+      if (modalityMatch) setSelectedModality(modalityMatch);
     }
-  }
+
+    const preSelectedBenefits = catalogBenefits.filter(cb =>
+      emp.employee_benefits?.some((eb: any) => matchesEmployeeBenefit(eb.benefit_name, cb.name))
+    ).map(cb => cb.name);
+    setCurrentBenefits(preSelectedBenefits);
+    setSelectedBenefits(preSelectedBenefits);
+
+    const vrEntry = emp.employee_benefits?.find(eb => matchesEmployeeBenefit(eb.benefit_name, VR_BENEFIT_NAME));
+    if (vrEntry) {
+      const label = getEmployeeBenefitLevelLabel(vrEntry.benefit_name, VR_BENEFIT_NAME);
+      const level = label ? label.replace(/^Nível\s*/, "") : "";
+      setCurrentVrLevel(level || null);
+      setCurrentVrValue(vrEntry.value ?? null);
+      // "Novo" começa espelhando o "Atual" (mesmo padrão dos demais campos
+      // auto-preenchidos) — evita herdar nível/valor de VR do funcionário anterior.
+      setNewVrLevel(level);
+      setNewVrValue(vrEntry.value ?? null);
+    } else {
+      setCurrentVrLevel(null);
+      setCurrentVrValue(null);
+      setNewVrLevel("");
+      setNewVrValue(null);
+    }
+
+    roleMatchDoneRef.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmployeeId, mpType]);
+
+  // Cargo/Senioridade/Nível só carregam depois que a Modalidade setada acima dispara
+  // a busca em cascata — por isso este efeito continua tentando a cada atualização de
+  // rolesForModality/levelsForRole, mas só até casar uma vez (ref acima).
+  useEffect(() => {
+    if (mpType !== "movimentacao" || !selectedEmployeeId) return;
+    if (roleMatchDoneRef.current === selectedEmployeeId) return;
+    const emp = employees.find(e => e.id === selectedEmployeeId);
+    if (!emp || !emp.role) return;
+
+    const roleMatch = rolesForModality.find(r => r.toLowerCase() === emp.role?.toLowerCase());
+    if (!roleMatch) return;
+    setSelectedRoleName(roleMatch);
+    if (emp.senioridade) setSelectedSeniority(emp.senioridade);
+
+    const levelMatch = levelsForRole.find(l => l.uses_level
+      ? l.level === emp.level && (!emp.senioridade || l.seniority === emp.senioridade)
+      : !l.uses_level);
+    if (!levelMatch) return;
+    setSelectedLevel(levelMatch.level || "");
+    setSelectedSalaryId(levelMatch.id);
+    setCurrentProfileCode(levelMatch.role_code || "");
+    roleMatchDoneRef.current = selectedEmployeeId;
+  }, [selectedEmployeeId, mpType, employees, rolesForModality, levelsForRole]);
 
   const toggleArrayItem = (array: string[], setArray: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
     setArray(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]);
@@ -433,6 +461,7 @@ export default function MPGeneratorPage() {
           email_corporate: email,
           unit: location,
           cost_center_id: costCenterId || null,
+          company_id: companyId || null,
           role: selectedSalaryInfo?.role_name,
           level: selectedSalaryInfo?.uses_level ? selectedSalaryInfo.level : null,
           senioridade: selectedSeniority || null,
@@ -452,6 +481,7 @@ export default function MPGeneratorPage() {
       const newBenefitsText = formatBenefitList(selectedBenefits, newVrLevel || null, newVrValue);
       const curBenefitsText = formatBenefitList(currentBenefits, currentVrLevel, currentVrValue);
       const selectedCcCode = costCenters.find(c => c.id === costCenterId)?.code || "";
+      const selectedCompanyName = companies.find(c => c.id === companyId)?.name || "";
 
       const { data: authData } = await supabase.auth.getUser();
       await createClient().from('mp_history').insert({
@@ -493,6 +523,7 @@ export default function MPGeneratorPage() {
           location,
           sector,
           costCenter: selectedCcCode,
+          company: selectedCompanyName,
           modality: selectedSalaryInfo?.modality || "",
           salary: selectedRoleInfo ? formatCurrency(selectedSalaryValue || 0) : "",
           schedule: selectedSchedule || "",
@@ -531,6 +562,7 @@ export default function MPGeneratorPage() {
             location: selectedEmployee?.unit || "-",
             sector: selectedEmployee?.sectors?.name || "-",
             costCenter: selectedEmployee?.cost_centers?.code || "-",
+            company: selectedEmployee?.companies?.trading_name || selectedEmployee?.companies?.name || "-",
             profileCode: selectedEmployee?.profile_code || currentProfileCode || "-",
             modality: selectedEmployee?.contract_type || "-",
             salary: selectedEmployee?.base_salary ? formatCurrency(selectedEmployee.base_salary) : "-",
@@ -542,6 +574,7 @@ export default function MPGeneratorPage() {
             location: location || "-",
             sector: sector || "-",
             costCenter: selectedCcCode || "-",
+            company: selectedCompanyName || "-",
             profileCode: selectedRoleInfo?.role_code || "-",
             modality: selectedSalaryInfo?.modality || "-",
             salary: selectedRoleInfo ? formatCurrency(selectedSalaryValue || 0) : "-",
@@ -667,7 +700,19 @@ export default function MPGeneratorPage() {
                     </select>
                   </div>
                 </div>
-                
+
+                <div className="space-y-2">
+                  <Label>Empresa</Label>
+                  <Select value={companyId || undefined} onValueChange={(val) => setCompanyId(val || '')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="space-y-2">
                   <Label>Setor</Label>
                   <Select value={sector || undefined} onValueChange={(val) => setSector(val || '')}>
@@ -913,10 +958,14 @@ export default function MPGeneratorPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
+                    <Label>Empresa</Label>
+                    <Input value={selectedEmployee?.companies?.trading_name || selectedEmployee?.companies?.name || "-"} readOnly />
+                  </div>
+                  <div className="space-y-2">
                     <Label>Setor</Label>
                     <Input value={selectedEmployee?.sectors?.name || "-"} readOnly />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label>Cargo / Nível</Label>
                     <Input value={`${selectedEmployee?.role || "-"} - ${selectedEmployee?.level || "-"}`} readOnly />
@@ -990,6 +1039,18 @@ export default function MPGeneratorPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Empresa</Label>
+                    <Select value={companyId || undefined} onValueChange={(val) => setCompanyId(val || '')}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">

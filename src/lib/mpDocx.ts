@@ -53,6 +53,7 @@ export type MpContratacaoData = {
   location: string;
   sector: string;
   costCenter: string;
+  company: string;
   modality: string;
   salary: string;
   schedule: string;
@@ -126,7 +127,7 @@ const box = (value: string, lines = 1) =>
     border: { top: boxBorder, bottom: boxBorder, left: boxBorder, right: boxBorder },
     shading: { fill: WHITE },
     children: [
-      text(value || "", { size: 18 }),
+      text(value || "", { size: 18, caps: true }),
       // Linhas extras dão altura à caixa sem depender de altura de célula.
       ...Array.from({ length: Math.max(0, lines - 1) }, () => new TextRun({ break: 1 })),
     ],
@@ -163,7 +164,7 @@ const inlineField = (name: string, value: string, icon?: MpIcon, lines = 1) =>
               new Paragraph({
                 spacing: { after: 0, line: 260 },
                 children: [
-                  text(value || "", { size: 18 }),
+                  text(value || "", { size: 18, caps: true }),
                   ...Array.from({ length: Math.max(0, lines - 1) }, () => new TextRun({ break: 1 })),
                 ],
               })
@@ -509,6 +510,11 @@ export function buildMpContratacaoDocument(data: MpContratacaoData): Document {
           panelCell([...field("Centro de custo", data.costCenter, "money")], 33),
         ],
       }),
+      new TableRow({
+        children: [
+          panelCell([...field("Empresa", data.company, "briefcase")], 34),
+        ],
+      }),
     ]),
     spacer(),
 
@@ -618,6 +624,7 @@ export type MpMovimentacaoData = {
     location: string;
     sector: string;
     costCenter: string;
+    company: string;
     profileCode: string;
     modality: string;
     salary: string;
@@ -629,6 +636,7 @@ export type MpMovimentacaoData = {
     location: string;
     sector: string;
     costCenter: string;
+    company: string;
     profileCode: string;
     modality: string;
     salary: string;
@@ -748,6 +756,7 @@ export function buildMpMovimentacaoDocument(data: MpMovimentacaoData): Document 
                   new TableRow({ children: [panelCell([inlineField("Local", data.current.location, "pin")], 100)] }),
                   new TableRow({ children: [panelCell([inlineField("Setor", data.current.sector, "building")], 100)] }),
                   new TableRow({ children: [panelCell([inlineField("Centro de custo", data.current.costCenter, "money")], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Empresa", data.current.company, "briefcase")], 100)] }),
                   new TableRow({ children: [panelCell([inlineField("Código do perfil", data.current.profileCode, "user")], 100)] }),
                   new TableRow({ children: [panelCell([inlineField("Modalidade", data.current.modality, "file")], 100)] }),
                   new TableRow({ children: [panelCell([inlineField("Remuneração", data.current.salary, "money")], 100)] }),
@@ -767,6 +776,7 @@ export function buildMpMovimentacaoDocument(data: MpMovimentacaoData): Document 
                   new TableRow({ children: [panelCell([inlineField("Local", data.newData.location, "pin")], 100)] }),
                   new TableRow({ children: [panelCell([inlineField("Setor", data.newData.sector, "building")], 100)] }),
                   new TableRow({ children: [panelCell([inlineField("Centro de custo", data.newData.costCenter, "money")], 100)] }),
+                  new TableRow({ children: [panelCell([inlineField("Empresa", data.newData.company, "briefcase")], 100)] }),
                   new TableRow({ children: [panelCell([inlineField("Código do perfil", data.newData.profileCode, "user")], 100)] }),
                   new TableRow({ children: [panelCell([inlineField("Modalidade", data.newData.modality, "file")], 100)] }),
                   new TableRow({ children: [panelCell([inlineField("Remuneração", data.newData.salary, "money")], 100)] }),

@@ -357,7 +357,9 @@ export function parseSolidesResume(text: string): ParsedResume {
   const phoneMatch = text.match(/(\(?\d{2}\)?\s*(?:9\s*)?\d{4,5}[-\s]?\d{4})/);
   const emailMatch = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]{2,})/);
 
-  // Cargo pretendido: linha do cabeçalho que não é nome, idade, cidade, telefone ou e-mail.
+  // Cargo pretendido: linha do cabeçalho que não é nome, idade, cidade, telefone, e-mail ou endereço.
+  const ADDRESS_LINE =
+    /^(rua|av\.?|avenida|alameda|travessa|rodovia|estrada|condom[ií]nio|residencial|apto\.?|apartamento|bloco|quadra|n[ºo]\.?\s*\d)/i;
   const headerRole =
     fields.role ||
     clean(
@@ -368,7 +370,8 @@ export function parseSolidesResume(text: string): ParsedResume {
             !SECTION_KEYS.has(norm(line)) &&
             !/\d/.test(line) &&
             !/@/.test(line) &&
-            !/\s-\s[A-Z]{2}$/.test(line),
+            !/\s-\s[A-Z]{2}$/.test(line) &&
+            !ADDRESS_LINE.test(line.trim()),
         ) ?? "",
     );
 
