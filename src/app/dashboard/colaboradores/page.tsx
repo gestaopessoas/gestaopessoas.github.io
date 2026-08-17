@@ -598,8 +598,8 @@ export default function ColaboradoresPage() {
               <Field label="Matrícula"><Input value={form.registration_number} onChange={(e) => {
                 const value = e.target.value;
                 update("registration_number", value);
-                // RHID começa igual à matrícula; só copia enquanto ninguém editou o campo à parte.
-                if (!form.rhid_code) update("rhid_code", value);
+                // RHID sempre acompanha a matrícula ao editar.
+                update("rhid_code", value);
               }} /></Field>
               <Field label="Ficha"><Input value={form.ficha} onChange={(e) => update("ficha", e.target.value)} /></Field>
               <Field label="Código do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} /></Field>
