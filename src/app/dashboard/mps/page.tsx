@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FileSpreadsheet, FileText, ArrowRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { matchesEmployeeBenefit } from "../colaboradores/lib/benefitRules.mjs";
+import { matchesEmployeeBenefit, getEmployeeBenefitLevelLabel } from "../colaboradores/lib/benefitRules.mjs";
 import { buildMpContratacaoDocx, buildMpMovimentacaoDocx, pngSize } from "@/lib/mpDocx";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-type Entity = { id: string; name: string };
+type Entity = { id: string; name: string; code?: string };
 
 type MpHistoryRow = {
   id: string;
@@ -51,14 +51,14 @@ type Employee = {
   sector_id?: string;
   sectors?: { name: string };
   cost_center_id?: string;
-  cost_centers?: { name: string };
+  cost_centers?: { code: string };
   role?: string;
   level?: string;
   contract_type?: string;
   base_salary?: number;
   profile_code?: string;
   status?: string;
-  employee_benefits?: { benefit_name: string }[];
+  employee_benefits?: { benefit_name: string; value: number | null }[];
 };
 
 type Benefit = {
@@ -103,18 +103,13 @@ const availableBenefits = [
 // Mesma ordem usada em tipos-beneficios; as chaves de level_values não ordenam sozinhas.
 const VR_LEVEL_ORDER = ["Inicial", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
-// Cargos considerados "Analista ou acima" para Req da Vaga
-const ANALYST_AND_ABOVE_ROLES = [
-  "analista", "coordenador", "gerente", "diretor", "supervisor",
-  "engenheiro", "mestre", "encarregado", "encarregada",
-  "especialista", "consultor", "chefe", "arquiteto", "lead", "tech lead",
-  "head", "chief", "vp", "vice-presidente", "presidente"
-];
+// Cargos elegíveis para Requisitante/Solicitante da MP
+const MP_REQUESTER_ROLES = ["coordenador", "supervisor", "diretor", "diretoria"];
 
-function isAnalystOrAbove(role: string | undefined): boolean {
+function isMpRequesterEligible(role: string | undefined): boolean {
   if (!role) return false;
   const r = role.toLowerCase();
-  return ANALYST_AND_ABOVE_ROLES.some(k => r.includes(k));
+  return MP_REQUESTER_ROLES.some(k => r.includes(k));
 }
 
 
@@ -150,6 +145,11 @@ export default function MPGeneratorPage() {
   const [updateProfile, setUpdateProfile] = useState(false);
   const [currentBenefits, setCurrentBenefits] = useState<string[]>([]);
   const [catalogBenefits, setCatalogBenefits] = useState<Benefit[]>([]);
+  const [currentProfileCode, setCurrentProfileCode] = useState<string>("");
+  const [currentVrLevel, setCurrentVrLevel] = useState<string | null>(null);
+  const [currentVrValue, setCurrentVrValue] = useState<number | null>(null);
+  const [newVrLevel, setNewVrLevel] = useState<string>("");
+  const [newVrValue, setNewVrValue] = useState<number | null>(null);
   
   // These states represent the "NOVO" or "ALTERAÇÃO"
   const [phone, setPhone] = useState("");
@@ -179,7 +179,7 @@ export default function MPGeneratorPage() {
     return employees.find(e => e.id === selectedEmployeeId);
   }, [employees, selectedEmployeeId]);
 
-  const modalities = ["CLT", "PJ"];
+  const modalities = ["CLT", "PJ", "Estágio", "Jovem Aprendiz"];
   const [rolesForModality, setRolesForModality] = useState<string[]>([]);
   const [levelsForRole, setLevelsForRole] = useState<SalaryRow[]>([]);
   
@@ -283,22 +283,32 @@ export default function MPGeneratorPage() {
 
       const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes, benefitsRes] = await Promise.all([
         supabase.from("employees")
-          .select("id, name, registration_number, ficha, phone, email_corporate, unit, cost_center_id, sectors(name), cost_centers(name:code), role, level, contract_type, base_salary, profile_code, status, employee_benefits(benefit_name)")
+          .select("id, name, registration_number, ficha, phone, email_corporate, unit, cost_center_id, sectors(name), cost_centers(code), role, level, contract_type, base_salary, profile_code, status, employee_benefits(benefit_name, value)")
           .eq("status", "Ativo") // Somente colaboradores ativos, exclui Arquivo Morto e Inativos
           .order("name"),
         supabase.from("workplaces").select("id, name").order("name"),
-        supabase.from("cost_centers").select("id, name:code").order("code"),
+        supabase.from("cost_centers").select("id, code, name").order("code"),
         supabase.from("system_setting_entries").select("path, value_text").eq("setting_key", "work_schedules").order("path"),
         supabase.from("mp_history").select("*, profiles:created_by(full_name), employees:employee_id(name)").order("created_at", { ascending: false }),
         supabase.from("sectors").select("id, name").order("name"),
-        supabase.from("company_benefits").select("*").order("name")
+        supabase.from("company_benefits").select("*, company_benefit_levels(level_code,amount)").order("name")
       ]);
 
       if (empsRes.data) setEmployees((empsRes.data as unknown as Employee[]).filter(e => e.status === "Ativo" || !e.status));
       if (wpRes.data) setWorkplaces(wpRes.data as Entity[]);
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
       if (depRes.data) setSectors(depRes.data as Entity[]);
-      if (benefitsRes.data) setCatalogBenefits(benefitsRes.data as unknown as Benefit[]);
+      if (benefitsRes.data) {
+        setCatalogBenefits(benefitsRes.data as unknown as Benefit[]);
+        type BenefitWithLevels = { name: string; company_benefit_levels?: { level_code: string; amount: number }[] };
+        const vrRow = (benefitsRes.data as unknown as BenefitWithLevels[]).find(b => matchesEmployeeBenefit(b.name, "VR"));
+        if (vrRow) {
+          const levels = (vrRow.company_benefit_levels ?? [])
+            .map(l => ({ level: l.level_code, value: Number(l.amount) }))
+            .sort((a, b) => VR_LEVEL_ORDER.indexOf(a.level) - VR_LEVEL_ORDER.indexOf(b.level));
+          setVrLevels(levels);
+        }
+      }
       let scheds: string[] = (settingsRes.data ?? []).sort((a, b) => Number(a.path[0]) - Number(b.path[0])).map((entry) => entry.value_text ?? "");
       if (!scheds || !scheds.length) {
         scheds = [
@@ -344,20 +354,43 @@ export default function MPGeneratorPage() {
           if (levelMatch) {
             setSelectedLevel(levelMatch.level || "");
             setSelectedSalaryId(levelMatch.id);
+            setCurrentProfileCode(levelMatch.role_code || "");
           }
         }
 
         // Auto-match benefits
         if (catalogBenefits.length > 0) {
-          const preSelectedBenefits = catalogBenefits.filter(cb => 
+          const preSelectedBenefits = catalogBenefits.filter(cb =>
             emp.employee_benefits?.some((eb: any) => matchesEmployeeBenefit(eb.benefit_name, cb.name))
           ).map(cb => cb.name);
           setCurrentBenefits(preSelectedBenefits);
           setSelectedBenefits(preSelectedBenefits);
+
+          const vrEntry = emp.employee_benefits?.find(eb => matchesEmployeeBenefit(eb.benefit_name, "VR"));
+          if (vrEntry) {
+            const label = getEmployeeBenefitLevelLabel(vrEntry.benefit_name, "VR");
+            const level = label ? label.replace(/^Nível\s*/, "") : "";
+            setCurrentVrLevel(level || null);
+            setCurrentVrValue(vrEntry.value ?? null);
+            // "Novo" começa espelhando o "Atual" (mesmo padrão dos demais campos
+            // auto-preenchidos) — evita herdar nível/valor de VR do funcionário anterior.
+            setNewVrLevel(level);
+            setNewVrValue(vrEntry.value ?? null);
+          } else {
+            setCurrentVrLevel(null);
+            setCurrentVrValue(null);
+            setNewVrLevel("");
+            setNewVrValue(null);
+          }
         }
       }
     } else if (mpType === "contratacao") {
       setPhone(""); setEmail(""); setSector("");
+      setCurrentProfileCode("");
+      setCurrentVrLevel(null);
+      setCurrentVrValue(null);
+      setNewVrLevel("");
+      setNewVrValue(null);
       // Do not clear location or cost center if they were set by Template
     }
   }
@@ -396,9 +429,14 @@ export default function MPGeneratorPage() {
 
       const empName = mpType === "contratacao" ? candidateName : selectedEmployee?.name || "Nao_Selecionado";
       const finalReason = reason === "Outros" ? customReason : reason;
-      const newBenefitsText = selectedBenefits.join(", ");
-      const curBenefitsText = currentBenefits.join(", ");
-      const selectedCcName = costCenters.find(c => c.id === costCenterId)?.name || "";
+      const formatBenefitList = (list: string[], level: string | null, value: number | null) =>
+        list.map(b => (b === "VR" && value != null)
+          ? `VR${level ? ` - Nível ${level}` : ""} (${formatCurrency(value)})`
+          : b
+        ).join(", ");
+      const newBenefitsText = formatBenefitList(selectedBenefits, newVrLevel || null, newVrValue);
+      const curBenefitsText = formatBenefitList(currentBenefits, currentVrLevel, currentVrValue);
+      const selectedCcCode = costCenters.find(c => c.id === costCenterId)?.code || "";
 
       const { data: authData } = await supabase.auth.getUser();
       await createClient().from('mp_history').insert({
@@ -439,7 +477,7 @@ export default function MPGeneratorPage() {
           profileCode: selectedRoleInfo?.role_code || "",
           location,
           sector,
-          costCenter: selectedCcName,
+          costCenter: selectedCcCode,
           modality: selectedSalaryInfo?.modality || "",
           salary: selectedRoleInfo ? formatCurrency(selectedSalaryValue || 0) : "",
           schedule: selectedSchedule || "",
@@ -477,18 +515,18 @@ export default function MPGeneratorPage() {
             level: selectedEmployee?.level || "-",
             location: selectedEmployee?.unit || "-",
             sector: selectedEmployee?.sectors?.name || "-",
-            costCenter: selectedEmployee?.cost_centers?.name || "-",
-            profileCode: selectedEmployee?.profile_code || "-",
+            costCenter: selectedEmployee?.cost_centers?.code || "-",
+            profileCode: selectedEmployee?.profile_code || currentProfileCode || "-",
             modality: selectedEmployee?.contract_type || "-",
             salary: selectedEmployee?.base_salary ? formatCurrency(selectedEmployee.base_salary) : "-",
-            benefits: currentBenefits.join(", ")
+            benefits: curBenefitsText
           },
           newData: {
             role: selectedRoleInfo?.role_name || "-",
             level: selectedRoleInfo?.uses_level ? (selectedSeniority ? `${selectedSeniority} - ${selectedRoleInfo.level || "-"}` : selectedRoleInfo.level || "-") : "-",
             location: location || "-",
             sector: sector || "-",
-            costCenter: selectedCcName || "-",
+            costCenter: selectedCcCode || "-",
             profileCode: selectedRoleInfo?.role_code || "-",
             modality: selectedSalaryInfo?.modality || "-",
             salary: selectedRoleInfo ? formatCurrency(selectedSalaryValue || 0) : "-",
@@ -721,7 +759,7 @@ export default function MPGeneratorPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {employees
-                          .filter(e => e.status === "Ativo" && isAnalystOrAbove(e.role))
+                          .filter(e => e.status === "Ativo" && isMpRequesterEligible(e.role))
                           .map(e => (
                             <SelectItem key={`req-${e.id}`} value={e.name}>{e.name} — {e.role}</SelectItem>
                           ))}
@@ -736,7 +774,7 @@ export default function MPGeneratorPage() {
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableReasonsMovimentacao.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                        {availableReasonsContratacao.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -767,6 +805,20 @@ export default function MPGeneratorPage() {
                         <Label htmlFor={`benefit-${benefit.id}`} className="text-sm font-normal cursor-pointer">
                           {benefit.name}
                         </Label>
+                        {benefit.name === "VR" && selectedBenefits.includes("VR") && vrLevels.length > 0 && (
+                          <select
+                            className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
+                            value={newVrLevel}
+                            onChange={(e) => {
+                              const lvl = e.target.value;
+                              setNewVrLevel(lvl);
+                              setNewVrValue(vrLevels.find(v => v.level === lvl)?.value ?? null);
+                            }}
+                          >
+                            <option value="">Nível...</option>
+                            {vrLevels.map(v => <option key={v.level} value={v.level}>Nível {v.level}</option>)}
+                          </select>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -830,7 +882,7 @@ export default function MPGeneratorPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Centro de Custo</Label>
-                      <Input value={selectedEmployee?.cost_centers?.name || "-"} readOnly />
+                      <Input value={selectedEmployee?.cost_centers?.code || "-"} readOnly />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -850,7 +902,7 @@ export default function MPGeneratorPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Código do Perfil</Label>
-                      <Input value={selectedEmployee?.profile_code || "-"} readOnly />
+                      <Input value={selectedEmployee?.profile_code || currentProfileCode || "-"} readOnly />
                     </div>
                   </div>
                 </div>
@@ -861,14 +913,19 @@ export default function MPGeneratorPage() {
                   <div className="grid grid-cols-2 gap-2">
                     {catalogBenefits.map(benefit => (
                       <div key={`cur-${benefit.id}`} className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`cur-benefit-${benefit.id}`} 
+                        <Checkbox
+                          id={`cur-benefit-${benefit.id}`}
                           checked={currentBenefits.includes(benefit.name)}
                           onCheckedChange={() => toggleArrayItem(currentBenefits, setCurrentBenefits, benefit.name)}
                         />
                         <Label htmlFor={`cur-benefit-${benefit.id}`} className="text-sm font-normal cursor-pointer">
                           {benefit.name}
                         </Label>
+                        {benefit.name === "VR" && currentVrValue !== null && (
+                          <span className="text-xs text-muted-foreground">
+                            {currentVrLevel ? `Nível ${currentVrLevel} — ` : ""}{formatCurrency(currentVrValue)}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1020,6 +1077,20 @@ export default function MPGeneratorPage() {
                           <Label htmlFor={`benefit-new-${benefit.id}`} className="text-sm font-normal cursor-pointer">
                             {benefit.name}
                           </Label>
+                          {benefit.name === "VR" && selectedBenefits.includes("VR") && vrLevels.length > 0 && (
+                            <select
+                              className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
+                              value={newVrLevel}
+                              onChange={(e) => {
+                                const lvl = e.target.value;
+                                setNewVrLevel(lvl);
+                                setNewVrValue(vrLevels.find(v => v.level === lvl)?.value ?? null);
+                              }}
+                            >
+                              <option value="">Nível...</option>
+                              {vrLevels.map(v => <option key={v.level} value={v.level}>Nível {v.level}</option>)}
+                            </select>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1039,7 +1110,7 @@ export default function MPGeneratorPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {employees
-                        .filter(e => e.status === "Ativo" && isAnalystOrAbove(e.role))
+                        .filter(e => e.status === "Ativo" && isMpRequesterEligible(e.role))
                         .map(e => (
                           <SelectItem key={`req-${e.id}`} value={e.name}>{e.name} — {e.role}</SelectItem>
                         ))}

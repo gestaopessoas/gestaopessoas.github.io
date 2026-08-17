@@ -309,7 +309,13 @@ const sectionHeader = (number: string, title: string, titleWidth = 34): (Paragra
 const checkbox = (checked: boolean, value: string) =>
   new Paragraph({
     spacing: { after: 40 },
-    children: [text(`${checked ? "☒" : "☐"} ${value}`, { size: 17 })],
+    children: [
+      text(`${checked ? "☒" : "☐"} ${value}`, {
+        size: checked ? 19 : 17,
+        bold: checked,
+        color: checked ? GOLD : LABEL_TEXT,
+      }),
+    ],
   });
 
 /** Bloco de assinatura: título, espaço para assinar, linha dourada e legenda. */
