@@ -553,7 +553,7 @@ export function buildMpContratacaoDocument(data: MpContratacaoData): Document {
       new TableRow({
         children: [
           panelCell([...field("Verificado por", data.verifiedBy, "userCheck")], 50),
-          panelCell([...field("Vigência", data.effectiveDate || "____ / ____ / ________", "calendar")], 50),
+          panelCell([...field("Vigência", data.effectiveDate || "____ / ________", "calendar")], 50),
         ],
       }),
     ]),
@@ -825,7 +825,7 @@ export function buildMpMovimentacaoDocument(data: MpMovimentacaoData): Document 
       new TableRow({
         children: [
           panelCell([inlineField("Verificado por:", data.verifiedBy, "userCheck")], 50),
-          panelCell([inlineField("Vigência:", data.effectiveDate || "____ / ____ / ________", "calendar")], 50),
+          panelCell([inlineField("Vigência:", data.effectiveDate || "____ / ________", "calendar")], 50),
         ],
       }),
     ]),

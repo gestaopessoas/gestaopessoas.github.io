@@ -910,7 +910,7 @@ export default function MPGeneratorPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Vigência</Label>
-                  <Input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
+                  <Input type="month" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
                 </div>
               </div>
             </div>
@@ -1251,7 +1251,7 @@ export default function MPGeneratorPage() {
               </div>
               <div className="space-y-2">
                 <Label>Vigência</Label>
-                <Input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
+                <Input type="month" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
               </div>
             </div>
           </div>
