@@ -28,11 +28,11 @@ const AGGREGATE_PAGE_SIZE = 1000;
 const AGGREGATE_TABS = ["aniversarios", "experiencia"];
 
 const fields = [
-  "id", "name", "registration_number", "ficha", "profile_code", "department_id", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
+  "id", "name", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
 ].join(", ");
 
 const emptyForm = {
-  name: "", registration_number: "", ficha: "", profile_code: "", department_id: "", department: "", sector_id: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
+  name: "", registration_number: "", ficha: "", profile_code: "", department_id: "", department: "", sector_id: "", rhid_code: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "", boot_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
@@ -149,8 +149,9 @@ export default function ColaboradoresPage() {
       supabase.from("cost_centers").select("id, name:code").order("code"),
       supabase.from("workplaces").select("id, name, type").order("name"),
       supabase.from("job_profiles").select("title"),
-      supabase.from("salary_table").select("id, role_name, modality, level, salary, uses_level, salary_experience, salary_after_probation")
-    ]).then(([depsRes, compsRes, ccRes, wpRes, rolesRes, salaryRes]) => {
+      supabase.from("salary_table").select("id, role_name, modality, level, salary, uses_level, salary_experience, salary_after_probation"),
+      supabase.from("sectors").select("id, name").order("name")
+    ]).then(([depsRes, compsRes, ccRes, wpRes, rolesRes, salaryRes, sectorsRes]) => {
       if (depsRes.data) setDepartments(depsRes.data as Entity[]);
       if (compsRes.data) setCompanies(compsRes.data as Entity[]);
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
@@ -159,6 +160,7 @@ export default function ColaboradoresPage() {
         setRoles(Array.from(new Set(rolesRes.data.map((d) => normalizeRole(d.title)))).sort() as string[]);
       }
       if (salaryRes.data) setSalaryRules(salaryRes.data as SalaryRule[]);
+      if (sectorsRes.data) setSectors(sectorsRes.data as Entity[]);
     });
 
     const params = new URLSearchParams(window.location.search);
@@ -355,7 +357,7 @@ export default function ColaboradoresPage() {
       setBirthdayError("");
     }
     const nullableDates = new Set(["birthday", "dismissed_at", "admission_date", "aso_date"]);
-    const nullableUuids = new Set(["department_id", "company_id", "cost_center_id", "workplace_id"]);
+    const nullableUuids = new Set(["department_id", "sector_id", "company_id", "cost_center_id", "workplace_id"]);
     const payload: Record<string, string | number | null> = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || nullableUuids.has(key) ? value || null : (value as string).trim() || null]));
     payload.name = form.name.trim();
     payload.role = normalizeRole(form.role);
@@ -621,6 +623,7 @@ export default function ColaboradoresPage() {
                 setForm((current) => ({ ...current, workplace_id: workplaceId, ...(schedule ?? {}) }));
               }} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{workplaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
               <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
+              <Field label="Setor"><select value={form.sector_id} onChange={(e) => update("sector_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{sectors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
               <Field label="Tipo de contrato"><Select value={form.contract_type} onChange={(value) => update("contract_type", value)} options={["", "CLT", "MEI", "PJ"]} /></Field>
               <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
               <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
@@ -663,6 +666,7 @@ export default function ColaboradoresPage() {
               <Field label="CTPS"><Input value={form.ctps} onChange={(e) => update("ctps", e.target.value)} /></Field>
               <Field label="Série CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
               <Field label="PIS"><Input value={form.pis} onChange={(e) => update("pis", e.target.value)} /></Field>
+              <Field label="Código do RHID"><Input value={form.rhid_code} onChange={(e) => update("rhid_code", e.target.value)} /></Field>
               <Field label="Observações" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
             </Section>
 

@@ -102,6 +102,9 @@ const availableBenefits = [
 
 // Mesma ordem usada em tipos-beneficios; as chaves de level_values não ordenam sozinhas.
 const VR_LEVEL_ORDER = ["Inicial", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+// Nome real do benefício no cadastro (company_benefits.name) — não é "VR", é o nome por
+// extenso ("VALE REFEIÇÃO"), confirmado no banco de produção.
+const VR_BENEFIT_NAME = "VALE REFEIÇÃO";
 
 // Cargos elegíveis para Requisitante/Solicitante da MP
 const MP_REQUESTER_ROLES = ["coordenador", "supervisor", "diretor", "diretoria"];
@@ -301,7 +304,10 @@ export default function MPGeneratorPage() {
       if (benefitsRes.data) {
         setCatalogBenefits(benefitsRes.data as unknown as Benefit[]);
         type BenefitWithLevels = { name: string; company_benefit_levels?: { level_code: string; amount: number }[] };
-        const vrRow = (benefitsRes.data as unknown as BenefitWithLevels[]).find(b => matchesEmployeeBenefit(b.name, "VR"));
+        // Pode haver mais de um cadastro batendo com o nome (ex.: duplicado antigo sem
+        // níveis); prioriza o que realmente tem níveis configurados.
+        const vrCandidates = (benefitsRes.data as unknown as BenefitWithLevels[]).filter(b => matchesEmployeeBenefit(b.name, VR_BENEFIT_NAME));
+        const vrRow = vrCandidates.find(b => (b.company_benefit_levels?.length ?? 0) > 0) ?? vrCandidates[0];
         if (vrRow) {
           const levels = (vrRow.company_benefit_levels ?? [])
             .map(l => ({ level: l.level_code, value: Number(l.amount) }))
@@ -383,9 +389,9 @@ export default function MPGeneratorPage() {
           setCurrentBenefits(preSelectedBenefits);
           setSelectedBenefits(preSelectedBenefits);
 
-          const vrEntry = emp.employee_benefits?.find(eb => matchesEmployeeBenefit(eb.benefit_name, "VR"));
+          const vrEntry = emp.employee_benefits?.find(eb => matchesEmployeeBenefit(eb.benefit_name, VR_BENEFIT_NAME));
           if (vrEntry) {
-            const label = getEmployeeBenefitLevelLabel(vrEntry.benefit_name, "VR");
+            const label = getEmployeeBenefitLevelLabel(vrEntry.benefit_name, VR_BENEFIT_NAME);
             const level = label ? label.replace(/^Nível\s*/, "") : "";
             setCurrentVrLevel(level || null);
             setCurrentVrValue(vrEntry.value ?? null);
@@ -439,7 +445,7 @@ export default function MPGeneratorPage() {
       const empName = mpType === "contratacao" ? candidateName : selectedEmployee?.name || "Nao_Selecionado";
       const finalReason = reason === "Outra" ? customReason : reason;
       const formatBenefitList = (list: string[], level: string | null, value: number | null) =>
-        list.map(b => (b === "VR" && value != null)
+        list.map(b => (b === VR_BENEFIT_NAME && value != null)
           ? `VR${level ? ` - Nível ${level}` : ""} (${formatCurrency(value)})`
           : b
         ).join(", ");
@@ -814,7 +820,7 @@ export default function MPGeneratorPage() {
                         <Label htmlFor={`benefit-${benefit.id}`} className="text-sm font-normal cursor-pointer">
                           {benefit.name}
                         </Label>
-                        {benefit.name === "VR" && selectedBenefits.includes("VR") && (
+                        {benefit.name === VR_BENEFIT_NAME && selectedBenefits.includes(VR_BENEFIT_NAME) && (
                           vrLevels.length > 0 ? (
                             <select
                               className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
@@ -942,7 +948,7 @@ export default function MPGeneratorPage() {
                         <Label htmlFor={`cur-benefit-${benefit.id}`} className="text-sm font-normal cursor-pointer">
                           {benefit.name}
                         </Label>
-                        {benefit.name === "VR" && currentVrValue !== null && (
+                        {benefit.name === VR_BENEFIT_NAME && currentVrValue !== null && (
                           <span className="text-xs text-muted-foreground">
                             {currentVrLevel ? `Nível ${currentVrLevel} — ` : ""}{formatCurrency(currentVrValue)}
                           </span>
@@ -1098,7 +1104,7 @@ export default function MPGeneratorPage() {
                           <Label htmlFor={`benefit-new-${benefit.id}`} className="text-sm font-normal cursor-pointer">
                             {benefit.name}
                           </Label>
-                          {benefit.name === "VR" && selectedBenefits.includes("VR") && (
+                          {benefit.name === VR_BENEFIT_NAME && selectedBenefits.includes(VR_BENEFIT_NAME) && (
                             vrLevels.length > 0 ? (
                               <select
                                 className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
