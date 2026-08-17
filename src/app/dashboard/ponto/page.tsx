@@ -4,51 +4,78 @@ import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Clock, UploadCloud, FileText, CheckCircle2, AlertTriangle, 
-  Download, Sparkles, Calendar, ShieldCheck, Users, RefreshCw, 
-  ArrowRight, Check, AlertCircle, Layers
+import {
+  Clock, UploadCloud, FileText, CheckCircle2, AlertTriangle,
+  Download, Sparkles, Calendar, ShieldCheck, Users, RefreshCw,
+  ArrowRight, Check, AlertCircle, Layers, TrendingUp, X
 } from "lucide-react";
 import { format } from "date-fns";
 import { saveAs } from "file-saver";
+import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 import {
   processRhidTxt, ProcessedRhidResult, EmployeeRecord,
   CompanyRecord, WorkplaceRecord, CompanyOutputFile
 } from "./rhidProcessor";
 import { errorMessage } from "@/lib/utils";
 
-type TimeLog = {
-  id: string;
-  timestamp: string;
-  type: string;
-  justification: string | null;
-  employees: { name: string } | null;
+const REFERENCE_MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+/** "Agosto / 2026" -> "2026-08-01". Retorna null se não reconhecer o formato. */
+function parseReferenceMonthToDate(referenceMonth: string): string | null {
+  const match = referenceMonth.match(/([A-Za-zçÇ]+)\s*\/\s*(\d{4})/);
+  if (!match) return null;
+  const monthIndex = REFERENCE_MONTH_NAMES.findIndex(m => m.toLowerCase() === match[1].toLowerCase());
+  if (monthIndex < 0) return null;
+  return `${match[2]}-${String(monthIndex + 1).padStart(2, "0")}-01`;
+}
+
+/** Minutos (podem ser negativos) -> "H:MM" com sinal. */
+function formatMinutesAsHours(totalMinutes: number): string {
+  const sign = totalMinutes < 0 ? "-" : "";
+  const abs = Math.abs(totalMinutes);
+  return `${sign}${Math.floor(abs / 60)}:${String(abs % 60).padStart(2, "0")}`;
+}
+
+type TimeBankMonthEntry = {
+  referenceMonth: string;
+  positiveMinutes: number;
+  negativeMinutes: number;
+};
+
+type TimeBankEmployee = {
+  employeeId: string;
+  name: string;
+  registrationNumber: string | null;
+  costCenterName: string | null;
+  companyName: string | null;
+  sectorName: string | null;
+  months: TimeBankMonthEntry[];
 };
 
 export default function PontoPage() {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [activeTab, setActiveTab] = useState<"rhid" | "espelho">("rhid");
-  const [loadingDb, setLoadingDb] = useState(true);
+  const [activeTab, setActiveTab] = useState<"rhid" | "banco_horas">("rhid");
   const [dbError, setDbError] = useState("");
-  
+
   // DB references
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
   const [companies, setCompanies] = useState<CompanyRecord[]>([]);
   const [workplaces, setWorkplaces] = useState<WorkplaceRecord[]>([]);
-  
-  // Espelho state
-  const [logs, setLogs] = useState<TimeLog[]>([]);
-  
+
+  // Banco de Horas state
+  const [timeBankEmployees, setTimeBankEmployees] = useState<TimeBankEmployee[]>([]);
+  const [loadingTimeBank, setLoadingTimeBank] = useState(true);
+  const [selectedTimeBankEmployee, setSelectedTimeBankEmployee] = useState<TimeBankEmployee | null>(null);
+
   // RHID Import state
   const [referenceMonth, setReferenceMonth] = useState<string>(() => {
     const now = new Date();
-    const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
     // Mês anterior como padrão típico de fechamento
     const prevMonthIndex = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
     const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-    return `${months[prevMonthIndex]} / ${year}`;
+    return `${REFERENCE_MONTH_NAMES[prevMonthIndex]} / ${year}`;
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [processedResult, setProcessedResult] = useState<ProcessedRhidResult | null>(null);
@@ -56,15 +83,56 @@ export default function PontoPage() {
   const [savingHistory, setSavingHistory] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState("");
 
+  const loadTimeBank = async () => {
+    setLoadingTimeBank(true);
+    try {
+      const { data, error } = await supabase
+        .from("employee_time_bank_entries")
+        .select("employee_id, reference_month, positive_minutes, negative_minutes, employees(name, registration_number, cost_centers(name), companies(name, trading_name), sectors(name))")
+        .order("reference_month");
+      if (error) throw error;
+
+      const byEmployee: Record<string, TimeBankEmployee> = {};
+      for (const row of (data ?? []) as unknown as Array<{
+        employee_id: string;
+        reference_month: string;
+        positive_minutes: number;
+        negative_minutes: number;
+        employees: { name: string; registration_number: string | null; cost_centers: { name: string } | null; companies: { name: string; trading_name: string | null } | null; sectors: { name: string } | null } | null;
+      }>) {
+        const emp = row.employees;
+        if (!byEmployee[row.employee_id]) {
+          byEmployee[row.employee_id] = {
+            employeeId: row.employee_id,
+            name: emp?.name || "Colaborador não encontrado",
+            registrationNumber: emp?.registration_number ?? null,
+            costCenterName: emp?.cost_centers?.name ?? null,
+            companyName: emp?.companies?.trading_name || emp?.companies?.name || null,
+            sectorName: emp?.sectors?.name ?? null,
+            months: [],
+          };
+        }
+        byEmployee[row.employee_id].months.push({
+          referenceMonth: row.reference_month,
+          positiveMinutes: row.positive_minutes,
+          negativeMinutes: row.negative_minutes,
+        });
+      }
+      setTimeBankEmployees(Object.values(byEmployee));
+    } catch (err) {
+      setDbError("Erro ao carregar banco de horas: " + errorMessage(err, "Erro desconhecido"));
+    } finally {
+      setLoadingTimeBank(false);
+    }
+  };
+
   useEffect(() => {
     async function fetchReferences() {
-      setLoadingDb(true);
       try {
-        const [empRes, compRes, workRes, logsRes] = await Promise.all([
+        const [empRes, compRes, workRes] = await Promise.all([
           supabase.from("employees").select("id, name, rhid_code, company_id, workplace_id, unit, work_schedule_start_1, work_schedule_end_1, work_schedule_start_2, work_schedule_end_2, status").eq("status", "Ativo"),
           supabase.from("companies").select("id, name, trading_name, dominio_code"),
           supabase.from("workplaces").select("id, name, type"),
-          supabase.from("time_logs").select("*, employees(name)").order("created_at", { ascending: false }).limit(30)
         ]);
 
         if (empRes.error) throw empRes.error;
@@ -73,12 +141,10 @@ export default function PontoPage() {
         setEmployees((empRes.data || []) as EmployeeRecord[]);
         setCompanies((compRes.data || []) as CompanyRecord[]);
         setWorkplaces((workRes.data || []) as WorkplaceRecord[]);
-        setLogs((logsRes.data ?? []) as unknown as TimeLog[]);
       } catch (err) {
         setDbError("Erro ao carregar dados oficiais do banco de dados: " + errorMessage(err, "Erro desconhecido"));
-      } finally {
-        setLoadingDb(false);
       }
+      await loadTimeBank();
     }
     fetchReferences();
   }, [supabase]);
@@ -182,6 +248,27 @@ export default function PontoPage() {
         if (error) throw error;
       }
 
+      // 3. Gravar o banco de horas do mês (extraído do arquivo: códigos 150/175/200
+      // creditam, 211/212 debitam — ver rhidProcessor.ts). Reimportar o mesmo mês
+      // sobrescreve o total anterior (upsert por employee_id + reference_month).
+      const referenceMonthDate = parseReferenceMonthToDate(referenceMonth);
+      if (referenceMonthDate) {
+        const timeBankPayload = Object.entries(processedResult.timeBankByEmployee).map(([employeeId, totals]) => ({
+          employee_id: employeeId,
+          reference_month: referenceMonthDate,
+          positive_minutes: totals.positiveMinutes,
+          negative_minutes: totals.negativeMinutes,
+          source_file: processedResult.fileName,
+        }));
+        if (timeBankPayload.length) {
+          const { error: timeBankError } = await supabase
+            .from("employee_time_bank_entries")
+            .upsert(timeBankPayload, { onConflict: "employee_id,reference_month" });
+          if (timeBankError) throw timeBankError;
+          await loadTimeBank();
+        }
+      }
+
       setSaveSuccessMessage(
         `Sucesso incrível! ${matchedEmployeesList.length} colaboradores tiveram seus registros arquivados no histórico mês a mês e os horários foram verificados/padronizados conforme a unidade.`
       );
@@ -223,15 +310,15 @@ export default function PontoPage() {
             Importação RHID ➔ Domínio
           </button>
           <button
-            onClick={() => setActiveTab("espelho")}
+            onClick={() => setActiveTab("banco_horas")}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              activeTab === "espelho" 
-                ? "bg-background text-foreground shadow-sm font-semibold border" 
+              activeTab === "banco_horas"
+                ? "bg-background text-foreground shadow-sm font-semibold border"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Clock className="w-4 h-4" />
-            Espelho de Ponto (Leitura)
+            <TrendingUp className="w-4 h-4" />
+            Banco de Horas
           </button>
         </div>
       </div>
@@ -555,45 +642,55 @@ export default function PontoPage() {
         </div>
       )}
 
-      {/* CONTEÚDO DA ABA: ESPELHO DE PONTO (LEITURA) */}
-      {activeTab === "espelho" && (
+      {/* CONTEÚDO DA ABA: BANCO DE HORAS */}
+      {activeTab === "banco_horas" && (
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Clock className="w-5 h-5 text-primary"/>
-              Últimos Registros Integrados (Somente Leitura)
+              <TrendingUp className="w-5 h-5 text-primary"/>
+              Banco de Horas por Colaborador
             </CardTitle>
             <CardDescription>
-              Os dados abaixo representam registros brutos gravados no banco de dados. Para gerar fechamento ou conciliação Domínio, utilize a aba de importação.
+              Saldo acumulado (horas extras 50/75/100% menos atrasos e faltas) extraído de cada fechamento RHID confirmado. Clique num colaborador para ver a evolução mês a mês.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {loadingDb ? <p className="text-sm text-muted-foreground p-4">Carregando espelho de ponto do banco...</p> : (
+            {loadingTimeBank ? <p className="text-sm text-muted-foreground p-4">Carregando banco de horas...</p> : (
               <div className="overflow-x-auto rounded-lg border mt-2">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-muted text-muted-foreground uppercase text-[11px] font-semibold">
                     <tr>
                       <th className="px-4 py-3">Colaborador</th>
-                      <th className="px-4 py-3">Data e Hora</th>
-                      <th className="px-4 py-3">Tipo de Registro</th>
-                      <th className="px-4 py-3">Status / Justificativa</th>
+                      <th className="px-4 py-3">Matrícula</th>
+                      <th className="px-4 py-3">Empresa</th>
+                      <th className="px-4 py-3">Centro de Custo</th>
+                      <th className="px-4 py-3">Setor</th>
+                      <th className="px-4 py-3 text-right">Saldo Atual</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {logs.map((log) => (
-                      <tr key={log.id} className="hover:bg-muted/40 transition-colors">
-                        <td className="px-4 py-3 font-medium">{log.employees?.name || 'N/D'}</td>
-                        <td className="px-4 py-3 tabular-nums font-mono text-xs">{format(new Date(log.timestamp), "dd/MM/yyyy HH:mm:ss")}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${log.type === 'ENTRY' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                            {log.type === 'ENTRY' ? 'Entrada' : 'Saída'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{log.justification || '-'}</td>
-                      </tr>
-                    ))}
-                    {logs.length === 0 && (
-                      <tr><td colSpan={4} className="px-6 py-10 text-center text-muted-foreground">Nenhum registro de relógio em tempo real localizado.</td></tr>
+                    {timeBankEmployees.map((emp) => {
+                      const sorted = [...emp.months].sort((a, b) => a.referenceMonth.localeCompare(b.referenceMonth));
+                      const cumulative = sorted.reduce((sum, m) => sum + m.positiveMinutes - m.negativeMinutes, 0);
+                      return (
+                        <tr
+                          key={emp.employeeId}
+                          className="hover:bg-muted/40 transition-colors cursor-pointer"
+                          onClick={() => setSelectedTimeBankEmployee(emp)}
+                        >
+                          <td className="px-4 py-3 font-medium">{emp.name}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{emp.registrationNumber || "-"}</td>
+                          <td className="px-4 py-3 text-muted-foreground text-xs">{emp.companyName || "-"}</td>
+                          <td className="px-4 py-3 text-muted-foreground text-xs">{emp.costCenterName || "-"}</td>
+                          <td className="px-4 py-3 text-muted-foreground text-xs">{emp.sectorName || "-"}</td>
+                          <td className={`px-4 py-3 text-right font-mono font-bold ${cumulative >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                            {formatMinutesAsHours(cumulative)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {timeBankEmployees.length === 0 && (
+                      <tr><td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">Nenhum banco de horas registrado ainda. Confirme um fechamento na aba de importação.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -602,6 +699,77 @@ export default function PontoPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* MODAL: EVOLUÇÃO DO BANCO DE HORAS */}
+      {selectedTimeBankEmployee && (() => {
+        const emp = selectedTimeBankEmployee;
+        const sorted = [...emp.months].sort((a, b) => a.referenceMonth.localeCompare(b.referenceMonth));
+        let running = 0;
+        const chartData = sorted.map((m) => {
+          running += m.positiveMinutes - m.negativeMinutes;
+          return {
+            month: format(new Date(`${m.referenceMonth}T00:00:00`), "MMM/yy"),
+            saldoHoras: Number((running / 60).toFixed(2)),
+            saldoLabel: formatMinutesAsHours(running),
+          };
+        });
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setSelectedTimeBankEmployee(null)}
+          >
+            <div
+              className="bg-background rounded-xl shadow-2xl border w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between p-6 border-b">
+                <div>
+                  <h3 className="text-lg font-bold">{emp.name}</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Matrícula {emp.registrationNumber || "-"} · {emp.companyName || "-"} · {emp.costCenterName || "-"} · {emp.sectorName || "-"}
+                  </p>
+                </div>
+                <button onClick={() => setSelectedTimeBankEmployee(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6">
+                {chartData.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-10">Sem meses registrados.</p>
+                ) : (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="month" fontSize={12} />
+                        <YAxis fontSize={12} unit="h" />
+                        <Tooltip formatter={(_value, _name, item) => [item.payload.saldoLabel, "Saldo"]} />
+                        <Line type="monotone" dataKey="saldoHoras" stroke="var(--primary)" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                <div className="mt-4 divide-y border rounded-lg">
+                  {sorted.map((m) => {
+                    const net = m.positiveMinutes - m.negativeMinutes;
+                    return (
+                      <div key={m.referenceMonth} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                        <span className="text-muted-foreground">{format(new Date(`${m.referenceMonth}T00:00:00`), "MMMM/yyyy")}</span>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          +{formatMinutesAsHours(m.positiveMinutes)} / -{formatMinutesAsHours(m.negativeMinutes)}
+                        </span>
+                        <span className={`font-mono font-semibold ${net >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                          {formatMinutesAsHours(net)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

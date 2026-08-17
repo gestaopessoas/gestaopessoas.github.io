@@ -62,6 +62,11 @@ export interface CompanyOutputFile {
   employees: MatchedEmployeeSummary[];
 }
 
+export interface TimeBankTotals {
+  positiveMinutes: number;
+  negativeMinutes: number;
+}
+
 export interface ProcessedRhidResult {
   fileName: string;
   totalLines: number;
@@ -69,7 +74,33 @@ export interface ProcessedRhidResult {
   filesByCompany: CompanyOutputFile[];
   alerts: AlertItem[];
   matchedEmployeesList: MatchedEmployeeSummary[];
+  timeBankByEmployee: Record<string, TimeBankTotals>;
 }
+
+// Código de evento na posição 19-21 do registro (documentação RHID):
+// 150 = hora extra 50%, 175 = 75%, 200 = 100% (todas creditam banco de horas);
+// 211 = Atrasos, 212 = Faltas (debitam banco de horas). Outros códigos são ignorados.
+const TIME_BANK_CREDIT_CODES = new Set(["150", "175", "200"]);
+const TIME_BANK_DEBIT_CODES = new Set(["211", "212"]);
+
+/**
+ * Lê o código de evento (posição 19-21) e o valor de horas do período (H:MM na
+ * posição 30-32, hora com 1 dígito) de uma linha do arquivo RHID. Retorna null se a
+ * linha não tiver um código de evento mapeado ou o valor num formato reconhecido.
+ */
+const parseTimeBankEntry = (line: string): { isCredit: boolean; minutes: number } | null => {
+  if (line.length < 33) return null;
+  const eventCode = line.substring(19, 22);
+  const isCredit = TIME_BANK_CREDIT_CODES.has(eventCode);
+  const isDebit = TIME_BANK_DEBIT_CODES.has(eventCode);
+  if (!isCredit && !isDebit) return null;
+  const hourDigit = line.charAt(30);
+  const minutePart = line.substring(31, 33);
+  const hours = parseInt(hourDigit, 10);
+  const minutes = parseInt(minutePart, 10);
+  if (isNaN(hours) || isNaN(minutes)) return null;
+  return { isCredit, minutes: hours * 60 + minutes };
+};
 
 export const getStandardSchedule = (emp: EmployeeRecord, workplaces: WorkplaceRecord[]): ScheduleSuggestion => {
   let isSedeOrPlantão = emp.unit === 'Sede' || emp.unit === 'Plantão';
@@ -179,6 +210,7 @@ export const processRhidTxt = (
   };
 
   const matchedEmployeeSummaries: Record<string, MatchedEmployeeSummary> = {};
+  const timeBankByEmployee: Record<string, TimeBankTotals> = {};
   let validRecordsCount = 0;
 
   lines.forEach((line, index) => {
@@ -192,6 +224,16 @@ export const processRhidTxt = (
     // Extração da matrícula na posição 7 a 11 (0-indexed)
     const rawMatricula = line.length >= 12 ? line.substring(7, 12) : trimmed.slice(7, 12);
     const emp = matchEmployee(rawMatricula, employees);
+
+    if (emp) {
+      const timeBankEntry = parseTimeBankEntry(line);
+      if (timeBankEntry) {
+        const totals = timeBankByEmployee[emp.id] ?? { positiveMinutes: 0, negativeMinutes: 0 };
+        if (timeBankEntry.isCredit) totals.positiveMinutes += timeBankEntry.minutes;
+        else totals.negativeMinutes += timeBankEntry.minutes;
+        timeBankByEmployee[emp.id] = totals;
+      }
+    }
 
     let assignedCompany: CompanyRecord = fallbackCompany;
     let workplaceName = "Não definido";
@@ -312,6 +354,7 @@ export const processRhidTxt = (
     validRecordsCount,
     filesByCompany,
     alerts,
-    matchedEmployeesList
+    matchedEmployeesList,
+    timeBankByEmployee
   };
 };
