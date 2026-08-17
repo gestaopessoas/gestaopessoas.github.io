@@ -28,7 +28,7 @@ type TrainingSession = {
 
 const withSatisfactionMetrics = (session: any): TrainingSession => {
   const metric = session.training_satisfaction_metrics;
-  const feedback = metric?.training_satisfaction_feedback ?? [];
+  const feedback = session.training_satisfaction_feedback ?? [];
   return {
     ...session,
     satisfaction_metrics: metric ? {
@@ -74,7 +74,7 @@ export default function TreinamentosPage() {
     async function init() {
       const { data } = await supabase
         .from("training_sessions")
-        .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score,training_satisfaction_feedback(feedback_type,content,position))")
+        .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score), training_satisfaction_feedback(feedback_type,content,position)")
         .order("training_date", { ascending: true });
       if (!ignore) {
         setSessions((data ?? []).map(withSatisfactionMetrics));
