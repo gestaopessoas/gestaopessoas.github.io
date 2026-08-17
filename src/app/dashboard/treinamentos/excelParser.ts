@@ -41,13 +41,15 @@ const CONTENT_KEYWORDS = ["conteúdo", "aplicabilidade", "aplicação"];
 const MANAGEMENT_KEYWORDS = ["gestão", "suporte"];
 const ENGAGEMENT_KEYWORDS = ["engajamento", "feedback", "aproveitamento"];
 
-function normalize(text: string) {
+export function normalize(text: string) {
   return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
 // Converte respostas de escala Likert em texto (Ótimo/Concordo Totalmente/...) pra nota 0-10,
 // pra alimentar o aproveitamento ponderado mesmo quando o Forms usa texto em vez de número.
-function likertToScore(raw: string | number): number | null {
+// Exportada: a análise por treinamento reusa pra transformar distribuição de
+// resposta em nota média por pergunta (radar) e em taxa de aprovação (KPIs).
+export function likertToScore(raw: string | number): number | null {
   if (typeof raw === "number") return raw >= 0 && raw <= 10 ? raw : null;
   const v = normalize(String(raw));
   if (v === "") return null;

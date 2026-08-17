@@ -5,23 +5,53 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, Users, Star, ThumbsUp, AlertTriangle } from "lucide-react";
+import {
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
+  RadialBarChart, RadialBar, PolarAngleAxis as RadialAngleAxis,
+} from "recharts";
+import { CalendarDays, Users, Star, ThumbsUp, AlertTriangle, CheckCircle2, Gauge } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { TrainingSession } from "./page";
+import { normalize, likertToScore } from "./excelParser";
 
-// Heurística de cor por rótulo de resposta: reconhece os padrões mais comuns
-// de escala Likert em português (concordância e qualidade). Rótulos que não
-// batem com nada conhecido caem no neutro — não trava a análise pra
-// perguntas novas que ainda não vimos.
-function answerColor(label: string): string {
-  const v = label.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const DONUT_COLORS = ["#16a34a", "#65a30d", "#d97706", "#dc2626", "#991b1b", "#6366f1", "#0891b2"];
+
+function answerColor(label: string, index: number): string {
+  const v = normalize(label);
   if (v.includes("totalmente") || v.includes("otimo") || v.includes("excelente") || v === "sim" || v.includes("muito bom")) return "#16a34a";
   if (v.includes("parcialmente") || v === "bom") return "#65a30d";
   if (v.includes("regular") || v.includes("neutro") || v.includes("nem discordo")) return "#d97706";
   if (v.includes("ruim") || (v.includes("discordo") && !v.includes("nem"))) return "#dc2626";
   if (v.includes("pessimo") || v === "nao" || v === "não") return "#991b1b";
-  return "#6366f1";
+  return DONUT_COLORS[index % DONUT_COLORS.length];
+}
+
+function scoreColor(score: number) {
+  if (score >= 8) return "#16a34a";
+  if (score >= 6) return "#d97706";
+  return "#dc2626";
+}
+
+// Detecta a pergunta certa por palavra-chave no cabeçalho, pra virar um KPI de
+// destaque (% aprovação, % utilidade). Se o Forms não tiver essa pergunta
+// específica ainda, o card simplesmente não aparece — nada quebra.
+function findKpi(distributions: Record<string, Record<string, number>>, keywords: string[]) {
+  const entry = Object.entries(distributions).find(([question]) =>
+    keywords.some(k => normalize(question).includes(normalize(k)))
+  );
+  if (!entry) return null;
+  const [question, answers] = entry;
+  const total = Object.values(answers).reduce((a, b) => a + b, 0);
+  if (total === 0) return null;
+  const positive = Object.entries(answers)
+    .filter(([label]) => {
+      const score = likertToScore(label);
+      return score != null && score >= 6.67;
+    })
+    .reduce((a, [, count]) => a + count, 0);
+  return { question, pct: Math.round((positive / total) * 100), total };
 }
 
 export function TrainingDetailModal({
@@ -39,13 +69,32 @@ export function TrainingDetailModal({
       .map(([question, answers]) => {
         const total = Object.values(answers).reduce((a, b) => a + b, 0);
         const sorted = Object.entries(answers).sort(([, a], [, b]) => b - a);
-        return { question, total, answers: sorted };
+        const scored = sorted.map(([label]) => likertToScore(label)).filter((v): v is number => v != null);
+        const weightedSum = sorted.reduce((sum, [label, count]) => {
+          const s = likertToScore(label);
+          return s != null ? sum + s * count : sum;
+        }, 0);
+        const avgScore = scored.length > 0 && total > 0 ? weightedSum / total : null;
+        return { question, total, answers: sorted, avgScore };
       });
   }, [metrics]);
 
+  const radarData = useMemo(() =>
+    questions
+      .filter(q => q.avgScore != null)
+      .map(q => ({
+        question: q.question.length > 22 ? q.question.slice(0, 21) + "…" : q.question,
+        nota: Number(q.avgScore!.toFixed(1)),
+      })),
+  [questions]);
+
+  const approvalKpi = useMemo(() => metrics ? findKpi(metrics.answer_distributions, ["objetivo", "aprov"]) : null, [metrics]);
+  const utilityKpi = useMemo(() => metrics ? findKpi(metrics.answer_distributions, ["aproveitamento", "util"]) : null, [metrics]);
+  const expectationsKpi = useMemo(() => metrics ? findKpi(metrics.answer_distributions, ["expectativa"]) : null, [metrics]);
+
   return (
     <Dialog open={!!session} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
         {session && (
           <>
             <DialogHeader>
@@ -55,9 +104,6 @@ export function TrainingDetailModal({
                 {session.participant_count != null && (
                   <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {session.participant_count} participantes</span>
                 )}
-                {metrics && (
-                  <span className="flex items-center gap-1"><Star className="w-3.5 h-3.5 fill-current text-amber-500" /> Nota {metrics.average_score.toFixed(1)} · {metrics.respondents} respondentes</span>
-                )}
               </DialogDescription>
             </DialogHeader>
 
@@ -66,39 +112,120 @@ export function TrainingDetailModal({
                 Nenhuma planilha de satisfação anexada a este treinamento ainda.
               </p>
             ) : (
-              <div className="space-y-4">
-                {questions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    A planilha importada não trouxe perguntas de múltipla escolha reconhecíveis.
-                  </p>
-                ) : (
-                  questions.map(({ question, total, answers }) => (
-                    <Card key={question}>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">{question}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        {answers.map(([label, count]) => {
-                          const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-                          return (
-                            <div key={label} className="space-y-1">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-foreground/90">{label}</span>
-                                <span className="text-muted-foreground font-medium">{count} · {pct}%</span>
-                              </div>
-                              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                                <div
-                                  className="h-full rounded-full transition-all"
-                                  style={{ width: `${pct}%`, backgroundColor: answerColor(label) }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
+              <div className="space-y-5">
+                {/* KPIs de destaque */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <Card className="overflow-hidden">
+                    <CardContent className="p-3 flex flex-col items-center">
+                      <div className="h-[90px] w-[90px] relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RadialBarChart innerRadius="70%" outerRadius="100%" data={[{ value: metrics.average_score * 10 }]} startAngle={90} endAngle={-270}>
+                            <RadialAngleAxis type="number" domain={[0, 100]} tick={false} />
+                            <RadialBar dataKey="value" cornerRadius={8} fill={scoreColor(metrics.average_score)} background={{ fill: "var(--muted)" }} />
+                          </RadialBarChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-lg font-bold">{metrics.average_score.toFixed(1)}</span>
+                        </div>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1"><Star className="w-3 h-3" /> Nota Geral</span>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-3 h-full flex flex-col items-center justify-center gap-1">
+                      <Users className="w-5 h-5 text-indigo-500" />
+                      <span className="text-xl font-bold">{metrics.respondents}</span>
+                      <span className="text-[11px] text-muted-foreground text-center">Respondentes</span>
+                    </CardContent>
+                  </Card>
+
+                  {approvalKpi && (
+                    <Card>
+                      <CardContent className="p-3 h-full flex flex-col items-center justify-center gap-1">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                        <span className="text-xl font-bold">{approvalKpi.pct}%</span>
+                        <span className="text-[11px] text-muted-foreground text-center">Aprovaram os objetivos</span>
                       </CardContent>
                     </Card>
-                  ))
+                  )}
+
+                  {utilityKpi && (
+                    <Card>
+                      <CardContent className="p-3 h-full flex flex-col items-center justify-center gap-1">
+                        <Gauge className="w-5 h-5 text-cyan-500" />
+                        <span className="text-xl font-bold">{utilityKpi.pct}%</span>
+                        <span className="text-[11px] text-muted-foreground text-center">Sentiram útil / aproveitaram</span>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {!utilityKpi && expectationsKpi && (
+                    <Card>
+                      <CardContent className="p-3 h-full flex flex-col items-center justify-center gap-1">
+                        <Gauge className="w-5 h-5 text-cyan-500" />
+                        <span className="text-xl font-bold">{expectationsKpi.pct}%</span>
+                        <span className="text-[11px] text-muted-foreground text-center">Expectativas atendidas</span>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Radar comparando todas as dimensões avaliadas */}
+                {radarData.length >= 3 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Perfil de Avaliação</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[260px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RadarChart data={radarData} outerRadius="75%">
+                            <PolarGrid className="stroke-muted" />
+                            <PolarAngleAxis dataKey="question" tick={{ fill: "currentColor", fontSize: 10 }} />
+                            <PolarRadiusAxis domain={[0, 10]} tick={{ fill: "currentColor", fontSize: 9 }} />
+                            <Radar dataKey="nota" stroke="#6366f1" fill="#6366f1" fillOpacity={0.35} />
+                            <Tooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
+
+                {/* Distribuição detalhada por pergunta, em donut */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {questions.map(({ question, total, answers }) => (
+                    <Card key={question}>
+                      <CardHeader className="pb-1">
+                        <CardTitle className="text-xs font-medium leading-tight">{question}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex items-center gap-3 pb-3">
+                        <div className="h-[100px] w-[100px] shrink-0">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={answers.map(([label, count]) => ({ label, count }))} dataKey="count" nameKey="label" innerRadius={28} outerRadius={48} paddingAngle={2}>
+                                {answers.map(([label], idx) => (
+                                  <Cell key={label} fill={answerColor(label, idx)} />
+                                ))}
+                              </Pie>
+                              <Tooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="space-y-1 min-w-0 flex-1">
+                          {answers.map(([label, count], idx) => (
+                            <div key={label} className="flex items-center gap-1.5 text-[11px]">
+                              <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: answerColor(label, idx) }} />
+                              <span className="truncate text-muted-foreground flex-1">{label}</span>
+                              <span className="font-medium shrink-0">{total > 0 ? Math.round((count / total) * 100) : 0}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
 
                 {(metrics.feedback_likes.length > 0 || metrics.feedback_improvements.length > 0) && (
                   <div className="grid gap-4 sm:grid-cols-2">
