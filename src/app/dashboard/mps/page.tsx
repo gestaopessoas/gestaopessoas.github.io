@@ -163,6 +163,7 @@ export default function MPGeneratorPage() {
   const [email, setEmail] = useState("");
   const [location, setLocation] = useState("");
   const [sector, setSector] = useState("");
+  const [sectorId, setSectorId] = useState<string | null>("");
   const [costCenterId, setCostCenterId] = useState<string | null>("");
   const [companyId, setCompanyId] = useState<string | null>("");
   
@@ -349,7 +350,7 @@ export default function MPGeneratorPage() {
   if (prevMpTypeForReset !== mpType) {
     setPrevMpTypeForReset(mpType);
     if (mpType === "contratacao") {
-      setPhone(""); setEmail(""); setSector("");
+      setPhone(""); setEmail(""); setSector(""); setSectorId("");
       setCurrentProfileCode("");
       setCurrentVrLevel(null);
       setCurrentVrValue(null);
@@ -379,6 +380,7 @@ export default function MPGeneratorPage() {
     setEmail(emp.email_corporate || "");
     setLocation(emp.unit || "");
     setSector(emp.sectors?.name || "");
+    setSectorId(emp.sector_id || "");
     setCostCenterId(emp.cost_center_id || "");
     setCompanyId(emp.company_id || "");
 
@@ -438,6 +440,11 @@ export default function MPGeneratorPage() {
     roleMatchDoneRef.current = selectedEmployeeId;
   }, [selectedEmployeeId, mpType, employees, rolesForModality, levelsForRole]);
 
+  const selectSector = (id: string | null) => {
+    setSectorId(id || "");
+    setSector(sectors.find(s => s.id === id)?.name || "");
+  };
+
   const toggleArrayItem = (array: string[], setArray: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
     setArray(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]);
   };
@@ -460,6 +467,7 @@ export default function MPGeneratorPage() {
           phone: phone,
           email_corporate: email,
           unit: location,
+          sector_id: sectorId || null,
           cost_center_id: costCenterId || null,
           company_id: companyId || null,
           role: selectedSalaryInfo?.role_name,
@@ -715,12 +723,12 @@ export default function MPGeneratorPage() {
 
                 <div className="space-y-2">
                   <Label>Setor</Label>
-                  <Select value={sector || undefined} onValueChange={(val) => setSector(val || '')}>
+                  <Select value={sectorId || undefined} onValueChange={selectSector}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {sectors.map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
+                      {sectors.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
