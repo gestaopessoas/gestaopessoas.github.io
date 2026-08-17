@@ -153,6 +153,12 @@ export default function TreinamentosPage() {
     });
   }, [sessions, selectedMonth, searchQuery]);
 
+  const muralSessions = useMemo(() => {
+    return [...filteredSessions]
+      .filter(s => s.satisfaction_metrics && (s.satisfaction_metrics.feedback_likes.length > 0 || s.satisfaction_metrics.feedback_improvements.length > 0))
+      .sort((a, b) => b.training_date.localeCompare(a.training_date));
+  }, [filteredSessions]);
+
   const grouped = useMemo(() => {
     return filteredSessions.reduce<Record<string, TrainingSession[]>>((acc, s) => {
       const key = s.training_date.slice(0, 7);
@@ -482,14 +488,12 @@ export default function TreinamentosPage() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {filteredSessions.filter(s => s.satisfaction_metrics && (s.satisfaction_metrics.feedback_likes.length > 0 || s.satisfaction_metrics.feedback_improvements.length > 0)).length === 0 ? (
+            {muralSessions.length === 0 ? (
               <div className="col-span-2 text-center py-12 text-muted-foreground border border-dashed rounded-xl">
                 Nenhum feedback qualitativo encontrado para os treinamentos selecionados.
               </div>
             ) : (
-              filteredSessions
-                .filter(s => s.satisfaction_metrics && (s.satisfaction_metrics.feedback_likes.length > 0 || s.satisfaction_metrics.feedback_improvements.length > 0))
-                .map(session => (
+              muralSessions.map(session => (
                   <Card key={session.id} className="border shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col justify-between">
                     <CardHeader className="bg-muted/20 border-b pb-3">
                       <div className="flex items-start justify-between">
