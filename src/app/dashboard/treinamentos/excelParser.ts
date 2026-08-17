@@ -14,6 +14,14 @@ export type SatisfactionMetrics = {
   management_support_score?: number;
   engagement_score?: number;
   weighted_utilization_score?: number;
+  // Uma entrada por linha do Excel (por respondente), pra quem quiser
+  // reprocessar ou cruzar dados sem depender só dos agregados acima.
+  responses: TrainingResponseRow[];
+};
+
+export type TrainingResponseRow = {
+  score: number | null;
+  answers: Record<string, string | number>;
 };
 
 // Colunas que nunca entram na análise de distribuição: metadados ou texto livre.
@@ -24,6 +32,10 @@ const SKIP_HEADER_PATTERNS = [
   /mais gostou/, /pode ser melhorado/, /descreveria/, /conte um pouco/,
   /proximos treinamentos/, /sugest/,
 ];
+
+// Só isso fica fora da linha bruta salva por respondente — o resto (mesmo
+// texto livre) entra, pra manter a linha do Excel completa.
+const RAW_ROW_SKIP_PATTERNS = [/^id$/, /hora de inicio/, /hora de conclusao/];
 
 const CONTENT_KEYWORDS = ["conteúdo", "aplicabilidade", "aplicação"];
 const MANAGEMENT_KEYWORDS = ["gestão", "suporte"];
@@ -105,12 +117,27 @@ export const parseSatisfactionExcel = async (file: File): Promise<SatisfactionMe
         const improvements: string[] = [];
         const answerDistributions: Record<string, Record<string, number>> = {};
         distributionIdxs.forEach(i => { answerDistributions[headers[i]] = {}; });
+        const responses: TrainingResponseRow[] = [];
+        const rawRowIdxs = headers
+          .map((h, i) => ({ h, i }))
+          .filter(({ h }) => h && !RAW_ROW_SKIP_PATTERNS.some(p => p.test(normalize(h))))
+          .map(({ i }) => i);
 
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i] as unknown[];
           if (!row || row.length === 0) continue;
 
           if (idxScore !== -1 && row[idxScore] != null) scores.push(row[idxScore] as string | number);
+
+          const rowAnswers: Record<string, string | number> = {};
+          rawRowIdxs.forEach(idx => {
+            if (row[idx] == null) return;
+            const val = typeof row[idx] === "number" ? (row[idx] as number) : String(row[idx]).trim();
+            if (val === "") return;
+            rowAnswers[headers[idx]] = val;
+          });
+          const rowScore = idxScore !== -1 && row[idxScore] != null ? Number(row[idxScore]) : null;
+          responses.push({ score: rowScore != null && !isNaN(rowScore) ? rowScore : null, answers: rowAnswers });
 
           contentIdxs.forEach(idx => {
             const score = row[idx] != null ? likertToScore(row[idx] as string | number) : null;
@@ -164,6 +191,7 @@ export const parseSatisfactionExcel = async (file: File): Promise<SatisfactionMe
           management_support_score: managementScore,
           engagement_score: engagementScore,
           weighted_utilization_score: weightedUtilization,
+          responses,
         };
 
         resolve(metrics);

@@ -41,6 +41,7 @@ const withSatisfactionMetrics = (session: any): TrainingSession => {
       management_support_score: metric.management_support_score != null ? Number(metric.management_support_score) : undefined,
       engagement_score: metric.engagement_score != null ? Number(metric.engagement_score) : undefined,
       answer_distributions: metric.answer_distributions ?? {},
+      responses: [],
       feedback_likes: feedback.filter((item: any) => item.feedback_type === "like").sort((a: any, b: any) => a.position - b.position).map((item: any) => item.content),
       feedback_improvements: feedback.filter((item: any) => item.feedback_type === "improvement").sort((a: any, b: any) => a.position - b.position).map((item: any) => item.content),
     } : null,
@@ -138,6 +139,12 @@ export default function TreinamentosPage() {
           await supabase.from("training_satisfaction_feedback").delete().eq("training_session_id", sessionId);
           const feedback = [...metrics.feedback_likes.map((content, position) => ({ training_session_id: sessionId, feedback_type: "like", content, position })), ...metrics.feedback_improvements.map((content, position) => ({ training_session_id: sessionId, feedback_type: "improvement", content, position }))];
           if (feedback.length) await supabase.from("training_satisfaction_feedback").insert(feedback);
+
+          await supabase.from("training_satisfaction_responses").delete().eq("training_session_id", sessionId);
+          if (metrics.responses.length) {
+            const responseRows = metrics.responses.map((r) => ({ training_session_id: sessionId, score: r.score, answers: r.answers }));
+            await supabase.from("training_satisfaction_responses").insert(responseRows);
+          }
         }
       }
     }
