@@ -9,15 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { 
-  Users, GraduationCap, CalendarDays, Clock, Pencil, Star, 
-  Download, TrendingUp, Award, MessageSquare, Filter, Search, 
-  ThumbsUp, AlertTriangle, CheckCircle2 
+import {
+  Users, GraduationCap, CalendarDays, Clock, Pencil, Star,
+  Download, TrendingUp, Award, MessageSquare, Filter, Search,
+  ThumbsUp, AlertTriangle, CheckCircle2, BarChart3
 } from "lucide-react";
 import { generateTrainingReport } from "./report";
 import { parseSatisfactionExcel, type SatisfactionMetrics } from "./excelParser";
+import { TrainingAnalyticsModal } from "./AnalyticsModal";
 
-type TrainingSession = {
+export type TrainingSession = {
   id: string;
   theme: string;
   training_date: string;
@@ -35,13 +36,16 @@ const withSatisfactionMetrics = (session: any): TrainingSession => {
       respondents: metric.respondents,
       average_score: Number(metric.average_score ?? 0),
       weighted_utilization_score: Number(metric.weighted_utilization_score ?? metric.average_score ?? 0),
+      content_score: metric.content_score != null ? Number(metric.content_score) : undefined,
+      management_support_score: metric.management_support_score != null ? Number(metric.management_support_score) : undefined,
+      engagement_score: metric.engagement_score != null ? Number(metric.engagement_score) : undefined,
       feedback_likes: feedback.filter((item: any) => item.feedback_type === "like").sort((a: any, b: any) => a.position - b.position).map((item: any) => item.content),
       feedback_improvements: feedback.filter((item: any) => item.feedback_type === "improvement").sort((a: any, b: any) => a.position - b.position).map((item: any) => item.content),
     } : null,
   };
 };
 
-const MONTH_LABELS: Record<string, string> = {
+export const MONTH_LABELS: Record<string, string> = {
   "2026-01": "Janeiro", "2026-02": "Fevereiro", "2026-03": "Março",
   "2026-04": "Abril",   "2026-05": "Maio",      "2026-06": "Junho",
   "2026-07": "Julho",   "2026-08": "Agosto",    "2026-09": "Setembro",
@@ -59,11 +63,12 @@ export default function TreinamentosPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"grid" | "mural">("grid");
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   const fetchSessions = async () => {
     const { data } = await supabase
       .from("training_sessions")
-      .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score,training_satisfaction_feedback(feedback_type,content,position))")
+      .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score,content_score,management_support_score,engagement_score), training_satisfaction_feedback(feedback_type,content,position)")
       .order("training_date", { ascending: true });
     setSessions((data ?? []).map(withSatisfactionMetrics));
     setLoading(false);
@@ -74,7 +79,7 @@ export default function TreinamentosPage() {
     async function init() {
       const { data } = await supabase
         .from("training_sessions")
-        .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score), training_satisfaction_feedback(feedback_type,content,position)")
+        .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score,content_score,management_support_score,engagement_score), training_satisfaction_feedback(feedback_type,content,position)")
         .order("training_date", { ascending: true });
       if (!ignore) {
         setSessions((data ?? []).map(withSatisfactionMetrics));
@@ -117,7 +122,15 @@ export default function TreinamentosPage() {
     if (sessionId !== "new") {
       const metrics = editing.satisfaction_metrics;
       if (metrics) {
-        const { data: metric } = await supabase.from("training_satisfaction_metrics").upsert({ training_session_id: sessionId, respondents: metrics.respondents, average_score: metrics.average_score, weighted_utilization_score: metrics.weighted_utilization_score }).select("training_session_id").single();
+        const { data: metric } = await supabase.from("training_satisfaction_metrics").upsert({
+          training_session_id: sessionId,
+          respondents: metrics.respondents,
+          average_score: metrics.average_score,
+          weighted_utilization_score: metrics.weighted_utilization_score,
+          content_score: metrics.content_score ?? null,
+          management_support_score: metrics.management_support_score ?? null,
+          engagement_score: metrics.engagement_score ?? null,
+        }).select("training_session_id").single();
         if (metric) {
           await supabase.from("training_satisfaction_feedback").delete().eq("training_session_id", sessionId);
           const feedback = [...metrics.feedback_likes.map((content, position) => ({ training_session_id: sessionId, feedback_type: "like", content, position })), ...metrics.feedback_improvements.map((content, position) => ({ training_session_id: sessionId, feedback_type: "improvement", content, position }))];
@@ -413,13 +426,22 @@ export default function TreinamentosPage() {
                             <h3 className="font-semibold leading-tight text-sm text-foreground group-hover:text-primary transition-colors">
                               {session.theme}
                             </h3>
-                            <button
-                              onClick={() => setEditing({ ...session })}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground shrink-0"
-                              title="Editar e importar Excel"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
+                              <button
+                                onClick={() => setAnalyticsOpen(true)}
+                                className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
+                                title="Análise Detalhada"
+                              >
+                                <BarChart3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setEditing({ ...session })}
+                                className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
+                                title="Editar e importar Excel"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                           
                           <div className="space-y-1.5 text-xs text-muted-foreground mt-3 pt-2 border-t">
@@ -640,6 +662,8 @@ export default function TreinamentosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <TrainingAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} sessions={filteredSessions} />
     </div>
   );
 }
