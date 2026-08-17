@@ -1,7 +1,7 @@
 export interface EmployeeRecord {
   id: string;
   name: string;
-  registration_number: string | null;
+  rhid_code: string | null;
   company_id: string | null;
   workplace_id: string | null;
   unit: string | null;
@@ -130,8 +130,8 @@ const matchEmployee = (rawMatricula: string, employees: EmployeeRecord[]): Emplo
   const numMatricula = parseInt(cleanMatricula, 10);
 
   return employees.find(emp => {
-    if (!emp.registration_number) return false;
-    const empReg = emp.registration_number.trim();
+    if (!emp.rhid_code) return false;
+    const empReg = emp.rhid_code.trim();
     if (empReg === cleanMatricula) return true;
     const empNum = parseInt(empReg, 10);
     return !isNaN(numMatricula) && !isNaN(empNum) && empNum === numMatricula;
@@ -273,7 +273,7 @@ export const processRhidTxt = (
         matchedEmployeeSummaries[emp.id] = {
           employeeId: emp.id,
           name: emp.name,
-          registrationNumber: emp.registration_number || rawMatricula.trim(),
+          registrationNumber: emp.rhid_code || rawMatricula.trim(),
           companyName: assignedCompany.trading_name || assignedCompany.name,
           workplaceName,
           recordsCount: 0,

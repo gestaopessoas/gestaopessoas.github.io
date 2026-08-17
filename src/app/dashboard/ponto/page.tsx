@@ -61,7 +61,7 @@ export default function PontoPage() {
       setLoadingDb(true);
       try {
         const [empRes, compRes, workRes, logsRes] = await Promise.all([
-          supabase.from("employees").select("id, name, registration_number, company_id, workplace_id, unit, work_schedule_start_1, work_schedule_end_1, work_schedule_start_2, work_schedule_end_2, status").eq("status", "Ativo"),
+          supabase.from("employees").select("id, name, rhid_code, company_id, workplace_id, unit, work_schedule_start_1, work_schedule_end_1, work_schedule_start_2, work_schedule_end_2, status").eq("status", "Ativo"),
           supabase.from("companies").select("id, name, trading_name, dominio_code"),
           supabase.from("workplaces").select("id, name, type"),
           supabase.from("time_logs").select("*, employees(name)").order("created_at", { ascending: false }).limit(30)
@@ -479,7 +479,7 @@ export default function PontoPage() {
                           <tr key={emp.employeeId} className="hover:bg-muted/30 transition-colors">
                             <td className="px-5 py-3.5 font-medium">
                               <div className="text-foreground font-semibold">{emp.name}</div>
-                              <div className="text-xs text-muted-foreground font-mono">Matrícula: {emp.registrationNumber}</div>
+                              <div className="text-xs text-muted-foreground font-mono">RHID: {emp.registrationNumber}</div>
                             </td>
                             <td className="px-5 py-3.5 text-muted-foreground text-xs">
                               {emp.companyName}
