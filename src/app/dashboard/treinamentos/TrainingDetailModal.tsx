@@ -28,6 +28,12 @@ function answerColor(label: string, index: number): string {
   return DONUT_COLORS[index % DONUT_COLORS.length];
 }
 
+// "Concordo Totalmente" -> "Totalmente" — pro texto de contexto embaixo do KPI
+// não ficar repetindo "Concordo"/"Discordo" toda hora.
+function shortAnswerLabel(label: string) {
+  return label.replace(/^concordo\s+/i, "").replace(/^discordo\s+/i, "");
+}
+
 function scoreColor(score: number) {
   if (score >= 8) return "#16a34a";
   if (score >= 6) return "#d97706";
@@ -45,13 +51,15 @@ function findKpi(distributions: Record<string, Record<string, number>>, keywords
   const [question, answers] = entry;
   const total = Object.values(answers).reduce((a, b) => a + b, 0);
   if (total === 0) return null;
-  const positive = Object.entries(answers)
-    .filter(([label]) => {
-      const score = likertToScore(label);
-      return score != null && score >= 6.67;
-    })
-    .reduce((a, [, count]) => a + count, 0);
-  return { question, pct: Math.round((positive / total) * 100), total };
+  const positiveEntries = Object.entries(answers).filter(([label]) => {
+    const score = likertToScore(label);
+    return score != null && score >= 6.67;
+  });
+  const positive = positiveEntries.reduce((a, [, count]) => a + count, 0);
+  const breakdown = positiveEntries
+    .sort(([, a], [, b]) => b - a)
+    .map(([label, count]) => ({ label, count }));
+  return { question, pct: Math.round((positive / total) * 100), total, breakdown };
 }
 
 export function TrainingDetailModal({
@@ -146,6 +154,9 @@ export function TrainingDetailModal({
                         <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                         <span className="text-xl font-bold">{approvalKpi.pct}%</span>
                         <span className="text-[11px] text-muted-foreground text-center">Aprovaram os objetivos</span>
+                        <span className="text-[10px] text-muted-foreground/70 text-center">
+                          {approvalKpi.breakdown.map(b => `${b.count} ${shortAnswerLabel(b.label)}`).join(" · ")}
+                        </span>
                       </CardContent>
                     </Card>
                   )}
@@ -156,6 +167,9 @@ export function TrainingDetailModal({
                         <Gauge className="w-5 h-5 text-cyan-500" />
                         <span className="text-xl font-bold">{utilityKpi.pct}%</span>
                         <span className="text-[11px] text-muted-foreground text-center">Sentiram útil / aproveitaram</span>
+                        <span className="text-[10px] text-muted-foreground/70 text-center">
+                          {utilityKpi.breakdown.map(b => `${b.count} ${shortAnswerLabel(b.label)}`).join(" · ")}
+                        </span>
                       </CardContent>
                     </Card>
                   )}
@@ -166,6 +180,9 @@ export function TrainingDetailModal({
                         <Gauge className="w-5 h-5 text-cyan-500" />
                         <span className="text-xl font-bold">{expectationsKpi.pct}%</span>
                         <span className="text-[11px] text-muted-foreground text-center">Expectativas atendidas</span>
+                        <span className="text-[10px] text-muted-foreground/70 text-center">
+                          {expectationsKpi.breakdown.map(b => `${b.count} ${shortAnswerLabel(b.label)}`).join(" · ")}
+                        </span>
                       </CardContent>
                     </Card>
                   )}
