@@ -60,7 +60,7 @@ export type MpContratacaoData = {
   requestedBy: string;
   /** Razão escolhida no formulário (marca o checkbox correspondente). */
   reason: string;
-  /** Texto livre quando a razão é "Outros". */
+  /** Texto livre quando a razão é "Outra". */
   customReason: string;
   replacementOf: string;
   justification: string;
@@ -449,7 +449,7 @@ function pageTitle(title: string): Table {
 function sectionGestao(data: MpContratacaoData): Table {
   const reason = data.reason || "";
   const isOutra = Boolean(reason) && reason !== "Aumento de quadro" && reason !== "Substituição";
-  const outraText = isOutra ? (reason === "Outros" ? data.customReason : reason) : "";
+  const outraText = isOutra ? (reason === "Outra" ? data.customReason : reason) : "";
 
   return layoutTable([
     new TableRow({

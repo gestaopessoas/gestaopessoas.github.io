@@ -90,7 +90,7 @@ const availableLogos = [
 ];
 
 const availableReasonsContratacao = [
-  "Substituição", "Aumento de quadro", "Outros"
+  "Aumento de quadro", "Substituição", "Outra"
 ];
 const availableReasonsMovimentacao = [
   "Promoção", "Progressão Horizontal", "Reajuste Anual", "Enquadramento"
@@ -329,6 +329,23 @@ export default function MPGeneratorPage() {
     fetchData();
   }, []);
 
+  // Reset dos campos da Contratação isolado do efeito abaixo: ele só deve disparar na
+  // troca de aba, não a cada vez que a cascata de Modalidade/Cargo recarrega (o que
+  // estava zerando Setor/Telefone/E-mail assim que o usuário avançava no formulário).
+  const [prevMpTypeForReset, setPrevMpTypeForReset] = useState(mpType);
+  if (prevMpTypeForReset !== mpType) {
+    setPrevMpTypeForReset(mpType);
+    if (mpType === "contratacao") {
+      setPhone(""); setEmail(""); setSector("");
+      setCurrentProfileCode("");
+      setCurrentVrLevel(null);
+      setCurrentVrValue(null);
+      setNewVrLevel("");
+      setNewVrValue(null);
+      // Do not clear location or cost center if they were set by Template
+    }
+  }
+
   const movimentacaoKey = `${mpType}|${selectedEmployeeId}|${employees.length}|${rolesForModality.length}|${levelsForRole.length}|${catalogBenefits.length}`;
   const [lastMovimentacaoKey, setLastMovimentacaoKey] = useState(movimentacaoKey);
   if (lastMovimentacaoKey !== movimentacaoKey) {
@@ -384,14 +401,6 @@ export default function MPGeneratorPage() {
           }
         }
       }
-    } else if (mpType === "contratacao") {
-      setPhone(""); setEmail(""); setSector("");
-      setCurrentProfileCode("");
-      setCurrentVrLevel(null);
-      setCurrentVrValue(null);
-      setNewVrLevel("");
-      setNewVrValue(null);
-      // Do not clear location or cost center if they were set by Template
     }
   }
 
@@ -428,7 +437,7 @@ export default function MPGeneratorPage() {
       }
 
       const empName = mpType === "contratacao" ? candidateName : selectedEmployee?.name || "Nao_Selecionado";
-      const finalReason = reason === "Outros" ? customReason : reason;
+      const finalReason = reason === "Outra" ? customReason : reason;
       const formatBenefitList = (list: string[], level: string | null, value: number | null) =>
         list.map(b => (b === "VR" && value != null)
           ? `VR${level ? ` - Nível ${level}` : ""} (${formatCurrency(value)})`
@@ -779,7 +788,7 @@ export default function MPGeneratorPage() {
                     </Select>
                   </div>
 
-                {reason === "Outros" && (
+                {reason === "Outra" && (
                   <div className="space-y-2">
                     <Label>Especificar Razão</Label>
                     <Input value={customReason} onChange={e => setCustomReason(e.target.value)} />
@@ -805,19 +814,31 @@ export default function MPGeneratorPage() {
                         <Label htmlFor={`benefit-${benefit.id}`} className="text-sm font-normal cursor-pointer">
                           {benefit.name}
                         </Label>
-                        {benefit.name === "VR" && selectedBenefits.includes("VR") && vrLevels.length > 0 && (
-                          <select
-                            className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
-                            value={newVrLevel}
-                            onChange={(e) => {
-                              const lvl = e.target.value;
-                              setNewVrLevel(lvl);
-                              setNewVrValue(vrLevels.find(v => v.level === lvl)?.value ?? null);
-                            }}
-                          >
-                            <option value="">Nível...</option>
-                            {vrLevels.map(v => <option key={v.level} value={v.level}>Nível {v.level}</option>)}
-                          </select>
+                        {benefit.name === "VR" && selectedBenefits.includes("VR") && (
+                          vrLevels.length > 0 ? (
+                            <select
+                              className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
+                              value={newVrLevel}
+                              onChange={(e) => {
+                                const lvl = e.target.value;
+                                setNewVrLevel(lvl);
+                                setNewVrValue(vrLevels.find(v => v.level === lvl)?.value ?? null);
+                              }}
+                            >
+                              <option value="">Nível...</option>
+                              {vrLevels.map(v => <option key={v.level} value={v.level}>Nível {v.level}</option>)}
+                            </select>
+                          ) : (
+                            // Sem níveis cadastrados em Tipos de Benefícios: valor digitado direto.
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="Valor R$"
+                              className="h-8 w-24 text-xs"
+                              value={newVrValue ?? ""}
+                              onChange={(e) => setNewVrValue(e.target.value ? Number(e.target.value) : null)}
+                            />
+                          )
                         )}
                       </div>
                     ))}
@@ -1077,19 +1098,31 @@ export default function MPGeneratorPage() {
                           <Label htmlFor={`benefit-new-${benefit.id}`} className="text-sm font-normal cursor-pointer">
                             {benefit.name}
                           </Label>
-                          {benefit.name === "VR" && selectedBenefits.includes("VR") && vrLevels.length > 0 && (
-                            <select
-                              className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
-                              value={newVrLevel}
-                              onChange={(e) => {
-                                const lvl = e.target.value;
-                                setNewVrLevel(lvl);
-                                setNewVrValue(vrLevels.find(v => v.level === lvl)?.value ?? null);
-                              }}
-                            >
-                              <option value="">Nível...</option>
-                              {vrLevels.map(v => <option key={v.level} value={v.level}>Nível {v.level}</option>)}
-                            </select>
+                          {benefit.name === "VR" && selectedBenefits.includes("VR") && (
+                            vrLevels.length > 0 ? (
+                              <select
+                                className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
+                                value={newVrLevel}
+                                onChange={(e) => {
+                                  const lvl = e.target.value;
+                                  setNewVrLevel(lvl);
+                                  setNewVrValue(vrLevels.find(v => v.level === lvl)?.value ?? null);
+                                }}
+                              >
+                                <option value="">Nível...</option>
+                                {vrLevels.map(v => <option key={v.level} value={v.level}>Nível {v.level}</option>)}
+                              </select>
+                            ) : (
+                              // Sem níveis cadastrados em Tipos de Benefícios: valor digitado direto.
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="Valor R$"
+                                className="h-8 w-24 text-xs"
+                                value={newVrValue ?? ""}
+                                onChange={(e) => setNewVrValue(e.target.value ? Number(e.target.value) : null)}
+                              />
+                            )
                           )}
                         </div>
                       ))}
