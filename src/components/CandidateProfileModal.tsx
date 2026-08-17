@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, 
   Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, 
@@ -179,6 +180,7 @@ export function CandidateProfileModal({
   const [historyForm, setHistoryForm] = useState({ stage: "", reason: "", notes: "", workplaceName: "", interviewerName: "", candidateFuture: "" });
   const [workplaceOptions, setWorkplaceOptions] = useState<string[]>([]);
   const [interviewerOptions, setInterviewerOptions] = useState<string[]>([]);
+  const [jobProfileOptions, setJobProfileOptions] = useState<string[]>([]);
   const [isSavingHistory, setIsSavingHistory] = useState(false);
   
   const handleSaveHistory = async (e: React.FormEvent) => {
@@ -240,10 +242,15 @@ export function CandidateProfileModal({
     Promise.all([
       supabase.from("workplaces").select("name").eq("status", "Ativo").order("name"),
       supabase.from("employees").select("name").eq("status", "Ativo").order("name"),
-    ]).then(([workplacesResult, employeesResult]) => {
+      supabase.from("job_profiles").select("title").order("title"),
+    ]).then(([workplacesResult, employeesResult, jobProfilesResult]) => {
       if (!active) return;
       if (!workplacesResult.error) setWorkplaceOptions((workplacesResult.data ?? []).map((workplace) => workplace.name));
       if (!employeesResult.error) setInterviewerOptions((employeesResult.data ?? []).map((employee) => employee.name));
+      if (!jobProfilesResult.error) {
+        const titles = (jobProfilesResult.data ?? []).map((jobProfile) => jobProfile.title).filter((title): title is string => Boolean(title));
+        setJobProfileOptions(Array.from(new Set(titles)));
+      }
     });
 
     return () => { active = false; };
@@ -733,12 +740,21 @@ ${text.substring(0, 8000)}`;
                       <div className="flex items-center gap-2.5">
                         <Briefcase className="h-4 w-4 text-primary shrink-0" />
                         {isEditing ? (
-                          <Input 
-                            value={formData.role_interest || formData.role || ""} 
-                            onChange={(e) => handleChange(formData.role_interest !== undefined ? 'role_interest' : 'role', e.target.value)}
-                            placeholder="Cargo"
-                            className="h-7 text-xs"
-                          />
+                          <Select
+                            value={formData.role_interest || formData.role || ""}
+                            onValueChange={(value) => handleChange(formData.role_interest !== undefined ? 'role_interest' : 'role', value)}
+                          >
+                            <SelectTrigger size="sm" className="w-full">
+                              <SelectValue placeholder="Cargo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from(new Set([...jobProfileOptions, formData.role_interest || formData.role].filter(Boolean))).map((title) => (
+                                <SelectItem key={title} value={title as string}>
+                                  {title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         ) : (
                           <span className="font-medium text-foreground">{formData.role_interest || formData.role || "Cargo não informado"}</span>
                         )}

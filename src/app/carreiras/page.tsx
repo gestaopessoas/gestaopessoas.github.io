@@ -4,10 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, MapPin, Send } from "lucide-react";
+import { Briefcase, MapPin, Send, Loader2, FileUp, Inbox } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { itemsToText } from "@/lib/resumeParser";
+import { analyzeResumeWithAI, parseResumeLocally, type ParsedResumeAcademic, type ParsedResumeExperience } from "@/lib/resumeAI";
 
 type Career = {
   id: string;
@@ -56,6 +59,11 @@ export default function CarreirasPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [parsingResume, setParsingResume] = useState(false);
+  const [resumeError, setResumeError] = useState("");
+  const [parsedAcademics, setParsedAcademics] = useState<ParsedResumeAcademic[]>([]);
+  const [parsedExperiences, setParsedExperiences] = useState<ParsedResumeExperience[]>([]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -102,6 +110,60 @@ export default function CarreirasPage() {
     ].some((value) => value?.toLowerCase().includes(term)));
   }, [careers, query]);
 
+  const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setResumeFile(file);
+    setResumeError("");
+    setParsingResume(true);
+
+    try {
+      let text = "";
+      if (file.type === "application/pdf") {
+        // Import dinâmico: pdfjs-dist toca DOMMatrix (API só de browser) na avaliação do
+        // módulo, o que quebra o SSR desta página pública se importado no topo do arquivo.
+        const pdfjsLib = await import("pdfjs-dist");
+        if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+        }
+        const buffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          text += itemsToText(content.items) + "\n";
+        }
+      } else {
+        text = await file.text();
+      }
+
+      if (!text.trim()) throw new Error("Texto vazio");
+
+      let parsed;
+      try {
+        parsed = await analyzeResumeWithAI(text);
+      } catch {
+        parsed = parseResumeLocally(text);
+      }
+
+      setCandidate((prev) => ({
+        ...prev,
+        full_name: prev.full_name || parsed.name,
+        email: prev.email || parsed.email,
+        phone: prev.phone || parsed.phone,
+        city: prev.city || parsed.city,
+        state: prev.state || parsed.state,
+        linkedin_url: prev.linkedin_url || parsed.linkedin_url,
+      }));
+      setParsedAcademics(parsed.academic_list);
+      setParsedExperiences(parsed.experience_list);
+    } catch {
+      setResumeError("Não foi possível ler o currículo automaticamente, preencha os campos manualmente.");
+    } finally {
+      setParsingResume(false);
+    }
+  };
+
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedJob) return;
@@ -110,7 +172,20 @@ export default function CarreirasPage() {
 
     const [firstName, ...lastParts] = candidate.full_name.trim().split(/\s+/);
     const supabase = createClient();
-    
+
+    // Upload antes do insert: anon só tem policy de INSERT em candidates (sem UPDATE),
+    // então gravar resume_url via update() depois falharia silenciosamente por RLS para
+    // candidatos novos. Fazendo o upload primeiro, o path entra direto no insert.
+    let resumePath: string | null = null;
+    if (resumeFile) {
+      resumePath = `${crypto.randomUUID()}/${resumeFile.name}`;
+      const { error: uploadError } = await supabase.storage.from("resumes").upload(resumePath, resumeFile);
+      if (uploadError) {
+        console.warn("Erro ao enviar currículo:", uploadError.message);
+        resumePath = null;
+      }
+    }
+
     // Attempt to find existing candidate by email first to avoid duplicate email constraint error
     let { data: candidateData, error: candidateError } = await supabase
       .from("candidates")
@@ -139,17 +214,49 @@ export default function CarreirasPage() {
           pcd_description: candidate.is_pcd ? candidate.pcd_description.trim() || null : null,
           role_interest: selectedJob.profile?.title || null,
           search_tags: [selectedJob.profile?.title, selectedJob.department, selectedJob.cost_center].filter(Boolean),
+          resume_url: resumePath,
         })
         .select("id")
         .single();
       candidateData = res.data;
       candidateError = res.error;
+    } else if (resumePath) {
+      // Candidato já existia: anon não tem policy de UPDATE em candidates, então isto é
+      // best-effort (provavelmente vira no-op por RLS) — não bloqueia a candidatura.
+      const { error: resumeUpdateError } = await supabase.from("candidates").update({ resume_url: resumePath }).eq("id", candidateData.id);
+      if (resumeUpdateError) console.warn("Erro ao vincular currículo:", resumeUpdateError.message);
     }
 
     if (candidateError || !candidateData) {
       setSaving(false);
       setError("Não foi possível cadastrar seus dados. Confira o e-mail e tente novamente.");
       return;
+    }
+
+    if (parsedAcademics.length > 0) {
+      const educations = parsedAcademics.map((item) => ({
+        candidate_id: candidateData.id,
+        institution_name: item.institution || "Não informada",
+        degree: item.course || "Não informado",
+        start_date: item.start_date,
+        end_date: item.in_progress ? null : item.end_date,
+      }));
+      const { error: eduError } = await supabase.from("candidate_educations").insert(educations);
+      if (eduError) console.warn("Erro ao salvar formações:", eduError.message);
+    }
+
+    if (parsedExperiences.length > 0) {
+      const experiences = parsedExperiences.map((item) => ({
+        candidate_id: candidateData.id,
+        company_name: item.company || "Não informada",
+        position_title: item.role || "Não informado",
+        start_date: item.start_date,
+        end_date: item.is_current ? null : item.end_date,
+        is_current: item.is_current,
+        description: item.description || "",
+      }));
+      const { error: expError } = await supabase.from("candidate_experiences").insert(experiences);
+      if (expError) console.warn("Erro ao salvar experiências:", expError.message);
     }
 
     const { error: applicationError } = await supabase
@@ -164,6 +271,10 @@ export default function CarreirasPage() {
 
     setIsApplicationOpen(false);
     setCandidate(emptyCandidate);
+    setResumeFile(null);
+    setResumeError("");
+    setParsedAcademics([]);
+    setParsedExperiences([]);
     window.location.assign(`/candidato/teste-personalidade?candidate_id=${candidateData.id}`);
   };
 
@@ -190,16 +301,31 @@ export default function CarreirasPage() {
           </div>
 
           {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
-          {loading && <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">Carregando vagas...</div>}
-          {!loading && filtered.length === 0 && <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">Nenhuma vaga aberta no momento.</div>}
+          {loading && (
+            <div className="grid gap-4">
+              {[0, 1, 2].map((index) => (
+                <div key={index} className="animate-pulse space-y-3 rounded-lg border bg-card p-6">
+                  <div className="h-5 w-1/3 rounded bg-muted" />
+                  <div className="h-3 w-1/2 rounded bg-muted" />
+                  <div className="h-16 w-full rounded bg-muted" />
+                </div>
+              ))}
+            </div>
+          )}
+          {!loading && filtered.length === 0 && (
+            <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
+              <Inbox className="mx-auto mb-2 h-8 w-8 text-muted-foreground/60" />
+              Nenhuma vaga aberta no momento.
+            </div>
+          )}
 
           <div className="grid gap-4">
             {filtered.map((career) => (
-              <Card key={career.id} className={selectedJob?.id === career.id ? "border-primary" : ""}>
+              <Card key={career.id} className={`transition-shadow hover:shadow-md ${selectedJob?.id === career.id ? "border-primary" : ""}`}>
                 <CardHeader>
                   <CardTitle>{career.profile?.title || "Vaga sem título"}</CardTitle>
-                  <CardDescription className="flex flex-wrap gap-x-3 gap-y-1">
-                    <span className="inline-flex items-center"><Briefcase className="mr-1.5 h-3.5 w-3.5" />{career.contract_type || "Contrato não informado"}</span>
+                  <CardDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <Badge variant="secondary"><Briefcase className="h-3.5 w-3.5" />{career.contract_type || "Contrato não informado"}</Badge>
                     <span className="inline-flex items-center"><MapPin className="mr-1.5 h-3.5 w-3.5" />{career.cost_center || career.department || "Área não informada"}</span>
                   </CardDescription>
                 </CardHeader>
@@ -209,7 +335,8 @@ export default function CarreirasPage() {
                     <Requirement title="Mínimo" text={[career.profile?.min_education, career.profile?.min_experience].filter(Boolean).join(" · ")} />
                     <Requirement title="Desejável" text={[career.profile?.desired_education, career.profile?.desired_experience, career.profile?.knowledge].filter(Boolean).join(" · ")} />
                   </div>
-                  <Button className="mt-4" variant="outline" onClick={() => { setSelectedJob(career); setError(""); setIsApplicationOpen(true); }}>
+                  <Button className="mt-4" onClick={() => { setSelectedJob(career); setError(""); setIsApplicationOpen(true); }}>
+                    <Send className="mr-2 h-4 w-4" />
                     Candidatar-se
                   </Button>
                 </CardContent>
@@ -228,6 +355,22 @@ export default function CarreirasPage() {
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
               {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+              <div className="space-y-2 rounded-lg border border-dashed p-3">
+                <Label htmlFor="resume-upload" className="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium text-primary">
+                  {parsingResume ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                  {parsingResume ? "Lendo currículo..." : resumeFile ? resumeFile.name : "Importar dados do currículo"}
+                </Label>
+                <input
+                  id="resume-upload"
+                  type="file"
+                  accept=".pdf,.txt"
+                  className="hidden"
+                  disabled={!selectedJob || parsingResume}
+                  onChange={handleResumeUpload}
+                />
+                <p className="text-xs text-muted-foreground">Opcional: envie um PDF ou TXT para preencher os campos automaticamente.</p>
+                {resumeError && <p className="text-xs text-destructive">{resumeError}</p>}
+              </div>
               <Field label="Nome completo *"><Input required disabled={!selectedJob} value={candidate.full_name} onChange={(event) => setCandidate({ ...candidate, full_name: event.target.value })} /></Field>
               <Field label="E-mail *"><Input required disabled={!selectedJob} type="email" value={candidate.email} onChange={(event) => setCandidate({ ...candidate, email: event.target.value })} /></Field>
               <Field label="Telefone"><Input disabled={!selectedJob} value={candidate.phone} onChange={(event) => setCandidate({ ...candidate, phone: event.target.value })} /></Field>
