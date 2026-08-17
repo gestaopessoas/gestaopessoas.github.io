@@ -94,7 +94,7 @@ export function TrainingDetailModal({
 
   return (
     <Dialog open={!!session} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[95vw] lg:max-w-6xl xl:max-w-7xl max-h-[85vh] overflow-y-auto">
         {session && (
           <>
             <DialogHeader>
@@ -173,19 +173,45 @@ export function TrainingDetailModal({
 
                 {/* Radar comparando todas as dimensões avaliadas */}
                 {radarData.length >= 3 && (
-                  <Card>
+                  <Card className="bg-gradient-to-br from-indigo-500/5 via-transparent to-transparent">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm">Perfil de Avaliação</CardTitle>
+                      <p className="text-xs text-muted-foreground">Nota média (0-10) de cada dimensão avaliada</p>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-[260px] w-full">
+                      <div className="h-[380px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          <RadarChart data={radarData} outerRadius="75%">
-                            <PolarGrid className="stroke-muted" />
-                            <PolarAngleAxis dataKey="question" tick={{ fill: "currentColor", fontSize: 10 }} />
-                            <PolarRadiusAxis domain={[0, 10]} tick={{ fill: "currentColor", fontSize: 9 }} />
-                            <Radar dataKey="nota" stroke="#6366f1" fill="#6366f1" fillOpacity={0.35} />
-                            <Tooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
+                          <RadarChart data={radarData} outerRadius="78%" cx="50%" cy="50%">
+                            <defs>
+                              <radialGradient id="radarFill" cx="50%" cy="50%" r="70%">
+                                <stop offset="0%" stopColor="#818cf8" stopOpacity={0.55} />
+                                <stop offset="100%" stopColor="#6366f1" stopOpacity={0.12} />
+                              </radialGradient>
+                            </defs>
+                            <PolarGrid gridType="polygon" radialLines className="stroke-muted-foreground/25" />
+                            <PolarAngleAxis
+                              dataKey="question"
+                              tick={{ fill: "currentColor", fontSize: 11, fontWeight: 500 }}
+                              tickLine={false}
+                            />
+                            <PolarRadiusAxis
+                              domain={[0, 10]}
+                              tickCount={6}
+                              axisLine={false}
+                              tick={{ fill: "currentColor", fontSize: 9, opacity: 0.6 }}
+                            />
+                            <Radar
+                              dataKey="nota"
+                              stroke="#6366f1"
+                              strokeWidth={2.5}
+                              fill="url(#radarFill)"
+                              dot={{ r: 4, fill: "#6366f1", stroke: "var(--card)", strokeWidth: 2 }}
+                              animationDuration={600}
+                            />
+                            <Tooltip
+                              contentStyle={{ borderRadius: "10px", border: "none", boxShadow: "0 8px 16px -4px rgb(0 0 0 / 0.15)" }}
+                              formatter={(v) => [`${v} / 10`, "Nota"]}
+                            />
                           </RadarChart>
                         </ResponsiveContainer>
                       </div>
@@ -194,7 +220,7 @@ export function TrainingDetailModal({
                 )}
 
                 {/* Distribuição detalhada por pergunta, em donut */}
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {questions.map(({ question, total, answers }) => (
                     <Card key={question}>
                       <CardHeader className="pb-1">
