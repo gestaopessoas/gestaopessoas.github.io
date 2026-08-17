@@ -595,7 +595,12 @@ export default function ColaboradoresPage() {
           <form onSubmit={save} className="mt-4">
             <Section title="Identificação">
               <Field label="Nome completo *" span><Input required value={form.name} onChange={(e) => update("name", e.target.value)} /></Field>
-              <Field label="Matrícula"><Input value={form.registration_number} onChange={(e) => update("registration_number", e.target.value)} /></Field>
+              <Field label="Matrícula"><Input value={form.registration_number} onChange={(e) => {
+                const value = e.target.value;
+                update("registration_number", value);
+                // RHID começa igual à matrícula; só copia enquanto ninguém editou o campo à parte.
+                if (!form.rhid_code) update("rhid_code", value);
+              }} /></Field>
               <Field label="Ficha"><Input value={form.ficha} onChange={(e) => update("ficha", e.target.value)} /></Field>
               <Field label="Código do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} /></Field>
               <Field label="CPF"><Input inputMode="numeric" value={form.cpf} onChange={(e) => { setCpfError(""); update("cpf", maskCpf(e.target.value)); }} placeholder="000.000.000-00" aria-invalid={!!cpfError} />{cpfError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{cpfError}</p>}</Field>
