@@ -131,7 +131,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <div className="flex items-center gap-2">
           <span className="text-primary mr-1">{"//"}</span>
           <span className={cn("transition-opacity duration-300", isCollapsed ? "opacity-0 w-0" : "opacity-100")}>
-            Gente & Gestão
+            ACPO - GESTÃO
           </span>
         </div>
       </div>
