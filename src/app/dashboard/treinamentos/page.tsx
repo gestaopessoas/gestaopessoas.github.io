@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { generateTrainingReport } from "./report";
 import { parseSatisfactionExcel, type SatisfactionMetrics } from "./excelParser";
-import { TrainingAnalyticsModal } from "./AnalyticsModal";
+import { OverallAnalytics } from "./OverallAnalytics";
+import { TrainingDetailModal } from "./TrainingDetailModal";
 
 export type TrainingSession = {
   id: string;
@@ -39,6 +40,7 @@ const withSatisfactionMetrics = (session: any): TrainingSession => {
       content_score: metric.content_score != null ? Number(metric.content_score) : undefined,
       management_support_score: metric.management_support_score != null ? Number(metric.management_support_score) : undefined,
       engagement_score: metric.engagement_score != null ? Number(metric.engagement_score) : undefined,
+      answer_distributions: metric.answer_distributions ?? {},
       feedback_likes: feedback.filter((item: any) => item.feedback_type === "like").sort((a: any, b: any) => a.position - b.position).map((item: any) => item.content),
       feedback_improvements: feedback.filter((item: any) => item.feedback_type === "improvement").sort((a: any, b: any) => a.position - b.position).map((item: any) => item.content),
     } : null,
@@ -62,13 +64,13 @@ export default function TreinamentosPage() {
   // Filtros de UI
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"grid" | "mural">("grid");
-  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"grid" | "geral" | "mural">("grid");
+  const [detailSession, setDetailSession] = useState<TrainingSession | null>(null);
 
   const fetchSessions = async () => {
     const { data } = await supabase
       .from("training_sessions")
-      .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score,content_score,management_support_score,engagement_score), training_satisfaction_feedback(feedback_type,content,position)")
+      .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score,content_score,management_support_score,engagement_score,answer_distributions), training_satisfaction_feedback(feedback_type,content,position)")
       .order("training_date", { ascending: true });
     setSessions((data ?? []).map(withSatisfactionMetrics));
     setLoading(false);
@@ -79,7 +81,7 @@ export default function TreinamentosPage() {
     async function init() {
       const { data } = await supabase
         .from("training_sessions")
-        .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score,content_score,management_support_score,engagement_score), training_satisfaction_feedback(feedback_type,content,position)")
+        .select("id, theme, training_date, training_time, participant_count, training_satisfaction_metrics(respondents,average_score,weighted_utilization_score,content_score,management_support_score,engagement_score,answer_distributions), training_satisfaction_feedback(feedback_type,content,position)")
         .order("training_date", { ascending: true });
       if (!ignore) {
         setSessions((data ?? []).map(withSatisfactionMetrics));
@@ -130,6 +132,7 @@ export default function TreinamentosPage() {
           content_score: metrics.content_score ?? null,
           management_support_score: metrics.management_support_score ?? null,
           engagement_score: metrics.engagement_score ?? null,
+          answer_distributions: metrics.answer_distributions ?? {},
         }).select("training_session_id").single();
         if (metric) {
           await supabase.from("training_satisfaction_feedback").delete().eq("training_session_id", sessionId);
@@ -361,6 +364,17 @@ export default function TreinamentosPage() {
             Visão em Grade
           </button>
           <button
+            onClick={() => setActiveTab("geral")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+              activeTab === "geral"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BarChart3 className="w-3 h-3" />
+            Visão Geral
+          </button>
+          <button
             onClick={() => setActiveTab("mural")}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
               activeTab === "mural" 
@@ -428,9 +442,9 @@ export default function TreinamentosPage() {
                             </h3>
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
                               <button
-                                onClick={() => setAnalyticsOpen(true)}
+                                onClick={() => setDetailSession(session)}
                                 className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
-                                title="Análise Detalhada"
+                                title="Análise deste treinamento"
                               >
                                 <BarChart3 className="w-3.5 h-3.5" />
                               </button>
@@ -496,6 +510,9 @@ export default function TreinamentosPage() {
             </Card>
           ))}
         </div>
+      ) : activeTab === "geral" ? (
+        /* VISÃO GERAL (ANALÍTICA AGREGADA) */
+        <OverallAnalytics sessions={filteredSessions} />
       ) : (
         /* MURAL DE FEEDBACKS QUALITATIVOS */
         <div className="space-y-6">
@@ -663,7 +680,7 @@ export default function TreinamentosPage() {
         </DialogContent>
       </Dialog>
 
-      <TrainingAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} sessions={filteredSessions} />
+      <TrainingDetailModal session={detailSession} onOpenChange={(open) => { if (!open) setDetailSession(null); }} />
     </div>
   );
 }
