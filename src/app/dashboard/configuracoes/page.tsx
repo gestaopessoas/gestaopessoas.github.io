@@ -11,6 +11,7 @@ import { Save, Loader2, DownloadCloud, ShieldAlert, CalendarDays, Link as LinkIc
 import { createClient } from "@/utils/supabase/client"
 import { usePermissions } from "@/hooks/usePermissions"
 import { GlobalHistoryTab } from "@/components/configuracoes/GlobalHistoryTab"
+import { AiModelTab } from "@/components/configuracoes/AiModelTab"
 import { errorMessage } from "@/lib/utils";
 
 const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "central_candidato", "recrutamento", "armarios", "uniformes", "ponto", "rgs", "ilhas", "admissao", "onboarding", "centros_de_custo", "departamentos", "cargos", "empresas", "obras", "beneficios", "treinamentos", "ferias", "holerites", "avaliacoes", "clima", "metas", "pdi", "competencias", "turnover", "analytics", "salarios", "configuracoes", "financeiro"] as const
@@ -204,6 +205,9 @@ export default function ConfiguracoesPage() {
             <TabsTrigger value="modulos" className="text-sm rounded-md flex-1">Módulos</TabsTrigger>
             <TabsTrigger value="permissoes" className="text-sm rounded-md flex-1 min-w-[140px]">Permissões</TabsTrigger>
             <TabsTrigger value="integracoes" className="text-sm rounded-md flex-1 min-w-[140px]">Integrações</TabsTrigger>
+            {can('configuracoes', 'edit') && (
+              <TabsTrigger value="ia" className="text-sm rounded-md flex-1 min-w-[100px]">IA</TabsTrigger>
+            )}
             <TabsTrigger value="backup" className="text-sm rounded-md flex-1">Backup</TabsTrigger>
             {can('configuracoes', 'edit') && (
               <TabsTrigger value="usuarios" className="text-sm rounded-md flex-1 min-w-[160px]">Usuários & Permissões</TabsTrigger>
@@ -303,6 +307,12 @@ export default function ConfiguracoesPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {can('configuracoes', 'edit') && (
+            <TabsContent value="ia" className="mt-6 space-y-6">
+              <AiModelTab />
+            </TabsContent>
+          )}
 
           <TabsContent value="permissoes" className="mt-6 space-y-6">
             <Card className="border-border/60 shadow-sm">
