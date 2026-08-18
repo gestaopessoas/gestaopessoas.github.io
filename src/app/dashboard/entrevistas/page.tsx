@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { errorMessage } from "@/lib/utils";
 import { itemsToText, parseSolidesResume, type ParsedResume } from "@/lib/resumeParser";
+import { buildResumeExtractionPrompt, parseExtractionResponse } from "@/lib/resumeExtractionPrompt";
 import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 
 // O parser local devolve ParsedResume; a IA devolve os mesmos campos mais alguns
@@ -778,9 +779,9 @@ export default function EntrevistasPage() {
       assessment: rowsToAssessment(interview.interview_assessments?.interview_assessment_values ?? []),
     })) as Interview[]);
     if (profilesData) {
-      const allRoles = [...profilesData.map(r => r.title), ...((data ?? []).map((i) => i.role))].filter(Boolean);
-      const uniqueRoles = Array.from(new Set(allRoles)).sort();
-      setRoles(uniqueRoles);
+      // Só títulos de job_profiles. Antes agregava interviews.role — texto livre vindo de
+      // importação de currículo — e cada erro da IA virava uma opção de cargo permanente.
+      setRoles(Array.from(new Set(profilesData.map(r => r.title).filter(Boolean))).sort());
     }
     if (workplacesData) {
       setWorksites(workplacesData.map((w: { name: string }) => w.name));
@@ -1186,7 +1187,9 @@ Resultado Final: ${form.result || "N/C"}
       candidate_name: parsed.name || "",
       email: parsed.email || "",
       phone: parsed.phone || "",
-      role: parsed.role || ""
+      // Vaga fica SEMPRE em branco: é escolhida no dropdown de job_profiles.
+      // Deixar a IA preencher enchia o campo com o cargo do último emprego.
+      role: ""
     }));
     setAssessmentForm(prev => ({
       ...prev,
@@ -1249,74 +1252,17 @@ Resultado Final: ${form.result || "N/C"}
     if (!resumeText.trim()) return;
     setIsAnalyzingResume(true);
     
-    const prompt = `Extraia os seguintes dados do currículo abaixo e retorne APENAS um JSON válido, sem crases, sem markdown, no formato:
-{
-  "name": "Nome Completo",
-  "email": "Email",
-  "phone": "Telefone ou Celular",
-  "role": "Cargo ou Objetivo Profissional",
-  "age": "Idade (ex: 33) ou apenas números",
-  "location": "Cidade / Estado (ex: Pelotas - RS)",
-  "is_internal": false,
-  "education": "Escolaridade / Formação Principal",
-  "professional_summary": "Resumo profissional completo",
-  "birth_date": "Data de nascimento (DD/MM/YYYY)",
-  "cpf": "CPF",
-  "marital_status": "Estado Civil (Solteiro, Casado, Divorciado, Viúvo, União Estável)",
-  "birthplace": "Naturalidade (Cidade/Estado de origem)",
-  "address": "Endereço atual completo",
-  "secondary_phone": "Telefone secundário",
-  "secondary_email": "E-mail secundário",
-  "emergency_contact_phone": "Telefone de recado",
-  "emergency_contact_name": "Nome do contato de recado",
-  "salary_expectation": "Pretensão Salarial",
-  "has_cnh": false,
-  "cnh_category": "Categoria da CNH (ex: B, AB)",
-  "languages": "Idiomas (ex: Inglês Intermediário, Espanhol Básico)",
-  "has_dependents": false,
-  "dependents_count": 0,
-  "dependents_notes": "Nomes/idades dos dependentes (filhos, enteados)",
-  "uniform_size": "Tamanho de uniforme (PP, P, M, G, GG, XG)",
-  "boot_size": "Número da botina (ex: 42)",
-  "gender": "Gênero biológico ou identidade (Masculino, Feminino, etc)",
-  "gender_identity": "Autodeclaração de gênero",
-  "sexual_orientation": "Orientação sexual",
-  "race_declaration": "Autodeclaração de raça/cor",
-
-  "academic_list": [
-    {
-      "id": "1",
-      "course": "Nome do Curso ou Graduação",
-      "institution": "Nome da Instituição ou Universidade",
-      "start_date": "Mês/Ano de Início (ex: 2011 ou 03/2011)",
-      "end_date": "Mês/Ano de Conclusão (ex: 2015 ou 12/2015)",
-      "in_progress": false
-    }
-  ],
-  "experience_list": [
-    {
-      "id": "1",
-      "role": "Nome do Cargo (ex: Psicólogo Clínico)",
-      "company": "Nome da Empresa ou Clínica",
-      "start_date": "Mês/Ano Início (ex: 08/2022)",
-      "end_date": "Mês/Ano Fim (ex: 05/2024)",
-      "is_current": false,
-      "description": "Descrição detalhada das atividades e realizações no cargo"
-    }
-  ],
-  "experience_summary": "Histórico de experiência em formato de texto resumido"
-}
-
-Currículo:
-${resumeText.replace(/Habilidades[\s\S]*?(Idiomas|Informações adicionais|Informações pessoais|Diversidade|Endereço|$)/i, "$1")}`;
+    // Prompt calibrado nos currículos reais do acervo — ver src/lib/resumeExtractionPrompt.ts.
+    // A seção "Habilidades" não é mais recortada do texto: ela vinha sendo apagada por regex
+    // porque candidatos colam requisitos de anúncio de vaga ali, mas o recorte também comia
+    // conteúdo legítimo até a próxima seção. A regra R14 do prompt trata isso sem perder texto.
+    const prompt = buildResumeExtractionPrompt(resumeText);
 
     try {
       const generatedText = await generateWithAI(prompt);
-      
-      const text = generatedText.replace(/```json/g, "").replace(/```/g, "").trim();
-      const parsed = JSON.parse(text);
+      const parsed = parseExtractionResponse(generatedText);
 
-      applyParsedResume(parsed);
+      applyParsedResume(parsed as Parameters<typeof applyParsedResume>[0]);
     } catch (e) {
       console.error(e);
       alert("Falha na Inteligência Artificial: " + errorMessage(e, "A resposta não estava no formato JSON correto."));
