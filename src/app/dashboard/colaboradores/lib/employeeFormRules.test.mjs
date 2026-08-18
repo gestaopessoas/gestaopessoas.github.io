@@ -12,6 +12,8 @@ import {
   salaryChangeDue,
   maskCurrencyInput,
   levelFieldOptions,
+  seniorityForLevel,
+  seniorityOptionsFromRules,
 } from "./employeeFormRules.mjs";
 import * as employeeFormRules from "./employeeFormRules.mjs";
 
@@ -50,22 +52,64 @@ test("cargo de campo não oferece senioridade e entra pelo piso", () => {
   assert.deepEqual(levelOptions, ["", "PISO", "Não Enquadrado"]);
 });
 
-test("cargo com nível mantém senioridade e filtra os níveis da faixa", () => {
+test("cargo com nível e sem senioridade cadastrada mostra todos os níveis da faixa", () => {
   const analista = [
     { role_name: "ANALISTA", modality: "CLT", uses_level: true, level: "Nível I" },
     { role_name: "ANALISTA", modality: "CLT", uses_level: true, level: "Nível VI" },
   ];
 
-  const semFiltro = levelFieldOptions(analista, undefined, ALL_LEVELS);
+  const semFiltro = levelFieldOptions(analista, "", ALL_LEVELS);
   assert.equal(semFiltro.showSeniority, true);
   assert.deepEqual(semFiltro.levelOptions, ["", "Nível I", "Nível VI", "PISO", "Não Enquadrado"]);
 
-  const junior = levelFieldOptions(analista, ["Nível I"], ALL_LEVELS);
-  assert.deepEqual(junior.levelOptions, ["", "Nível I", "PISO", "Não Enquadrado"]);
+  // Sem senioridade no cadastro não há como filtrar: esconder opção seria pior que mostrar.
+  const comSenioridadeEscolhida = levelFieldOptions(analista, "Júnior", ALL_LEVELS);
+  assert.deepEqual(comSenioridadeEscolhida.levelOptions, ["", "Nível I", "Nível VI", "PISO", "Não Enquadrado"]);
+});
 
-  // senioridade sem nenhum nível correspondente não pode zerar a lista
-  const diretoria = levelFieldOptions(analista, ["Diretoria"], ALL_LEVELS);
-  assert.deepEqual(diretoria.levelOptions, ["", "Nível I", "Nível VI", "PISO", "Não Enquadrado"]);
+// Cenário que originou o bug: os níveis se chamam "1".."5" DENTRO de cada senioridade, então
+// o mesmo rótulo de nível existe em Júnior, Pleno e Sênior. Qualquer lógica que mapeie nível
+// para senioridade globalmente erra aqui — a pista tem que ser o par (cargo, senioridade).
+const assistente = [
+  { role_name: "ASSISTENTE", modality: "CLT", uses_level: true, seniority: "Júnior", level: "1" },
+  { role_name: "ASSISTENTE", modality: "CLT", uses_level: true, seniority: "Júnior", level: "2" },
+  { role_name: "ASSISTENTE", modality: "CLT", uses_level: true, seniority: "Pleno", level: "1" },
+  { role_name: "ASSISTENTE", modality: "CLT", uses_level: true, seniority: "Pleno", level: "2" },
+];
+
+test("níveis são filtrados pela senioridade escolhida, mesmo com rótulos repetidos", () => {
+  const junior = levelFieldOptions(assistente, "Júnior", ALL_LEVELS);
+  assert.deepEqual(junior.levelOptions, ["", "1", "2", "PISO", "Não Enquadrado"]);
+
+  const pleno = levelFieldOptions(assistente, "Pleno", ALL_LEVELS);
+  assert.deepEqual(pleno.levelOptions, ["", "1", "2", "PISO", "Não Enquadrado"]);
+});
+
+test("senioridades disponíveis saem da tabela salarial do cargo, sem repetir", () => {
+  assert.deepEqual(seniorityOptionsFromRules(assistente), ["Júnior", "Pleno"]);
+  assert.deepEqual(seniorityOptionsFromRules([]), []);
+});
+
+test("senioridade derivada do nível usa o dado do cargo e admite não saber", () => {
+  // Rótulo repetido: a primeira regra que casa define, e nunca deve inventar quando não há dado.
+  assert.equal(seniorityForLevel(assistente, "1"), "Júnior");
+  assert.equal(seniorityForLevel(assistente, "9"), null);
+  assert.equal(seniorityForLevel(assistente, ""), null);
+  assert.equal(seniorityForLevel([{ uses_level: true, level: "1" }], "1"), null);
+});
+
+test("cargo com faixa larga (diretoria/coordenação) respeita a divisão cadastrada", () => {
+  const coordenador = [
+    ...Array.from({ length: 5 }, (_, i) => ({ role_name: "COORDENADOR", modality: "CLT", uses_level: true, seniority: "Júnior", level: String(i + 1) })),
+    ...Array.from({ length: 5 }, (_, i) => ({ role_name: "COORDENADOR", modality: "CLT", uses_level: true, seniority: "Pleno", level: String(i + 6) })),
+    ...Array.from({ length: 5 }, (_, i) => ({ role_name: "COORDENADOR", modality: "CLT", uses_level: true, seniority: "Sênior", level: String(i + 11) })),
+  ];
+
+  assert.deepEqual(levelFieldOptions(coordenador, "Júnior", ALL_LEVELS).levelOptions,
+    ["", "1", "2", "3", "4", "5", "PISO", "Não Enquadrado"]);
+  assert.deepEqual(levelFieldOptions(coordenador, "Sênior", ALL_LEVELS).levelOptions,
+    ["", "11", "12", "13", "14", "15", "PISO", "Não Enquadrado"]);
+  assert.equal(seniorityForLevel(coordenador, "13"), "Sênior");
 });
 
 test("cargo sem faixa cadastrada mantém todos os níveis mais piso", () => {
