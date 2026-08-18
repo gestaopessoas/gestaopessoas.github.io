@@ -63,6 +63,7 @@ export default function BeneficiosPage() {
   const [ataDate, setAtaDate] = useState<string>(todayStr);
   const [ataStatus, setAtaStatus] = useState<Record<string, "CONFIRMED" | "CANCELLED">>({});
   const [ataExtraIds, setAtaExtraIds] = useState<string[]>([]); // colaboradores fora da Sede incluídos manualmente
+  const [ataHiddenSede, setAtaHiddenSede] = useState<string[]>([]); // colaboradores da Sede excluídos da ata deste dia
   const [ataManual, setAtaManual] = useState<{ id: string; name: string }[]>([]); // pessoas fora do cadastro (terceiros/visitantes)
   const [ataManualName, setAtaManualName] = useState("");
   const [ataCosts, setAtaCosts] = useState<Record<string, { company_cost: number; employee_cost: number }>>({});
@@ -285,8 +286,10 @@ export default function BeneficiosPage() {
 
   // ===== Ata diária de almoço (Sede) =====
 
-  // Base do dia: colaboradores ativos da Sede + inclusões manuais avulsas + cadastros manuais (fora do sistema)
-  const sedeAtivos = employees.filter((e) => e.status === "Ativo" && e.workplaceType === "SEDE");
+  // Base do dia: colaboradores ativos da Sede (menos os excluídos do dia) + inclusões avulsas + cadastros manuais
+  const sedeAtivos = employees
+    .filter((e) => e.status === "Ativo" && e.workplaceType === "SEDE")
+    .filter((e) => !ataHiddenSede.includes(e.id));
   const ataExtraEmployees = ataExtraIds
     .map((id) => employees.find((e) => e.id === id))
     .filter((e): e is Employee => Boolean(e));
@@ -359,6 +362,7 @@ export default function BeneficiosPage() {
       setAtaCosts(costsMap);
       setAtaExtraIds(extras);
       setAtaManual(manual);
+      setAtaHiddenSede([]);
       setAtaLoading(false);
     },
     [supabase, employees]
@@ -396,6 +400,27 @@ export default function BeneficiosPage() {
       delete next[employeeId];
       return next;
     });
+  };
+
+  // Excluir colaborador da Sede da ata deste dia (marca CANCELLED e persiste na hora)
+  const excludeSedeFromAta = async (employeeId: string) => {
+    const emp = employees.find((e) => e.id === employeeId);
+    const cost = ataCostFor(employeeId, emp?.workplaceType);
+    const { error } = await supabase.from("lunch_lists").upsert(
+      {
+        employee_id: employeeId,
+        lunch_date: ataDate,
+        status: "CANCELLED",
+        company_cost: cost.company_cost,
+        employee_cost: cost.employee_cost,
+      },
+      { onConflict: "employee_id,lunch_date" }
+    );
+    if (error) {
+      alert(`Erro ao excluir da lista do dia: ${error.message}`);
+      return;
+    }
+    setAtaHiddenSede((prev) => [...prev, employeeId]);
   };
 
   // Cadastro manual: pessoa que não está em employees (terceiro/visitante)
@@ -877,6 +902,16 @@ export default function BeneficiosPage() {
                                   onClick={() => removeAtaManual(emp.id)}
                                 >
                                   Remover
+                                </Button>
+                              )}
+                              {!isExtra && !isManual && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-muted-foreground hover:text-red-500"
+                                  onClick={() => excludeSedeFromAta(emp.id)}
+                                >
+                                  Excluir
                                 </Button>
                               )}
                             </td>
