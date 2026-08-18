@@ -381,11 +381,14 @@ export default function ColaboradoresPage() {
 
     if (result.error) {
       setSaving(false);
-      setError(`Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
+      setError(result.error.code === "23505" && result.error.message?.includes("employees_cpf_unique")
+        ? "Já existe um colaborador cadastrado com este CPF."
+        : `Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
       return;
     }
 
     if (!criticalFieldsMatch(payload, result.data)) {
+      if (isNew) await supabase.from("employees").delete().eq("id", result.data.id);
       setSaving(false);
       setError("O banco não confirmou todos os campos alterados. Revise RG, Cargo, Código do Perfil, Nível, Empresa, Obra/Unidade, Estado civil e Status.");
       return;
