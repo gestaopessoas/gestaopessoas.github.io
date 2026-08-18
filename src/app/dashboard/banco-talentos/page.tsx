@@ -300,7 +300,11 @@ export default function BancoTalentosPage() {
               city: data.city || null,
               state: data.state || null,
               role_interest: data.role_interest || data.role || null,
-              status: "Banco de Talentos",
+              // candidates não tem coluna `status`: o status é derivado por
+              // resolveCandidateStatus, que lê a marcação em search_tags. Gravar "status"
+              // aqui quebrava o insert ("Could not find the 'status' column") — e, mesmo
+              // aceito, o candidato não apareceria nesta tela, que filtra pelo derivado.
+              search_tags: ["Banco de Talentos"],
             });
             if (error) {
               if (error.code === '23505') alert("Já existe um candidato com este e-mail.");
