@@ -177,6 +177,7 @@ type ProfileInterview = {
   role?: string | null;
   status?: string | null;
   result?: string | null;
+  destination?: string | null;
   evaluator?: string | null;
   interview_date?: string | null;
   assessment?: {
@@ -205,8 +206,8 @@ type CandidateProfileModalProps = {
   defaultEditMode?: boolean;
   initialData?: Partial<ProfilePerson>;
   initialAssessmentData?: any;
-  interviewProgress?: { status: string; result: string };
-  onSave?: (data: ProfilePerson, assessmentData: any, interviewProgress?: { status: string; result: string }) => Promise<void>;
+  interviewProgress?: { status: string; result: string; destination?: string };
+  onSave?: (data: ProfilePerson, assessmentData: any, interviewProgress?: { status: string; result: string; destination?: string }) => Promise<void>;
 };
 
 export function CandidateProfileModal({
@@ -229,7 +230,7 @@ export function CandidateProfileModal({
   const [resolvedCandidateId, setResolvedCandidateId] = useState<string | null>(candidateId || null);
   const [formData, setFormData] = useState<ProfilePerson>(initialData || {});
   const [assessmentData, setAssessmentData] = useState<any>(initialAssessmentData || {});
-  const [progress, setProgress] = useState(() => normalizeInterviewProgress(interviewProgress || { status: "Aguardando", result: "N/C" }));
+  const [progress, setProgress] = useState(() => normalizeInterviewProgress(interviewProgress || { status: "Aguardando", result: "N/C", destination: "" }));
   const [isEditing, setIsEditing] = useState(defaultEditMode);
   const [isSaving, setIsSaving] = useState(false);
   const [isParsingCv, setIsParsingCv] = useState(false);
@@ -507,8 +508,9 @@ export function CandidateProfileModal({
   const [expDraft, setExpDraft] = useState<ProfileExperience | null>(null);
   const [savingEntry, setSavingEntry] = useState(false);
   const [entryError, setEntryError] = useState("");
-  // Sem candidate_id resolvido não há onde gravar: o candidato precisa existir antes.
-  const canEditEntries = Boolean(resolvedCandidateId);
+  // Sem candidate_id resolvido, o item fica em memória (__persisted: false) e só vai pro
+  // banco em flushImportedEntries(), depois que handleSave() cria o candidato.
+  const canEditEntries = true;
 
   // Opções do campo Cargo: os títulos de job_profiles mais o valor já gravado, para o Select
   // conseguir renderizar o que está selecionado.
@@ -522,13 +524,25 @@ export function CandidateProfileModal({
   const restoreRef = useRef<HTMLElement | null>(null);
 
   const saveEducation = async () => {
-    if (!eduDraft || !resolvedCandidateId) return;
+    if (!eduDraft) return;
     if (!(eduDraft.degree || eduDraft.course)?.trim() && !eduDraft.institution?.trim()) {
       setEntryError("Informe ao menos o curso ou a instituição.");
       return;
     }
-    setSavingEntry(true);
     setEntryError("");
+
+    // Candidato ainda não existe: guarda em memória, mesmo formato dos itens importados —
+    // flushImportedEntries() grava no banco assim que handleSave() criar o candidato.
+    if (!resolvedCandidateId) {
+      const draft = { ...eduDraft, id: eduDraft.id || String(Date.now() + Math.random()), __persisted: false };
+      setEducations((prev) => (eduDraft.id && prev.some((item) => item.id === eduDraft.id)
+        ? prev.map((item) => (item.id === eduDraft.id ? draft : item))
+        : [draft, ...prev]));
+      setEduDraft(null);
+      return;
+    }
+
+    setSavingEntry(true);
     const supabase = createClient();
     const row = educationToRow(eduDraft, resolvedCandidateId);
 
@@ -562,13 +576,23 @@ export function CandidateProfileModal({
   };
 
   const saveExperience = async () => {
-    if (!expDraft || !resolvedCandidateId) return;
+    if (!expDraft) return;
     if (!expDraft.role?.trim() && !expDraft.company?.trim()) {
       setEntryError("Informe ao menos o cargo ou a empresa.");
       return;
     }
-    setSavingEntry(true);
     setEntryError("");
+
+    if (!resolvedCandidateId) {
+      const draft = { ...expDraft, id: expDraft.id || String(Date.now() + Math.random()), __persisted: false };
+      setExperiences((prev) => (expDraft.id && prev.some((item) => item.id === expDraft.id)
+        ? prev.map((item) => (item.id === expDraft.id ? draft : item))
+        : [draft, ...prev]));
+      setExpDraft(null);
+      return;
+    }
+
+    setSavingEntry(true);
     const supabase = createClient();
     const row = experienceToRow(expDraft, resolvedCandidateId);
 
@@ -1130,7 +1154,7 @@ export function CandidateProfileModal({
                             <select
                               disabled={!isEditing}
                               value={progress.status}
-                              onChange={(e) => setProgress(normalizeInterviewProgress({ status: e.target.value, result: progress.result }))}
+                              onChange={(e) => setProgress(normalizeInterviewProgress({ status: e.target.value, result: progress.result, destination: progress.destination }))}
                               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
                             >
                               <option value="Aguardando">Aguardando</option>
@@ -1144,13 +1168,26 @@ export function CandidateProfileModal({
                             <select
                               disabled={!isEditing}
                               value={progress.result}
-                              onChange={(e) => setProgress(normalizeInterviewProgress({ status: progress.status, result: e.target.value }))}
+                              onChange={(e) => setProgress(normalizeInterviewProgress({ status: progress.status, result: e.target.value, destination: progress.destination }))}
                               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
                             >
                               <option value="N/C">N/C</option>
                               <option value="Aprovado">Aprovado</option>
                               <option value="Reprovado">Reprovado</option>
+                            </select>
+                          </label>
+                          <label className="space-y-1.5">
+                            <span className="text-xs text-muted-foreground block font-medium">Destino</span>
+                            <select
+                              disabled={!isEditing}
+                              value={progress.destination}
+                              onChange={(e) => setProgress(normalizeInterviewProgress({ status: progress.status, result: progress.result, destination: e.target.value }))}
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              <option value="">-</option>
+                              <option value="Contratado">Contratado</option>
                               <option value="Banco de Talentos">Banco de Talentos</option>
+                              <option value="Descartado">Descartado</option>
                               <option value="Desistente">Desistente</option>
                             </select>
                           </label>
@@ -1376,9 +1413,6 @@ export function CandidateProfileModal({
                             Adicionar experiência
                           </Button>
                         )}
-                        {!canEditEntries && (
-                          <p className="text-xs text-muted-foreground italic">* Salve o candidato para poder incluir experiências manualmente.</p>
-                        )}
                       </div>
                     </details>
 
@@ -1463,9 +1497,6 @@ export function CandidateProfileModal({
                             <Plus className="h-4 w-4 mr-1.5" />
                             Adicionar formação
                           </Button>
-                        )}
-                        {!canEditEntries && (
-                          <p className="text-xs text-muted-foreground italic">* Salve o candidato para poder incluir formações manualmente.</p>
                         )}
                       </div>
                     </details>
@@ -1594,12 +1625,17 @@ export function CandidateProfileModal({
                                     </span>
                                   )}
                                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                    int.result === "Aprovado" || int.result === "Contratado" ? "bg-emerald-100 text-emerald-800" :
+                                    int.result === "Aprovado" ? "bg-emerald-100 text-emerald-800" :
                                     int.result === "Reprovado" ? "bg-rose-100 text-rose-800" :
                                     "bg-amber-100 text-amber-800"
                                   }`}>
                                     {int.result || int.status}
                                   </span>
+                                  {int.destination && (
+                                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+                                      {int.destination}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                               <CandidateAssessmentTab 
