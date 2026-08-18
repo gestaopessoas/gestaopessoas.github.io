@@ -496,7 +496,7 @@ export default function BeneficiosPage() {
     const dateLabel = format(new Date(`${ataDate}T00:00:00`), "dd/MM/yyyy");
     exportLunchListPdf(
       dateLabel,
-      confirmados.map((emp) => ({ name: emp.name, department: emp.department }))
+      confirmados.map((emp) => ({ name: emp.name, department: emp.department, workplaceType: emp.workplaceType }))
     );
   };
 
