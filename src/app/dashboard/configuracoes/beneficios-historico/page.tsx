@@ -37,7 +37,7 @@ export default function BeneficiosHistoricoPage() {
     setLoading(true);
     const { data: emps } = await supabase
       .from("employees")
-      .select(`id, name, status, admission_date, departments(name)`)
+      .select(`id, name, status, admission_date, sectors(name)`)
       .not("admission_date", "is", null);
 
     const { data: igs } = await supabase.from("benefit_ignores").select("employee_id");
@@ -48,13 +48,13 @@ export default function BeneficiosHistoricoPage() {
       .order("created_at", { ascending: false });
 
     const empsList: Employee[] = (emps || []).map((e: Record<string, unknown>) => {
-      const deps = e.departments as Record<string, unknown> | null;
+      const sec = e.sectors as Record<string, unknown> | null;
       return {
         id: String(e.id || ""),
         name: String(e.name || ""),
         status: String(e.status || ""),
         admission_date: String(e.admission_date || ""),
-        department: deps && deps.name ? String(deps.name) : undefined,
+        department: sec && sec.name ? String(sec.name) : undefined,
       };
     });
     setEmployees(empsList);

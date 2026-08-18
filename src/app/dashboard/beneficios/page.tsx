@@ -89,7 +89,7 @@ export default function BeneficiosPage() {
     // Fetch todos os funcionários para análise de ativos (inclusão) e desligados (corte)
     const { data: emps } = await supabase
       .from("employees")
-      .select(`id, name, status, admission_date, cost_center, departments(name), workplaces!employees_workplace_id_fkey(type)`)
+      .select(`id, name, status, admission_date, cost_center, sectors(name), workplaces!employees_workplace_id_fkey(type)`)
       .not("admission_date", "is", null);
 
     // Fetch benefícios ativos
@@ -106,12 +106,12 @@ export default function BeneficiosPage() {
     const today = new Date().toISOString().split("T")[0];
     const { data: lunches } = await supabase
       .from("lunch_lists")
-      .select(`id, employee_id, lunch_date, status, manual_name, company_cost, employee_cost, employees(name, departments(name))`)
+      .select(`id, employee_id, lunch_date, status, manual_name, company_cost, employee_cost, employees(name)`)
       .gte("lunch_date", today)
       .order("lunch_date", { ascending: true });
 
     const empsList: Employee[] = (emps || []).map((e: Record<string, unknown>) => {
-      const deps = e.departments as Record<string, unknown> | null;
+      const sec = e.sectors as Record<string, unknown> | null;
       const wp = e.workplaces as Record<string, unknown> | null;
       return {
         id: String(e.id || ""),
@@ -119,7 +119,7 @@ export default function BeneficiosPage() {
         status: String(e.status || ""),
         admission_date: String(e.admission_date || ""),
         cost_center: e.cost_center ? String(e.cost_center) : undefined,
-        department: deps && deps.name ? String(deps.name) : undefined,
+        department: sec && sec.name ? String(sec.name) : undefined,
         workplaceType: wp && wp.type ? String(wp.type) : undefined,
       };
     });
@@ -302,9 +302,15 @@ export default function BeneficiosPage() {
     ...ataManualEmployees,
   ];
 
-  const ataCostFor = (id: string) => ataCosts[id] ?? { company_cost: 0, employee_cost: 0 };
-  const setAtaCost = (id: string, field: "company_cost" | "employee_cost", value: number) => {
-    setAtaCosts((prev) => ({ ...prev, [id]: { ...ataCostFor(id), [field]: value } }));
+  // Custo padrão do almoço: empresa sempre 17,02; colaborador paga metade, exceto quem é de Obra/Unidade (isento).
+  const ATA_COMPANY_COST = 17.02;
+  const ataDefaultCost = (workplaceType?: string) => ({
+    company_cost: ATA_COMPANY_COST,
+    employee_cost: workplaceType === "OBRA" || workplaceType === "UNIDADE" ? 0 : ATA_COMPANY_COST / 2,
+  });
+  const ataCostFor = (id: string, workplaceType?: string) => ataCosts[id] ?? ataDefaultCost(workplaceType);
+  const setAtaCost = (id: string, field: "company_cost" | "employee_cost", value: number, workplaceType?: string) => {
+    setAtaCosts((prev) => ({ ...prev, [id]: { ...ataCostFor(id, workplaceType), [field]: value } }));
   };
 
   const ataSearchResults =
@@ -423,8 +429,8 @@ export default function BeneficiosPage() {
       employee_id: emp.id,
       lunch_date: ataDate,
       status: ataStatusFor(emp.id),
-      company_cost: ataCostFor(emp.id).company_cost,
-      employee_cost: ataCostFor(emp.id).employee_cost,
+      company_cost: ataCostFor(emp.id, emp.workplaceType).company_cost,
+      employee_cost: ataCostFor(emp.id, emp.workplaceType).employee_cost,
     }));
     const manualRows = ataManual.map((m) => ({
       id: m.id.startsWith("manual-") ? undefined : m.id,
@@ -818,7 +824,7 @@ export default function BeneficiosPage() {
                       {ataList.map((emp) => {
                         const isManual = ataManual.some((m) => m.id === emp.id);
                         const isExtra = !isManual && ataExtraIds.includes(emp.id) && !sedeAtivos.some((s) => s.id === emp.id);
-                        const cost = ataCostFor(emp.id);
+                        const cost = ataCostFor(emp.id, emp.workplaceType);
                         return (
                           <tr key={emp.id} className="hover:bg-muted/50">
                             <td className="px-4 py-3">
@@ -838,7 +844,7 @@ export default function BeneficiosPage() {
                                 step="0.01"
                                 min={0}
                                 value={cost.company_cost}
-                                onChange={(e) => setAtaCost(emp.id, "company_cost", Number(e.target.value))}
+                                onChange={(e) => setAtaCost(emp.id, "company_cost", Number(e.target.value), emp.workplaceType)}
                                 className="h-8 w-28"
                               />
                             </td>
@@ -848,7 +854,7 @@ export default function BeneficiosPage() {
                                 step="0.01"
                                 min={0}
                                 value={cost.employee_cost}
-                                onChange={(e) => setAtaCost(emp.id, "employee_cost", Number(e.target.value))}
+                                onChange={(e) => setAtaCost(emp.id, "employee_cost", Number(e.target.value), emp.workplaceType)}
                                 className="h-8 w-28"
                               />
                             </td>
