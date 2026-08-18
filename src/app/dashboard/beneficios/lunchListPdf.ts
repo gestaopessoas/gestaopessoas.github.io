@@ -73,16 +73,18 @@ export const exportLunchListPdf = async (dateLabel: string, attendees: LunchAtte
     theme: "plain",
     styles: {
       font: "helvetica",
-      fontSize: 10,
+      fontSize: 8,
+      cellPadding: 1.5,
       textColor: TITLE_TEXT,
       lineColor: [201, 204, 206],
       lineWidth: 0.1,
-      minCellHeight: 10,
+      minCellHeight: 6,
     },
     headStyles: {
       fillColor: [244, 244, 244],
       textColor: TITLE_TEXT,
       fontStyle: "bold",
+      fontSize: 8,
     },
     alternateRowStyles: {
       fillColor: [250, 250, 250],
