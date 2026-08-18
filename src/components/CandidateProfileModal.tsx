@@ -9,11 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, 
   Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, 
-  Info, Heart, DollarSign, Users, ChevronRight, Edit2, Save, History, FileCheck, FileUp
+  Info, Heart, DollarSign, Users, ChevronRight, Edit2, Save, History, FileCheck, FileUp,
+  Plus, Pencil, Trash2
 } from "lucide-react";
 import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
 import * as pdfjsLib from "pdfjs-dist";
 import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
+import { buildResumeExtractionPrompt, parseExtractionResponse } from "@/lib/resumeExtractionPrompt";
 import { usePermissions } from "@/hooks/usePermissions";
 import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
 import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
@@ -76,6 +78,10 @@ type ProfilePerson = {
   isFromInterview?: boolean;
 };
 
+// __persisted marca os itens que existem de fato em candidate_educations /
+// candidate_experiences. Os demais vêm do assessment da entrevista, com id sintético
+// (Math.random): podem ser editados — o salvamento vira insert — mas nunca podem ser alvo de
+// update/delete por id, que falharia silenciosamente.
 type ProfileEducation = {
   id?: string;
   degree?: string | null;
@@ -84,6 +90,7 @@ type ProfileEducation = {
   status?: string | null;
   start_date?: string | null;
   end_date?: string | null;
+  __persisted?: boolean;
 };
 
 type ProfileExperience = {
@@ -94,7 +101,58 @@ type ProfileExperience = {
   start_date?: string | null;
   end_date?: string | null;
   activities?: string | null;
+  __persisted?: boolean;
 };
+
+// As tabelas usam nomes de coluna diferentes dos campos da ficha. Mapear nos dois sentidos
+// num lugar só evita que cada ponto de gravação invente o seu próprio de-para.
+function mapEducationRow(row: any): ProfileEducation {
+  return {
+    __persisted: true,
+    id: row.id,
+    degree: row.degree ?? null,
+    course: row.degree ?? null,
+    institution: row.institution_name ?? null,
+    status: row.end_date ? "Concluído" : "Em andamento",
+    start_date: row.start_date ?? null,
+    end_date: row.end_date ?? null,
+  };
+}
+
+function educationToRow(item: ProfileEducation, candidateId: string) {
+  return {
+    candidate_id: candidateId,
+    institution_name: item.institution?.trim() || "Não informada",
+    degree: (item.degree || item.course)?.trim() || "Não informado",
+    start_date: item.start_date || null,
+    end_date: item.status === "Em andamento" ? null : item.end_date || null,
+  };
+}
+
+function mapExperienceRow(row: any): ProfileExperience {
+  return {
+    __persisted: true,
+    id: row.id,
+    role: row.position_title ?? null,
+    company: row.company_name ?? null,
+    current: Boolean(row.is_current),
+    start_date: row.start_date ?? null,
+    end_date: row.end_date ?? null,
+    activities: row.description ?? null,
+  };
+}
+
+function experienceToRow(item: ProfileExperience, candidateId: string) {
+  return {
+    candidate_id: candidateId,
+    company_name: item.company?.trim() || "Não informada",
+    position_title: item.role?.trim() || "Não informado",
+    start_date: item.start_date || null,
+    end_date: item.current ? null : item.end_date || null,
+    is_current: Boolean(item.current),
+    description: item.activities?.trim() || "",
+  };
+}
 
 type AssessmentAcademic = ProfileEducation & { start_year?: string | null; end_year?: string | null };
 type AssessmentExperience = ProfileExperience;
@@ -296,27 +354,17 @@ export function CandidateProfileModal({
 
       if (!text) throw new Error("Texto vazio");
 
-      let parsed = null;
+      // Forma solta de propósito: a rota de IA devolve o superset de campos do prompt
+      // compartilhado e o fallback local devolve ParsedResume — só lemos as chaves comuns.
+      let parsed: any = null;
       try {
         const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
         if (!apiKey) throw new Error("Chave não configurada");
 
-        const prompt = `Extraia os seguintes dados do currículo abaixo e retorne APENAS um JSON válido, sem crases, sem markdown. Capture o máximo de detalhes possível, incluindo formação e experiências profissionais se presentes.
-Formato esperado:
-{
-  "name": "Nome completo",
-  "email": "Email principal",
-  "phone": "Telefone com DDD",
-  "role": "Cargo atual ou objetivo",
-  "city": "Cidade",
-  "state": "Estado",
-  "academic_list": [{ "course": "Curso", "institution": "Instituição", "start_date": "YYYY", "end_date": "YYYY", "in_progress": boolean }],
-  "experience_list": [{ "role": "Cargo", "company": "Empresa", "start_date": "YYYY", "end_date": "YYYY", "is_current": boolean, "description": "Descrição" }]
-}
-Texto:
-${text.substring(0, 8000)}`;
+        const prompt = buildResumeExtractionPrompt(text);
 
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        // gemini-1.5-flash foi descontinuado na API; 2.5-flash e o modelo corrente.
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -327,10 +375,10 @@ ${text.substring(0, 8000)}`;
 
         if (!res.ok) throw new Error("Erro na API Gemini");
         const json = await res.json();
-        let rawStr = json.candidates[0].content.parts[0].text;
-        rawStr = rawStr.replace(/```json\n?|\n?```/g, "").trim();
-        parsed = JSON.parse(rawStr);
-        
+        const rawStr = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawStr) throw new Error("Resposta vazia da IA");
+        parsed = parseExtractionResponse(rawStr);
+
       } catch (aiError) {
         console.warn("Erro na IA, usando analisador local", aiError);
         parsed = parseSolidesResume(text);
@@ -357,7 +405,8 @@ ${text.substring(0, 8000)}`;
             full_name: parsed.name || prev.full_name,
             email: parsed.email || prev.email,
             phone: parsed.phone || prev.phone,
-            role: parsed.role || prev.role,
+            // role/role_interest de propósito fora daqui: a vaga é escolhida no dropdown
+            // de job_profiles, nunca inferida do currículo.
             city: parsed.city || parsed.location?.split("-")[0]?.trim() || prev.city,
             state: parsed.state || parsed.location?.split("-")[1]?.trim() || prev.state,
           }));
@@ -394,8 +443,95 @@ ${text.substring(0, 8000)}`;
   const [loading, setLoading] = useState(!initialData);
   const [openingResume, setOpeningResume] = useState(false);
 
+  // Edição manual de formação/experiência — rede de segurança para quando a leitura do
+  // currículo por IA falha ou vem incompleta. `null` = nenhum item aberto no editor.
+  const [eduDraft, setEduDraft] = useState<ProfileEducation | null>(null);
+  const [expDraft, setExpDraft] = useState<ProfileExperience | null>(null);
+  const [savingEntry, setSavingEntry] = useState(false);
+  const [entryError, setEntryError] = useState("");
+  // Sem candidate_id resolvido não há onde gravar: o candidato precisa existir antes.
+  const canEditEntries = Boolean(resolvedCandidateId);
+
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
+
+  const saveEducation = async () => {
+    if (!eduDraft || !resolvedCandidateId) return;
+    if (!(eduDraft.degree || eduDraft.course)?.trim() && !eduDraft.institution?.trim()) {
+      setEntryError("Informe ao menos o curso ou a instituição.");
+      return;
+    }
+    setSavingEntry(true);
+    setEntryError("");
+    const supabase = createClient();
+    const row = educationToRow(eduDraft, resolvedCandidateId);
+
+    // Itens vindos do assessment de entrevista têm id sintético (Math.random) que não existe
+    // em candidate_educations — por isso o update é por id só quando o item veio do banco.
+    const isPersisted = Boolean(eduDraft.id) && educations.some((item) => item.id === eduDraft.id && item.__persisted);
+    const { data, error } = isPersisted
+      ? await supabase.from("candidate_educations").update(row).eq("id", eduDraft.id!).select("*").single()
+      : await supabase.from("candidate_educations").insert(row).select("*").single();
+
+    setSavingEntry(false);
+    if (error || !data) {
+      setEntryError("Não foi possível salvar a formação: " + (error?.message ?? "erro desconhecido"));
+      return;
+    }
+    const saved = { ...mapEducationRow(data), __persisted: true };
+    setEducations((prev) => (isPersisted ? prev.map((item) => (item.id === eduDraft.id ? saved : item)) : [saved, ...prev]));
+    setEduDraft(null);
+  };
+
+  const deleteEducation = async (item: ProfileEducation) => {
+    if (!window.confirm(`Excluir a formação "${item.degree || item.course || "sem título"}"? Esta ação não pode ser desfeita.`)) return;
+    if (item.__persisted && item.id) {
+      const { error } = await createClient().from("candidate_educations").delete().eq("id", item.id);
+      if (error) {
+        setEntryError("Não foi possível excluir: " + error.message);
+        return;
+      }
+    }
+    setEducations((prev) => prev.filter((entry) => entry.id !== item.id));
+  };
+
+  const saveExperience = async () => {
+    if (!expDraft || !resolvedCandidateId) return;
+    if (!expDraft.role?.trim() && !expDraft.company?.trim()) {
+      setEntryError("Informe ao menos o cargo ou a empresa.");
+      return;
+    }
+    setSavingEntry(true);
+    setEntryError("");
+    const supabase = createClient();
+    const row = experienceToRow(expDraft, resolvedCandidateId);
+
+    const isPersisted = Boolean(expDraft.id) && experiences.some((item) => item.id === expDraft.id && item.__persisted);
+    const { data, error } = isPersisted
+      ? await supabase.from("candidate_experiences").update(row).eq("id", expDraft.id!).select("*").single()
+      : await supabase.from("candidate_experiences").insert(row).select("*").single();
+
+    setSavingEntry(false);
+    if (error || !data) {
+      setEntryError("Não foi possível salvar a experiência: " + (error?.message ?? "erro desconhecido"));
+      return;
+    }
+    const saved = { ...mapExperienceRow(data), __persisted: true };
+    setExperiences((prev) => (isPersisted ? prev.map((item) => (item.id === expDraft.id ? saved : item)) : [saved, ...prev]));
+    setExpDraft(null);
+  };
+
+  const deleteExperience = async (item: ProfileExperience) => {
+    if (!window.confirm(`Excluir a experiência "${item.role || item.company || "sem título"}"? Esta ação não pode ser desfeita.`)) return;
+    if (item.__persisted && item.id) {
+      const { error } = await createClient().from("candidate_experiences").delete().eq("id", item.id);
+      if (error) {
+        setEntryError("Não foi possível excluir: " + error.message);
+        return;
+      }
+    }
+    setExperiences((prev) => prev.filter((entry) => entry.id !== item.id));
+  };
 
   const openResume = async () => {
     if (!person?.resume_url) return;
@@ -476,6 +612,7 @@ ${text.substring(0, 8000)}`;
       let resolvedId: string | null = null;
       let resultsData: BigFiveResult[] = [];
       let educationsData: ProfileEducation[] = [];
+      let experiencesData: ProfileExperience[] = [];
       let interviewsData: ProfileInterview[] = [];
       let candidateInterviewsData: CandidateInterview[] = [];
 
@@ -568,10 +705,16 @@ ${text.substring(0, 8000)}`;
         if (data) candidateInterviewsData = data;
       }
 
-      // 4. Buscar formações
+      // 4. Buscar formações e experiências
       if (targetCandId) {
         const { data } = await supabase.from("candidate_educations").select("*").eq("candidate_id", targetCandId).order("start_date", { ascending: false });
-        if (data) educationsData = data;
+        if (data) educationsData = data.map(mapEducationRow);
+
+        // candidate_experiences não era lida aqui: experiências gravadas pelo portal de
+        // carreiras e pelo cadastro manual ficavam invisíveis na ficha, que só mostrava as
+        // que vinham do assessment de entrevista.
+        const { data: expData } = await supabase.from("candidate_experiences").select("*").eq("candidate_id", targetCandId).order("start_date", { ascending: false });
+        if (expData) experiencesData = expData.map(mapExperienceRow);
       }
 
       // 5. Buscar entrevistas
@@ -595,7 +738,7 @@ ${text.substring(0, 8000)}`;
 
       // Extrair formações e experiências
       const extractedEdu: ProfileEducation[] = [...educationsData];
-      const extractedExp: ProfileExperience[] = [];
+      const extractedExp: ProfileExperience[] = [...experiencesData];
 
       interviewsData.forEach((int) => {
         if (int.assessment) {
@@ -748,7 +891,10 @@ ${text.substring(0, 8000)}`;
                               <SelectValue placeholder="Cargo" />
                             </SelectTrigger>
                             <SelectContent>
-                              {Array.from(new Set([...jobProfileOptions, formData.role_interest || formData.role].filter(Boolean))).map((title) => (
+                              {/* Só cargos reais de job_profiles. Antes o valor atual entrava
+                                  como opção, o que fazia texto solto vindo de importação de
+                                  currículo virar "cargo" legítimo no dropdown. */}
+                              {jobProfileOptions.map((title) => (
                                 <SelectItem key={title} value={title as string}>
                                   {title}
                                 </SelectItem>
@@ -1041,18 +1187,30 @@ ${text.substring(0, 8000)}`;
                         </div>
                         <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
                       </summary>
-                      <div className="p-5">
-                        {experiences.length === 0 ? (
+                      <div className="p-5 space-y-4">
+                        {experiences.length === 0 && !expDraft ? (
                           <p className="text-sm text-muted-foreground italic">Nenhuma experiência profissional registrada.</p>
                         ) : (
                           <div className="space-y-4">
                             {experiences.map((exp, i) => (
-                              <div key={i} className="p-4 rounded-xl border bg-muted/30 text-sm space-y-2">
-                                <div className="flex items-center justify-between">
+                              <div key={exp.id || i} className="p-4 rounded-xl border bg-muted/30 text-sm space-y-2">
+                                <div className="flex items-start justify-between gap-2">
                                   <p className="font-bold text-foreground text-base">{exp.role || "Cargo / Função"}</p>
-                                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${exp.current ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
-                                    {exp.current ? "Atual" : [exp.start_date, exp.end_date].filter(Boolean).join(" - ")}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${exp.current ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
+                                      {exp.current ? "Atual" : [exp.start_date, exp.end_date].filter(Boolean).join(" - ") || "Sem período"}
+                                    </span>
+                                    {canEditEntries && (
+                                      <>
+                                        <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" title="Editar" onClick={() => { setEntryError(""); setEduDraft(null); setExpDraft(exp); }}>
+                                          <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" title="Excluir" onClick={() => deleteExperience(exp)}>
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                                 <p className="text-xs font-semibold text-primary">{exp.company || "Empresa"}</p>
                                 {exp.activities && (
@@ -1062,8 +1220,51 @@ ${text.substring(0, 8000)}`;
                             ))}
                           </div>
                         )}
-                        {!isEditing && (
-                          <p className="text-xs text-muted-foreground mt-4 italic">* A edição de experiências diretamente na ficha ainda não está disponível.</p>
+
+                        {expDraft && (
+                          <div className="p-4 rounded-xl border border-primary/40 bg-primary/5 space-y-3">
+                            <p className="text-sm font-bold">{expDraft.__persisted ? "Editar experiência" : "Nova experiência"}</p>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <EntryField label="Cargo / Função">
+                                <Input value={expDraft.role || ""} onChange={(e) => setExpDraft({ ...expDraft, role: e.target.value })} placeholder="Ex: Auxiliar de Almoxarifado" />
+                              </EntryField>
+                              <EntryField label="Empresa">
+                                <Input value={expDraft.company || ""} onChange={(e) => setExpDraft({ ...expDraft, company: e.target.value })} placeholder="Ex: Construtora ACPO" />
+                              </EntryField>
+                              <EntryField label="Início">
+                                <Input type="date" value={expDraft.start_date || ""} onChange={(e) => setExpDraft({ ...expDraft, start_date: e.target.value })} />
+                              </EntryField>
+                              <EntryField label="Saída">
+                                <Input type="date" disabled={expDraft.current} value={expDraft.end_date || ""} onChange={(e) => setExpDraft({ ...expDraft, end_date: e.target.value })} />
+                              </EntryField>
+                            </div>
+                            <label className="flex items-center gap-2 text-sm">
+                              <input type="checkbox" checked={Boolean(expDraft.current)} onChange={(e) => setExpDraft({ ...expDraft, current: e.target.checked, end_date: e.target.checked ? "" : expDraft.end_date })} />
+                              Emprego atual
+                            </label>
+                            <EntryField label="Atividades">
+                              <Textarea rows={3} value={expDraft.activities || ""} onChange={(e) => setExpDraft({ ...expDraft, activities: e.target.value })} placeholder="Principais atividades e responsabilidades" />
+                            </EntryField>
+                            {entryError && <p className="text-xs text-destructive">{entryError}</p>}
+                            <div className="flex gap-2">
+                              <Button type="button" size="sm" disabled={savingEntry} onClick={saveExperience}>
+                                {savingEntry ? "Salvando..." : "Salvar"}
+                              </Button>
+                              <Button type="button" size="sm" variant="outline" disabled={savingEntry} onClick={() => { setExpDraft(null); setEntryError(""); }}>
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {canEditEntries && !expDraft && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => { setEntryError(""); setEduDraft(null); setExpDraft({ role: "", company: "", start_date: "", end_date: "", current: false, activities: "" }); }}>
+                            <Plus className="h-4 w-4 mr-1.5" />
+                            Adicionar experiência
+                          </Button>
+                        )}
+                        {!canEditEntries && (
+                          <p className="text-xs text-muted-foreground italic">* Salve o candidato para poder incluir experiências manualmente.</p>
                         )}
                       </div>
                     </details>
@@ -1077,14 +1278,26 @@ ${text.substring(0, 8000)}`;
                         </div>
                         <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
                       </summary>
-                      <div className="p-5">
-                        {educations.length === 0 ? (
+                      <div className="p-5 space-y-4">
+                        {educations.length === 0 && !eduDraft ? (
                           <p className="text-sm text-muted-foreground italic">Nenhum registro acadêmico.</p>
                         ) : (
                           <div className="grid gap-3 sm:grid-cols-2">
                             {educations.map((edu, i) => (
-                              <div key={i} className="p-4 rounded-xl border bg-muted/30 text-sm space-y-1">
-                                <p className="font-bold text-foreground">{edu.degree || edu.course || "Formação Acadêmica"}</p>
+                              <div key={edu.id || i} className="p-4 rounded-xl border bg-muted/30 text-sm space-y-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="font-bold text-foreground">{edu.degree || edu.course || "Formação Acadêmica"}</p>
+                                  {canEditEntries && (
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" title="Editar" onClick={() => { setEntryError(""); setExpDraft(null); setEduDraft(edu); }}>
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" title="Excluir" onClick={() => deleteEducation(edu)}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
                                 <p className="text-xs text-muted-foreground font-medium">{edu.institution || "Instituição não informada"}</p>
                                 <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-2 border-t mt-2">
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-muted text-foreground font-medium">{edu.status || "Concluído"}</span>
@@ -1093,6 +1306,53 @@ ${text.substring(0, 8000)}`;
                               </div>
                             ))}
                           </div>
+                        )}
+
+                        {eduDraft && (
+                          <div className="p-4 rounded-xl border border-primary/40 bg-primary/5 space-y-3">
+                            <p className="text-sm font-bold">{eduDraft.__persisted ? "Editar formação" : "Nova formação"}</p>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <EntryField label="Curso / Grau">
+                                <Input value={eduDraft.degree || eduDraft.course || ""} onChange={(e) => setEduDraft({ ...eduDraft, degree: e.target.value, course: e.target.value })} placeholder="Ex: Técnico em Edificações" />
+                              </EntryField>
+                              <EntryField label="Instituição">
+                                <Input value={eduDraft.institution || ""} onChange={(e) => setEduDraft({ ...eduDraft, institution: e.target.value })} placeholder="Ex: IFSul" />
+                              </EntryField>
+                              <EntryField label="Início">
+                                <Input type="date" value={eduDraft.start_date || ""} onChange={(e) => setEduDraft({ ...eduDraft, start_date: e.target.value })} />
+                              </EntryField>
+                              <EntryField label="Conclusão">
+                                <Input type="date" disabled={eduDraft.status === "Em andamento"} value={eduDraft.end_date || ""} onChange={(e) => setEduDraft({ ...eduDraft, end_date: e.target.value })} />
+                              </EntryField>
+                            </div>
+                            <label className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={eduDraft.status === "Em andamento"}
+                                onChange={(e) => setEduDraft({ ...eduDraft, status: e.target.checked ? "Em andamento" : "Concluído", end_date: e.target.checked ? "" : eduDraft.end_date })}
+                              />
+                              Em andamento
+                            </label>
+                            {entryError && <p className="text-xs text-destructive">{entryError}</p>}
+                            <div className="flex gap-2">
+                              <Button type="button" size="sm" disabled={savingEntry} onClick={saveEducation}>
+                                {savingEntry ? "Salvando..." : "Salvar"}
+                              </Button>
+                              <Button type="button" size="sm" variant="outline" disabled={savingEntry} onClick={() => { setEduDraft(null); setEntryError(""); }}>
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {canEditEntries && !eduDraft && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => { setEntryError(""); setExpDraft(null); setEduDraft({ degree: "", course: "", institution: "", start_date: "", end_date: "", status: "Concluído" }); }}>
+                            <Plus className="h-4 w-4 mr-1.5" />
+                            Adicionar formação
+                          </Button>
+                        )}
+                        {!canEditEntries && (
+                          <p className="text-xs text-muted-foreground italic">* Salve o candidato para poder incluir formações manualmente.</p>
                         )}
                       </div>
                     </details>
@@ -1482,3 +1742,12 @@ function BigFiveBar({ label, score, color }: { label: string; score: number | nu
   );
 }
 
+
+function EntryField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+      {children}
+    </div>
+  );
+}

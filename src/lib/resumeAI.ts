@@ -10,6 +10,7 @@
 // fora do formato ISO falha (ou é descartada) no insert.
 
 import { parseSolidesResume } from "./resumeParser";
+import { buildResumeExtractionPrompt, parseExtractionResponse } from "./resumeExtractionPrompt";
 
 export type ParsedResumeAcademic = {
   course: string;
@@ -41,30 +42,9 @@ export type ParsedResumeFields = {
 
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
-/**
- * Converte datas em formatos comuns de currículo (YYYY, MM/YYYY, DD/MM/YYYY, YYYY-MM)
- * para ISO "YYYY-MM-DD". Retorna null quando não reconhece o formato — melhor gravar
- * data ausente do que uma string que quebra o insert na coluna `date`.
- */
-export function normalizeResumeDate(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const value = raw.trim();
-  if (!value) return null;
+import { normalizeResumeDate } from "./resumeDate";
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  if (/^\d{4}-\d{2}$/.test(value)) return `${value}-01`;
-  if (/^\d{4}$/.test(value)) return `${value}-01-01`;
-
-  const monthYear = value.match(/^(\d{1,2})\/(\d{4})$/);
-  if (monthYear) return `${monthYear[2]}-${monthYear[1].padStart(2, "0")}-01`;
-
-  const dayMonthYear = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (dayMonthYear) {
-    return `${dayMonthYear[3]}-${dayMonthYear[2].padStart(2, "0")}-${dayMonthYear[1].padStart(2, "0")}`;
-  }
-
-  return null;
-}
+export { normalizeResumeDate };
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -101,24 +81,7 @@ export async function analyzeResumeWithAI(text: string): Promise<ParsedResumeFie
   const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
   if (!apiKey) throw new Error("Chave Gemini não configurada");
 
-  const prompt = `Extraia os seguintes dados do currículo abaixo e retorne APENAS um JSON válido, sem crases, sem markdown. Capture o máximo de detalhes possível de formação acadêmica e experiências profissionais.
-
-IMPORTANTE: todas as datas (start_date, end_date) devem estar SEMPRE no formato ISO "YYYY-MM-DD" (use o dia 01 quando o currículo só tiver mês/ano ou só o ano). Nunca use "Mês/Ano" ou texto livre nas datas.
-
-Formato esperado:
-{
-  "name": "Nome completo",
-  "email": "Email principal",
-  "phone": "Telefone com DDD",
-  "city": "Cidade",
-  "state": "Estado (sigla, ex: SP)",
-  "linkedin_url": "URL do perfil do LinkedIn, se houver",
-  "academic_list": [{ "course": "Curso", "institution": "Instituição", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "in_progress": boolean }],
-  "experience_list": [{ "role": "Cargo", "company": "Empresa", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "is_current": boolean, "description": "Descrição das atividades" }]
-}
-
-Texto do currículo:
-${text.substring(0, 8000)}`;
+  const prompt = buildResumeExtractionPrompt(text);
 
   const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
     method: "POST",
@@ -131,18 +94,20 @@ ${text.substring(0, 8000)}`;
 
   if (!res.ok) throw new Error("Erro na API Gemini");
   const json = await res.json();
-  let rawStr = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const rawStr = json?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!rawStr) throw new Error("Resposta vazia da IA");
-  rawStr = rawStr.replace(/```json\n?|\n?```/g, "").trim();
-  const parsed = JSON.parse(rawStr);
+  const parsed = parseExtractionResponse(rawStr) as Record<string, any>;
+
+  // O prompt devolve "location" ("Cidade - UF"); city/state aqui saem daí.
+  const [locCity, locState] = asString(parsed.location).split(/\s*-\s*/);
 
   return {
-    name: parsed.name || "",
-    email: parsed.email || "",
-    phone: parsed.phone || "",
-    city: parsed.city || "",
-    state: parsed.state || "",
-    linkedin_url: parsed.linkedin_url || "",
+    name: asString(parsed.name),
+    email: asString(parsed.email),
+    phone: asString(parsed.phone),
+    city: asString(parsed.city) || (locCity ?? "").trim(),
+    state: asString(parsed.state) || (locState ?? "").trim(),
+    linkedin_url: asString(parsed.linkedin_url),
     academic_list: Array.isArray(parsed.academic_list) ? parsed.academic_list.map(normalizeAcademic) : [],
     experience_list: Array.isArray(parsed.experience_list) ? parsed.experience_list.map(normalizeExperience) : [],
   };

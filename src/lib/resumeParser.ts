@@ -357,24 +357,6 @@ export function parseSolidesResume(text: string): ParsedResume {
   const phoneMatch = text.match(/(\(?\d{2}\)?\s*(?:9\s*)?\d{4,5}[-\s]?\d{4})/);
   const emailMatch = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]{2,})/);
 
-  // Cargo pretendido: linha do cabeçalho que não é nome, idade, cidade, telefone, e-mail ou endereço.
-  const ADDRESS_LINE =
-    /^(rua|av\.?|avenida|alameda|travessa|rodovia|estrada|condom[ií]nio|residencial|apto\.?|apartamento|bloco|quadra|n[ºo]\.?\s*\d)/i;
-  const headerRole =
-    fields.role ||
-    clean(
-      headerLines
-        .slice(1)
-        .find(
-          (line) =>
-            !SECTION_KEYS.has(norm(line)) &&
-            !/\d/.test(line) &&
-            !/@/.test(line) &&
-            !/\s-\s[A-Z]{2}$/.test(line) &&
-            !ADDRESS_LINE.test(line.trim()),
-        ) ?? "",
-    );
-
   const academic_list = parseAcademics(sectionLines("Formação"));
   const courses = sectionLines("Cursos e certificações")
     .map((line) => clean(line))
@@ -405,7 +387,11 @@ export function parseSolidesResume(text: string): ParsedResume {
     name,
     email: fields.email || (emailMatch ? emailMatch[1] : ""),
     phone: fields.phone || fields.mobile || (phoneMatch ? phoneMatch[1] : ""),
-    role: headerRole,
+    // Sempre vazio de propósito: a vaga é escolhida no dropdown alimentado por
+    // job_profiles. Antes isto era adivinhado pela primeira linha "livre" do cabeçalho
+    // do PDF, o que enchia candidates.role_interest de texto solto ("Currículo",
+    // "Objetivo", o cargo do último emprego) e poluía o dropdown com opções falsas.
+    role: "",
     age: ageMatch ? ageMatch[1] : "",
     location,
     education,
