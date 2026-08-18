@@ -5,12 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Briefcase, MapPin, Send, Loader2, FileUp, Inbox } from "lucide-react";
+import { Briefcase, MapPin, Send, Loader2, FileUp, Inbox, CheckCircle2, GraduationCap, BriefcaseBusiness, ClipboardCheck, Building2, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { itemsToText } from "@/lib/resumeParser";
-import { analyzeResumeWithAI, parseResumeLocally, type ParsedResumeAcademic, type ParsedResumeExperience } from "@/lib/resumeAI";
+import { parseResumeLocally, type ParsedResumeAcademic, type ParsedResumeExperience } from "@/lib/resumeAI";
 
 type Career = {
   id: string;
@@ -64,6 +65,7 @@ export default function CarreirasPage() {
   const [resumeError, setResumeError] = useState("");
   const [parsedAcademics, setParsedAcademics] = useState<ParsedResumeAcademic[]>([]);
   const [parsedExperiences, setParsedExperiences] = useState<ParsedResumeExperience[]>([]);
+  const [isDraggingResume, setIsDraggingResume] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -113,6 +115,10 @@ export default function CarreirasPage() {
   const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    await processResumeFile(file);
+  };
+
+  const processResumeFile = async (file: File) => {
     setResumeFile(file);
     setResumeError("");
     setParsingResume(true);
@@ -139,12 +145,7 @@ export default function CarreirasPage() {
 
       if (!text.trim()) throw new Error("Texto vazio");
 
-      let parsed;
-      try {
-        parsed = await analyzeResumeWithAI(text);
-      } catch {
-        parsed = parseResumeLocally(text);
-      }
+      const parsed = parseResumeLocally(text);
 
       setCandidate((prev) => ({
         ...prev,
@@ -280,20 +281,26 @@ export default function CarreirasPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <section className="border-b bg-muted/30 px-4 py-14">
-        <div className="mx-auto max-w-5xl">
-          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Carreiras ACPO</h1>
+      <section className="relative overflow-hidden border-b bg-gradient-to-br from-primary/10 via-background to-background px-4 py-16">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative mx-auto max-w-5xl">
+          <Badge variant="secondary" className="mb-4">
+            <Building2 className="h-3.5 w-3.5" /> ACPO Empreendimentos
+          </Badge>
+          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Construa sua carreira com a gente</h1>
           <p className="mt-4 max-w-2xl text-lg leading-8 text-muted-foreground">
-            Vagas abertas conectadas ao perfil de competência e ao processo seletivo interno.
+            Vagas abertas conectadas ao perfil de competência e ao processo seletivo interno. Candidate-se em poucos passos: envie seu currículo, confirme seus dados e responda ao teste de perfil.
           </p>
           <div className="mt-6 flex w-full max-w-md items-center gap-2">
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Buscar por cargo, área ou requisito..." />
-            <Button type="button">Buscar</Button>
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Buscar por cargo, área ou requisito..." className="pl-9" />
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-10 lg:grid-cols-[1fr_360px]">
+      <section className="mx-auto max-w-5xl px-4 py-10">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold">Vagas abertas</h2>
@@ -321,9 +328,9 @@ export default function CarreirasPage() {
 
           <div className="grid gap-4">
             {filtered.map((career) => (
-              <Card key={career.id} className={`transition-shadow hover:shadow-md ${selectedJob?.id === career.id ? "border-primary" : ""}`}>
+              <Card key={career.id} className={`transition-all hover:-translate-y-0.5 hover:shadow-lg ${selectedJob?.id === career.id ? "border-primary" : ""}`}>
                 <CardHeader>
-                  <CardTitle>{career.profile?.title || "Vaga sem título"}</CardTitle>
+                  <CardTitle className="text-xl">{career.profile?.title || "Vaga sem título"}</CardTitle>
                   <CardDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <Badge variant="secondary"><Briefcase className="h-3.5 w-3.5" />{career.contract_type || "Contrato não informado"}</Badge>
                     <span className="inline-flex items-center"><MapPin className="mr-1.5 h-3.5 w-3.5" />{career.cost_center || career.department || "Área não informada"}</span>
@@ -351,15 +358,41 @@ export default function CarreirasPage() {
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Candidatar-se a {selectedJob?.profile?.title || "esta vaga"}</DialogTitle>
-            <DialogDescription>Preencha seus dados. Ao concluir, você seguirá diretamente para o teste PSI.</DialogDescription>
+            <DialogDescription className="flex flex-wrap items-center gap-1.5">
+              <span>Etapa 1 de 2: seus dados.</span>
+              <span className="inline-flex items-center gap-1 font-medium text-primary"><ClipboardCheck className="h-3.5 w-3.5" /> Ao enviar, você segue direto para o teste de perfil.</span>
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={submit} className="space-y-6">
               {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
-              <div className="space-y-2 rounded-lg border border-dashed p-3">
-                <Label htmlFor="resume-upload" className="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium text-primary">
-                  {parsingResume ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-                  {parsingResume ? "Lendo currículo..." : resumeFile ? resumeFile.name : "Importar dados do currículo"}
-                </Label>
+
+              <FormSection title="Currículo" description="Envie um arquivo e preenchemos os campos automaticamente.">
+                <label
+                  htmlFor="resume-upload"
+                  onDragOver={(event) => { event.preventDefault(); if (selectedJob && !parsingResume) setIsDraggingResume(true); }}
+                  onDragLeave={() => setIsDraggingResume(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setIsDraggingResume(false);
+                    const file = event.dataTransfer.files?.[0];
+                    if (file && selectedJob && !parsingResume) processResumeFile(file);
+                  }}
+                  className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+                    isDraggingResume ? "border-primary bg-primary/5" : resumeFile ? "border-green-500/40 bg-green-500/5" : "border-input hover:bg-muted/40"
+                  } ${!selectedJob || parsingResume ? "pointer-events-none opacity-60" : ""}`}
+                >
+                  {parsingResume ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  ) : resumeFile ? (
+                    <CheckCircle2 className="h-6 w-6 text-green-600" />
+                  ) : (
+                    <FileUp className="h-6 w-6 text-muted-foreground" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {parsingResume ? "Lendo currículo..." : resumeFile ? resumeFile.name : "Arraste seu currículo aqui ou clique para escolher"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">PDF ou TXT · opcional, mas acelera o preenchimento</span>
+                </label>
                 <input
                   id="resume-upload"
                   type="file"
@@ -368,36 +401,69 @@ export default function CarreirasPage() {
                   disabled={!selectedJob || parsingResume}
                   onChange={handleResumeUpload}
                 />
-                <p className="text-xs text-muted-foreground">Opcional: envie um PDF ou TXT para preencher os campos automaticamente.</p>
                 {resumeError && <p className="text-xs text-destructive">{resumeError}</p>}
-              </div>
-              <Field label="Nome completo *"><Input required disabled={!selectedJob} value={candidate.full_name} onChange={(event) => setCandidate({ ...candidate, full_name: event.target.value })} /></Field>
-              <Field label="E-mail *"><Input required disabled={!selectedJob} type="email" value={candidate.email} onChange={(event) => setCandidate({ ...candidate, email: event.target.value })} /></Field>
-              <Field label="Telefone"><Input disabled={!selectedJob} value={candidate.phone} onChange={(event) => setCandidate({ ...candidate, phone: event.target.value })} /></Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Cidade"><Input disabled={!selectedJob} value={candidate.city} onChange={(event) => setCandidate({ ...candidate, city: event.target.value })} /></Field>
-                <Field label="UF"><Input disabled={!selectedJob} value={candidate.state} onChange={(event) => setCandidate({ ...candidate, state: event.target.value })} /></Field>
-              </div>
-              <Field label="LinkedIn"><Input disabled={!selectedJob} value={candidate.linkedin_url} onChange={(event) => setCandidate({ ...candidate, linkedin_url: event.target.value })} /></Field>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Data de nascimento"><Input type="date" value={candidate.birth_date} onChange={(event) => setCandidate({ ...candidate, birth_date: event.target.value })} /></Field>
-                <Field label="CPF"><Input inputMode="numeric" value={candidate.cpf} onChange={(event) => setCandidate({ ...candidate, cpf: event.target.value })} /></Field>
-              </div>
-              <Field label="Endereço"><Input value={candidate.address} onChange={(event) => setCandidate({ ...candidate, address: event.target.value })} /></Field>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Pretensão salarial"><Input value={candidate.salary_expectation} onChange={(event) => setCandidate({ ...candidate, salary_expectation: event.target.value })} /></Field>
-                <Field label="Possui CNH?"><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.has_cnh ? "sim" : "nao"} onChange={(event) => setCandidate({ ...candidate, has_cnh: event.target.value === "sim" })}><option value="nao">Não</option><option value="sim">Sim</option></select></Field>
-              </div>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={candidate.is_pcd} onChange={(event) => setCandidate({ ...candidate, is_pcd: event.target.checked })} /> Pessoa com deficiência (PcD)</label>
-              {candidate.is_pcd && <Field label="Descrição PcD"><Input value={candidate.pcd_description} onChange={(event) => setCandidate({ ...candidate, pcd_description: event.target.value })} /></Field>}
-              <Button type="submit" className="w-full" disabled={!selectedJob || saving}>
-                <Send className="mr-2 h-4 w-4" />
-                {saving ? "Enviando..." : "Enviar candidatura"}
+                {(parsedAcademics.length > 0 || parsedExperiences.length > 0) && (
+                  <div className="flex flex-wrap gap-2">
+                    {parsedAcademics.length > 0 && (
+                      <Badge variant="secondary"><GraduationCap className="h-3.5 w-3.5" /> {parsedAcademics.length} formação(ões) importada(s)</Badge>
+                    )}
+                    {parsedExperiences.length > 0 && (
+                      <Badge variant="secondary"><BriefcaseBusiness className="h-3.5 w-3.5" /> {parsedExperiences.length} experiência(s) importada(s)</Badge>
+                    )}
+                  </div>
+                )}
+              </FormSection>
+
+              <FormSection title="Dados pessoais">
+                <Field label="Nome completo *"><Input required disabled={!selectedJob} value={candidate.full_name} onChange={(event) => setCandidate({ ...candidate, full_name: event.target.value })} /></Field>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="E-mail *"><Input required disabled={!selectedJob} type="email" value={candidate.email} onChange={(event) => setCandidate({ ...candidate, email: event.target.value })} /></Field>
+                  <Field label="Telefone"><Input disabled={!selectedJob} value={candidate.phone} onChange={(event) => setCandidate({ ...candidate, phone: event.target.value })} /></Field>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Data de nascimento"><Input type="date" value={candidate.birth_date} onChange={(event) => setCandidate({ ...candidate, birth_date: event.target.value })} /></Field>
+                  <Field label="CPF"><Input inputMode="numeric" value={candidate.cpf} onChange={(event) => setCandidate({ ...candidate, cpf: event.target.value })} /></Field>
+                </div>
+                <Field label="LinkedIn"><Input disabled={!selectedJob} value={candidate.linkedin_url} onChange={(event) => setCandidate({ ...candidate, linkedin_url: event.target.value })} /></Field>
+              </FormSection>
+
+              <FormSection title="Endereço e disponibilidade">
+                <Field label="Endereço"><Input value={candidate.address} onChange={(event) => setCandidate({ ...candidate, address: event.target.value })} /></Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Cidade"><Input disabled={!selectedJob} value={candidate.city} onChange={(event) => setCandidate({ ...candidate, city: event.target.value })} /></Field>
+                  <Field label="UF"><Input disabled={!selectedJob} value={candidate.state} onChange={(event) => setCandidate({ ...candidate, state: event.target.value })} /></Field>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Pretensão salarial"><Input value={candidate.salary_expectation} onChange={(event) => setCandidate({ ...candidate, salary_expectation: event.target.value })} /></Field>
+                  <Field label="Possui CNH?"><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.has_cnh ? "sim" : "nao"} onChange={(event) => setCandidate({ ...candidate, has_cnh: event.target.value === "sim" })}><option value="nao">Não</option><option value="sim">Sim</option></select></Field>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={candidate.is_pcd} onCheckedChange={(checked) => setCandidate({ ...candidate, is_pcd: checked === true })} />
+                  Pessoa com deficiência (PcD)
+                </label>
+                {candidate.is_pcd && <Field label="Descrição PcD"><Input value={candidate.pcd_description} onChange={(event) => setCandidate({ ...candidate, pcd_description: event.target.value })} /></Field>}
+              </FormSection>
+
+              <Button type="submit" className="w-full" size="lg" disabled={!selectedJob || saving}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                {saving ? "Enviando..." : "Enviar candidatura e continuar para o teste"}
               </Button>
           </form>
         </DialogContent>
       </Dialog>
     </main>
+  );
+}
+
+function FormSection({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3 border-t pt-4 first:border-t-0 first:pt-0">
+      <div>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+      </div>
+      <div className="space-y-3">{children}</div>
+    </div>
   );
 }
 
