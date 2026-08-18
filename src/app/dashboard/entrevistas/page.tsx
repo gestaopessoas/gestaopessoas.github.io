@@ -12,7 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { errorMessage } from "@/lib/utils";
 import { itemsToText, parseSolidesResume, type ParsedResume } from "@/lib/resumeParser";
-import { buildResumeExtractionPrompt, parseExtractionResponse, GEMINI_MODEL, GEMINI_GENERATE_URL } from "@/lib/resumeExtractionPrompt";
+import { buildResumeExtractionPrompt, parseExtractionResponse } from "@/lib/resumeExtractionPrompt";
+import { DEFAULT_RESUME_MODEL, fetchResumeModel, geminiGenerateUrl } from "@/lib/resumeModelSettings";
 import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 
 // O parser local devolve ParsedResume; a IA devolve os mesmos campos mais alguns
@@ -204,15 +205,16 @@ export type AIProvider = {
 };
 
 export const defaultProviders: AIProvider[] = [
-  { id: "gemini", name: "Gemini (Sistema)", baseUrl: "https://generativelanguage.googleapis.com/v1beta", apiKey: "", isActive: true, models: [], selectedModel: GEMINI_MODEL },
+  { id: "gemini", name: "Gemini (Sistema)", baseUrl: "https://generativelanguage.googleapis.com/v1beta", apiKey: "", isActive: true, models: [], selectedModel: DEFAULT_RESUME_MODEL },
   { id: "9router", name: "9router", baseUrl: "https://rk9xyun.abc-tunnel.us/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
   { id: "openrouter", name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
   { id: "opencode", name: "Opencode", baseUrl: "https://api.opencode.com/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
   { id: "nvidia", name: "Nvidia NIM", baseUrl: "https://integrate.api.nvidia.com/v1", apiKey: "", isActive: false, models: [], selectedModel: "nvidia/nemotron-3-ultra-550b-a55b" },
 ];
 
-// Modelo centralizado em resumeExtractionPrompt.ts — ver comentário lá sobre versões mortas.
-const GEMINI_URL = GEMINI_GENERATE_URL;
+// Modelo padrão para as chamadas avulsas desta tela (parecer de teste). A importação de
+// currículo usa o modelo configurado pelo administrador — ver analyzeResume.
+const GEMINI_URL = geminiGenerateUrl(DEFAULT_RESUME_MODEL);
 
 async function generateTestText(testName: string, classification: string): Promise<string> {
   const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
@@ -619,15 +621,19 @@ export default function EntrevistasPage() {
     }
   };
 
-  const generateWithAI = async (prompt: string): Promise<string> => {
+  // `modelOverride` existe para a importação de currículo usar o modelo definido pelo
+  // administrador em Configurações › IA, que vale para todo mundo. A seleção de provedor
+  // desta tela mora em localStorage, ou seja, é por navegador — serve para experimentar,
+  // não para configurar o sistema.
+  const generateWithAI = async (prompt: string, modelOverride?: string): Promise<string> => {
     const activeProvider = providers.find(p => p.isActive) || providers.find(p => p.id === "gemini");
     if (!activeProvider) throw new Error("Nenhum provedor de IA ativo encontrado.");
 
     if (activeProvider.id === "gemini") {
       const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       if (!apiKey) throw new Error("Chave do Gemini não configurada nas variáveis de ambiente.");
-      
-      const modelToUse = activeProvider.selectedModel || GEMINI_MODEL;
+
+      const modelToUse = modelOverride || activeProvider.selectedModel || DEFAULT_RESUME_MODEL;
       const baseUrl = activeProvider.baseUrl.replace(/\/+$/, "");
       const url = `${baseUrl}/models/${modelToUse}:generateContent?key=${apiKey}`;
       
@@ -1259,7 +1265,8 @@ Resultado Final: ${form.result || "N/C"}
     const prompt = buildResumeExtractionPrompt(resumeText);
 
     try {
-      const generatedText = await generateWithAI(prompt);
+      const model = await fetchResumeModel(createClient());
+      const generatedText = await generateWithAI(prompt, model);
       const parsed = parseExtractionResponse(generatedText);
 
       applyParsedResume(parsed as Parameters<typeof applyParsedResume>[0]);

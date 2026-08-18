@@ -10,7 +10,8 @@
 // fora do formato ISO falha (ou é descartada) no insert.
 
 import { parseSolidesResume } from "./resumeParser";
-import { buildResumeExtractionPrompt, parseExtractionResponse, GEMINI_GENERATE_URL } from "./resumeExtractionPrompt";
+import { buildResumeExtractionPrompt, parseExtractionResponse } from "./resumeExtractionPrompt";
+import { DEFAULT_RESUME_MODEL, geminiGenerateUrl } from "./resumeModelSettings";
 
 export type ParsedResumeAcademic = {
   course: string;
@@ -40,7 +41,9 @@ export type ParsedResumeFields = {
   experience_list: ParsedResumeExperience[];
 };
 
-const GEMINI_URL = GEMINI_GENERATE_URL;
+// Este módulo serve ao portal público (sem sessão para ler system_settings), então usa o
+// padrão. A configuração do administrador vale para as telas internas.
+const GEMINI_URL = geminiGenerateUrl(DEFAULT_RESUME_MODEL);
 
 import { normalizeResumeDate } from "./resumeDate";
 

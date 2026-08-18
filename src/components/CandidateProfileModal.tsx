@@ -15,7 +15,8 @@ import {
 import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
 import * as pdfjsLib from "pdfjs-dist";
 import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
-import { buildResumeExtractionPrompt, parseExtractionResponse, GEMINI_GENERATE_URL } from "@/lib/resumeExtractionPrompt";
+import { buildResumeExtractionPrompt, parseExtractionResponse } from "@/lib/resumeExtractionPrompt";
+import { fetchResumeModel, geminiGenerateUrl } from "@/lib/resumeModelSettings";
 import { normalizeResumeDate } from "@/lib/resumeDate";
 import { usePermissions } from "@/hooks/usePermissions";
 import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
@@ -371,7 +372,9 @@ export function CandidateProfileModal({
 
         const prompt = buildResumeExtractionPrompt(text);
 
-        const res = await fetch(`${GEMINI_GENERATE_URL}?key=${apiKey}`, {
+        // Modelo definido pelo administrador em Configurações › IA (com fallback ao padrão).
+        const model = await fetchResumeModel(createClient());
+        const res = await fetch(`${geminiGenerateUrl(model)}?key=${apiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
