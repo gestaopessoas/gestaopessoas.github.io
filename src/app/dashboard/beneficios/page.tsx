@@ -8,23 +8,30 @@ import { Button } from "@/components/ui/button";
 import { differenceInDays, format } from "date-fns";
 import { hasBenefitKind } from "@/lib/benefitClassification";
 import { PermissionsContext } from "@/contexts/PermissionsContext";
-import { 
-  Download, 
-  Utensils, 
-  CreditCard, 
-  HeartPulse, 
-  UserMinus, 
-  EyeOff, 
-  CheckCircle2, 
-  History, 
-  RotateCcw, 
-  ShieldAlert, 
-  Lock, 
-  UserCheck, 
-  AlertCircle 
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { exportLunchListPdf } from "./lunchListPdf";
+import {
+  Download,
+  Utensils,
+  CreditCard,
+  HeartPulse,
+  UserMinus,
+  EyeOff,
+  CheckCircle2,
+  History,
+  RotateCcw,
+  ShieldAlert,
+  Lock,
+  UserCheck,
+  AlertCircle,
+  FileSignature,
+  Save,
+  Search,
+  UserPlus,
 } from "lucide-react";
 
-type Employee = { id: string; name: string; status: string; admission_date: string; cost_center?: string; department?: string };
+type Employee = { id: string; name: string; status: string; admission_date: string; cost_center?: string; department?: string; workplaceType?: string };
 type Benefit = { id?: string; employee_id: string; benefit_type: string; benefit_name?: string; value: number };
 type LunchList = { id: string; employee_id: string; lunch_date: string; status: string; employees: Employee };
 
@@ -80,6 +87,15 @@ export default function BeneficiosPage() {
   const [loading, setLoading] = useState(true);
   const [undoingId, setUndoingId] = useState<string | null>(null);
 
+  // Estado da ata diária de almoço (Sede)
+  const todayStr = new Date().toISOString().split("T")[0];
+  const [ataDate, setAtaDate] = useState<string>(todayStr);
+  const [ataStatus, setAtaStatus] = useState<Record<string, "CONFIRMED" | "CANCELLED">>({});
+  const [ataExtraIds, setAtaExtraIds] = useState<string[]>([]); // colaboradores fora da Sede incluídos manualmente
+  const [ataSearch, setAtaSearch] = useState("");
+  const [ataLoading, setAtaLoading] = useState(false);
+  const [ataSaving, setAtaSaving] = useState(false);
+
   const registerAudit = async (payload: Omit<AuditLog, "id" | "created_at" | "restore_items">, restoreItems: Benefit[] = []) => {
     const { data, error } = await supabase.from("benefit_audit_logs").insert(payload).select("id").single();
     if (error) throw error;
@@ -99,7 +115,7 @@ export default function BeneficiosPage() {
     // Fetch todos os funcionários para análise de ativos (inclusão) e desligados (corte)
     const { data: emps } = await supabase
       .from("employees")
-      .select(`id, name, status, admission_date, cost_center, departments(name)`)
+      .select(`id, name, status, admission_date, cost_center, departments(name), workplaces(type)`)
       .not("admission_date", "is", null);
 
     // Fetch benefícios ativos
@@ -128,6 +144,7 @@ export default function BeneficiosPage() {
 
     const empsList: Employee[] = (emps || []).map((e: Record<string, unknown>) => {
       const deps = e.departments as Record<string, unknown> | null;
+      const wp = e.workplaces as Record<string, unknown> | null;
       return {
         id: String(e.id || ""),
         name: String(e.name || ""),
@@ -135,6 +152,7 @@ export default function BeneficiosPage() {
         admission_date: String(e.admission_date || ""),
         cost_center: e.cost_center ? String(e.cost_center) : undefined,
         department: deps && deps.name ? String(deps.name) : undefined,
+        workplaceType: wp && wp.type ? String(wp.type) : undefined,
       };
     });
 
@@ -394,6 +412,117 @@ export default function BeneficiosPage() {
 
   // Colaboradores que estão atualmente ignorados em benefit_ignores
   const ignoredEmployeesList = employees.filter((emp) => ignores.includes(emp.id));
+
+  // ===== Ata diária de almoço (Sede) =====
+
+  // Base do dia: colaboradores ativos da Sede + inclusões manuais avulsas
+  const sedeAtivos = employees.filter((e) => e.status === "Ativo" && e.workplaceType === "SEDE");
+  const ataExtraEmployees = ataExtraIds
+    .map((id) => employees.find((e) => e.id === id))
+    .filter((e): e is Employee => Boolean(e));
+  const ataList = [...sedeAtivos, ...ataExtraEmployees.filter((e) => !sedeAtivos.some((s) => s.id === e.id))];
+
+  const ataSearchResults =
+    ataSearch.trim().length < 2
+      ? []
+      : employees
+          .filter(
+            (e) =>
+              e.status === "Ativo" &&
+              e.name.toLowerCase().includes(ataSearch.toLowerCase()) &&
+              !ataList.some((a) => a.id === e.id)
+          )
+          .slice(0, 8);
+
+  const fetchAtaDay = useCallback(
+    async (date: string) => {
+      setAtaLoading(true);
+      const { data } = await supabase
+        .from("lunch_lists")
+        .select("employee_id, status")
+        .eq("lunch_date", date);
+
+      const statusMap: Record<string, "CONFIRMED" | "CANCELLED"> = {};
+      const extras: string[] = [];
+      (data || []).forEach((row: Record<string, unknown>) => {
+        const empId = String(row.employee_id || "");
+        const st = String(row.status || "") === "CANCELLED" ? "CANCELLED" : "CONFIRMED";
+        statusMap[empId] = st;
+        if (!employees.some((e) => e.id === empId && e.status === "Ativo" && e.workplaceType === "SEDE")) {
+          extras.push(empId);
+        }
+      });
+
+      setAtaStatus(statusMap);
+      setAtaExtraIds(extras);
+      setAtaLoading(false);
+    },
+    [supabase, employees]
+  );
+
+  useEffect(() => {
+    const run = async () => {
+      if (!loading && employees.length > 0) {
+        await fetchAtaDay(ataDate);
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ataDate, loading]);
+
+  const ataStatusFor = (employeeId: string): "CONFIRMED" | "CANCELLED" => ataStatus[employeeId] ?? "CONFIRMED";
+
+  const toggleAtaAttendee = (employeeId: string) => {
+    setAtaStatus((prev) => ({
+      ...prev,
+      [employeeId]: ataStatusFor(employeeId) === "CONFIRMED" ? "CANCELLED" : "CONFIRMED",
+    }));
+  };
+
+  const addAtaExtra = (employeeId: string) => {
+    setAtaExtraIds((prev) => (prev.includes(employeeId) ? prev : [...prev, employeeId]));
+    setAtaStatus((prev) => ({ ...prev, [employeeId]: "CONFIRMED" }));
+    setAtaSearch("");
+  };
+
+  const removeAtaExtra = (employeeId: string) => {
+    setAtaExtraIds((prev) => prev.filter((id) => id !== employeeId));
+    setAtaStatus((prev) => {
+      const next = { ...prev };
+      delete next[employeeId];
+      return next;
+    });
+  };
+
+  const saveAtaDay = async () => {
+    setAtaSaving(true);
+    const rows = ataList.map((emp) => ({
+      employee_id: emp.id,
+      lunch_date: ataDate,
+      status: ataStatusFor(emp.id),
+    }));
+    const { error } = await supabase.from("lunch_lists").upsert(rows, { onConflict: "employee_id,lunch_date" });
+    setAtaSaving(false);
+    if (error) {
+      alert(`Erro ao salvar a lista do dia: ${error.message}`);
+      return;
+    }
+    await fetchAtaDay(ataDate);
+    await fetchData();
+  };
+
+  const generateAtaPdf = () => {
+    const confirmados = ataList.filter((emp) => ataStatusFor(emp.id) === "CONFIRMED");
+    if (confirmados.length === 0) {
+      alert("Nenhum colaborador confirmado para gerar a ata.");
+      return;
+    }
+    const dateLabel = format(new Date(`${ataDate}T00:00:00`), "dd/MM/yyyy");
+    exportLunchListPdf(
+      dateLabel,
+      confirmados.map((emp) => ({ name: emp.name, department: emp.department }))
+    );
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -835,10 +964,122 @@ export default function BeneficiosPage() {
         {/* ABA 5: ALMOÇO NA SEDE */}
         <TabsContent value="almoco" className="space-y-4">
           <Card>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FileSignature className="w-4 h-4 text-amber-500" />
+                  Ata do Dia
+                </CardTitle>
+                <CardDescription>
+                  Benefício exclusivo da Sede. Ajuste inclusões/exclusões do dia e gere a lista para assinatura.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={ataDate}
+                  onChange={(e) => setAtaDate(e.target.value)}
+                  className="w-auto"
+                />
+                <Button onClick={saveAtaDay} disabled={ataSaving || ataLoading} size="sm" className="gap-2">
+                  <Save className="w-4 h-4" /> {ataSaving ? "Salvando..." : "Salvar Lista"}
+                </Button>
+                <Button onClick={generateAtaPdf} disabled={ataLoading} size="sm" variant="outline" className="gap-2">
+                  <FileSignature className="w-4 h-4" /> Gerar Ata em PDF
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Incluir colaborador avulso (fora da Sede) para este dia..."
+                  value={ataSearch}
+                  onChange={(e) => setAtaSearch(e.target.value)}
+                  className="pl-8"
+                />
+                {ataSearchResults.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover shadow-md">
+                    {ataSearchResults.map((emp) => (
+                      <button
+                        key={emp.id}
+                        type="button"
+                        onClick={() => addAtaExtra(emp.id)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                      >
+                        <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
+                        {emp.name}
+                        <span className="text-xs text-muted-foreground">{emp.department || "-"}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {ataLoading ? (
+                <p className="text-sm text-muted-foreground">Carregando lista do dia...</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-muted text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-3 w-10">Vai</th>
+                        <th className="px-4 py-3">Colaborador</th>
+                        <th className="px-4 py-3">Setor</th>
+                        <th className="px-4 py-3">Origem</th>
+                        <th className="px-4 py-3 text-right">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {ataList.map((emp) => {
+                        const isExtra = ataExtraIds.includes(emp.id) && !sedeAtivos.some((s) => s.id === emp.id);
+                        return (
+                          <tr key={emp.id} className="hover:bg-muted/50">
+                            <td className="px-4 py-3">
+                              <Checkbox
+                                checked={ataStatusFor(emp.id) === "CONFIRMED"}
+                                onCheckedChange={() => toggleAtaAttendee(emp.id)}
+                              />
+                            </td>
+                            <td className="px-4 py-3 font-medium">{emp.name}</td>
+                            <td className="px-4 py-3">{emp.department || "-"}</td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">
+                              {isExtra ? "Inclusão avulsa" : "Sede"}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {isExtra && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-muted-foreground hover:text-red-500"
+                                  onClick={() => removeAtaExtra(emp.id)}
+                                >
+                                  Remover
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {ataList.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                            Nenhum colaborador ativo na Sede encontrado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div>
-                <CardTitle>Almoço na Sede</CardTitle>
-                <CardDescription>Lista de confirmação diária de refeições na sede.</CardDescription>
+                <CardTitle>Histórico de Almoço</CardTitle>
+                <CardDescription>Registros futuros já salvos na tabela de confirmação.</CardDescription>
               </div>
               <Button
                 size="sm"
