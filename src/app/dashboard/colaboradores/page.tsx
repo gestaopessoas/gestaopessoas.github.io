@@ -96,6 +96,7 @@ export default function ColaboradoresPage() {
   const [birthdayError, setBirthdayError] = useState("");
   const [cpfError, setCpfError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+  const [duplicateCpf, setDuplicateCpf] = useState<Employee | null>(null);
   
   // Modals state
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
@@ -381,11 +382,18 @@ export default function ColaboradoresPage() {
 
     if (result.error) {
       setSaving(false);
-      setError(`Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
+      if (result.error.code === "23505" && result.error.message?.includes("employees_cpf_unique")) {
+        const existing = employees.find((e) => e.cpf === payload.cpf);
+        if (existing) { setDuplicateCpf(existing); return; }
+        setError("Já existe um colaborador cadastrado com este CPF.");
+      } else {
+        setError(`Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
+      }
       return;
     }
 
     if (!criticalFieldsMatch(payload, result.data)) {
+      if (isNew) await supabase.from("employees").delete().eq("id", result.data.id);
       setSaving(false);
       setError("O banco não confirmou todos os campos alterados. Revise RG, Cargo, Código do Perfil, Nível, Empresa, Obra/Unidade, Estado civil e Status.");
       return;
@@ -640,7 +648,7 @@ export default function ColaboradoresPage() {
               }} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{workplaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
               <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
               <Field label="Setor"><select value={form.sector_id} onChange={(e) => update("sector_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{sectors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
-              <Field label="Tipo de contrato"><Select value={form.contract_type} onChange={(value) => update("contract_type", value)} options={["", "CLT", "MEI", "PJ"]} /></Field>
+              <Field label="Tipo de contrato"><Select value={form.contract_type} onChange={(value) => update("contract_type", value)} options={["", "CLT", "MEI", "PJ", "Estágio", "Jovem Aprendiz"]} /></Field>
               <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
               <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
               <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} /></Field>
@@ -1016,6 +1024,21 @@ export default function ColaboradoresPage() {
                 <Button onClick={() => { setPage(0); setShowFilterModal(false); }}>Aplicar Filtros</Button>
               </div>
             </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={duplicateCpf !== null} onOpenChange={(open) => { if (!open) setDuplicateCpf(null); }}>
+        <DialogContent className="max-w-md sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>CPF já cadastrado</DialogTitle>
+            <DialogDescription>Já existe um colaborador cadastrado com este CPF: &quot;{duplicateCpf?.name}&quot;. Deseja editar o cadastro existente?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDuplicateCpf(null)}>Cancelar</Button>
+            <Button type="button" onClick={() => { if (duplicateCpf) startEdit(duplicateCpf); setDuplicateCpf(null); }}>
+              Ir para cadastro
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -1,12 +1,12 @@
-export function normalizeInterviewProgress({ status, result }) {
-  if (result === "Aprovado" || result === "Reprovado" || result === "Banco de Talentos") {
-    return { status: "Compareceu", result };
+export function normalizeInterviewProgress({ status, result, destination = "" }) {
+  if (result === "Aprovado" || result === "Reprovado") {
+    return { status: "Compareceu", result, destination: destination || "" };
   }
-  if (result === "Desistente" || status === "Desistente") {
-    return { status: "Desistente", result: "Desistente" };
+  if (status === "Desistente") {
+    return { status: "Desistente", result: "N/C", destination: destination || "Desistente" };
   }
   if (status === "Aguardando" || status === "Confirmado") {
-    return { status, result: "N/C" };
+    return { status, result: "N/C", destination: destination || "" };
   }
-  return { status: status || "Aguardando", result: result || "N/C" };
+  return { status: status || "Aguardando", result: result || "N/C", destination: destination || "" };
 }

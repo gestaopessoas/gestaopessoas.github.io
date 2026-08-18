@@ -127,6 +127,7 @@ type Interview = {
   interview_date: string | null;
   interview_time: string | null;
   result: string | null;
+  destination: string | null;
   assessment: Assessment | null;
   created_at: string;
   updated_at?: string;
@@ -158,8 +159,14 @@ const statusStyle: Record<string, string> = {
 const resultStyle: Record<string, string> = {
   Aprovado: "text-emerald-600",
   Reprovado: "text-red-600",
-  Desistente: "text-zinc-500",
   "N/C": "text-zinc-500",
+};
+
+const destinationStyle: Record<string, string> = {
+  Contratado: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  "Banco de Talentos": "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  Descartado: "bg-red-500/10 text-red-700 dark:text-red-300",
+  Desistente: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-300",
 };
 
 const defaultAssessment: Assessment = {
@@ -535,7 +542,7 @@ export default function EntrevistasPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [currentUpdatedAt, setCurrentUpdatedAt] = useState<string | null>(null);
   const [form, setForm] = useState({
-    candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C"
+    candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C", destination: ""
   });
   const [assessmentForm, setAssessmentForm] = useState<Assessment>(defaultAssessment);
   const [movingToTalents, setMovingToTalents] = useState(false);
@@ -834,16 +841,17 @@ export default function EntrevistasPage() {
 
   const exportToCsv = () => {
     if (filtered.length === 0) return;
-    const headers = ["Candidato", "Telefone", "Email", "Cargo Alvo", "Data", "Hora", "Status", "Resultado"];
+    const headers = ["Candidato", "Telefone", "Email", "Cargo Alvo", "Data", "Hora", "Status", "Resultado", "Destino"];
     const rows = filtered.map(i => [
-      `"${i.candidate_name || ''}"`, 
-      `"${i.phone || ''}"`, 
-      `"${i.email || ''}"`, 
-      `"${i.role || ''}"`, 
-      `"${i.interview_date ? new Date(i.interview_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : ''}"`, 
-      `"${i.interview_time || ''}"`, 
-      `"${i.status || ''}"`, 
-      `"${i.result || ''}"`
+      `"${i.candidate_name || ''}"`,
+      `"${i.phone || ''}"`,
+      `"${i.email || ''}"`,
+      `"${i.role || ''}"`,
+      `"${i.interview_date ? new Date(i.interview_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : ''}"`,
+      `"${i.interview_time || ''}"`,
+      `"${i.status || ''}"`,
+      `"${i.result || ''}"`,
+      `"${i.destination || ''}"`
     ].join(","));
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows].join("\n");
     const encodedUri = encodeURI(csvContent);
@@ -882,6 +890,7 @@ PARECER FINAL / OBSERVAÇÕES
 ${assessmentForm.observations || 'Nenhum registrado'}
 
 Resultado Final: ${form.result || "N/C"}
+Destino: ${form.destination || "N/I"}
 `.trim();
 
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -900,6 +909,7 @@ Resultado Final: ${form.result || "N/C"}
     const role = form.role || 'N/I';
     const date = form.interview_date ? new Date(form.interview_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/I';
     const result = form.result || 'N/C';
+    const destination = form.destination || '';
     const resultColor = result === 'Aprovado' ? '#16a34a' : result === 'Reprovado' ? '#dc2626' : '#d97706';
 
     const fortes = (assessmentForm.strengths || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -950,6 +960,7 @@ Resultado Final: ${form.result || "N/C"}
     <h1>${candidate}</h1>
     <div class="header-sub">Parecer de Entrevista · ${role}</div>
     <div class="result-badge">Resultado: ${result}</div>
+    ${destination ? `<div class="result-badge" style="margin-top:8px;background:#6366f115;color:#6366f1;border-color:#6366f140">Destino: ${destination}</div>` : ''}
   </div>
   <div class="body">
     <div class="info-grid">
@@ -1043,17 +1054,18 @@ Resultado Final: ${form.result || "N/C"}
     }
   };
 
-  const handleModalSave = async (formData: any, assessmentData: any, interviewProgress?: { status: string; result: string }) => {
+  const handleModalSave = async (formData: any, assessmentData: any, interviewProgress?: { status: string; result: string; destination?: string }) => {
     setSaving(true);
     setError("");
     const supabase = createClient();
-    
+
     const payload = {
       ...Object.fromEntries(
         Object.entries(form).map(([key, value]) => [key, value.trim() || null])
       ),
       status: interviewProgress?.status || form.status,
       result: interviewProgress?.result || form.result,
+      destination: interviewProgress?.destination || form.destination || null,
       candidate_name: formData.full_name || formData.name || form.candidate_name,
       email: formData.email,
       phone: formData.phone,
@@ -1113,11 +1125,13 @@ Resultado Final: ${form.result || "N/C"}
     
     if (isSuccess) {
       const payloadAny = payload as unknown as Record<string, any>;
-      if ((payloadAny.result === "Aprovado" || payloadAny.result === "Banco de Talentos") && payloadAny.candidate_name) {
+      // Toda entrevista salva reflete um registro na Central do Candidato,
+      // independente do Destino escolhido — não só Aprovado/Banco de Talentos.
+      if (payloadAny.candidate_name) {
         const parts = payloadAny.candidate_name.split(" ");
-        const tag = payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : "Banco de Talentos";
-        
-        const { error: insertError } = await supabase.from("candidates").insert({
+        const tag = payloadAny.destination || (payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : payloadAny.result === "Reprovado" ? "Reprovado na Entrevista" : "Entrevistado");
+
+        const { error: upsertError } = await supabase.from("candidates").upsert({
           full_name: payloadAny.candidate_name,
           first_name: parts[0] || "",
           last_name: parts.slice(1).join(" ") || "",
@@ -1142,10 +1156,10 @@ Resultado Final: ${form.result || "N/C"}
           dependents_count: formData.dependents_count ?? null,
           uniform_size: formData.uniform_size || null,
           boot_size: formData.boot_size || null
-        });
-        if (insertError) console.error("Erro ao enviar para candidatos:", insertError);
+        }, { onConflict: "email" });
+        if (upsertError) console.error("Erro ao enviar para candidatos:", upsertError);
       }
-      setIsModalOpen(false); 
+      setIsModalOpen(false);
       loadInterviews();
     }
     setSaving(false);
@@ -1355,7 +1369,7 @@ Resultado Final: ${form.result || "N/C"}
   const openNewModal = () => {
     setEditingId(null);
     setCurrentUpdatedAt(null);
-    setForm({ candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C" });
+    setForm({ candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C", destination: "" });
     setAssessmentForm(defaultAssessment);
     setActiveTab("dados");
     setIsModalOpen(true);
@@ -1373,6 +1387,7 @@ Resultado Final: ${form.result || "N/C"}
       interview_time: interview.interview_time || "",
       status: interview.status || "Aguardando",
       result: interview.result || "N/C",
+      destination: interview.destination || "",
     });
     const assessment = interview.assessment || defaultAssessment;
     setAssessmentForm({
@@ -1519,15 +1534,16 @@ Resultado Final: ${form.result || "N/C"}
                   <th className="px-4 py-3">Data / Hora</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Resultado</th>
+                  <th className="px-4 py-3">Destino</th>
                   <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
                 {loading && (
-                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>Carregando entrevistas...</td></tr>
+                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>Carregando entrevistas...</td></tr>
                 )}
                 {!loading && filtered.length === 0 && (
-                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>Nenhum registro encontrado.</td></tr>
+                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>Nenhum registro encontrado.</td></tr>
                 )}
                 {!loading && filtered.map((interview) => (
                   <tr key={interview.id} onClick={() => openEditModal(interview)} className="hover:bg-muted/30 cursor-pointer transition-colors group">
@@ -1563,6 +1579,15 @@ Resultado Final: ${form.result || "N/C"}
                          {interview.result || "-"}
                        </span>
                     </td>
+                    <td className="px-4 py-3 min-w-36">
+                       {interview.destination ? (
+                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${destinationStyle[interview.destination] || "bg-muted text-muted-foreground"}`}>
+                           {interview.destination}
+                         </span>
+                       ) : (
+                         <span className="text-muted-foreground">-</span>
+                       )}
+                    </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <Button
                         variant="ghost"
@@ -1595,7 +1620,7 @@ Resultado Final: ${form.result || "N/C"}
             ...assessmentForm
           } : undefined}
           initialAssessmentData={!editingId ? assessmentForm : undefined}
-          interviewProgress={{ status: form.status, result: form.result }}
+          interviewProgress={{ status: form.status, result: form.result, destination: form.destination }}
           isEditable={true}
           defaultEditMode={true}
           onClose={() => setIsModalOpen(false)}
