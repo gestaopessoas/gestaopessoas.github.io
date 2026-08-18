@@ -377,8 +377,8 @@ export default function ColaboradoresPage() {
     const isPromoted = !isNew && !isDismissed && (form.role !== original?.role || form.level !== original?.level || form.department_id !== original?.department_id || form.workplace_id !== original?.workplace_id);
 
     const result = editingId
-      ? await supabase.from("employees").update(payload).eq("id", editingId).select("id, rg, role, profile_code, level, company_id, workplace_id, marital_status, status").single()
-      : await supabase.from("employees").insert(payload).select("id, rg, role, profile_code, level, company_id, workplace_id, marital_status, status").single();
+      ? await supabase.from("employees").update(payload).eq("id", editingId).select("id, ficha, rg, role, profile_code, level, company_id, workplace_id, marital_status, status").single()
+      : await supabase.from("employees").insert(payload).select("id, ficha, rg, role, profile_code, level, company_id, workplace_id, marital_status, status").single();
 
     if (result.error) {
       setSaving(false);
