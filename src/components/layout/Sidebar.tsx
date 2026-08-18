@@ -74,6 +74,7 @@ const sidebarGroups = [
       { name: "Obras", href: "/dashboard/obras", icon: LayoutDashboard, module: "obras" },
       { name: "Resumo Financeiro", href: "/dashboard/financeiro", icon: CircleDollarSign, module: "financeiro" },
       { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, module: "analytics" },
+      { name: "Histórico de Benefícios", href: "/dashboard/configuracoes/beneficios-historico", icon: Gift, module: "beneficios" },
       { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings, module: "configuracoes" },
     ]
   }

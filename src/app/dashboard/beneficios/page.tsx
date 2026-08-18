@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState, useContext, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { differenceInDays, format } from "date-fns";
 import { hasBenefitKind } from "@/lib/benefitClassification";
-import { PermissionsContext } from "@/contexts/PermissionsContext";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { exportLunchListPdf } from "./lunchListPdf";
@@ -19,12 +18,6 @@ import {
   UserMinus,
   EyeOff,
   CheckCircle2,
-  History,
-  RotateCcw,
-  ShieldAlert,
-  Lock,
-  UserCheck,
-  AlertCircle,
   FileSignature,
   Save,
   Search,
@@ -33,7 +26,16 @@ import {
 
 type Employee = { id: string; name: string; status: string; admission_date: string; cost_center?: string; department?: string; workplaceType?: string };
 type Benefit = { id?: string; employee_id: string; benefit_type: string; benefit_name?: string; value: number };
-type LunchList = { id: string; employee_id: string; lunch_date: string; status: string; employees: Employee };
+type LunchList = {
+  id: string;
+  employee_id: string | null;
+  lunch_date: string;
+  status: string;
+  manual_name?: string | null;
+  company_cost?: number | null;
+  employee_cost?: number | null;
+  employees: Employee | null;
+};
 
 type AuditLog = {
   id: string;
@@ -47,51 +49,23 @@ type AuditLog = {
   employee_department?: string;
 };
 
-// Dados de demonstração de auditoria como contingência visual se o SQL ainda estiver aguardando execução na produção
-const FALLBACK_AUDIT_LOGS: AuditLog[] = [
-  {
-    id: "log-demo-1",
-    employee_id: "e-demo-1",
-    action_type: "REMOVE_BENEFIT",
-    benefit_details: "Exclusão de Plano SulClínica e OdontoPrev por Demissão (Corte Pós-Demissão)",
-    restore_items: [
-      { employee_id: "e-demo-1", benefit_name: "SulClínica", value: 350, benefit_type: "SulClínica" },
-      { employee_id: "e-demo-1", benefit_name: "OdontoPrev", value: 45, benefit_type: "OdontoPrev" }
-    ],
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-    employee_name: "Mariana Souza Santos (Demonstração)",
-    employee_department: "Atendimento & Recepção"
-  },
-  {
-    id: "log-demo-2",
-    employee_id: "e-demo-2",
-    action_type: "IGNORE_INCLUSION",
-    benefit_details: "Elegibilidade de Inclusão ao Plano de Saúde Ignorada no painel",
-    created_at: new Date(Date.now() - 172800000).toISOString(),
-    employee_name: "Carlos Eduardo Mendes (Demonstração)",
-    employee_department: "Tecnologia / TI"
-  }
-];
-
 export default function BeneficiosPage() {
   const supabase = createClient();
-  const { level } = useContext(PermissionsContext);
-  // Nível >= 50 indica Administrador de acordo com PermissionsContext (ou fallback em localhost para testes locais)
-  const isAdmin = level >= 50 || (typeof window !== "undefined" && window.location.hostname === "localhost") || false;
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [benefits, setBenefits] = useState<Benefit[]>([]);
   const [lunchLists, setLunchLists] = useState<LunchList[]>([]);
   const [ignores, setIgnores] = useState<string[]>([]); // array de employee_ids ignorados
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [undoingId, setUndoingId] = useState<string | null>(null);
 
   // Estado da ata diária de almoço (Sede)
   const todayStr = new Date().toISOString().split("T")[0];
   const [ataDate, setAtaDate] = useState<string>(todayStr);
   const [ataStatus, setAtaStatus] = useState<Record<string, "CONFIRMED" | "CANCELLED">>({});
   const [ataExtraIds, setAtaExtraIds] = useState<string[]>([]); // colaboradores fora da Sede incluídos manualmente
+  const [ataManual, setAtaManual] = useState<{ id: string; name: string }[]>([]); // pessoas fora do cadastro (terceiros/visitantes)
+  const [ataManualName, setAtaManualName] = useState("");
+  const [ataCosts, setAtaCosts] = useState<Record<string, { company_cost: number; employee_cost: number }>>({});
   const [ataSearch, setAtaSearch] = useState("");
   const [ataLoading, setAtaLoading] = useState(false);
   const [ataSaving, setAtaSaving] = useState(false);
@@ -132,15 +106,9 @@ export default function BeneficiosPage() {
     const today = new Date().toISOString().split("T")[0];
     const { data: lunches } = await supabase
       .from("lunch_lists")
-      .select(`id, employee_id, lunch_date, status, employees(name, departments(name))`)
+      .select(`id, employee_id, lunch_date, status, manual_name, company_cost, employee_cost, employees(name, departments(name))`)
       .gte("lunch_date", today)
       .order("lunch_date", { ascending: true });
-
-    // Fetch de registros da tabela de auditoria benefit_audit_logs
-    const { data: audits, error: auditError } = await supabase
-      .from("benefit_audit_logs")
-      .select("*, benefit_audit_log_entries(path, value_text, value_number)")
-      .order("created_at", { ascending: false });
 
     const empsList: Employee[] = (emps || []).map((e: Record<string, unknown>) => {
       const deps = e.departments as Record<string, unknown> | null;
@@ -169,37 +137,6 @@ export default function BeneficiosPage() {
     setBenefits(bensList);
     setIgnores((igs || []).map((i: Record<string, unknown>) => String(i.employee_id)));
     setLunchLists((lunches || []) as unknown as LunchList[]);
-
-    // Mapeia logs e enriquece com nomes de colaboradores para visualização clara no painel
-    if (auditError || !audits) {
-      setAuditLogs([]);
-    } else {
-      const enrichedAudits: AuditLog[] = audits.map((a: Record<string, unknown>) => {
-        const emp = empsList.find((e) => e.id === String(a.employee_id));
-        return {
-          id: String(a.id || ""),
-          employee_id: String(a.employee_id || ""),
-          action_type: String(a.action_type || ""),
-          benefit_details: String(a.benefit_details || ""),
-          restore_items: Object.values(((a.benefit_audit_log_entries ?? []) as { path: string[]; value_text: string | null; value_number: number | null }[]).reduce((items: Record<string, Benefit>, entry) => {
-            const [index, field] = entry.path;
-            if (index === undefined || !field) return items;
-            const item = items[index] ?? { employee_id: "", benefit_type: "", value: 0 };
-            if (field === "value") item.value = Number(entry.value_number ?? 0);
-            else if (field === "employee_id") item.employee_id = entry.value_text ?? "";
-            else if (field === "benefit_name") item.benefit_name = entry.value_text ?? "";
-            else if (field === "benefit_type") item.benefit_type = entry.value_text ?? "";
-            items[index] = item;
-            return items;
-          }, {})),
-          performed_by: a.performed_by ? String(a.performed_by) : undefined,
-          created_at: String(a.created_at || ""),
-          employee_name: emp ? emp.name : `Colaborador (${String(a.employee_id || "").slice(0, 8)})`,
-          employee_department: emp ? emp.department : undefined,
-        };
-      });
-      setAuditLogs(enrichedAudits);
-    }
 
     setLoading(false);
     if (typeof window !== "undefined") {
@@ -346,81 +283,29 @@ export default function BeneficiosPage() {
     await fetchData();
   };
 
-  // MECANISMO DE DESFAZER AÇÃO (Restaurar) - EXCLUSIVO PARA ADMINISTRADORES (level >= 50)
-  const handleUndoAuditAction = async (log: AuditLog) => {
-    if (!isAdmin) {
-      alert("⚠️ Acesso Negado: Apenas Administradores (Nível 50+) podem desfazer ações de auditoria e reverter cortes.");
-      return;
-    }
-
-    if (
-      !confirm(
-        `[DESFAZER ADMIN] Confirmar a reversão do evento "${log.action_type}" para ${log.employee_name || log.employee_id}?`
-      )
-    ) {
-      return;
-    }
-
-    setUndoingId(log.id);
-    try {
-      if (log.action_type.includes("IGNORE")) {
-        // Desfazer ignoração: apaga de benefit_ignores para recolocar na lista de Inclusões Pendentes
-        await supabase.from("benefit_ignores").delete().eq("employee_id", log.employee_id);
-        setIgnores((prev) => prev.filter((id) => id !== log.employee_id));
-        alert(`✅ Ignoração desfeita com sucesso! O colaborador "${log.employee_name}" voltou para Inclusão Pendente.`);
-      } else if (log.action_type.includes("REMOVE")) {
-        if (log.restore_items?.length) {
-          const itemsToRestore = log.restore_items.map((item) => ({
-            employee_id: log.employee_id,
-            benefit_name: item.benefit_name || item.benefit_type || "Plano Restaurado",
-            value: item.value,
-          }));
-          await supabase.from("employee_benefits").insert(itemsToRestore);
-        }
-        alert(`✅ Corte desfeito com sucesso! Os benefícios de "${log.employee_name}" foram devidamente restaurados.`);
-      }
-
-      // Excluir ou marcar log como reverter na tabela de auditoria
-      if (!log.id.startsWith("log-demo-")) {
-        await supabase.from("benefit_audit_logs").delete().eq("id", log.id);
-      }
-      
-      setAuditLogs((prev) => prev.filter((l) => l.id !== log.id));
-      await fetchData();
-    } catch (err: unknown) {
-      console.error("Erro ao desfazer ação:", err);
-      alert("Ocorreu um erro ao processar o desfazimento no banco.");
-    } finally {
-      setUndoingId(null);
-    }
-  };
-
-  // Desfazer ignoração diretamente da lista de colaboradores atualmente ignorados no banco
-  const handleUndoDirectIgnore = async (employeeId: string, empName?: string) => {
-    if (!isAdmin) {
-      alert("⚠️ Acesso Negado: Apenas Administradores (Nível 50+) podem remover ignorações e restaurar elegibilidade.");
-      return;
-    }
-    if (!confirm(`[DESFAZER ADMIN] Restaurar "${empName || employeeId}" para a fila de Inclusão Pendente?`)) return;
-
-    setLoading(true);
-      await supabase.from("benefit_ignores").delete().eq("employee_id", employeeId);
-    setIgnores((prev) => prev.filter((id) => id !== employeeId));
-    alert(`✅ Elegibilidade restaurada para "${empName || "Colaborador"}"!`);
-    await fetchData();
-  };
-
-  // Colaboradores que estão atualmente ignorados em benefit_ignores
-  const ignoredEmployeesList = employees.filter((emp) => ignores.includes(emp.id));
-
   // ===== Ata diária de almoço (Sede) =====
 
-  // Base do dia: colaboradores ativos da Sede + inclusões manuais avulsas
+  // Base do dia: colaboradores ativos da Sede + inclusões manuais avulsas + cadastros manuais (fora do sistema)
   const sedeAtivos = employees.filter((e) => e.status === "Ativo" && e.workplaceType === "SEDE");
   const ataExtraEmployees = ataExtraIds
     .map((id) => employees.find((e) => e.id === id))
     .filter((e): e is Employee => Boolean(e));
-  const ataList = [...sedeAtivos, ...ataExtraEmployees.filter((e) => !sedeAtivos.some((s) => s.id === e.id))];
+  const ataManualEmployees: Employee[] = ataManual.map((m) => ({
+    id: m.id,
+    name: m.name,
+    status: "Ativo",
+    admission_date: "",
+  }));
+  const ataList = [
+    ...sedeAtivos,
+    ...ataExtraEmployees.filter((e) => !sedeAtivos.some((s) => s.id === e.id)),
+    ...ataManualEmployees,
+  ];
+
+  const ataCostFor = (id: string) => ataCosts[id] ?? { company_cost: 0, employee_cost: 0 };
+  const setAtaCost = (id: string, field: "company_cost" | "employee_cost", value: number) => {
+    setAtaCosts((prev) => ({ ...prev, [id]: { ...ataCostFor(id), [field]: value } }));
+  };
 
   const ataSearchResults =
     ataSearch.trim().length < 2
@@ -439,22 +324,35 @@ export default function BeneficiosPage() {
       setAtaLoading(true);
       const { data } = await supabase
         .from("lunch_lists")
-        .select("employee_id, status")
+        .select("id, employee_id, status, manual_name, company_cost, employee_cost")
         .eq("lunch_date", date);
 
       const statusMap: Record<string, "CONFIRMED" | "CANCELLED"> = {};
+      const costsMap: Record<string, { company_cost: number; employee_cost: number }> = {};
       const extras: string[] = [];
+      const manual: { id: string; name: string }[] = [];
       (data || []).forEach((row: Record<string, unknown>) => {
-        const empId = String(row.employee_id || "");
         const st = String(row.status || "") === "CANCELLED" ? "CANCELLED" : "CONFIRMED";
+        const costs = { company_cost: Number(row.company_cost || 0), employee_cost: Number(row.employee_cost || 0) };
+        if (row.manual_name) {
+          const rowId = String(row.id || "");
+          statusMap[rowId] = st;
+          costsMap[rowId] = costs;
+          manual.push({ id: rowId, name: String(row.manual_name) });
+          return;
+        }
+        const empId = String(row.employee_id || "");
         statusMap[empId] = st;
+        costsMap[empId] = costs;
         if (!employees.some((e) => e.id === empId && e.status === "Ativo" && e.workplaceType === "SEDE")) {
           extras.push(empId);
         }
       });
 
       setAtaStatus(statusMap);
+      setAtaCosts(costsMap);
       setAtaExtraIds(extras);
+      setAtaManual(manual);
       setAtaLoading(false);
     },
     [supabase, employees]
@@ -494,19 +392,66 @@ export default function BeneficiosPage() {
     });
   };
 
+  // Cadastro manual: pessoa que não está em employees (terceiro/visitante)
+  const addAtaManual = () => {
+    const name = ataManualName.trim();
+    if (!name) return;
+    const id = `manual-${crypto.randomUUID()}`;
+    setAtaManual((prev) => [...prev, { id, name }]);
+    setAtaStatus((prev) => ({ ...prev, [id]: "CONFIRMED" }));
+    setAtaManualName("");
+  };
+
+  const removeAtaManual = (id: string) => {
+    setAtaManual((prev) => prev.filter((m) => m.id !== id));
+    setAtaStatus((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setAtaCosts((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
   const saveAtaDay = async () => {
     setAtaSaving(true);
-    const rows = ataList.map((emp) => ({
+    const cadastrados = [...sedeAtivos, ...ataExtraEmployees.filter((e) => !sedeAtivos.some((s) => s.id === e.id))];
+    const rows = cadastrados.map((emp) => ({
       employee_id: emp.id,
       lunch_date: ataDate,
       status: ataStatusFor(emp.id),
+      company_cost: ataCostFor(emp.id).company_cost,
+      employee_cost: ataCostFor(emp.id).employee_cost,
     }));
-    const { error } = await supabase.from("lunch_lists").upsert(rows, { onConflict: "employee_id,lunch_date" });
-    setAtaSaving(false);
-    if (error) {
-      alert(`Erro ao salvar a lista do dia: ${error.message}`);
-      return;
+    const manualRows = ataManual.map((m) => ({
+      id: m.id.startsWith("manual-") ? undefined : m.id,
+      manual_name: m.name,
+      lunch_date: ataDate,
+      status: ataStatusFor(m.id),
+      company_cost: ataCostFor(m.id).company_cost,
+      employee_cost: ataCostFor(m.id).employee_cost,
+    }));
+
+    if (rows.length) {
+      const { error } = await supabase.from("lunch_lists").upsert(rows, { onConflict: "employee_id,lunch_date" });
+      if (error) {
+        setAtaSaving(false);
+        alert(`Erro ao salvar a lista do dia: ${error.message}`);
+        return;
+      }
     }
+    if (manualRows.length) {
+      const { error } = await supabase.from("lunch_lists").upsert(manualRows, { onConflict: "manual_name,lunch_date" });
+      if (error) {
+        setAtaSaving(false);
+        alert(`Erro ao salvar os registros manuais: ${error.message}`);
+        return;
+      }
+    }
+    setAtaSaving(false);
     await fetchAtaDay(ataDate);
     await fetchData();
   };
@@ -529,12 +474,12 @@ export default function BeneficiosPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Gestão de Benefícios</h1>
         <p className="text-muted-foreground text-sm">
-          Acompanhamento de planos de saúde, cortes pós-demissão, vale-refeição, almoço e auditoria de reversões.
+          Acompanhamento de planos de saúde, cortes pós-demissão, vale-refeição e almoço.
         </p>
       </div>
 
       <Tabs defaultValue="planos" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-4">
+        <TabsList className="grid w-full grid-cols-4 mb-4">
           <TabsTrigger value="planos" className="flex gap-2 relative">
             <HeartPulse className="w-4 h-4" />
             <span>Inclusão Pendente</span>
@@ -550,15 +495,6 @@ export default function BeneficiosPage() {
             {pendentesCorte.length > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
                 {pendentesCorte.length}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="audit" className="flex gap-1.5 relative text-amber-700 dark:text-amber-400 font-semibold">
-            <History className="w-4 h-4 text-amber-500" />
-            <span>Controle & Histórico</span>
-            {auditLogs.length > 0 && (
-              <span className="ml-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300">
-                {auditLogs.length}
               </span>
             )}
           </TabsTrigger>
@@ -734,173 +670,7 @@ export default function BeneficiosPage() {
           </Card>
         </TabsContent>
 
-        {/* ABA 3: CONTROLE & HISTÓRICO COM DESFAZER (SÓ ADMIN) */}
-        <TabsContent value="audit" className="space-y-6">
-          <Card className="border-amber-500/30 shadow-md">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <History className="h-6 w-6 text-amber-500" />
-                  <div>
-                    <CardTitle className="text-xl">Controle, Auditoria &amp; Reversões de Benefícios</CardTitle>
-                    <CardDescription>
-                      Rastro completo das ignorações e exclusões realizadas no sistema. Permite restauração e reversão com snapshot de dados originais.
-                    </CardDescription>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Banner de Controle de Segurança e Permissões (Admin vs Gestor) */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-transparent p-4 text-sm text-zinc-800 dark:text-zinc-200">
-                <div className="flex items-start sm:items-center gap-2.5">
-                  <ShieldAlert className="h-5 w-5 text-amber-500 shrink-0 mt-0.5 sm:mt-0" />
-                  <div>
-                    <span className="font-bold">Política de Ação &ldquo;Desfazer&rdquo;:</span> Apenas perfis com nível de segurança <strong>50 ou superior (Administradores)</strong> possuem autorização para reverter cortes ou reabrir pendências ignoradas.
-                  </div>
-                </div>
-                <div className={`flex items-center gap-1.5 shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border shadow-xs ${
-                  isAdmin
-                    ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-700/50"
-                    : "bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"
-                }`}>
-                  {isAdmin ? <UserCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : <Lock className="h-4 w-4 text-zinc-500" />}
-                  <span>Seu Nível: {level >= 50 ? `Administrador (${level})` : `Gestor / Leitor (${level})`}</span>
-                </div>
-              </div>
-
-              {/* Seção A: Histórico de Ações Executadas (Cortes e Ignorações com Snapshot) */}
-              <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-white mb-3 flex items-center gap-2">
-                  <RotateCcw className="h-4 w-4 text-amber-500" />
-                  <span>Log de Alterações Recentes &amp; Vínculos Preservados</span>
-                </h3>
-
-                <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-muted/70 text-xs font-semibold uppercase text-muted-foreground">
-                      <tr>
-                        <th className="px-4 py-3">Data / Hora</th>
-                        <th className="px-4 py-3">Colaborador</th>
-                        <th className="px-4 py-3">Tipo do Evento</th>
-                        <th className="px-4 py-3">Descrição da Ação</th>
-                        <th className="px-4 py-3 text-right">Reversão Admin</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                      {auditLogs.map((log) => (
-                        <tr key={log.id} className="hover:bg-amber-500/5 transition-colors">
-                          <td className="px-4 py-3 tabular-nums text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-                            {format(new Date(log.created_at), "dd/MM/yyyy HH:mm")}
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100">
-                            <div>{log.employee_name}</div>
-                            {log.employee_department && (
-                              <span className="text-xs font-normal text-zinc-500 dark:text-zinc-400">
-                                {log.employee_department}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold tracking-wide ${
-                              log.action_type.includes("REMOVE")
-                                ? "bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30"
-                                : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30"
-                            }`}>
-                              {log.action_type.includes("REMOVE") ? "CORTE EFETUADO" : "ELEGIBILIDADE IGNORADA"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-zinc-600 dark:text-zinc-300 leading-normal max-w-sm">
-                            {log.benefit_details}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={!isAdmin || undoingId === log.id}
-                              onClick={() => handleUndoAuditAction(log)}
-                              className={`gap-1.5 text-xs font-bold transition-all ${
-                                isAdmin
-                                  ? "border-amber-500 text-amber-700 hover:bg-amber-500 hover:text-zinc-950 dark:text-amber-400 dark:hover:text-zinc-950 shadow-xs"
-                                  : "opacity-50 cursor-not-allowed text-zinc-400"
-                              }`}
-                            >
-                              <RotateCcw className={`h-3.5 w-3.5 ${undoingId === log.id ? "animate-spin" : ""}`} />
-                              <span>{undoingId === log.id ? "Revertendo..." : "Desfazer (Admin)"}</span>
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                      {auditLogs.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                            Nenhum registro de auditoria encontrado em &ldquo;benefit_audit_logs&rdquo;.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Seção B: Lista Completa de Ignorados na Tabela benefit_ignores */}
-              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800/80">
-                <h3 className="text-base font-bold text-zinc-900 dark:text-white mb-2 flex items-center gap-2">
-                  <EyeOff className="h-4 w-4 text-zinc-500" />
-                  <span>Colaboradores Atualmente com Elegibilidade Ignorada no Sistema</span>
-                </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
-                  Abaixo estão listados todos os funcionários cadastrados na tabela &ldquo;benefit_ignores&rdquo; que estão invisíveis na aba de Inclusão Pendente.
-                </p>
-
-                {ignoredEmployeesList.length > 0 ? (
-                  <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-muted/50 text-xs font-semibold uppercase text-muted-foreground">
-                        <tr>
-                          <th className="px-4 py-3">Colaborador</th>
-                          <th className="px-4 py-3">Setor</th>
-                          <th className="px-4 py-3">Admissão</th>
-                          <th className="px-4 py-3 text-right">Restauração Admin</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                        {ignoredEmployeesList.map((emp) => (
-                          <tr key={emp.id} className="hover:bg-muted/40">
-                            <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">{emp.name}</td>
-                            <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{emp.department || "-"}</td>
-                            <td className="px-4 py-3 tabular-nums text-xs text-zinc-500">
-                              {format(new Date(emp.admission_date), "dd/MM/yyyy")}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={!isAdmin}
-                                onClick={() => handleUndoDirectIgnore(emp.id, emp.name)}
-                                className="gap-1.5 text-xs font-bold text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-950/40"
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                <span>Restaurar Elegibilidade (Admin)</span>
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 p-6 text-center text-sm text-zinc-500 dark:text-zinc-400 flex flex-col items-center justify-center gap-2">
-                    <AlertCircle className="h-6 w-6 text-zinc-400 stroke-[1.5]" />
-                    <span>Nenhum colaborador possui ignoração ativa na tabela &ldquo;benefit_ignores&rdquo; neste momento.</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ABA 4: RELATÓRIO VR */}
+        {/* ABA 3: RELATÓRIO VR */}
         <TabsContent value="vr" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1016,6 +786,18 @@ export default function BeneficiosPage() {
                 )}
               </div>
 
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Cadastrar manualmente (pessoa fora do sistema)..."
+                  value={ataManualName}
+                  onChange={(e) => setAtaManualName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addAtaManual()}
+                />
+                <Button onClick={addAtaManual} disabled={!ataManualName.trim()} size="sm" variant="outline" className="gap-2 shrink-0">
+                  <UserPlus className="w-4 h-4" /> Cadastrar Manual
+                </Button>
+              </div>
+
               {ataLoading ? (
                 <p className="text-sm text-muted-foreground">Carregando lista do dia...</p>
               ) : (
@@ -1027,12 +809,16 @@ export default function BeneficiosPage() {
                         <th className="px-4 py-3">Colaborador</th>
                         <th className="px-4 py-3">Setor</th>
                         <th className="px-4 py-3">Origem</th>
+                        <th className="px-4 py-3 w-32">Custo Empresa</th>
+                        <th className="px-4 py-3 w-32">Custo Colaborador</th>
                         <th className="px-4 py-3 text-right">Ação</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
                       {ataList.map((emp) => {
-                        const isExtra = ataExtraIds.includes(emp.id) && !sedeAtivos.some((s) => s.id === emp.id);
+                        const isManual = ataManual.some((m) => m.id === emp.id);
+                        const isExtra = !isManual && ataExtraIds.includes(emp.id) && !sedeAtivos.some((s) => s.id === emp.id);
+                        const cost = ataCostFor(emp.id);
                         return (
                           <tr key={emp.id} className="hover:bg-muted/50">
                             <td className="px-4 py-3">
@@ -1044,7 +830,27 @@ export default function BeneficiosPage() {
                             <td className="px-4 py-3 font-medium">{emp.name}</td>
                             <td className="px-4 py-3">{emp.department || "-"}</td>
                             <td className="px-4 py-3 text-xs text-muted-foreground">
-                              {isExtra ? "Inclusão avulsa" : "Sede"}
+                              {isManual ? "Manual" : isExtra ? "Inclusão avulsa" : "Sede"}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                value={cost.company_cost}
+                                onChange={(e) => setAtaCost(emp.id, "company_cost", Number(e.target.value))}
+                                className="h-8 w-28"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                value={cost.employee_cost}
+                                onChange={(e) => setAtaCost(emp.id, "employee_cost", Number(e.target.value))}
+                                className="h-8 w-28"
+                              />
                             </td>
                             <td className="px-4 py-3 text-right">
                               {isExtra && (
@@ -1057,13 +863,23 @@ export default function BeneficiosPage() {
                                   Remover
                                 </Button>
                               )}
+                              {isManual && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-muted-foreground hover:text-red-500"
+                                  onClick={() => removeAtaManual(emp.id)}
+                                >
+                                  Remover
+                                </Button>
+                              )}
                             </td>
                           </tr>
                         );
                       })}
                       {ataList.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                          <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                             Nenhum colaborador ativo na Sede encontrado.
                           </td>
                         </tr>
@@ -1089,8 +905,10 @@ export default function BeneficiosPage() {
                   exportCSV(
                     lunchLists.map((l) => ({
                       Data: l.lunch_date,
-                      Colaborador: l.employees?.name,
+                      Colaborador: l.employees?.name || l.manual_name || "Desconhecido",
                       Status: l.status,
+                      "Custo Empresa": l.company_cost ?? 0,
+                      "Custo Colaborador": l.employee_cost ?? 0,
                     })),
                     "almoco_sede"
                   )
@@ -1110,6 +928,8 @@ export default function BeneficiosPage() {
                         <th className="px-4 py-3">Data</th>
                         <th className="px-4 py-3">Colaborador</th>
                         <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Custo Empresa</th>
+                        <th className="px-4 py-3 text-right">Custo Colaborador</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -1119,7 +939,10 @@ export default function BeneficiosPage() {
                             {format(new Date(lunch.lunch_date), "dd/MM/yyyy")}
                           </td>
                           <td className="px-4 py-3 font-medium">
-                            {lunch.employees?.name || "Desconhecido"}
+                            {lunch.employees?.name || lunch.manual_name || "Desconhecido"}
+                            {!lunch.employees?.name && lunch.manual_name && (
+                              <span className="ml-2 text-xs font-normal text-muted-foreground">(manual)</span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <span
@@ -1132,11 +955,17 @@ export default function BeneficiosPage() {
                               {lunch.status === "CONFIRMED" ? "Confirmado" : "Cancelado"}
                             </span>
                           </td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lunch.company_cost ?? 0)}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lunch.employee_cost ?? 0)}
+                          </td>
                         </tr>
                       ))}
                       {lunchLists.length === 0 && (
                         <tr>
-                          <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                          <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                             Nenhum registro de almoço futuro encontrado.
                           </td>
                         </tr>
