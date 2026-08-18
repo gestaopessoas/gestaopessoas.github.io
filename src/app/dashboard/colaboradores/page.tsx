@@ -96,6 +96,7 @@ export default function ColaboradoresPage() {
   const [birthdayError, setBirthdayError] = useState("");
   const [cpfError, setCpfError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+  const [duplicateCpf, setDuplicateCpf] = useState<Employee | null>(null);
   
   // Modals state
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
@@ -381,9 +382,13 @@ export default function ColaboradoresPage() {
 
     if (result.error) {
       setSaving(false);
-      setError(result.error.code === "23505" && result.error.message?.includes("employees_cpf_unique")
-        ? "Já existe um colaborador cadastrado com este CPF."
-        : `Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
+      if (result.error.code === "23505" && result.error.message?.includes("employees_cpf_unique")) {
+        const existing = employees.find((e) => e.cpf === payload.cpf);
+        if (existing) { setDuplicateCpf(existing); return; }
+        setError("Já existe um colaborador cadastrado com este CPF.");
+      } else {
+        setError(`Não foi possível salvar o registro: ${result.error.message || JSON.stringify(result.error)}`);
+      }
       return;
     }
 
@@ -1019,6 +1024,21 @@ export default function ColaboradoresPage() {
                 <Button onClick={() => { setPage(0); setShowFilterModal(false); }}>Aplicar Filtros</Button>
               </div>
             </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={duplicateCpf !== null} onOpenChange={(open) => { if (!open) setDuplicateCpf(null); }}>
+        <DialogContent className="max-w-md sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>CPF já cadastrado</DialogTitle>
+            <DialogDescription>Já existe um colaborador cadastrado com este CPF: &quot;{duplicateCpf?.name}&quot;. Deseja editar o cadastro existente?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDuplicateCpf(null)}>Cancelar</Button>
+            <Button type="button" onClick={() => { if (duplicateCpf) startEdit(duplicateCpf); setDuplicateCpf(null); }}>
+              Ir para cadastro
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
