@@ -15,7 +15,8 @@ import {
 import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
 import * as pdfjsLib from "pdfjs-dist";
 import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
-import { buildResumeExtractionPrompt, parseExtractionResponse } from "@/lib/resumeExtractionPrompt";
+import { buildResumeExtractionPrompt, parseExtractionResponse, GEMINI_GENERATE_URL } from "@/lib/resumeExtractionPrompt";
+import { normalizeResumeDate } from "@/lib/resumeDate";
 import { usePermissions } from "@/hooks/usePermissions";
 import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
 import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
@@ -239,6 +240,7 @@ export function CandidateProfileModal({
   const [workplaceOptions, setWorkplaceOptions] = useState<string[]>([]);
   const [interviewerOptions, setInterviewerOptions] = useState<string[]>([]);
   const [jobProfileOptions, setJobProfileOptions] = useState<string[]>([]);
+  const [jobProfilesFailed, setJobProfilesFailed] = useState(false);
   const [isSavingHistory, setIsSavingHistory] = useState(false);
   
   const handleSaveHistory = async (e: React.FormEvent) => {
@@ -305,9 +307,15 @@ export function CandidateProfileModal({
       if (!active) return;
       if (!workplacesResult.error) setWorkplaceOptions((workplacesResult.data ?? []).map((workplace) => workplace.name));
       if (!employeesResult.error) setInterviewerOptions((employeesResult.data ?? []).map((employee) => employee.name));
-      if (!jobProfilesResult.error) {
+      if (jobProfilesResult.error) {
+        // Falha silenciosa aqui deixava o campo Cargo sem nenhuma opção, parecendo
+        // desabilitado. Registrar para o erro não sumir de novo sem rastro.
+        console.warn("Erro ao carregar cargos de job_profiles:", jobProfilesResult.error.message);
+        setJobProfilesFailed(true);
+      } else {
         const titles = (jobProfilesResult.data ?? []).map((jobProfile) => jobProfile.title).filter((title): title is string => Boolean(title));
         setJobProfileOptions(Array.from(new Set(titles)));
+        setJobProfilesFailed(titles.length === 0);
       }
     });
 
@@ -363,8 +371,7 @@ export function CandidateProfileModal({
 
         const prompt = buildResumeExtractionPrompt(text);
 
-        // gemini-1.5-flash foi descontinuado na API; 2.5-flash e o modelo corrente.
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const res = await fetch(`${GEMINI_GENERATE_URL}?key=${apiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -400,28 +407,76 @@ export function CandidateProfileModal({
         }
 
         if (shouldApply) {
+          // Só preenche campo vazio: importar um currículo não pode apagar o que o RH já
+          // digitou à mão. `keep` devolve o valor novo apenas quando o atual está em branco.
+          function keep<T>(incoming: unknown, current: T): T {
+            const value = typeof incoming === "string" ? incoming.trim() : incoming;
+            if (value === undefined || value === null || value === "") return current;
+            return current === undefined || current === null || current === "" ? (value as T) : current;
+          }
+          const [locCity, locState] = String(parsed.location || "").split(/\s*[-/,]\s*/);
+
           setFormData(prev => ({
             ...prev,
-            full_name: parsed.name || prev.full_name,
-            email: parsed.email || prev.email,
-            phone: parsed.phone || prev.phone,
+            full_name: keep(parsed.name, prev.full_name),
+            email: keep(parsed.email, prev.email),
+            phone: keep(parsed.phone, prev.phone),
             // role/role_interest de propósito fora daqui: a vaga é escolhida no dropdown
             // de job_profiles, nunca inferida do currículo.
-            city: parsed.city || parsed.location?.split("-")[0]?.trim() || prev.city,
-            state: parsed.state || parsed.location?.split("-")[1]?.trim() || prev.state,
+            city: keep(parsed.city || locCity, prev.city),
+            state: keep(parsed.state || locState, prev.state),
+            secondary_phone: keep(parsed.secondary_phone, prev.secondary_phone),
+            secondary_email: keep(parsed.secondary_email, prev.secondary_email),
+            emergency_contact_name: keep(parsed.emergency_contact_name, prev.emergency_contact_name),
+            emergency_contact_phone: keep(parsed.emergency_contact_phone, prev.emergency_contact_phone),
+            cpf: keep(parsed.cpf, prev.cpf),
+            birth_date: keep(normalizeResumeDate(parsed.birth_date), prev.birth_date),
+            birthplace: keep(parsed.birthplace, prev.birthplace),
+            marital_status: keep(parsed.marital_status, prev.marital_status),
+            gender: keep(parsed.gender, prev.gender),
+            address: keep(parsed.address, prev.address),
+            salary_expectation: keep(parsed.salary_expectation, prev.salary_expectation),
+            languages: keep(parsed.languages, prev.languages),
+            uniform_size: keep(parsed.uniform_size, prev.uniform_size),
+            boot_size: keep(parsed.boot_size, prev.boot_size),
+            gender_identity: keep(parsed.gender_identity, prev.gender_identity),
+            sexual_orientation: keep(parsed.sexual_orientation, prev.sexual_orientation),
+            race_declaration: keep(parsed.race_declaration, prev.race_declaration),
+            dependents_notes: keep(parsed.dependents_notes, prev.dependents_notes),
+            dependents_count: keep(parsed.dependents_count, prev.dependents_count),
+            has_cnh: typeof parsed.has_cnh === "boolean" ? (prev.has_cnh ?? parsed.has_cnh) : prev.has_cnh,
+            has_dependents: typeof parsed.has_dependents === "boolean" ? (prev.has_dependents ?? parsed.has_dependents) : prev.has_dependents,
+            cnh_categories: keep(parsed.cnh_category, prev.cnh_categories),
           }));
-          
-          if (parsed.academic_list && parsed.academic_list.length > 0) {
-            setAssessmentData((prev: any) => ({
-              ...prev,
-              academic_list: parsed.academic_list
-            }));
+
+          // As listas alimentam as seções visíveis da ficha (educations/experiences).
+          // Antes iam só para assessmentData, que nenhuma dessas seções lê — por isso o
+          // currículo era importado e a ficha continuava dizendo "nenhum registro".
+          if (Array.isArray(parsed.academic_list) && parsed.academic_list.length > 0) {
+            setAssessmentData((prev: any) => ({ ...prev, academic_list: parsed.academic_list }));
+            setEducations(parsed.academic_list.map((item: any, index: number) => ({
+              id: `import-edu-${Date.now()}-${index}`,
+              degree: item.course || item.degree || "",
+              course: item.course || item.degree || "",
+              institution: item.institution || "",
+              status: item.in_progress ? "Em andamento" : "Concluído",
+              start_date: normalizeResumeDate(item.start_date),
+              end_date: item.in_progress ? null : normalizeResumeDate(item.end_date),
+              __persisted: false,
+            })));
           }
-          if (parsed.experience_list && parsed.experience_list.length > 0) {
-            setAssessmentData((prev: any) => ({
-              ...prev,
-              experience_list: parsed.experience_list
-            }));
+          if (Array.isArray(parsed.experience_list) && parsed.experience_list.length > 0) {
+            setAssessmentData((prev: any) => ({ ...prev, experience_list: parsed.experience_list }));
+            setExperiences(parsed.experience_list.map((item: any, index: number) => ({
+              id: `import-exp-${Date.now()}-${index}`,
+              role: item.role || "",
+              company: item.company || "",
+              current: Boolean(item.is_current ?? item.current),
+              start_date: normalizeResumeDate(item.start_date),
+              end_date: (item.is_current ?? item.current) ? null : normalizeResumeDate(item.end_date),
+              activities: item.description || item.activities || "",
+              __persisted: false,
+            })));
           }
         }
       }
@@ -451,6 +506,14 @@ export function CandidateProfileModal({
   const [entryError, setEntryError] = useState("");
   // Sem candidate_id resolvido não há onde gravar: o candidato precisa existir antes.
   const canEditEntries = Boolean(resolvedCandidateId);
+
+  // Opções do campo Cargo: os títulos de job_profiles mais o valor já gravado, para o Select
+  // conseguir renderizar o que está selecionado.
+  const currentCargo = (formData.role_interest || formData.role || "").trim();
+  const cargoOptions = useMemo(
+    () => Array.from(new Set([...jobProfileOptions, currentCargo].filter(Boolean))),
+    [jobProfileOptions, currentCargo],
+  );
 
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
@@ -569,8 +632,42 @@ export function CandidateProfileModal({
       setIsSaving(true);
       await onSave(formData, assessmentData, progress);
       setPerson({ ...person, ...formData });
+      // Formações/experiências vindas da importação existem só em memória até aqui. Sem esta
+      // descarga elas somem ao fechar a ficha: no fluxo "Novo Candidato" não havia
+      // candidate_id na hora de importar, então não dava para gravá-las antes.
+      await flushImportedEntries();
       setIsSaving(false);
       setIsEditing(false);
+    }
+  };
+
+  /** Grava em candidate_educations/candidate_experiences o que veio da importação. */
+  const flushImportedEntries = async () => {
+    const candidateId = resolvedCandidateId;
+    if (!candidateId) return;
+
+    const pendingEdu = educations.filter((item) => !item.__persisted);
+    const pendingExp = experiences.filter((item) => !item.__persisted);
+    if (pendingEdu.length === 0 && pendingExp.length === 0) return;
+
+    const supabase = createClient();
+
+    if (pendingEdu.length > 0) {
+      const { data, error } = await supabase
+        .from("candidate_educations")
+        .insert(pendingEdu.map((item) => educationToRow(item, candidateId)))
+        .select("*");
+      if (error) console.warn("Erro ao salvar formações importadas:", error.message);
+      else if (data) setEducations((prev) => [...data.map(mapEducationRow), ...prev.filter((item) => item.__persisted)]);
+    }
+
+    if (pendingExp.length > 0) {
+      const { data, error } = await supabase
+        .from("candidate_experiences")
+        .insert(pendingExp.map((item) => experienceToRow(item, candidateId)))
+        .select("*");
+      if (error) console.warn("Erro ao salvar experiências importadas:", error.message);
+      else if (data) setExperiences((prev) => [...data.map(mapExperienceRow), ...prev.filter((item) => item.__persisted)]);
     }
   };
 
@@ -880,6 +977,7 @@ export function CandidateProfileModal({
                       )}
                     </h3>
                     <div className="space-y-2.5 text-sm text-muted-foreground">
+                      <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2.5">
                         <Briefcase className="h-4 w-4 text-primary shrink-0" />
                         {isEditing ? (
@@ -891,11 +989,15 @@ export function CandidateProfileModal({
                               <SelectValue placeholder="Cargo" />
                             </SelectTrigger>
                             <SelectContent>
-                              {/* Só cargos reais de job_profiles. Antes o valor atual entrava
-                                  como opção, o que fazia texto solto vindo de importação de
-                                  currículo virar "cargo" legítimo no dropdown. */}
-                              {jobProfileOptions.map((title) => (
-                                <SelectItem key={title} value={title as string}>
+                              {/* A lista selecionável é só job_profiles. O valor atual entra
+                                  junto porque o Select precisa dele entre os itens para
+                                  conseguir exibi-lo — sem isso, um cargo já gravado aparecia
+                                  em branco e a lista vazia parecia um campo desabilitado.
+                                  Isso não reabre a poluição antiga: nada mais escreve texto
+                                  livre nesse campo, então o valor atual ou está vazio ou é um
+                                  cargo que alguém escolheu aqui. */}
+                              {cargoOptions.map((title) => (
+                                <SelectItem key={title} value={title}>
                                   {title}
                                 </SelectItem>
                               ))}
@@ -905,7 +1007,15 @@ export function CandidateProfileModal({
                           <span className="font-medium text-foreground">{formData.role_interest || formData.role || "Cargo não informado"}</span>
                         )}
                       </div>
-                      
+                      {isEditing && cargoOptions.length === 0 && (
+                        <p className="pl-[26px] text-xs text-amber-600">
+                          {jobProfilesFailed
+                            ? "Nenhum cargo disponível — cadastre um Perfil de Cargo para poder selecionar aqui."
+                            : "Carregando cargos..."}
+                        </p>
+                      )}
+                      </div>
+
                       <div className="flex items-center gap-2.5 break-all">
                         <Mail className="h-4 w-4 text-primary shrink-0" />
                         {isEditing && contactsAreVisible ? (

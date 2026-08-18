@@ -11,6 +11,15 @@
 /** Recorte de texto enviado à IA. Currículos do conjunto real cabem folgados em 12k. */
 const MAX_RESUME_CHARS = 12000;
 
+// Modelo Gemini usado por todas as importações de currículo. Fica aqui, num lugar só, porque
+// já queimamos duas versões: 1.5-flash saiu do ar e depois 2.5-flash passou a responder
+// 404 ("no longer available to new users"). Como toda chamada de IA é embrulhada em
+// try/catch com fallback para o parser local, um modelo morto NÃO aparece como erro na
+// tela: a importação simplesmente devolve pouca coisa, como se o currículo fosse ruim.
+// Se a extração voltar a vir pobre, suspeite daqui primeiro.
+export const GEMINI_MODEL = "gemini-3.6-flash";
+export const GEMINI_GENERATE_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
 const OUTPUT_SHAPE = `{
   "name": "Nome completo do candidato",
   "email": "E-mail principal",

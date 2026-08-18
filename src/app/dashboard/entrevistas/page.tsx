@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { errorMessage } from "@/lib/utils";
 import { itemsToText, parseSolidesResume, type ParsedResume } from "@/lib/resumeParser";
-import { buildResumeExtractionPrompt, parseExtractionResponse } from "@/lib/resumeExtractionPrompt";
+import { buildResumeExtractionPrompt, parseExtractionResponse, GEMINI_MODEL, GEMINI_GENERATE_URL } from "@/lib/resumeExtractionPrompt";
 import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 
 // O parser local devolve ParsedResume; a IA devolve os mesmos campos mais alguns
@@ -204,15 +204,15 @@ export type AIProvider = {
 };
 
 export const defaultProviders: AIProvider[] = [
-  { id: "gemini", name: "Gemini (Sistema)", baseUrl: "https://generativelanguage.googleapis.com/v1beta", apiKey: "", isActive: true, models: [], selectedModel: "gemini-2.5-flash" },
+  { id: "gemini", name: "Gemini (Sistema)", baseUrl: "https://generativelanguage.googleapis.com/v1beta", apiKey: "", isActive: true, models: [], selectedModel: GEMINI_MODEL },
   { id: "9router", name: "9router", baseUrl: "https://rk9xyun.abc-tunnel.us/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
   { id: "openrouter", name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
   { id: "opencode", name: "Opencode", baseUrl: "https://api.opencode.com/v1", apiKey: "", isActive: false, models: [], selectedModel: "" },
   { id: "nvidia", name: "Nvidia NIM", baseUrl: "https://integrate.api.nvidia.com/v1", apiKey: "", isActive: false, models: [], selectedModel: "nvidia/nemotron-3-ultra-550b-a55b" },
 ];
 
-// gemini-1.5-flash foi descontinuado na API; 2.5-flash e estavel.
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+// Modelo centralizado em resumeExtractionPrompt.ts — ver comentário lá sobre versões mortas.
+const GEMINI_URL = GEMINI_GENERATE_URL;
 
 async function generateTestText(testName: string, classification: string): Promise<string> {
   const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
@@ -627,7 +627,7 @@ export default function EntrevistasPage() {
       const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       if (!apiKey) throw new Error("Chave do Gemini não configurada nas variáveis de ambiente.");
       
-      const modelToUse = activeProvider.selectedModel || "gemini-2.5-flash";
+      const modelToUse = activeProvider.selectedModel || GEMINI_MODEL;
       const baseUrl = activeProvider.baseUrl.replace(/\/+$/, "");
       const url = `${baseUrl}/models/${modelToUse}:generateContent?key=${apiKey}`;
       
