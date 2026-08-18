@@ -15,11 +15,11 @@ import { StatsCards } from "./components/StatsCards";
 import { DocumentsCell, EmployeeTable, Pagination, SearchBar } from "./components/EmployeeTable";
 import { MONTHS, type Employee, type Entity } from "./components/types";
 import { normalizeRole } from "./lib/normalizeRole.mjs";
-import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, isValidCpf, levelFieldOptions, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput, SENIORITY_OPTIONS } from "./lib/employeeFormRules.mjs";
+import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, isValidCpf, levelFieldOptions, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput, SENIORITY_OPTIONS, seniorityForLevel, seniorityOptionsFromRules } from "./lib/employeeFormRules.mjs";
 import { openTrialPeriods } from "./lib/trialPeriodRules.mjs";
 import { exportBirthdaysPdf } from "./birthdaysPdf";
 
-type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
+type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; seniority: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
 type TrialPeriod = { id: string; name: string; daysRemaining: number; endDate: string; isWarning: boolean; isOverdue: boolean };
 
 // Abas de lista paginam no banco. As abas de agregação (aniversários / experiência) calculam
@@ -58,13 +58,6 @@ const maskPhone = (value: string) => {
   if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
   if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-};
-
-const SENIORITY_LEVEL_MAP: Record<string, string[]> = {
-  "Júnior":    ["Nível I", "Nível II", "Nível III", "Nível IV", "Nível V"],
-  "Pleno":     ["Nível VI", "Nível VII", "Nível VIII", "Nível IX", "Nível X"],
-  "Sênior":    ["Nível XI", "Nível XII", "Nível XIII", "Nível XIV", "Nível XV"],
-  "Diretoria": ["Diretoria"],
 };
 
 const ALL_LEVELS = ["", "Nível I", "Nível II", "Nível III", "Nível IV", "Nível V", "Nível VI", "Nível VII", "Nível VIII", "Nível IX", "Nível X", "Nível XI", "Nível XII", "Nível XIII", "Nível XIV", "Nível XV", "Diretoria", "N/A (Não aplicavel)"];
@@ -149,7 +142,7 @@ export default function ColaboradoresPage() {
       supabase.from("cost_centers").select("id, name:code").order("code"),
       supabase.from("workplaces").select("id, name, type").order("name"),
       supabase.from("job_profiles").select("title"),
-      supabase.from("salary_table").select("id, role_name, modality, level, salary, uses_level, salary_experience, salary_after_probation"),
+      supabase.from("salary_table").select("id, role_name, modality, level, seniority, salary, uses_level, salary_experience, salary_after_probation"),
       supabase.from("sectors").select("id, name").order("name")
     ]).then(([depsRes, compsRes, ccRes, wpRes, rolesRes, salaryRes, sectorsRes]) => {
       if (depsRes.data) setDepartments(depsRes.data as Entity[]);
@@ -272,8 +265,16 @@ export default function ColaboradoresPage() {
         updated.senioridade = "";
         if (noLevelRule.salary_experience != null) updated.base_salary = formatCurrencyInput(noLevelRule.salary_experience);
       } else if (field === "senioridade" && value) {
-        const allowedLevels = SENIORITY_LEVEL_MAP[value] ?? [];
-        const matchingRules = candidates.filter((r) => r.uses_level && r.level && allowedLevels.includes(r.level));
+        // Níveis da senioridade escolhida saem da tabela salarial do próprio cargo. Antes
+        // vinham de um mapa fixo (Nível I–XV) que não corresponde ao que está cadastrado,
+        // então o filtro nunca casava e o nível não era buscado.
+        const matchingRules = candidates.filter((r) => r.uses_level && r.level && r.seniority === value);
+
+        // O nível atual deixa de valer se não pertence à nova senioridade — evita salvar um
+        // par cargo/nível que não existe na tabela.
+        if (current.level && !matchingRules.some((r) => r.level === current.level)) {
+          updated.level = "";
+        }
         if (matchingRules.length === 1) {
           updated.level = matchingRules[0].level!;
           if (matchingRules[0].salary != null) updated.base_salary = formatCurrencyInput(matchingRules[0].salary);
@@ -286,9 +287,12 @@ export default function ColaboradoresPage() {
           if (minRule?.salary != null) updated.base_salary = formatCurrencyInput(minRule.salary);
         }
         if (field === "level" && level && !["PISO", "Não Enquadrado"].includes(level)) {
-          for (const [sen, levels] of Object.entries(SENIORITY_LEVEL_MAP)) {
-            if (levels.includes(level)) { updated.senioridade = sen; break; }
-          }
+          // Preenche a senioridade a partir do dado do cargo, e só quando ela ainda não foi
+          // escolhida ou não combina com o nível. O código anterior varria um mapa global e
+          // sobrescrevia a senioridade escolhida pelo usuário a cada troca de nível — era
+          // esse o bug de "voltar para a senioridade anterior".
+          const derived = seniorityForLevel(candidates, level);
+          if (derived && derived !== current.senioridade) updated.senioridade = derived;
         }
       }
     }
@@ -513,9 +517,16 @@ export default function ColaboradoresPage() {
   );
   const { showSeniority, levelOptions: levelDisplayOptions } = levelFieldOptions(
     roleSalaryEntries,
-    form.senioridade ? SENIORITY_LEVEL_MAP[form.senioridade] : undefined,
+    form.senioridade,
     ALL_LEVELS
   );
+
+  // Senioridades vêm da tabela salarial do cargo. Quando o cargo não tem senioridade
+  // cadastrada, cai na lista genérica para não travar cargo novo ainda sem faixa.
+  const roleSeniorities = seniorityOptionsFromRules(roleSalaryEntries);
+  const seniorityDisplayOptions = roleSeniorities.length
+    ? ["", ...roleSeniorities, "Não Enquadrado", "Não Aplicável"]
+    : SENIORITY_OPTIONS;
 
   return (
     <div className="space-y-6">
@@ -617,7 +628,7 @@ export default function ColaboradoresPage() {
               <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={statusOptions} /></Field>
               <Field label="Cargo *"><select required value={form.role} onChange={(e) => update("role", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Selecione...</option>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
               {showSeniority && (
-                <Field label="Senioridade"><Select value={form.senioridade} onChange={(value) => update("senioridade", value)} options={SENIORITY_OPTIONS} /></Field>
+                <Field label="Senioridade"><Select value={form.senioridade} onChange={(value) => update("senioridade", value)} options={seniorityDisplayOptions} /></Field>
               )}
               <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={levelDisplayOptions} /></Field>
               <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.trading_name || c.name}</option>)}</select></Field>

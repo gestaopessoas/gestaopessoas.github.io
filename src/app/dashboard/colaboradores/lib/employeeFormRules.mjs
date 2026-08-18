@@ -84,22 +84,58 @@ export const salaryChangeDue = (admissionDate, baseSalary, experienceSalary, aft
 export const LEVEL_FALLBACK_OPTIONS = ["PISO", "Não Enquadrado"];
 export const SENIORITY_OPTIONS = ["", "Júnior", "Pleno", "Sênior", "Diretoria", "Não Enquadrado", "Não Aplicável"];
 
+const unique = (values) => Array.from(new Set(values));
+
+/**
+ * Senioridades que existem NA TABELA SALARIAL para o cargo.
+ *
+ * Vem do dado, nunca de uma lista fixa: cada cargo tem a sua estrutura. Há cargos com cinco
+ * níveis por senioridade e cargos (diretoria, coordenação) com uma faixa bem maior, e há
+ * cargos que simplesmente não usam trilha de senioridade. Uma tabela global de
+ * senioridade → níveis não consegue representar isso e faz o cargo errado casar com o nível
+ * errado.
+ */
+export const seniorityOptionsFromRules = (roleSalaryEntries) =>
+  unique(
+    (roleSalaryEntries ?? [])
+      .filter((rule) => rule.uses_level && rule.seniority)
+      .map((rule) => rule.seniority),
+  );
+
+/**
+ * Senioridade à qual um nível pertence, para o cargo informado. Retorna null quando o dado
+ * não diz — e nesse caso quem chama deve preservar o que o usuário escolheu, em vez de
+ * chutar.
+ */
+export const seniorityForLevel = (roleSalaryEntries, level) => {
+  if (!level) return null;
+  const match = (roleSalaryEntries ?? []).find(
+    (rule) => rule.uses_level && rule.level === level && rule.seniority,
+  );
+  return match?.seniority ?? null;
+};
+
 // Decide o que mostrar nos campos Senioridade e Nível a partir das faixas do cargo:
-// - faixas com nível: trilha de senioridade normal, todos os níveis da faixa ficam disponíveis independente da senioridade;
+// - faixas com nível e com senioridade: os níveis são filtrados pela senioridade escolhida;
+// - faixas com nível e sem senioridade no cadastro: mostra todos os níveis da faixa, porque
+//   não há como filtrar e esconder opção seria pior do que mostrar demais;
 // - faixas sem nível (Oficial, Meio-Oficial, Servente): não existe trilha de senioridade,
 //   o colaborador entra no piso ou fica não enquadrado;
 // - cargo sem faixa cadastrada: não esconde nada, para não perder dado de cargo novo.
-export const levelFieldOptions = (roleSalaryEntries, seniorityAllowedLevels, allLevels) => {
+export const levelFieldOptions = (roleSalaryEntries, selectedSeniority, allLevels) => {
   const entries = roleSalaryEntries ?? [];
-  const leveled = entries.filter((rule) => rule.uses_level && rule.level).map((rule) => rule.level);
-  const seniorityLevels = seniorityAllowedLevels?.length
-    ? leveled.filter((level) => seniorityAllowedLevels.includes(level))
-    : leveled;
+  const leveledRules = entries.filter((rule) => rule.uses_level && rule.level);
+  const hasSeniorityData = leveledRules.some((rule) => rule.seniority);
 
   if (entries.some((rule) => rule.uses_level)) {
+    const filtered =
+      hasSeniorityData && selectedSeniority
+        ? leveledRules.filter((rule) => rule.seniority === selectedSeniority)
+        : leveledRules;
+
     return {
       showSeniority: true,
-      levelOptions: ["", ...(seniorityLevels.length ? seniorityLevels : leveled), ...LEVEL_FALLBACK_OPTIONS],
+      levelOptions: ["", ...unique(filtered.map((rule) => rule.level)), ...LEVEL_FALLBACK_OPTIONS],
     };
   }
 
