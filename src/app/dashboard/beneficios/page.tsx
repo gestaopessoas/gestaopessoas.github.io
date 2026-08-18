@@ -89,7 +89,7 @@ export default function BeneficiosPage() {
     // Fetch todos os funcionários para análise de ativos (inclusão) e desligados (corte)
     const { data: emps } = await supabase
       .from("employees")
-      .select(`id, name, status, admission_date, cost_center, departments(name), workplaces(type)`)
+      .select(`id, name, status, admission_date, cost_center, departments(name), workplaces!employees_workplace_id_fkey(type)`)
       .not("admission_date", "is", null);
 
     // Fetch benefícios ativos
