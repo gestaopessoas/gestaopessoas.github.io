@@ -305,11 +305,11 @@ export default function BeneficiosPage() {
     ...ataManualEmployees,
   ];
 
-  // Custo padrão do almoço: empresa sempre 17,02; colaborador paga metade, exceto quem é de Obra/Unidade (isento).
+  // Custo padrão do almoço: empresa sempre 17,02; quem tem registro de Sede é isento, o resto (Obra/Unidade) paga metade.
   const ATA_COMPANY_COST = 17.02;
   const ataDefaultCost = (workplaceType?: string) => ({
     company_cost: ATA_COMPANY_COST,
-    employee_cost: workplaceType === "OBRA" || workplaceType === "UNIDADE" ? 0 : ATA_COMPANY_COST / 2,
+    employee_cost: workplaceType === "SEDE" ? 0 : ATA_COMPANY_COST / 2,
   });
   const ataCostFor = (id: string, workplaceType?: string) => ataCosts[id] ?? ataDefaultCost(workplaceType);
   const setAtaCost = (id: string, field: "company_cost" | "employee_cost", value: number, workplaceType?: string) => {
