@@ -10,7 +10,7 @@
 // fora do formato ISO falha (ou é descartada) no insert.
 
 import { parseSolidesResume } from "./resumeParser";
-import { buildResumeExtractionPrompt, parseExtractionResponse } from "./resumeExtractionPrompt";
+import { buildResumeExtractionPrompt, parseExtractionResponse, GEMINI_GENERATE_URL } from "./resumeExtractionPrompt";
 
 export type ParsedResumeAcademic = {
   course: string;
@@ -40,7 +40,7 @@ export type ParsedResumeFields = {
   experience_list: ParsedResumeExperience[];
 };
 
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const GEMINI_URL = GEMINI_GENERATE_URL;
 
 import { normalizeResumeDate } from "./resumeDate";
 
