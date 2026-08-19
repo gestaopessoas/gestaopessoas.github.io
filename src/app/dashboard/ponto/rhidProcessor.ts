@@ -1,3 +1,5 @@
+import { computeHourBank, type TimeRecord } from "./lib/hoursRules";
+
 export interface EmployeeRecord {
   id: string;
   name: string;
@@ -78,28 +80,24 @@ export interface ProcessedRhidResult {
 }
 
 // Código de evento na posição 19-21 do registro (documentação RHID):
-// 150 = hora extra 50%, 175 = 75%, 200 = 100% (todas creditam banco de horas);
-// 211 = Atrasos, 212 = Faltas (debitam banco de horas). Outros códigos são ignorados.
-const TIME_BANK_CREDIT_CODES = new Set(["150", "175", "200"]);
-const TIME_BANK_DEBIT_CODES = new Set(["211", "212"]);
+// 150 = hora extra 50%, 175 = 75%, 200 = 100%; 211 = Atrasos, 212 = Faltas.
+// O que cada código credita/debita no banco de horas (1:1, sem percentual) e
+// o percentual pago em hora extra vivem em ./lib/hoursRules.ts.
 
 /**
  * Lê o código de evento (posição 19-21) e o valor de horas do período (H:MM na
  * posição 30-32, hora com 1 dígito) de uma linha do arquivo RHID. Retorna null se a
- * linha não tiver um código de evento mapeado ou o valor num formato reconhecido.
+ * linha não tiver um código de evento reconhecido ou o valor num formato inválido.
  */
-const parseTimeBankEntry = (line: string): { isCredit: boolean; minutes: number } | null => {
+const parseTimeBankEntry = (line: string): TimeRecord | null => {
   if (line.length < 33) return null;
-  const eventCode = line.substring(19, 22);
-  const isCredit = TIME_BANK_CREDIT_CODES.has(eventCode);
-  const isDebit = TIME_BANK_DEBIT_CODES.has(eventCode);
-  if (!isCredit && !isDebit) return null;
+  const code = line.substring(19, 22);
   const hourDigit = line.charAt(30);
   const minutePart = line.substring(31, 33);
   const hours = parseInt(hourDigit, 10);
   const minutes = parseInt(minutePart, 10);
   if (isNaN(hours) || isNaN(minutes)) return null;
-  return { isCredit, minutes: hours * 60 + minutes };
+  return { code, hours, minutes };
 };
 
 export const getStandardSchedule = (emp: EmployeeRecord, workplaces: WorkplaceRecord[]): ScheduleSuggestion => {
@@ -226,11 +224,12 @@ export const processRhidTxt = (
     const emp = matchEmployee(rawMatricula, employees);
 
     if (emp) {
-      const timeBankEntry = parseTimeBankEntry(line);
-      if (timeBankEntry) {
+      const timeRecord = parseTimeBankEntry(line);
+      if (timeRecord) {
+        const { positiveMinutes, negativeMinutes } = computeHourBank([timeRecord]);
         const totals = timeBankByEmployee[emp.id] ?? { positiveMinutes: 0, negativeMinutes: 0 };
-        if (timeBankEntry.isCredit) totals.positiveMinutes += timeBankEntry.minutes;
-        else totals.negativeMinutes += timeBankEntry.minutes;
+        totals.positiveMinutes += positiveMinutes;
+        totals.negativeMinutes += negativeMinutes;
         timeBankByEmployee[emp.id] = totals;
       }
     }
