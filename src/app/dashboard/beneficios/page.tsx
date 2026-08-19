@@ -10,6 +10,7 @@ import { hasBenefitKind } from "@/lib/benefitClassification";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { exportLunchListPdf } from "./lunchListPdf";
+import { MonthlyBenefitsTab } from "./MonthlyBenefitsTab";
 import { buildVrCutList } from "./lib/vrCutList";
 import {
   Download,
@@ -514,7 +515,7 @@ export default function BeneficiosPage() {
       </div>
 
       <Tabs defaultValue="planos" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-4">
+        <TabsList className="grid w-full grid-cols-5 mb-4">
           <TabsTrigger value="planos" className="flex gap-2 relative">
             <HeartPulse className="w-4 h-4" />
             <span>Inclusão Pendente</span>

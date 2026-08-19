@@ -30,3 +30,23 @@ export function summarizeSalaryRoles(rows) {
     actionLabel: role.usesLevel ? "Gerenciar níveis" : "Gerenciar salários",
   }));
 }
+
+export const STANDARD_LEVELS = ["PISO", "Júnior", "Pleno", "Sênior", "Máster"];
+
+export function groupByRegimeAndLevel(rows) {
+  const byRegime = {
+    CLT: {},
+    PJ: {},
+  };
+
+  for (const row of rows) {
+    if (!byRegime[row.modality]) {
+      byRegime[row.modality] = {};
+    }
+    if (row.uses_level && row.level) {
+      byRegime[row.modality][row.level] = row;
+    }
+  }
+
+  return byRegime;
+}

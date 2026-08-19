@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import { formatCurrencyInput, maskCurrencyInput, parseCurrencyInput } from "../../colaboradores/lib/employeeFormRules.mjs";
-import { summarizeSalaryRoles } from "./lib/salaryTableViewRules.mjs";
+import { summarizeSalaryRoles, STANDARD_LEVELS, groupByRegimeAndLevel } from "./lib/salaryTableViewRules.mjs";
 
 type SalaryRow = {
   id: string;
@@ -250,31 +250,51 @@ export default function SalaryTablePage() {
             <DialogTitle>{editingRole ? `Níveis: ${editingRole}` : "Nova Faixa Salarial"}</DialogTitle>
           </DialogHeader>
           {editingRole ? (
-            <div className="space-y-4">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">Nível</th>
-                    <th className="text-left py-2">Modality</th>
-                    <th className="text-left py-2">Salário</th>
-                    <th className="text-right py-2">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roleVariants.map(v => (
-                    <tr key={v.id} className="border-b">
-                      <td className="py-2">{v.uses_level ? v.level : "Sem nível"}</td>
-                      <td className="py-2">{v.modality}</td>
-                      <td className="py-2">{v.uses_level ? formatCurrency(v.salary || 0) : `${formatCurrency(v.salary_experience || 0)} → ${formatCurrency(v.salary_after_probation || 0)}`}</td>
-                      <td className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => { setEditingRow(v); setEditingRole(""); }}>Editar</Button>
-                        <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDelete(v.id)}><Trash2 className="h-4 w-4"/></Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <Button onClick={() => setEditingRow({ role_name: editingRole, level: "Júnior", modality: "CLT", salary: 0, role_code: roleVariants[0].role_code, uses_level: true, salary_experience: null, salary_after_probation: null })}>Adicionar faixa</Button>
+            <div className="space-y-6">
+              {(() => {
+                const grouped = groupByRegimeAndLevel(roleVariants);
+                return ["CLT", "PJ"].map((modality) => {
+                  const levels = grouped[modality];
+                  if (!levels) return null;
+                  return (
+                    <div key={modality} className="space-y-2">
+                      <h3 className="font-medium text-center border-b pb-2">{modality}</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-center">
+                          <thead>
+                            <tr>
+                              {STANDARD_LEVELS.map(lvl => <th key={lvl} className="py-2 border-b">{lvl}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              {STANDARD_LEVELS.map(lvl => {
+                                const row = levels[lvl];
+                                return (
+                                  <td key={lvl} className="py-2">
+                                    {row ? (
+                                      <div className="flex flex-col items-center gap-1">
+                                        <span>{formatCurrency(row.salary || 0)}</span>
+                                        <div className="flex gap-1">
+                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingRow(row); setEditingRole(""); }}><Edit3 className="h-3 w-3"/></Button>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDelete(row.id)}><Trash2 className="h-3 w-3"/></Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground">—</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+              <Button onClick={() => setEditingRow({ role_name: editingRole, level: "Júnior", modality: "CLT", salary: 0, role_code: roleVariants[0]?.role_code || "", uses_level: true, salary_experience: null, salary_after_probation: null })}>Adicionar faixa</Button>
             </div>
           ) : (
             <div className="space-y-4 py-4">

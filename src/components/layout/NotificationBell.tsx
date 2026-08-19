@@ -8,6 +8,7 @@ import {
   TrialNotification,
   RgsNotification,
   BenefitNotification,
+  MonthlyBenefitNotification,
   PendingProfileNotification,
   UserPreferences,
   EmployeeData,
@@ -24,6 +25,7 @@ export function NotificationBell() {
   const [trialNotifications, setTrialNotifications] = useState<TrialNotification[]>([]);
   const [rgsNotifications, setRgsNotifications] = useState<RgsNotification[]>([]);
   const [benefitNotifications, setBenefitNotifications] = useState<BenefitNotification[]>([]);
+  const [monthlyBenefitNotifications, setMonthlyBenefitNotifications] = useState<MonthlyBenefitNotification[]>([]);
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfileNotification[]>([]);
   const [pendingLeads, setPendingLeads] = useState<number>(0);
   const [_preferences, setPreferences] = useState<UserPreferences>({ trial: true, rgs: true, benefits: true, profile: true });
@@ -86,6 +88,17 @@ export function NotificationBell() {
         setPendingProfiles(generatePendingProfileNotifications(empData, userPrefs));
         setTrialNotifications(generateTrialNotifications(empData, userPrefs));
         setBenefitNotifications(generateBenefitNotifications(empData, (bens ?? []) as unknown as BenefitData[], userPrefs, ignoredIds));
+        
+        const referenceMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        const reminderDay = reminderRes?.data?.value_text ? Number(reminderRes.data.value_text) : 15;
+        const monthlyNotes = generateMonthlyBenefitNotifications(
+          empData,
+          bens as any,
+          (monthlyRes?.data ?? []) as any,
+          referenceMonth,
+          reminderDay
+        );
+        setMonthlyBenefitNotifications(monthlyNotes);
       }
 
       if (!rgsError && rgsData) {
@@ -128,7 +141,7 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const totalCount = trialNotifications.length + rgsNotifications.length + benefitNotifications.length + pendingProfiles.length + pendingLeads;
+  const totalCount = trialNotifications.length + rgsNotifications.length + benefitNotifications.length + monthlyBenefitNotifications.length + pendingProfiles.length + pendingLeads;
   
   const cutsCount = benefitNotifications.filter(b => b.type === "CORTE").length;
   const inclusionsCount = benefitNotifications.filter(b => b.type === "INCLUSAO").length;
@@ -207,6 +220,26 @@ export function NotificationBell() {
                         {pendingLeads} {pendingLeads === 1 ? 'novo resgate ou candidato' : 'novos resgates ou candidatos'} aguardando avaliação
                       </div>
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Lançamentos Mensais */}
+              {monthlyBenefitNotifications.length > 0 && (
+                <div className="border-b last:border-b-0 pb-2">
+                  <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <DollarSign className="h-3.5 w-3.5 text-amber-500" /> Benefícios Mensais
+                    </h3>
+                    <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{monthlyBenefitNotifications.length}</span>
+                  </div>
+                  <div className="px-2 pt-2 flex flex-col gap-1">
+                    {monthlyBenefitNotifications.map((n) => (
+                      <div key={n.id} className="text-sm p-2 bg-muted/30 rounded-md hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => { setIsOpen(false); router.push("/dashboard/beneficios"); }}>
+                        <div className="font-medium text-foreground">{n.name}</div>
+                        <div className="text-xs text-muted-foreground">Pendente: {n.benefits.join(", ")}</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

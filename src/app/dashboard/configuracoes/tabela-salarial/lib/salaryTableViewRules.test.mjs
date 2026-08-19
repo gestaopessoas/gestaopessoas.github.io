@@ -84,3 +84,18 @@ test("expõe rótulos contextuais e prioriza a faixa sem nível em dados mistos"
   assert.equal(roles[0].salariesByModality.CLT.afterProbation, null);
   assert.deepEqual(roles[1].salariesByModality, {});
 });
+
+test("groupByRegimeAndLevel agrupa por CLT/PJ e níveis", async () => {
+  const { groupByRegimeAndLevel } = await import("./salaryTableViewRules.mjs");
+  const rows = [
+    { id: "1", uses_level: true, modality: "CLT", level: "Júnior", salary: 2000 },
+    { id: "2", uses_level: true, modality: "CLT", level: "Pleno", salary: 3000 },
+    { id: "3", uses_level: true, modality: "PJ", level: "Sênior", salary: 5000 },
+  ];
+  
+  const grouped = groupByRegimeAndLevel(rows);
+  assert.equal(grouped.CLT["Júnior"].salary, 2000);
+  assert.equal(grouped.CLT["Pleno"].salary, 3000);
+  assert.equal(grouped.PJ["Sênior"].salary, 5000);
+  assert.equal(grouped.CLT["PISO"], undefined);
+});

@@ -31,6 +31,7 @@ export default function ConfiguracoesPage() {
   const [permissions, setPermissions] = useState({ "2fa": true, ai_notifications: true })
   const [jobRequestCode, setJobRequestCode] = useState("")
   const [showJobCode, setShowJobCode] = useState(false)
+  const [reminderDay, setReminderDay] = useState<number>(15);
   const [workSchedules, setWorkSchedules] = useState<string[]>([
     "SEG A SEX das 07:45h - 12h - 13:15 - 17:48h", 
     "SEG A SEX das 07:30h - 12h - 13:15 - 17:33h"
@@ -85,7 +86,7 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('system_settings').select('key, pause_history_tracking, system_setting_entries(path, value_text, value_boolean)').in('key', ['modules', 'permissions', 'work_schedules'])
+      const { data } = await supabase.from('system_settings').select('key, pause_history_tracking, system_setting_entries(path, value_text, value_boolean)').in('key', ['modules', 'permissions', 'work_schedules', 'monthly_benefits'])
       if (data) {
         data.forEach(row => {
           const entries = (row.system_setting_entries ?? []) as SettingEntry[];
@@ -95,6 +96,10 @@ export default function ConfiguracoesPage() {
           }
           if (row.key === 'permissions') setPermissions((previous) => ({ ...previous, ...readSettingFlags(entries) }))
           if (row.key === 'work_schedules') setWorkSchedules(entries.sort((a, b) => Number(a.path[0]) - Number(b.path[0])).map((entry) => entry.value_text ?? ''))
+          if (row.key === 'monthly_benefits') {
+            const entry = entries.find(e => e.path[0] === 'reminder_day');
+            if (entry) setReminderDay(Number(entry.value_text));
+          }
         })
       }
       const { data: publicForm } = await supabase.from('public_form_settings').select('value').eq('key', 'job_request_code').maybeSingle()
@@ -111,7 +116,8 @@ export default function ConfiguracoesPage() {
       const { error: settingsError } = await supabase.from('system_settings').upsert([
         { key: 'modules', pause_history_tracking: pauseHistory },
         { key: 'permissions', pause_history_tracking: pauseHistory },
-        { key: 'work_schedules', pause_history_tracking: pauseHistory }
+        { key: 'work_schedules', pause_history_tracking: pauseHistory },
+        { key: 'monthly_benefits', pause_history_tracking: false }
       ], { onConflict: 'key' });
       
       if (settingsError) throw new Error(settingsError.message);
@@ -122,12 +128,13 @@ export default function ConfiguracoesPage() {
       );
       if (publicFormError) throw new Error(publicFormError.message);
 
-      const { error: entriesError } = await supabase.from('system_setting_entries').delete().in('setting_key', ['modules', 'permissions', 'work_schedules']);
+      const { error: entriesError } = await supabase.from('system_setting_entries').delete().in('setting_key', ['modules', 'permissions', 'work_schedules', 'monthly_benefits']);
       if (entriesError) throw new Error(entriesError.message);
       const entries = [
         ...Object.entries(modules).map(([key, value]) => ({ setting_key: 'modules', path: [key], value_type: 'boolean', value_boolean: value })),
         ...Object.entries(permissions).map(([key, value]) => ({ setting_key: 'permissions', path: [key], value_type: 'boolean', value_boolean: value })),
         ...workSchedules.map((value, index) => ({ setting_key: 'work_schedules', path: [String(index)], value_type: 'string', value_text: value })),
+        { setting_key: 'monthly_benefits', path: ['reminder_day'], value_type: 'string', value_text: String(reminderDay) },
       ];
       if (entries.length) {
         const { error } = await supabase.from('system_setting_entries').insert(entries);

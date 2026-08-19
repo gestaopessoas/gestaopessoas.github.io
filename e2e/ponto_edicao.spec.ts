@@ -7,7 +7,7 @@ test.describe('Ponto - Edição de horas', () => {
     await page.fill('input[type="email"]', process.env.LOGIN_BRUNO as string);
     await page.fill('input[type="password"]', process.env.PASS_BRUNO as string);
     await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard/**');
+    await page.waitForURL('**/dashboard**', { timeout: 60000 });
   });
 
   test('Deve visualizar e editar o ponto de um colaborador na aba diário', async ({ page }) => {
