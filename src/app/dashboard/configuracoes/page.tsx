@@ -12,6 +12,7 @@ import { createClient } from "@/utils/supabase/client"
 import { usePermissions } from "@/hooks/usePermissions"
 import { GlobalHistoryTab } from "@/components/configuracoes/GlobalHistoryTab"
 import { AiModelTab } from "@/components/configuracoes/AiModelTab"
+import { PontoHistoryTab } from "@/components/configuracoes/PontoHistoryTab"
 import { errorMessage } from "@/lib/utils";
 
 const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "central_candidato", "recrutamento", "armarios", "uniformes", "ponto", "rgs", "ilhas", "admissao", "onboarding", "centros_de_custo", "departamentos", "cargos", "empresas", "obras", "beneficios", "treinamentos", "ferias", "holerites", "avaliacoes", "clima", "metas", "pdi", "competencias", "turnover", "analytics", "salarios", "configuracoes", "financeiro"] as const
@@ -214,6 +215,9 @@ export default function ConfiguracoesPage() {
             )}
             {level >= 50 && (
               <TabsTrigger value="log" className="text-sm rounded-md flex-1 min-w-[140px]">Log de Histórico</TabsTrigger>
+            )}
+            {level >= 50 && (
+              <TabsTrigger value="ponto_history" className="text-sm rounded-md flex-1 min-w-[150px]">Histórico do Ponto</TabsTrigger>
             )}
           </TabsList>
           
@@ -475,9 +479,16 @@ export default function ConfiguracoesPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
           {level >= 50 && (
             <TabsContent value="log" className="mt-6 space-y-6">
               <GlobalHistoryTab />
+            </TabsContent>
+          )}
+
+          {level >= 50 && (
+            <TabsContent value="ponto_history" className="mt-6 space-y-6">
+              <PontoHistoryTab />
             </TabsContent>
           )}
 

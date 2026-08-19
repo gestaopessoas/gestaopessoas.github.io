@@ -17,6 +17,7 @@ import {
   CompanyRecord, WorkplaceRecord, CompanyOutputFile
 } from "./rhidProcessor";
 import { errorMessage } from "@/lib/utils";
+import { DiarioPontoTab } from "@/components/ponto/DiarioPontoTab";
 
 const REFERENCE_MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -56,7 +57,7 @@ export default function PontoPage() {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [activeTab, setActiveTab] = useState<"rhid" | "banco_horas">("rhid");
+  const [activeTab, setActiveTab] = useState<"rhid" | "banco_horas" | "diario">("rhid");
   const [dbError, setDbError] = useState("");
 
   // DB references
@@ -292,7 +293,7 @@ export default function PontoPage() {
             Gestão Inteligente de Ponto (RHID)
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Substituição 100% web das planilhas presenciais: cruze colaboradores, injete códigos Domínio oficiais, padronize horários e salve o histórico mês a mês.
+        Substituição 100% web das planilhas presenciais: cruze colaboradores, injete códigos Domínio oficiais, padronize horários e salve o histórico mês a mês.
           </p>
         </div>
 
@@ -319,6 +320,17 @@ export default function PontoPage() {
           >
             <TrendingUp className="w-4 h-4" />
             Banco de Horas
+          </button>
+          <button
+            onClick={() => setActiveTab("diario")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === "diario"
+                ? "bg-background text-foreground shadow-sm font-semibold border"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            Lançamentos Manuais
           </button>
         </div>
       </div>
@@ -698,6 +710,11 @@ export default function PontoPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* CONTEÚDO DA ABA: DIÁRIO */}
+      {activeTab === "diario" && (
+        <DiarioPontoTab />
       )}
 
       {/* MODAL: EVOLUÇÃO DO BANCO DE HORAS */}
