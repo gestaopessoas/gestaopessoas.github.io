@@ -9,6 +9,11 @@ import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, 
 import { useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import { findCode } from "@/lib/codeLookup";
+import cboData from "@/data/cbo.json";
+import { generateMpReport } from "./components/generateMpReport";
+import { findCode } from "@/lib/codeLookup";
+import cboData from "@/data/cbo.json";
 import { RelatedRecords } from "./components/RelatedRecords";
 import { Section, Field, Select } from "./components/FormHelpers";
 import { StatsCards } from "./components/StatsCards";
@@ -142,7 +147,7 @@ export default function ColaboradoresPage() {
       supabase.from("companies").select("id, name, trading_name, tax_rate_clt, tax_rate_prolabore").order("name"),
       supabase.from("cost_centers").select("id, name:code").order("code"),
       supabase.from("workplaces").select("id, name, type").order("name"),
-      supabase.from("job_profiles").select("title"),
+      supabase.from("job_profiles").select("title, profile_code"),
       supabase.from("salary_table").select("id, role_name, modality, level, seniority, salary, uses_level, salary_experience, salary_after_probation"),
       supabase.from("sectors").select("id, name").order("name")
     ]).then(([depsRes, compsRes, ccRes, wpRes, rolesRes, salaryRes, sectorsRes]) => {
@@ -151,7 +156,7 @@ export default function ColaboradoresPage() {
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
       if (wpRes.data) setWorkplaces(wpRes.data as Entity[]);
       if (rolesRes.data) {
-        setRoles(Array.from(new Set(rolesRes.data.map((d) => normalizeRole(d.title)))).sort() as string[]);
+        setJobProfiles(rolesRes.data); setRoles(Array.from(new Set(rolesRes.data.map((d) => normalizeRole(d.title)))).sort() as string[]);
       }
       if (salaryRes.data) setSalaryRules(salaryRes.data as SalaryRule[]);
       if (sectorsRes.data) setSectors(sectorsRes.data as Entity[]);
@@ -235,6 +240,34 @@ export default function ColaboradoresPage() {
     }, 250);
     return () => window.clearTimeout(timer);
   }, [page, pageSize, query, refresh, advancedFilters, activeTab]);
+
+
+  const handleCodeLookup = (e: React.KeyboardEvent<HTMLInputElement>, field: "profile_code" | "cbo") => {
+    if (e.ctrlKey && e.key === "Enter") {
+      e.preventDefault();
+      const queryStr = form[field] || form.role;
+      if (!queryStr) return;
+      
+      const source = field === "profile_code" ? jobProfiles : cboData;
+      const type = field === "profile_code" ? "cargo" : "cbo";
+      const result = findCode(queryStr, type, source);
+      
+      if (result.code) {
+        update(field, result.code);
+      } else if (result.matches.length > 0) {
+        const msg = result.matches.map((m, i) => `${i + 1} - ${m.title} (${m.code})`).join('\n');
+        const ans = window.prompt(`Múltiplos encontrados. Digite o número da opção:\n${msg}`);
+        if (ans) {
+          const idx = parseInt(ans) - 1;
+          if (idx >= 0 && idx < result.matches.length) {
+            update(field, result.matches[idx].code);
+          }
+        }
+      } else {
+        alert("Nenhum código encontrado.");
+      }
+    }
+  };
 
   const update = (field: keyof EmployeeForm, value: string) => setForm((current) => {
     const updated = { ...current, [field]: value };
@@ -621,7 +654,7 @@ export default function ColaboradoresPage() {
                 update("rhid_code", value);
               }} /></Field>
               <Field label="Ficha"><Input value={form.ficha} onChange={(e) => update("ficha", e.target.value)} /></Field>
-              <Field label="Código do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} /></Field>
+              <Field label="Código do Perfil"><Input value={form.profile_code} onChange={(e) => update("profile_code", e.target.value)} onKeyDown={(e) => handleCodeLookup(e, "profile_code")} placeholder="Ctrl+Enter para buscar" /></Field>
               <Field label="CPF"><Input inputMode="numeric" value={form.cpf} onChange={(e) => { setCpfError(""); update("cpf", maskCpf(e.target.value)); }} placeholder="000.000.000-00" aria-invalid={!!cpfError} />{cpfError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{cpfError}</p>}</Field>
               <Field label="RG"><Input inputMode="numeric" maxLength={15} value={form.rg} onChange={(e) => update("rg", sanitizeRgInput(e.target.value))} placeholder="Somente números (até 15 dígitos)" /></Field>
               <Field label="Nascimento"><Input type="date" max={todayIso()} value={form.birthday} onChange={(e) => { setBirthdayError(""); update("birthday", e.target.value); }} />{birthdayError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{birthdayError}</p>}</Field>
@@ -651,7 +684,7 @@ export default function ColaboradoresPage() {
               <Field label="Tipo de contrato"><Select value={form.contract_type} onChange={(value) => update("contract_type", value)} options={["", "CLT", "MEI", "PJ", "Estágio", "Jovem Aprendiz"]} /></Field>
               <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
               <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
-              <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} /></Field>
+              <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} onKeyDown={(e) => handleCodeLookup(e, "cbo")} placeholder="Ctrl+Enter para buscar" /></Field>
               <Field label="Tamanho da camisa"><Select value={form.shirt_size} onChange={(value) => update("shirt_size", value)} options={["", "PP", "P", "M", "G", "GG", "XG", "XXG"]} /></Field>
               <Field label="Tamanho da botina"><Select value={form.boot_size} onChange={(value) => update("boot_size", value)} options={["", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46"]} /></Field>
             </Section>

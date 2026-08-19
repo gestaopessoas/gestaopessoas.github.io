@@ -1,4 +1,6 @@
 "use client";
+import { findCode } from "@/lib/codeLookup";
+import cboData from "@/data/cbo.json";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +67,32 @@ export default function CargosPage() {
     if (!term) return cargos;
     return cargos.filter((c) => [c.title, c.cbo].some((v) => v?.toLowerCase().includes(term)));
   }, [cargos, query]);
+
+
+  const handleCboLookup = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.ctrlKey && e.key === "Enter") {
+      e.preventDefault();
+      const queryStr = form.cbo || form.title;
+      if (!queryStr) return;
+      
+      const result = findCode(queryStr, "cbo", cboData);
+      
+      if (result.code) {
+        setForm({ ...form, cbo: result.code });
+      } else if (result.matches.length > 0) {
+        const msg = result.matches.map((m, i) => `${i + 1} - ${m.title} (${m.code})`).join('\n');
+        const ans = window.prompt(`Múltiplos encontrados. Digite o número da opção:\n${msg}`);
+        if (ans) {
+          const idx = parseInt(ans) - 1;
+          if (idx >= 0 && idx < result.matches.length) {
+            setForm({ ...form, cbo: result.matches[idx].code });
+          }
+        }
+      } else {
+        alert("Nenhum código encontrado.");
+      }
+    }
+  };
 
   const startNew = () => {
     setEditingId(null);
@@ -188,42 +216,52 @@ export default function CargosPage() {
             setError("");
           }
         }}>
-          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingId ? "Editar cargo" : "Adicionar cargo"}</DialogTitle>
               <DialogDescription>Preencha os detalhes do cargo abaixo.</DialogDescription>
             </DialogHeader>
-            <form onSubmit={save} className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-4 mb-4">
-                <div className="md:col-span-2">
-                  <Field label="Nome do Cargo *"><Input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
-                </div>
-                <Field label="CBO"><Input value={form.cbo} onChange={(event) => setForm({ ...form, cbo: event.target.value })} /></Field>
-                <Field label="Código do Perfil *"><Input required value={form.profile_code} onChange={(event) => setForm({ ...form, profile_code: event.target.value })} /></Field>
-                <div className="md:col-span-4 flex flex-col gap-1.5 pt-2">
-                  <label className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer">
-                    <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" checked={form.is_operational} onChange={(e) => setForm({ ...form, is_operational: e.target.checked })} />
-                    Cargo Operacional?
-                  </label>
-                </div>
-              </div>
+            <form onSubmit={save} className="space-y-6">
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Coluna 1 */}
+                <div className="space-y-4">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <Field label="Nome do Cargo *"><Input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field>
+                    </div>
+                    <Field label="CBO"><Input value={form.cbo} onChange={(event) => setForm({ ...form, cbo: event.target.value })} onKeyDown={handleCboLookup} placeholder="Ctrl+Enter p/ buscar" /></Field>
+                    <Field label="Código do Perfil *"><Input required value={form.profile_code} onChange={(event) => setForm({ ...form, profile_code: event.target.value })} /></Field>
+                  </div>
 
-              <div className="grid gap-3 md:grid-cols-2 mb-4">
-                <Field label="Escolaridade Mínima"><Input value={form.min_education} onChange={(event) => setForm({ ...form, min_education: event.target.value })} /></Field>
-                <Field label="Escolaridade Desejável"><Input value={form.desired_education} onChange={(event) => setForm({ ...form, desired_education: event.target.value })} /></Field>
-                <Field label="Experiência Mínima"><Input value={form.min_experience} onChange={(event) => setForm({ ...form, min_experience: event.target.value })} /></Field>
-                <Field label="Experiência Desejável"><Input value={form.desired_experience} onChange={(event) => setForm({ ...form, desired_experience: event.target.value })} /></Field>
-              </div>
+                  <div className="flex flex-col gap-1.5 pt-2">
+                    <label className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer">
+                      <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" checked={form.is_operational} onChange={(e) => setForm({ ...form, is_operational: e.target.checked })} />
+                      Cargo Operacional?
+                    </label>
+                  </div>
 
-              <div className="grid gap-3 md:grid-cols-1 mb-4">
-                <Field label="CNH"><Input value={form.cnh} onChange={(event) => setForm({ ...form, cnh: event.target.value })} placeholder="Ex: Categoria B" /></Field>
-                <Field label="Treinamentos de Integração"><Input value={form.integration_trainings} onChange={(event) => setForm({ ...form, integration_trainings: event.target.value })} /></Field>
-                <Field label="Conhecimentos"><textarea value={form.knowledge} onChange={(event) => setForm({ ...form, knowledge: event.target.value })} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
-                <Field label="Atividades"><textarea value={form.activities} onChange={(event) => setForm({ ...form, activities: event.target.value })} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
-                <Field label="Competências"><textarea value={form.competencies} onChange={(event) => setForm({ ...form, competencies: event.target.value })} rows={2} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label="Escolaridade Mínima"><Input value={form.min_education} onChange={(event) => setForm({ ...form, min_education: event.target.value })} /></Field>
+                    <Field label="Escolaridade Desejável"><Input value={form.desired_education} onChange={(event) => setForm({ ...form, desired_education: event.target.value })} /></Field>
+                    <Field label="Experiência Mínima"><Input value={form.min_experience} onChange={(event) => setForm({ ...form, min_experience: event.target.value })} /></Field>
+                    <Field label="Experiência Desejável"><Input value={form.desired_experience} onChange={(event) => setForm({ ...form, desired_experience: event.target.value })} /></Field>
+                  </div>
+                  
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label="CNH"><Input value={form.cnh} onChange={(event) => setForm({ ...form, cnh: event.target.value })} placeholder="Ex: Categoria B" /></Field>
+                    <Field label="Treinamentos de Integração"><Input value={form.integration_trainings} onChange={(event) => setForm({ ...form, integration_trainings: event.target.value })} /></Field>
+                  </div>
+                </div>
+
+                {/* Coluna 2 */}
+                <div className="space-y-4">
+                  <Field label="Conhecimentos"><textarea value={form.knowledge} onChange={(event) => setForm({ ...form, knowledge: event.target.value })} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
+                  <Field label="Atividades"><textarea value={form.activities} onChange={(event) => setForm({ ...form, activities: event.target.value })} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
+                  <Field label="Competências"><textarea value={form.competencies} onChange={(event) => setForm({ ...form, competencies: event.target.value })} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
+                </div>
               </div>
               
-              <div className="mt-4 flex justify-end">
+              <div className="flex justify-end pt-2 border-t border-border">
                 <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
               </div>
             </form>
