@@ -63,13 +63,13 @@ function applyAdvancedFilters<T extends { eq: any; ilike: any; gte: any; lte: an
 }
 
 const fields = [
-  "id", "name", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
+  "id", "name", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "company_anniversary", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
 ].join(", ");
 
 const emptyForm = {
   name: "", registration_number: "", ficha: "", profile_code: "", department_id: "", department: "", sector_id: "",
   rhid_code: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
-  email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "", boot_size: "",
+  email_personal: "", email_corporate: "", contract_type: "", admission_date: "", company_anniversary: "", shirt_size: "", boot_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
   work_schedule_start_1: "", work_schedule_end_1: "", work_schedule_start_2: "", work_schedule_end_2: "", weekly_hours: "", work_days: "",
@@ -439,7 +439,7 @@ export default function ColaboradoresPage() {
       }
       setBirthdayError("");
     }
-    const nullableDates = new Set(["birthday", "dismissed_at", "admission_date", "aso_date"]);
+    const nullableDates = new Set(["birthday", "dismissed_at", "admission_date", "company_anniversary", "aso_date"]);
     const nullableUuids = new Set(["department_id", "sector_id", "company_id", "cost_center_id", "workplace_id"]);
     const payload: Record<string, string | number | null> = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || nullableUuids.has(key) ? value || null : (value as string).trim() || null]));
     payload.name = form.name.trim();
@@ -447,6 +447,11 @@ export default function ColaboradoresPage() {
     payload.marital_status = canonicalizeOption(form.marital_status, maritalStatusOptions) || null;
     payload.status = canonicalizeOption(form.status, statusOptions);
     for (const field of ["base_salary", "variable_salary", "commission"]) payload[field] = parseCurrencyInput(form[field as keyof EmployeeForm]);
+    
+    if (!payload.company_anniversary && payload.admission_date) {
+      payload.company_anniversary = payload.admission_date;
+    }
+
     const supabase = createClient();
     
     const isNew = !editingId;
@@ -728,6 +733,7 @@ export default function ColaboradoresPage() {
               <Field label="Setor"><select value={form.sector_id} onChange={(e) => update("sector_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{sectors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
               <Field label="Tipo de contrato"><Select value={form.contract_type} onChange={(value) => update("contract_type", value)} options={["", "CLT", "MEI", "PJ", "Estágio", "Jovem Aprendiz"]} /></Field>
               <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
+              <Field label="Aniversário de empresa"><Input type="date" value={form.company_anniversary} onChange={(e) => update("company_anniversary", e.target.value)} /></Field>
               <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
               <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} onKeyDown={(e) => handleCodeLookup(e, "cbo")} placeholder="Ctrl+Enter para buscar" /></Field>
               <Field label="Tamanho da camisa"><Select value={form.shirt_size} onChange={(value) => update("shirt_size", value)} options={["", "PP", "P", "M", "G", "GG", "XG", "XXG"]} /></Field>

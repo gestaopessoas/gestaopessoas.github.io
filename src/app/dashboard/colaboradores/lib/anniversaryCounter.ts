@@ -11,8 +11,8 @@ export const countWorkAnniversaries = (
     // Must be active
     if (!["Ativo", "Férias", "Afastado"].includes(e.status ?? "")) return false;
     
-    if (!e.admission_date) return false;
-    const adm = new Date(e.admission_date + "T12:00:00");
+    if (!e.company_anniversary) return false;
+    const adm = new Date(e.company_anniversary + "T12:00:00");
     if (!isValid(adm)) return false;
 
     // Must be in the reference month
