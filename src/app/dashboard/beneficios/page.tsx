@@ -329,7 +329,7 @@ export default function BeneficiosPage() {
           .slice(0, 8);
 
   const fetchAtaDay = useCallback(
-    async (date: string, resetHidden: boolean = true) => {
+    async (date: string) => {
       setAtaLoading(true);
       const { data } = await supabase
         .from("lunch_lists")
@@ -340,6 +340,7 @@ export default function BeneficiosPage() {
       const costsMap: Record<string, { company_cost: number; employee_cost: number }> = {};
       const extras: string[] = [];
       const manual: { id: string; name: string }[] = [];
+      const hiddenSede: string[] = [];
       (data || []).forEach((row: Record<string, unknown>) => {
         const st = String(row.status || "") === "CANCELLED" ? "CANCELLED" : "CONFIRMED";
         const costs = { company_cost: Number(row.company_cost || 0), employee_cost: Number(row.employee_cost || 0) };
@@ -353,8 +354,12 @@ export default function BeneficiosPage() {
         const empId = String(row.employee_id || "");
         statusMap[empId] = st;
         costsMap[empId] = costs;
-        if (!employees.some((e) => e.id === empId && e.status === "Ativo" && e.workplaceType === "SEDE")) {
+        const isSedeNativo = employees.some((e) => e.id === empId && e.status === "Ativo" && e.workplaceType === "SEDE");
+        if (!isSedeNativo) {
           extras.push(empId);
+        } else if (st === "CANCELLED") {
+          // Sede nativo com exclusão já persistida: fica fora da ata deste dia até ser re-incluído.
+          hiddenSede.push(empId);
         }
       });
 
@@ -362,7 +367,7 @@ export default function BeneficiosPage() {
       setAtaCosts(costsMap);
       setAtaExtraIds(extras);
       setAtaManual(manual);
-      if (resetHidden) setAtaHiddenSede([]);
+      setAtaHiddenSede(hiddenSede);
       setAtaLoading(false);
     },
     [supabase, employees]
@@ -483,7 +488,7 @@ export default function BeneficiosPage() {
       }
     }
     setAtaSaving(false);
-    await fetchAtaDay(ataDate, false);
+    await fetchAtaDay(ataDate);
     await fetchData();
   };
 
