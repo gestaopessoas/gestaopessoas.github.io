@@ -10,6 +10,7 @@ import { hasBenefitKind } from "@/lib/benefitClassification";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { exportLunchListPdf } from "./lunchListPdf";
+import { buildVrCutList } from "./lib/vrCutList";
 import {
   Download,
   Utensils,
@@ -166,11 +167,9 @@ export default function BeneficiosPage() {
   });
 
   // Pendentes de Corte (Desligados que ainda possuem benefícios ativos)
-  const pendentesCorte = employees.filter((emp) => {
-    if (emp.status !== "Desligado") return false;
-    const hasBenefits = benefits.some((b) => b.employee_id === emp.id);
-    return hasBenefits;
-  });
+  // Deduplicado por employee.id em buildVrCutList: blinda contra fan-out/duplicidade
+  // vinda da consulta de employees (issue #30).
+  const pendentesCorte = buildVrCutList(employees, benefits);
 
   // Relatório VR agrupado por centro de custo
   const vrBenefits = benefits.filter(
@@ -267,14 +266,14 @@ export default function BeneficiosPage() {
     )
       return;
     setLoading(true);
-    const ids = pendentesCorte.map((emp) => emp.id);
+    const ids = pendentesCorte.map((entry) => entry.employee.id);
 
-    const auditInserts = pendentesCorte.map((emp) => {
-      const empBens = benefits.filter((b) => b.employee_id === emp.id);
+    const auditInserts = pendentesCorte.map((entry) => {
+      const empBens = benefits.filter((b) => b.employee_id === entry.employee.id);
       return {
-        employee_id: emp.id,
+        employee_id: entry.employee.id,
         action_type: "REMOVE_ALL_BENEFIT",
-        benefit_details: `Corte em massa pós-demissão: excluídos benefícios de ${emp.name}`,
+        benefit_details: `Corte em massa pós-demissão: excluídos benefícios de ${entry.employee.name}`,
         restoreItems: empBens,
       };
     });
@@ -667,30 +666,25 @@ export default function BeneficiosPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {pendentesCorte.map((emp) => {
-                        const empBenefits = benefits
-                          .filter((b) => b.employee_id === emp.id)
-                          .map((b) => b.benefit_type);
-                        return (
-                          <tr key={emp.id} className="hover:bg-muted/50">
-                            <td className="px-4 py-3 font-medium text-red-600">{emp.name}</td>
-                            <td className="px-4 py-3">{emp.department || "-"}</td>
-                            <td className="px-4 py-3 text-muted-foreground">
-                              {empBenefits.join(", ")}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <Button
-                                size="sm"
-                                variant="default"
-                                className="bg-green-600 hover:bg-green-700"
-                                onClick={() => handleRemoveBenefits(emp.id)}
-                              >
-                                <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Marcar Feito
-                              </Button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {pendentesCorte.map((entry) => (
+                        <tr key={entry.employee.id} className="hover:bg-muted/50">
+                          <td className="px-4 py-3 font-medium text-red-600">{entry.employee.name}</td>
+                          <td className="px-4 py-3">{entry.employee.department || "-"}</td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {entry.benefitTypes.join(", ")}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="bg-green-600 hover:bg-green-700"
+                              onClick={() => handleRemoveBenefits(entry.employee.id)}
+                            >
+                              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Marcar Feito
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
                       {pendentesCorte.length === 0 && (
                         <tr>
                           <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
