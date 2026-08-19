@@ -70,26 +70,6 @@ Vale rodar uma varredura estática nas migrations (tabelas referenciadas e nunca
 criadas; `CREATE POLICY` repetido sem `DROP` anterior) — é muito mais rápido que
 descobrir de migration em migration a cada `supabase start`.
 
-## Docker
-
-**A primeira subida do Supabase baixa ~12 imagens e vários GB.**
-`npx supabase start` puxa postgres, gotrue, postgrest, realtime, storage, kong,
-studio, vector, logflare, mailpit, postgres-meta e edge-runtime. Leva bastante
-tempo e o log fica só com linhas de camada — não é travamento. Depois disso as
-subidas são rápidas.
-
-**O `.env.local` entra no container pelo bind mount, mas não vence.**
-O dev server loga `Environments: .env.local` (que aponta para PRODUÇÃO), o que
-assusta. O `@next/env` não sobrescreve o que já está em `process.env`, então o
-`env_file: .env.docker` do compose prevalece — verificado no log de rede do
-browser (`GET http://localhost:54321/rest/v1/...`). Ao mudar essa configuração,
-reconferir por lá, não pelo log do Next.
-
-**O `NEXT_PUBLIC_SUPABASE_URL` do container é `localhost`, não nome de serviço.**
-Quem fala com o Supabase é o browser na máquina do usuário
-(`createBrowserClient`), não o container. Trocar por um hostname de rede Docker
-quebra o app no navegador.
-
 **`supabase db dump --linked` é bloqueado por ser leitura em produção.**
 Precisa de autorização explícita do usuário nomeando produção como alvo.
 

@@ -7,28 +7,10 @@ Sistema **ATS (Applicant Tracking System) e Core HR**. Plataforma web para gest�
 - **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS v4, shadcn/ui
 - **Backend:** Supabase (Postgres 17, Auth, Storage, Realtime)
 - **Deploy:** GitHub Pages (static export)
-- **Dev local:** Docker Compose + Supabase CLI
 
 ## Ambiente local
 
-O banco completo (Postgres + Auth + REST + Storage + Realtime + Studio) sobe via Supabase CLI. O app sobe via Docker Compose.
-
-```bash
-# Subir banco local
-npx supabase start
-
-# Subir app (dev com hot reload)
-docker compose up web
-```
-
-- App: http://localhost:3000
-- Studio (banco): http://localhost:54323
-- Emails (auth): http://localhost:54324
-
-Para resetar o banco local:
-```bash
-npx supabase db reset
-```
+Sem Docker. `npm run dev` com `.env.local` apontando pro Supabase de produção.
 
 ## Variáveis de ambiente
 
@@ -40,13 +22,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 NEXT_PUBLIC_GEMINI_API_KEY=...
 ```
 
-Para dev sem Docker, use `npm run dev` com `.env.local` apontando para produção.
-
 ## Scripts disponíveis
 
 | Comando | Descrição |
 |---------|-----------|
-| `npm run dev` | Dev server local (sem Docker) |
+| `npm run dev` | Dev server local |
 | `npm run build` | Build static export (`out/`) |
 | `npm run lint` | ESLint |
 
@@ -83,7 +63,6 @@ scripts/            → Scripts de import/migração
 
 ## Documentação interna
 
-- [docs/docker.md](docs/docker.md) — Setup completo do ambiente local
 - [docs/adr/](docs/adr/) — Decisões arquiteturais (RLS, UI drift, etc.)
 - [DESAFIOS.md](DESAFIOS.md) — Armadilhas e convenções descobertas
 - [docs/auditoria-projeto.md](docs/auditoria-projeto.md) — Auditoria completa do repositório
