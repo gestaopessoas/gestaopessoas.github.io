@@ -849,9 +849,10 @@ export default function BeneficiosPage() {
                       {ataList.map((emp) => {
                         const isManual = ataManual.some((m) => m.id === emp.id);
                         const isExtra = !isManual && ataExtraIds.includes(emp.id) && !sedeAtivos.some((s) => s.id === emp.id);
+                        const isForaDaSede = emp.workplaceType !== "SEDE";
                         const cost = ataCostFor(emp.id, emp.workplaceType);
                         return (
-                          <tr key={emp.id} className="hover:bg-muted/50">
+                          <tr key={emp.id} className={`hover:bg-muted/50 ${isForaDaSede ? "bg-zinc-100 dark:bg-zinc-800/40" : ""}`}>
                             <td className="px-4 py-3">
                               <Checkbox
                                 checked={ataStatusFor(emp.id) === "CONFIRMED"}
