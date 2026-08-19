@@ -2,13 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Briefcase, CheckCircle2, Clock, ExternalLink, MessageCircle, Plus, Search, Edit3, Archive, ListTodo, ArchiveRestore, User, Calendar, MapPin, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
+import VagaForm, { type VagaFormValues } from "./VagaForm";
 
 type JobRequest = {
   id: string;
@@ -27,6 +27,22 @@ type JobRequest = {
   required_requirements: string | null;
   desired_requirements: string | null;
   manager_expectations: string | null;
+  profile_id: string | null;
+  department_id: string | null;
+  target_date: string | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_notes: string | null;
+  work_schedule: string | null;
+  work_mode: string | null;
+  is_pcd_eligible: boolean | null;
+  affirmative_tags: string[] | null;
+  benefits: string[] | null;
+  reason: string | null;
+  level_min: string | null;
+  level_max: string | null;
+  seniority: string | null;
+  notes: string | null;
 };
 
 const statusStyle: Record<string, string> = {
@@ -51,6 +67,7 @@ export default function VagasAdminPage() {
   const [selectedJob, setSelectedJob] = useState<JobRequest | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editError, setEditError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -59,7 +76,7 @@ export default function VagasAdminPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("job_requests")
-        .select("id, requester_name, requester_area, requester_whatsapp, position_title, unit, quantity, contract_type, urgency, status, created_at, behavioral_tags, search_tags, required_requirements, desired_requirements, manager_expectations")
+        .select("id, requester_name, requester_area, requester_whatsapp, position_title, unit, quantity, contract_type, urgency, status, created_at, behavioral_tags, search_tags, required_requirements, desired_requirements, manager_expectations, profile_id, department_id, target_date, salary_min, salary_max, salary_notes, work_schedule, work_mode, is_pcd_eligible, affirmative_tags, benefits, reason, level_min, level_max, seniority, notes")
         .order("created_at", { ascending: false });
 
       if (!active) return;
@@ -123,30 +140,57 @@ export default function VagasAdminPage() {
     setSelectedJob(null);
   };
   
-  const handleSaveEdit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSaveEdit = async (
+    values: VagaFormValues,
+    meta: { selectedLevelMin: string; selectedLevelMax: string; selectedSeniority: string; salaryMin: number | null; salaryMax: number | null }
+  ) => {
     if (!selectedJob) return;
+    setEditError("");
     setIsSaving(true);
-    
+
     const supabase = createClient();
-    const { error } = await supabase.from("job_requests").update({
-      position_title: selectedJob.position_title,
-      quantity: selectedJob.quantity,
-      unit: selectedJob.unit,
-      contract_type: selectedJob.contract_type,
-      required_requirements: selectedJob.required_requirements,
-      desired_requirements: selectedJob.desired_requirements,
-      manager_expectations: selectedJob.manager_expectations,
-    }).eq("id", selectedJob.id);
-    
+    const updatePayload = {
+      profile_id: values.profile_id || null,
+      department_id: values.sector_id || null,
+      position_title: values.position_title,
+      requested_role: values.position_title,
+      unit: values.unit || null,
+      quantity: Number(values.quantity) || 1,
+      contract_type: values.contract_type,
+      reason: values.reason,
+      urgency: values.urgency,
+      target_date: values.target_date || null,
+      salary_min: meta.salaryMin,
+      salary_max: meta.salaryMax,
+      salary_notes: values.salary_notes || null,
+      work_schedule: values.work_schedule || null,
+      behavioral_tags: values.behavioral_tags,
+      search_tags: values.search_tags,
+      benefits: values.benefits,
+      required_requirements: values.required_requirements || null,
+      desired_requirements: values.desired_requirements || null,
+      manager_expectations: values.manager_expectations || null,
+      notes: values.notes || null,
+      work_mode: values.work_mode || null,
+      is_pcd_eligible: values.is_pcd_eligible,
+      affirmative_tags: values.affirmative_tags,
+      level_min: meta.selectedLevelMin || null,
+      level_max: meta.selectedLevelMax || null,
+      seniority: meta.selectedSeniority || null,
+    };
+
+    const { error } = await supabase.from("job_requests").update(updatePayload).eq("id", selectedJob.id);
+
     setIsSaving(false);
-    
+
     if (error) {
-      alert("Erro ao salvar vaga: " + error.message);
+      setEditError("Erro ao salvar vaga: " + error.message);
       return;
     }
-    
-    setRequests(prev => prev.map(item => item.id === selectedJob.id ? selectedJob : item));
+
+    const merged = { ...selectedJob, ...updatePayload };
+    setRequests(prev => prev.map(item => item.id === selectedJob.id ? merged : item));
+    setSelectedJob(merged);
     setIsEditing(false);
   };
 
@@ -282,7 +326,7 @@ export default function VagasAdminPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   {!isEditing ? (
                     <>
-                      <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                      <Button variant="outline" size="sm" onClick={() => { setEditError(""); setIsEditing(true); }}>
                         <Edit3 className="w-4 h-4 mr-2" /> Editar
                       </Button>
                       <Link href={`/dashboard/vagas/kanban?id=${selectedJob.id}`}>
@@ -303,11 +347,7 @@ export default function VagasAdminPage() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </>
-                  ) : (
-                    <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
-                      Cancelar
-                    </Button>
-                  )}
+                  ) : null}
                 </div>
               </div>
               
@@ -373,42 +413,46 @@ export default function VagasAdminPage() {
                     )}
                   </div>
                 ) : (
-                  <form onSubmit={handleSaveEdit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2 col-span-2">
-                        <Label>Título da Vaga</Label>
-                        <Input value={selectedJob.position_title || ""} onChange={(e) => setSelectedJob({...selectedJob, position_title: e.target.value})} required />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Quantidade</Label>
-                        <Input type="number" min="1" value={selectedJob.quantity || 1} onChange={(e) => setSelectedJob({...selectedJob, quantity: parseInt(e.target.value)})} required />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Unidade / Obra</Label>
-                        <Input value={selectedJob.unit || ""} onChange={(e) => setSelectedJob({...selectedJob, unit: e.target.value})} />
-                      </div>
-                      <div className="space-y-2 col-span-2">
-                        <Label>Tipo de Contrato</Label>
-                        <Input value={selectedJob.contract_type || ""} onChange={(e) => setSelectedJob({...selectedJob, contract_type: e.target.value})} />
-                      </div>
-                      <div className="space-y-2 col-span-2">
-                        <Label>Requisitos Mínimos</Label>
-                        <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={selectedJob.required_requirements || ""} onChange={(e) => setSelectedJob({...selectedJob, required_requirements: e.target.value})} />
-                      </div>
-                      <div className="space-y-2 col-span-2">
-                        <Label>Requisitos Desejáveis</Label>
-                        <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={selectedJob.desired_requirements || ""} onChange={(e) => setSelectedJob({...selectedJob, desired_requirements: e.target.value})} />
-                      </div>
-                      <div className="space-y-2 col-span-2">
-                        <Label>Expectativas do Gestor</Label>
-                        <textarea rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={selectedJob.manager_expectations || ""} onChange={(e) => setSelectedJob({...selectedJob, manager_expectations: e.target.value})} />
-                      </div>
-                    </div>
-                    <DialogFooter className="pt-4 border-t mt-4">
-                      <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>Cancelar</Button>
-                      <Button type="submit" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar Alterações"}</Button>
-                    </DialogFooter>
-                  </form>
+                  <VagaForm
+                    mode="edit"
+                    initialValues={{
+                      profile_id: selectedJob.profile_id || "",
+                      sector_id: selectedJob.department_id || "",
+                      position_title: selectedJob.position_title || "",
+                      unit: selectedJob.unit || "",
+                      quantity: String(selectedJob.quantity ?? 1),
+                      contract_type: selectedJob.contract_type || "CLT",
+                      reason: selectedJob.reason || "Substituição",
+                      urgency: selectedJob.urgency || "Média",
+                      target_date: selectedJob.target_date || "",
+                      salary_min: selectedJob.salary_min != null ? String(selectedJob.salary_min) : "",
+                      salary_max: selectedJob.salary_max != null ? String(selectedJob.salary_max) : "",
+                      salary_notes: selectedJob.salary_notes || "",
+                      work_schedule: selectedJob.work_schedule || "",
+                      work_mode: selectedJob.work_mode || "Presencial",
+                      is_pcd_eligible: selectedJob.is_pcd_eligible ?? false,
+                      affirmative_tags: selectedJob.affirmative_tags ?? [],
+                      behavioral_tags: selectedJob.behavioral_tags ?? [],
+                      search_tags: selectedJob.search_tags ?? [],
+                      required_requirements: selectedJob.required_requirements || "",
+                      desired_requirements: selectedJob.desired_requirements || "",
+                      manager_expectations: selectedJob.manager_expectations || "",
+                      notes: selectedJob.notes || "",
+                      benefits: selectedJob.benefits ?? [],
+                    }}
+                    initialSelectedLevels={{
+                      levelMin: selectedJob.level_min || "",
+                      levelMax: selectedJob.level_max || "",
+                      seniority: selectedJob.seniority || "",
+                    }}
+                    requesterName={selectedJob.requester_name || ""}
+                    requesterContact={selectedJob.requester_whatsapp || ""}
+                    onSubmit={handleSaveEdit}
+                    submitting={isSaving}
+                    submitLabel="Salvar Alterações"
+                    onCancel={() => setIsEditing(false)}
+                    error={editError}
+                  />
                 )}
               </div>
             </>
