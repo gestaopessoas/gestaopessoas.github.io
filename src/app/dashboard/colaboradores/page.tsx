@@ -37,7 +37,8 @@ const fields = [
 ].join(", ");
 
 const emptyForm = {
-  name: "", registration_number: "", ficha: "", profile_code: "", department_id: "", department: "", sector_id: "", rhid_code: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
+  name: "", registration_number: "", ficha: "", profile_code: "", department_id: "", department: "", sector_id: "",
+      department_id: "", rhid_code: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "", boot_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
@@ -116,12 +117,16 @@ export default function ColaboradoresPage() {
     unit: "",
     status: "",
     admission_start: "",
+      admission_end: "",
+      dismissed_start: "",
+      dismissed_end: "",
     admission_end: "",
   });
   
   const [activeTab, setActiveTab] = useState<"todos" | "aniversarios" | "experiencia" | "inativos">("todos");
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [listPageSize, setListPageSize] = useState(25);
+  const [birthdayMode, setBirthdayMode] = useState<"atual" | "seguinte">("atual");
 
   const pageSize = AGGREGATE_TABS.includes(activeTab) ? AGGREGATE_PAGE_SIZE : listPageSize;
   // Trocar de aba muda o tamanho da página: manter o índice antigo apontaria para um intervalo inválido.
@@ -580,7 +585,7 @@ export default function ColaboradoresPage() {
       </header>
 
       {/* Stats — descrevem a força de trabalho ativa; na aba Inativos os números seriam enganosos. */}
-      {activeTab !== "inativos" && <StatsCards employees={statsRows} />}
+      {activeTab !== "inativos" && <StatsCards employees={statsRows} birthdayMode={birthdayMode} />}
 
       {/* Tabs */}
       <div className="flex w-full flex-wrap gap-2 rounded-md bg-muted p-1 sm:w-fit">

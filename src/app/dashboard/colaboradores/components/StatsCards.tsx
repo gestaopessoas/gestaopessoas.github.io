@@ -1,6 +1,8 @@
 "use client";
 
-import { Users, Cake, Activity, AlertCircle, AlertTriangle } from "lucide-react";
+import { Users, Cake, Activity, AlertCircle, AlertTriangle, PartyPopper } from "lucide-react";
+import { computeCounters } from "../lib/employeeCounters";
+import { countWorkAnniversaries } from "../lib/anniversaryCounter";
 import { Employee, MONTHS } from "./types";
 import { differenceInDays, differenceInYears, isValid } from "date-fns";
 
@@ -8,7 +10,7 @@ interface StatsCardsProps {
   employees: Employee[];
 }
 
-export function StatsCards({ employees }: StatsCardsProps) {
+export function StatsCards({ employees, birthdayMode = "atual" }: StatsCardsProps) {
   const today = new Date();
   const currentMonth = today.getMonth();
 
@@ -42,7 +44,7 @@ export function StatsCards({ employees }: StatsCardsProps) {
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
       {cards.map((card) => (
         <div key={card.label} className="rounded-xl border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between">
