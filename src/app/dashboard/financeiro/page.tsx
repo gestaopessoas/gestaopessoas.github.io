@@ -79,6 +79,42 @@ export default function FinanceiroPage() {
     run();
   }, [month, year]);
 
+  // Seguro de Vida (employee_benefits) e Almoço (lunch_lists confirmado no mês) —
+  // colaborador desligado no meio do período conta o custo cheio, sem pró-rata
+  // (calculateFinancialCosts não olha status/data, só se tem o benefício).
+  useEffect(() => {
+    const run = async () => {
+      if (data.length === 0) {
+        setBenefitStats({ seguroTotal: 0, almocoTotal: 0, seguroCount: 0, almocoCount: 0 });
+        return;
+      }
+      const supabase = createClient();
+      const employeeIds = data.map((d) => d.employee_id);
+      const monthStr = String(month).padStart(2, "0");
+      const monthStart = `${year}-${monthStr}-01`;
+      const monthEnd = new Date(year, month, 0).toISOString().split("T")[0];
+
+      const [{ data: seguroRows }, { data: lunchRows }] = await Promise.all([
+        supabase.from("employee_benefits").select("employee_id").eq("benefit_name", "Seguro de Vida").in("employee_id", employeeIds),
+        supabase.from("lunch_lists").select("employee_id").eq("status", "CONFIRMED").gte("lunch_date", monthStart).lte("lunch_date", monthEnd).in("employee_id", employeeIds),
+      ]);
+
+      const seguroIds = new Set((seguroRows ?? []).map((r) => r.employee_id));
+      const almocoIds = new Set((lunchRows ?? []).map((r) => r.employee_id));
+
+      const employeesForCalc: EmployeeBenefitStatus[] = data.map((d) => ({
+        id: d.employee_id,
+        name: d.name,
+        hasSeguroVida: seguroIds.has(d.employee_id),
+        hasAlmoco: almocoIds.has(d.employee_id),
+        status: d.status,
+      }));
+
+      setBenefitStats(calculateFinancialCosts(employeesForCalc, seguroUnitCost, almocoUnitCost));
+    };
+    run();
+  }, [data, seguroUnitCost, almocoUnitCost, month, year]);
+
   const handleSaveSnapshot = async () => {
     setSaving(true);
     const supabase = createClient();
