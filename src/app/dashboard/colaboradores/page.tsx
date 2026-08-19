@@ -150,8 +150,9 @@ export default function ColaboradoresPage() {
       supabase.from("workplaces").select("id, name, type").order("name"),
       supabase.from("job_profiles").select("title, profile_code"),
       supabase.from("salary_table").select("id, role_name, modality, level, seniority, salary, uses_level, salary_experience, salary_after_probation"),
-      supabase.from("sectors").select("id, name").order("name")
-    ]).then(([depsRes, compsRes, ccRes, wpRes, rolesRes, salaryRes, sectorsRes]) => {
+      supabase.from("sectors").select("id, name").order("name"),
+      supabase.from("system_setting_entries").select("path, value_text").eq("setting_key", "colaboradores")
+    ]).then(([depsRes, compsRes, ccRes, wpRes, rolesRes, salaryRes, sectorsRes, settingsRes]) => {
       if (depsRes.data) setDepartments(depsRes.data as Entity[]);
       if (compsRes.data) setCompanies(compsRes.data as Entity[]);
       if (ccRes.data) setCostCenters(ccRes.data as Entity[]);
@@ -161,6 +162,8 @@ export default function ColaboradoresPage() {
       }
       if (salaryRes.data) setSalaryRules(salaryRes.data as SalaryRule[]);
       if (sectorsRes.data) setSectors(sectorsRes.data as Entity[]);
+      const birthdayModeEntry = (settingsRes.data ?? []).find((e: { path: string[] }) => e.path[0] === "birthday_mode");
+      if (birthdayModeEntry?.value_text === "seguinte") setBirthdayMode("seguinte");
     });
 
     const params = new URLSearchParams(window.location.search);
