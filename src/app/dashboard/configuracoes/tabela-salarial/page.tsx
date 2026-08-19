@@ -9,13 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import { formatCurrencyInput, maskCurrencyInput, parseCurrencyInput } from "../../colaboradores/lib/employeeFormRules.mjs";
-import { summarizeSalaryRoles, STANDARD_LEVELS, groupByRegimeAndLevel } from "./lib/salaryTableViewRules.mjs";
+import { summarizeSalaryRoles, groupByRegimeAndLevel, levelsInUse, STANDARD_LEVELS, NO_SENIORITY_KEY } from "./lib/salaryTableViewRules.mjs";
+
+const SENIORITY_LEVELS = ["Júnior", "Pleno", "Sênior"];
 
 type SalaryRow = {
   id: string;
   role_code: string;
   role_name: string;
   level: string | null;
+  seniority: string | null;
   modality: string;
   salary: number | null;
   uses_level: boolean;
@@ -53,7 +56,8 @@ export default function SalaryTablePage() {
   const [editingRow, setEditingRow] = useState<Partial<SalaryRow>>({
     role_code: "",
     role_name: "",
-    level: "Júnior",
+    level: "Nível I",
+    seniority: "",
     modality: "CLT",
     salary: 0, uses_level: true, salary_experience: null, salary_after_probation: null
   });
@@ -101,6 +105,7 @@ export default function SalaryTablePage() {
       role_code: editingRow.role_code,
       role_name: editingRow.role_name,
       level: editingRow.uses_level === false ? null : editingRow.level,
+      seniority: editingRow.uses_level === false ? null : (editingRow.seniority || null),
       modality: editingRow.modality,
       salary: editingRow.uses_level === false ? null : editingRow.salary,
       uses_level: editingRow.uses_level !== false,
@@ -154,7 +159,7 @@ export default function SalaryTablePage() {
           </p>
         </div>
         <Button onClick={() => {
-          setEditingRow({ role_code: "", role_name: "", level: "Júnior", modality: "CLT", salary: 0, uses_level: true, salary_experience: null, salary_after_probation: null });
+          setEditingRow({ role_code: "", role_name: "", level: "Nível I", seniority: "", modality: "CLT", salary: 0, uses_level: true, salary_experience: null, salary_after_probation: null });
           setSaveError("");
           setEditingRole("");
           setIsModalOpen(true);
@@ -245,56 +250,69 @@ export default function SalaryTablePage() {
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingRole ? `Níveis: ${editingRole}` : "Nova Faixa Salarial"}</DialogTitle>
           </DialogHeader>
           {editingRole ? (
             <div className="space-y-6">
               {(() => {
-                const grouped = groupByRegimeAndLevel(roleVariants) as Record<string, Record<string, SalaryRow>>;
+                const grouped = groupByRegimeAndLevel(roleVariants) as Record<string, Record<string, Record<string, SalaryRow>>>;
+                const levels = levelsInUse(roleVariants) as string[];
                 return ["CLT", "PJ"].map((modality) => {
-                  const levels = grouped[modality];
-                  if (!levels) return null;
+                  const seniorityGroups = grouped[modality];
+                  if (!seniorityGroups) return null;
+                  const seniorityKeys = Object.keys(seniorityGroups);
+                  if (seniorityKeys.length === 0) return null;
                   return (
-                    <div key={modality} className="space-y-2">
+                    <div key={modality} className="space-y-4">
                       <h3 className="font-medium text-center border-b pb-2">{modality}</h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-center">
-                          <thead>
-                            <tr>
-                              {STANDARD_LEVELS.map(lvl => <th key={lvl} className="py-2 border-b">{lvl}</th>)}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr>
-                              {STANDARD_LEVELS.map(lvl => {
-                                const row = levels[lvl];
-                                return (
-                                  <td key={lvl} className="py-2">
-                                    {row ? (
-                                      <div className="flex flex-col items-center gap-1">
-                                        <span>{formatCurrency(row.salary || 0)}</span>
-                                        <div className="flex gap-1">
-                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingRow(row); setEditingRole(""); }}><Edit3 className="h-3 w-3"/></Button>
-                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDelete(row.id)}><Trash2 className="h-3 w-3"/></Button>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <span className="text-muted-foreground">—</span>
-                                    )}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
+                      {seniorityKeys.map((seniorityKey) => {
+                        const levelsForSeniority = seniorityGroups[seniorityKey];
+                        return (
+                          <div key={seniorityKey} className="space-y-2">
+                            {seniorityKey !== NO_SENIORITY_KEY && (
+                              <h4 className="text-sm font-medium text-muted-foreground text-center">{seniorityKey}</h4>
+                            )}
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm text-center">
+                                <thead>
+                                  <tr>
+                                    {levels.map(lvl => <th key={lvl} className="py-2 border-b whitespace-nowrap px-2">{lvl}</th>)}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr>
+                                    {levels.map(lvl => {
+                                      const row = levelsForSeniority[lvl];
+                                      return (
+                                        <td key={lvl} className="py-2 px-2">
+                                          {row ? (
+                                            <div className="flex flex-col items-center gap-1">
+                                              <span className="whitespace-nowrap">{formatCurrency(row.salary || 0)}</span>
+                                              <div className="flex gap-1">
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingRow(row); setEditingRole(""); }}><Edit3 className="h-3 w-3"/></Button>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDelete(row.id)}><Trash2 className="h-3 w-3"/></Button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <span className="text-muted-foreground">—</span>
+                                          )}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 });
               })()}
-              <Button onClick={() => setEditingRow({ role_name: editingRole, level: "Júnior", modality: "CLT", salary: 0, role_code: roleVariants[0]?.role_code || "", uses_level: true, salary_experience: null, salary_after_probation: null })}>Adicionar faixa</Button>
+              <Button onClick={() => setEditingRow({ role_name: editingRole, level: "Nível I", seniority: "", modality: "CLT", salary: 0, role_code: roleVariants[0]?.role_code || "", uses_level: true, salary_experience: null, salary_after_probation: null })}>Adicionar faixa</Button>
             </div>
           ) : (
             <div className="space-y-4 py-4">
@@ -316,17 +334,23 @@ export default function SalaryTablePage() {
                     <option value="sem-nivel">Sem nível</option>
                   </select>
                 </div>
-                {editingRow.uses_level !== false &&
+                {editingRow.uses_level !== false && (
+                <>
                 <div className="space-y-2">
                   <Label>Nível</Label>
-                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.level || "Júnior"} onChange={(e) => setEditingRow({ ...editingRow, level: e.target.value })}>
-                    <option value="PISO">PISO</option>
-                    <option value="Júnior">Júnior</option>
-                    <option value="Pleno">Pleno</option>
-                    <option value="Sênior">Sênior</option>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.level || "Nível I"} onChange={(e) => setEditingRow({ ...editingRow, level: e.target.value })}>
+                    {STANDARD_LEVELS.map((lvl) => <option key={lvl} value={lvl}>{lvl}</option>)}
                   </select>
                 </div>
-                }
+                <div className="space-y-2">
+                  <Label>Senioridade</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.seniority || ""} onChange={(e) => setEditingRow({ ...editingRow, seniority: e.target.value })}>
+                    <option value="">Sem senioridade</option>
+                    {SENIORITY_LEVELS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                </>
+                )}
                 <div className="space-y-2">
                   <Label>Modalidade</Label>
                   <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.modality || "CLT"} onChange={(e) => setEditingRow({ ...editingRow, modality: e.target.value })}>
