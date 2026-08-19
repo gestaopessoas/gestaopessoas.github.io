@@ -655,16 +655,20 @@ export function CandidateProfileModal({
   };
 
   const handleSave = async () => {
-    if (onSave) {
-      setIsSaving(true);
+    if (!onSave) return;
+    setIsSaving(true);
+    try {
       await onSave(formData, assessmentData, progress);
       setPerson({ ...person, ...formData });
       // Formações/experiências vindas da importação existem só em memória até aqui. Sem esta
       // descarga elas somem ao fechar a ficha: no fluxo "Novo Candidato" não havia
       // candidate_id na hora de importar, então não dava para gravá-las antes.
       await flushImportedEntries();
-      setIsSaving(false);
       setIsEditing(false);
+    } catch {
+      // onSave já mostra o alerta de validação; só evita deixar o botão travado.
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -816,10 +820,6 @@ export function CandidateProfileModal({
       }
       if (!resultsData.length && targetEmpId) {
         const { data } = await supabase.from("candidate_big_five_results").select("*").eq("employee_id", targetEmpId).order("created_at", { ascending: false });
-        if (data) resultsData = data;
-      }
-      if (!resultsData.length && personEmail) {
-        const { data } = await supabase.from("candidate_big_five_results").select("*").eq("candidate_email", personEmail).order("created_at", { ascending: false });
         if (data) resultsData = data;
       }
 
