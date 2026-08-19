@@ -291,7 +291,7 @@ export default function BancoTalentosPage() {
           onSave={async (data) => {
             if (!data.full_name && !data.name) { alert("Nome é obrigatório."); throw new Error("Validation"); }
             if (!data.email) { alert("E-mail é obrigatório."); throw new Error("Validation"); }
-            const { error } = await supabase.from("candidates").insert({
+            const { data: insertedData, error } = await supabase.from("candidates").insert({
               full_name: data.full_name || data.name,
               first_name: (data.full_name || data.name || "").split(" ")[0],
               last_name: (data.full_name || data.name || "").split(" ").slice(1).join(" "),
@@ -305,7 +305,7 @@ export default function BancoTalentosPage() {
               // aqui quebrava o insert ("Could not find the 'status' column") — e, mesmo
               // aceito, o candidato não apareceria nesta tela, que filtra pelo derivado.
               search_tags: ["Banco de Talentos"],
-            });
+            }).select("id").single();
             if (error) {
               if (error.code === '23505') alert("Já existe um candidato com este e-mail.");
               else alert("Erro ao salvar: " + error.message);
@@ -313,6 +313,7 @@ export default function BancoTalentosPage() {
             }
             setIsAddCandidateModalOpen(false);
             fetchCandidates();
+            return insertedData.id;
           }}
         />
       )}

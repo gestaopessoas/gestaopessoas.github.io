@@ -207,7 +207,7 @@ type CandidateProfileModalProps = {
   initialData?: Partial<ProfilePerson>;
   initialAssessmentData?: any;
   interviewProgress?: { status: string; result: string; destination?: string };
-  onSave?: (data: ProfilePerson, assessmentData: any, interviewProgress?: { status: string; result: string; destination?: string }) => Promise<void>;
+  onSave?: (data: ProfilePerson, assessmentData: any, interviewProgress?: { status: string; result: string; destination?: string }) => Promise<string | void>;
 };
 
 export function CandidateProfileModal({
@@ -658,12 +658,19 @@ export function CandidateProfileModal({
     if (!onSave) return;
     setIsSaving(true);
     try {
-      await onSave(formData, assessmentData, progress);
+      const returnedId = await onSave(formData, assessmentData, progress);
       setPerson({ ...person, ...formData });
+      
+      let targetId = resolvedCandidateId;
+      if (typeof returnedId === "string") {
+        targetId = returnedId;
+        if (!resolvedCandidateId) setResolvedCandidateId(returnedId);
+      }
+      
       // Formações/experiências vindas da importação existem só em memória até aqui. Sem esta
       // descarga elas somem ao fechar a ficha: no fluxo "Novo Candidato" não havia
       // candidate_id na hora de importar, então não dava para gravá-las antes.
-      await flushImportedEntries();
+      await flushImportedEntries(targetId);
       setIsEditing(false);
     } catch {
       // onSave já mostra o alerta de validação; só evita deixar o botão travado.
@@ -673,8 +680,8 @@ export function CandidateProfileModal({
   };
 
   /** Grava em candidate_educations/candidate_experiences o que veio da importação. */
-  const flushImportedEntries = async () => {
-    const candidateId = resolvedCandidateId;
+  const flushImportedEntries = async (overrideId?: string | null) => {
+    const candidateId = overrideId || resolvedCandidateId;
     if (!candidateId) return;
 
     const pendingEdu = educations.filter((item) => !item.__persisted);

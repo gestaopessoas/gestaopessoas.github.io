@@ -462,7 +462,7 @@ export default function CentralCandidatoPage() {
               alert("E-mail é obrigatório.");
               throw new Error("Validation");
             }
-            const { error } = await supabase.from("candidates").insert({
+            const { data: insertedData, error } = await supabase.from("candidates").insert({
               full_name: data.full_name || data.name,
               first_name: (data.full_name || data.name || "").split(" ")[0],
               last_name: (data.full_name || data.name || "").split(" ").slice(1).join(" "),
@@ -471,7 +471,7 @@ export default function CentralCandidatoPage() {
               city: data.city || null,
               state: data.state || null,
               role_interest: data.role_interest || data.role || null,
-            });
+            }).select("id").single();
             if (error) {
               if (error.code === '23505') alert("Já existe um candidato com este e-mail.");
               else alert("Erro ao salvar: " + error.message);
@@ -479,6 +479,7 @@ export default function CentralCandidatoPage() {
             }
             setIsAddCandidateModalOpen(false);
             fetchCandidates();
+            return insertedData.id;
           }}
         />
       )}

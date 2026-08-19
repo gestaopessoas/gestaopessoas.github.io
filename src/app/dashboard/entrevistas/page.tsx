@@ -1131,7 +1131,7 @@ Destino: ${form.destination || "N/I"}
         const parts = payloadAny.candidate_name.split(" ");
         const tag = payloadAny.destination || (payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : payloadAny.result === "Reprovado" ? "Reprovado na Entrevista" : "Entrevistado");
 
-        const { error: upsertError } = await supabase.from("candidates").upsert({
+        const { data: upsertData, error: upsertError } = await supabase.from("candidates").upsert({
           full_name: payloadAny.candidate_name,
           first_name: parts[0] || "",
           last_name: parts.slice(1).join(" ") || "",
@@ -1156,8 +1156,14 @@ Destino: ${form.destination || "N/I"}
           dependents_count: formData.dependents_count ?? null,
           uniform_size: formData.uniform_size || null,
           boot_size: formData.boot_size || null
-        }, { onConflict: "email" });
+        }, { onConflict: "email" }).select("id").single();
         if (upsertError) console.error("Erro ao enviar para candidatos:", upsertError);
+        else if (upsertData) {
+          setIsModalOpen(false);
+          loadInterviews();
+          setSaving(false);
+          return upsertData.id;
+        }
       }
       setIsModalOpen(false);
       loadInterviews();
