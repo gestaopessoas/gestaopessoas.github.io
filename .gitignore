@@ -58,6 +58,7 @@ verify-permissions.mjs
 
 # backups (SQL/JSON dumps de produção)
 /backups
+/*.sql
 
 # stray files
 /types.ts
