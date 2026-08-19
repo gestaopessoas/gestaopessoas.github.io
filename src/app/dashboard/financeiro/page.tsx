@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { calculateFinancialCosts, type EmployeeBenefitStatus } from "./lib/financialCosts";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +41,9 @@ export default function FinanceiroPage() {
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [status, setStatus] = useState<string>("Em Andamento");
+  const [seguroUnitCost, setSeguroUnitCost] = useState<number>(15);
+  const [almocoUnitCost, setAlmocoUnitCost] = useState<number>(25);
+  const [benefitStats, setBenefitStats] = useState({ seguroTotal: 0, almocoTotal: 0, seguroCount: 0, almocoCount: 0 });
 
   const [isRevertModalOpen, setIsRevertModalOpen] = useState(false);
   const [password, setPassword] = useState("");
@@ -275,6 +281,37 @@ export default function FinanceiroPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-muted-foreground" /> 
+              Custo: Seguro de Vida
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(benefitStats.seguroTotal)}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {benefitStats.seguroCount} elegíveis × <input type="number" className="w-16 h-6 border rounded px-1 text-right inline-block ml-1" value={seguroUnitCost} onChange={(e) => setSeguroUnitCost(Number(e.target.value))} /> /cada
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-muted-foreground" /> 
+              Custo: Almoço na Empresa
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(benefitStats.almocoTotal)}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {benefitStats.almocoCount} elegíveis × <input type="number" className="w-16 h-6 border rounded px-1 text-right inline-block ml-1" value={almocoUnitCost} onChange={(e) => setAlmocoUnitCost(Number(e.target.value))} /> /cada
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/40 text-left">
@@ -322,7 +359,7 @@ export default function FinanceiroPage() {
                   <td className="p-3 text-right">{formatCurrency(totals.alimentacao + totals.vr)}</td>
                   <td className="p-3 text-right">{formatCurrency(totals.odonto + totals.sulclinica)}</td>
                   <td className="p-3 text-right">{formatCurrency(totals.seguro)}</td>
-                  <td className="p-3 text-right text-lg text-primary">{formatCurrency(totals.total)}</td>
+                  <td className="p-3 text-right text-lg text-primary">{formatCurrency(totals.total + benefitStats.seguroTotal + benefitStats.almocoTotal)}</td>
                 </tr>
               </>
             )}
