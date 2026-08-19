@@ -85,9 +85,11 @@ export default function BancoTalentosPage() {
         const rows: CandidateRow[] = data.map((c) => {
           const finalStatus = resolveCandidateStatus(c).status;
 
-          const worksitesStr = Array.isArray(c.available_worksites) && c.available_worksites.length > 0 
-                ? c.available_worksites.join(", ") 
-                : (c.city || "Obra não informada");
+          // Obras Disponíveis reflete só o campo "obras de interesse" do candidato —
+          // nunca a cidade/endereço, que é outro dado e não deve aparecer aqui.
+          const worksitesStr = Array.isArray(c.available_worksites) && c.available_worksites.length > 0
+                ? c.available_worksites.join(", ")
+                : "Não informado";
 
           return {
             id: c.id,
