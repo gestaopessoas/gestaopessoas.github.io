@@ -285,9 +285,10 @@ export default function MPGeneratorPage() {
 
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user) {
-        const { data: profile } = await createClient().from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle();
+        const { data: profile } = await createClient().from('profiles').select('full_name, level').eq('id', userData.user.id).maybeSingle();
         // O nome vai impresso na MP; sem perfil cadastrado, cai no e-mail.
         setCurrentUser(profile?.full_name || userData.user.email || "");
+        setCurrentUserLevel(profile?.level ?? 0);
       }
 
       const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes, benefitsRes, companiesRes] = await Promise.all([
