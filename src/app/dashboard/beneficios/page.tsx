@@ -24,6 +24,7 @@ import {
   Save,
   Search,
   UserPlus,
+  DollarSign,
 } from "lucide-react";
 
 type Employee = { id: string; name: string; status: string; admission_date: string; cost_center?: string; department?: string; workplaceType?: string };
@@ -542,6 +543,10 @@ export default function BeneficiosPage() {
             <Utensils className="w-4 h-4" />
             <span>Almoço Sede</span>
           </TabsTrigger>
+          <TabsTrigger value="mensal" className="flex gap-2">
+            <DollarSign className="w-4 h-4" />
+            <span>Lançamentos Mensais</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* ABA 1: INCLUSÃO PENDENTE */}
@@ -1018,6 +1023,10 @@ export default function BeneficiosPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="mensal" className="space-y-4">
+          <MonthlyBenefitsTab />
         </TabsContent>
       </Tabs>
     </div>
