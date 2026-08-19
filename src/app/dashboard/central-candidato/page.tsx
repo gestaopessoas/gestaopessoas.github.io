@@ -72,6 +72,7 @@ export default function CentralCandidatoPage() {
   const [recusaModalData, setRecusaModalData] = useState<{ id: string; name: string; workplace: string | null } | null>(null);
   const { can } = usePermissions();
   const canDelete = can("central_candidato", "delete");
+  const canEdit = can("central_candidato", "edit");
   const router = useRouter();
 
   const supabase = createClient();
@@ -439,6 +440,7 @@ export default function CentralCandidatoPage() {
 
       {selectedCandidateId && (
         <CandidateProfileModal 
+          isEditable={canEdit}
           candidateId={selectedCandidateId} 
           onClose={() => {
             setSelectedCandidateId(null);
