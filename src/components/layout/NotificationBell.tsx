@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Bell, UserX, AlertTriangle, Briefcase, ChevronRight, HeartPulse } from "lucide-react";
+import { Bell, UserX, AlertTriangle, Briefcase, ChevronRight, HeartPulse, DollarSign } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import {
@@ -17,7 +17,8 @@ import {
   generatePendingProfileNotifications,
   generateTrialNotifications,
   generateRgsNotifications,
-  generateBenefitNotifications
+  generateBenefitNotifications,
+  generateMonthlyBenefitNotifications
 } from "@/lib/notifications";
 import { errorMessage } from "@/lib/utils";
 
@@ -66,11 +67,15 @@ export function NotificationBell() {
         }
       } catch (e) { empError = { message: errorMessage(e) }; }
 
+      const referenceMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+
       const [
         { data: rgsData, error: rgsError },
         { data: bens },
         { data: igs },
-        { data: leadsData }
+        { data: leadsData },
+        { data: reminderEntries },
+        { data: monthlyData }
       ] = await Promise.all([
         supabase
           .from("rgs_processes")
@@ -78,7 +83,15 @@ export function NotificationBell() {
           .eq("status", "Pendente"),
         supabase.from("employee_benefits").select("employee_id, benefit_name"),
         supabase.from("benefit_ignores").select("employee_id"),
-        supabase.from("partner_leads").select("id").neq("status", "atendido")
+        supabase.from("partner_leads").select("id").neq("status", "atendido"),
+        supabase
+          .from("system_setting_entries")
+          .select("path, value_text")
+          .eq("setting_key", "monthly_benefits"),
+        supabase
+          .from("employee_monthly_benefits")
+          .select("employee_id, benefit_name, reference_month")
+          .eq("reference_month", referenceMonth)
       ]);
 
       setPendingLeads(leadsData ? leadsData.length : 0);
@@ -89,12 +102,12 @@ export function NotificationBell() {
         setTrialNotifications(generateTrialNotifications(empData, userPrefs));
         setBenefitNotifications(generateBenefitNotifications(empData, (bens ?? []) as unknown as BenefitData[], userPrefs, ignoredIds));
         
-        const referenceMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-        const reminderDay = reminderRes?.data?.value_text ? Number(reminderRes.data.value_text) : 15;
+        const reminderEntry = (reminderEntries ?? []).find((e: { path: string[] }) => e.path[0] === "reminder_day") as { value_text?: string } | undefined;
+        const reminderDay = reminderEntry?.value_text ? Number(reminderEntry.value_text) : 15;
         const monthlyNotes = generateMonthlyBenefitNotifications(
           empData,
           bens as any,
-          (monthlyRes?.data ?? []) as any,
+          (monthlyData ?? []) as any,
           referenceMonth,
           reminderDay
         );

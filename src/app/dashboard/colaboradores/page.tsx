@@ -11,9 +11,6 @@ import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { findCode } from "@/lib/codeLookup";
 import cboData from "@/data/cbo.json";
-import { generateMpReport } from "./components/generateMpReport";
-import { findCode } from "@/lib/codeLookup";
-import cboData from "@/data/cbo.json";
 import { RelatedRecords } from "./components/RelatedRecords";
 import { Section, Field, Select } from "./components/FormHelpers";
 import { StatsCards } from "./components/StatsCards";
@@ -38,7 +35,7 @@ const fields = [
 
 const emptyForm = {
   name: "", registration_number: "", ficha: "", profile_code: "", department_id: "", department: "", sector_id: "",
-      department_id: "", rhid_code: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
+  rhid_code: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", shirt_size: "", boot_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
@@ -117,10 +114,9 @@ export default function ColaboradoresPage() {
     unit: "",
     status: "",
     admission_start: "",
-      admission_end: "",
-      dismissed_start: "",
-      dismissed_end: "",
     admission_end: "",
+    dismissed_start: "",
+    dismissed_end: "",
   });
   
   const [activeTab, setActiveTab] = useState<"todos" | "aniversarios" | "experiencia" | "inativos">("todos");
@@ -1054,7 +1050,7 @@ export default function ColaboradoresPage() {
             </div>
             <div className="p-4 border-t flex justify-between bg-muted/30">
               <Button variant="ghost" onClick={() => {
-                setAdvancedFilters({ gender: "", marital_status: "", sector_id: "", role: "", unit: "", status: "", admission_start: "", admission_end: "" });
+                setAdvancedFilters({ gender: "", marital_status: "", sector_id: "", role: "", unit: "", status: "", admission_start: "", admission_end: "", dismissed_start: "", dismissed_end: "" });
                 setPage(0);
               }}>Limpar Filtros</Button>
               <div className="flex gap-2">

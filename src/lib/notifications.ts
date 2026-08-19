@@ -90,7 +90,7 @@ export function generateMonthlyBenefitNotifications(
         if (!pendingMap.has(ab.employee_id)) {
           pendingMap.set(ab.employee_id, { name: emp.name, benefits: [] });
         }
-        pendingMap.get(ab.employee_id).benefits.push(ab.benefit_name);
+        pendingMap.get(ab.employee_id)!.benefits.push(ab.benefit_name);
       }
     }
   });

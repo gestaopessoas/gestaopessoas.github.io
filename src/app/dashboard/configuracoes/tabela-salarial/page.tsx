@@ -252,7 +252,7 @@ export default function SalaryTablePage() {
           {editingRole ? (
             <div className="space-y-6">
               {(() => {
-                const grouped = groupByRegimeAndLevel(roleVariants);
+                const grouped = groupByRegimeAndLevel(roleVariants) as Record<string, Record<string, SalaryRow>>;
                 return ["CLT", "PJ"].map((modality) => {
                   const levels = grouped[modality];
                   if (!levels) return null;
