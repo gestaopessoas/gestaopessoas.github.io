@@ -354,31 +354,13 @@ export default function NovaVagaPage() {
           desired_requirements: form.desired_requirements || null,
           manager_expectations: form.manager_expectations || null,
           notes: form.notes || null,
+          work_mode: form.work_mode || null,
+          is_pcd_eligible: form.is_pcd_eligible,
+          affirmative_tags: form.affirmative_tags,
           status: "Aprovada",
         });
 
       if (requestError) throw new Error("Erro ao salvar o histórico da vaga (job_requests): " + requestError.message);
-
-      const { error: jobError } = await supabase
-        .from("job_openings")
-        .insert({
-          profile_id: form.profile_id || null,
-          department_id: form.sector_id || null,
-          cost_center: form.unit || null,
-          contract_type: form.contract_type,
-          target_date: form.target_date || null,
-          observations: form.notes || form.manager_expectations || null,
-          benefits: form.benefits,
-          salary_min: salaryMin,
-          salary_max: salaryMax,
-          seniority: selectedSeniority || null,
-          work_mode: form.work_mode || null,
-          is_pcd_eligible: form.is_pcd_eligible,
-          affirmative_tags: form.affirmative_tags,
-          status: "Aberta",
-        });
-
-      if (jobError) throw new Error("Erro ao publicar vaga externa (job_openings): " + jobError.message);
 
       router.push("/dashboard/vagas");
       router.refresh();
