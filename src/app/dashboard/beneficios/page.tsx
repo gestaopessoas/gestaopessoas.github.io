@@ -329,7 +329,7 @@ export default function BeneficiosPage() {
           .slice(0, 8);
 
   const fetchAtaDay = useCallback(
-    async (date: string) => {
+    async (date: string, resetHidden: boolean = true) => {
       setAtaLoading(true);
       const { data } = await supabase
         .from("lunch_lists")
@@ -362,7 +362,7 @@ export default function BeneficiosPage() {
       setAtaCosts(costsMap);
       setAtaExtraIds(extras);
       setAtaManual(manual);
-      setAtaHiddenSede([]);
+      if (resetHidden) setAtaHiddenSede([]);
       setAtaLoading(false);
     },
     [supabase, employees]
@@ -483,7 +483,7 @@ export default function BeneficiosPage() {
       }
     }
     setAtaSaving(false);
-    await fetchAtaDay(ataDate);
+    await fetchAtaDay(ataDate, false);
     await fetchData();
   };
 

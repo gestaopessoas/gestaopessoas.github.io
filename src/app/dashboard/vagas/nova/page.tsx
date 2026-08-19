@@ -44,6 +44,12 @@ const behavioralTags = [
   "Trabalho em equipe"
 ];
 
+const affirmativeTags = [
+  "Vaga Afirmativa Para Pessoas LGBTQIAP+", "Vaga Afirmativa Para Pessoas Pretas",
+  "Vaga Afirmativa Para Mulheres", "Vaga Afirmativa Para Pessoas Com +40 Anos",
+  "Vaga Afirmativa Para Indígenas",
+];
+
 const searchTags = [
   "Experiência comprovada", "Disponibilidade imediata", "Estabilidade", "Potencial de crescimento",
   "Júnior", "Pleno", "Sênior", "Primeiro emprego", "Atendimento ao cliente", "Rotina administrativa",
@@ -76,6 +82,9 @@ const initialForm = {
   salary_max: "",
   salary_notes: "",
   work_schedule: "",
+  work_mode: "Presencial",
+  is_pcd_eligible: false,
+  affirmative_tags: [] as string[],
   behavioral_tags: [] as string[],
   search_tags: [] as string[],
   required_requirements: "",
@@ -177,9 +186,9 @@ export default function NovaVagaPage() {
     };
   }, []);
 
-  const set = (field: keyof typeof initialForm, value: string | string[]) => setForm((prev) => ({ ...prev, [field]: value }));
+  const set = (field: keyof typeof initialForm, value: string | string[] | boolean) => setForm((prev) => ({ ...prev, [field]: value }));
 
-  const toggleTag = (field: "behavioral_tags" | "search_tags" | "benefits", tag: string) => {
+  const toggleTag = (field: "behavioral_tags" | "search_tags" | "benefits" | "affirmative_tags", tag: string) => {
     setForm((prev) => ({
       ...prev,
       [field]: prev[field].includes(tag) ? prev[field].filter((item) => item !== tag) : [...prev[field], tag],
@@ -360,6 +369,12 @@ export default function NovaVagaPage() {
           target_date: form.target_date || null,
           observations: form.notes || form.manager_expectations || null,
           benefits: form.benefits,
+          salary_min: salaryMin,
+          salary_max: salaryMax,
+          seniority: selectedSeniority || null,
+          work_mode: form.work_mode || null,
+          is_pcd_eligible: form.is_pcd_eligible,
+          affirmative_tags: form.affirmative_tags,
           status: "Aberta",
         });
 
@@ -377,7 +392,7 @@ export default function NovaVagaPage() {
     }
   };
 
-  const tagBox = (field: "behavioral_tags" | "search_tags" | "benefits", tags: string[]) => (
+  const tagBox = (field: "behavioral_tags" | "search_tags" | "benefits" | "affirmative_tags", tags: string[]) => (
     <div className="max-h-80 overflow-y-auto rounded-lg border bg-muted/20 p-3">
       <div className="mb-3 text-xs font-medium text-muted-foreground">{form[field].length} selecionada(s)</div>
       <div className="flex flex-wrap gap-2">
@@ -540,8 +555,23 @@ export default function NovaVagaPage() {
                 {workSchedules.map((schedule) => <option key={schedule} value={schedule}>{schedule}</option>)}
               </select>
             </Field>
-            <Field label="Observação de salário" className="md:col-span-4"><Input value={form.salary_notes} onChange={(event) => set("salary_notes", event.target.value)} placeholder="Ex: combinar conforme experiência" /></Field>
+            <Field label="Modalidade">
+              <select value={form.work_mode} onChange={(event) => set("work_mode", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                {["Presencial", "Híbrido", "Remoto"].map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </Field>
+            <Field label="Observação de salário" className="md:col-span-3"><Input value={form.salary_notes} onChange={(event) => set("salary_notes", event.target.value)} placeholder="Ex: combinar conforme experiência" /></Field>
           </div>
+        </section>
+
+        <section className="rounded-lg border bg-card p-5">
+          <h2 className="mb-4 text-lg font-semibold">Vaga afirmativa e acessibilidade</h2>
+          <label className="mb-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.is_pcd_eligible} onChange={(event) => set("is_pcd_eligible", event.target.checked)} className="h-4 w-4 rounded border-input" />
+            Elegível para pessoas com deficiência (PCD)
+          </label>
+          <p className="mb-3 mt-1 text-sm text-muted-foreground">Marque as políticas afirmativas aplicáveis a esta vaga.</p>
+          {tagBox("affirmative_tags", affirmativeTags)}
         </section>
 
         <section className="rounded-lg border bg-card p-5">
