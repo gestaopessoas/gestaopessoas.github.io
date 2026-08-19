@@ -29,6 +29,39 @@ type TrialPeriod = { id: string; name: string; daysRemaining: number; endDate: s
 const AGGREGATE_PAGE_SIZE = 1000;
 const AGGREGATE_TABS = ["aniversarios", "experiencia"];
 
+type AdvancedFilters = {
+  gender: string;
+  marital_status: string;
+  sector_id: string;
+  department_id: string;
+  role: string;
+  unit: string;
+  status: string;
+  admission_start: string;
+  admission_end: string;
+  dismissed_start: string;
+  dismissed_end: string;
+};
+
+// Aplica os filtros avançados a uma query de employees. Compartilhado entre a
+// listagem paginada e a query dos cartões de indicadores (issue #25: os
+// cartões ignoravam os filtros aplicados) — mesma regra nos dois lugares.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyAdvancedFilters<T extends { eq: any; ilike: any; gte: any; lte: any }>(request: T, filters: AdvancedFilters): T {
+  let r = request;
+  if (filters.gender) r = r.eq("gender", filters.gender);
+  if (filters.marital_status) r = r.eq("marital_status", filters.marital_status);
+  if (filters.sector_id) r = r.eq("sector_id", filters.sector_id);
+  if (filters.department_id) r = r.eq("department_id", filters.department_id);
+  if (filters.role) r = r.ilike("role", `%${filters.role}%`);
+  if (filters.unit) r = r.ilike("workplaces.name", `%${filters.unit}%`);
+  if (filters.admission_start) r = r.gte("admission_date", filters.admission_start);
+  if (filters.admission_end) r = r.lte("admission_date", filters.admission_end);
+  if (filters.dismissed_start) r = r.gte("dismissed_at", filters.dismissed_start);
+  if (filters.dismissed_end) r = r.lte("dismissed_at", filters.dismissed_end);
+  return r;
+}
+
 const fields = [
   "id", "name", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
 ].join(", ");
@@ -110,6 +143,7 @@ export default function ColaboradoresPage() {
     gender: "",
     marital_status: "",
     sector_id: "",
+    department_id: "",
     role: "",
     unit: "",
     status: "",
@@ -181,15 +215,28 @@ export default function ColaboradoresPage() {
     }
   }, []);
 
-  // Query enxuta e independente da paginação: só as colunas que os cartões consomem.
+  // Query enxuta (só as colunas que os cartões consomem) mas com os MESMOS filtros
+  // da listagem — sem paginação (issue #25: cartões deviam refletir os filtros aplicados).
   useEffect(() => {
     const supabase = createClient();
-    const request = HIDDEN_STATUSES.reduce(
-      (acc, status) => acc.neq("status", status),
-      supabase.from("employees").select("status, birthday, admission_date, aso_date").limit(10000)
-    );
+    let request = supabase
+      .from("employees")
+      .select(`status, birthday, admission_date, aso_date, workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)`)
+      .limit(10000);
+
+    if (advancedFilters.status) {
+      request = request.eq("status", advancedFilters.status);
+    } else {
+      request = HIDDEN_STATUSES.reduce((acc, status) => acc.neq("status", status), request);
+    }
+
+    const term = query.trim().replace(/[,%()]/g, " ");
+    if (term) request = request.or(`name.ilike."%${term}%",cpf.ilike."%${term}%",rg.ilike."%${term}%",role.ilike."%${term}%"`);
+
+    request = applyAdvancedFilters(request, advancedFilters);
+
     request.then(({ data }) => setStatsRows((data ?? []) as unknown as Employee[]));
-  }, [refresh]);
+  }, [refresh, query, advancedFilters]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -225,14 +272,8 @@ export default function ColaboradoresPage() {
       const term = query.trim().replace(/[,%()]/g, " ");
       if (term) request = request.or(`name.ilike."%${term}%",cpf.ilike."%${term}%",rg.ilike."%${term}%",role.ilike."%${term}%"`);
       
-      if (advancedFilters.gender) request = request.eq("gender", advancedFilters.gender);
-      if (advancedFilters.marital_status) request = request.eq("marital_status", advancedFilters.marital_status);
-      if (advancedFilters.sector_id) request = request.eq("sector_id", advancedFilters.sector_id);
-      if (advancedFilters.role) request = request.ilike("role", `%${advancedFilters.role}%`);
-      if (advancedFilters.unit) request = request.ilike("workplaces.name", `%${advancedFilters.unit}%`);
-      if (advancedFilters.admission_start) request = request.gte("admission_date", advancedFilters.admission_start);
-      if (advancedFilters.admission_end) request = request.lte("admission_date", advancedFilters.admission_end);
-      
+      request = applyAdvancedFilters(request, advancedFilters);
+
       const { data, error: loadError, count } = await request;
       setLoading(false);
       if (loadError) {
@@ -1003,6 +1044,13 @@ export default function ColaboradoresPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
+                  <Label>Departamento</Label>
+                  <select value={advancedFilters.department_id} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, department_id: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Todos</option>
+                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
                   <Label>Situação</Label>
                   <select value={advancedFilters.status} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                     <option value="">Todos (Exceto Desligados)</option>
@@ -1049,11 +1097,19 @@ export default function ColaboradoresPage() {
                   <Label>Data de Admissão (Fim)</Label>
                   <Input type="date" value={advancedFilters.admission_end} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, admission_end: e.target.value }))} />
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Data de Desligamento (Início)</Label>
+                  <Input type="date" value={advancedFilters.dismissed_start} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, dismissed_start: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Data de Desligamento (Fim)</Label>
+                  <Input type="date" value={advancedFilters.dismissed_end} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, dismissed_end: e.target.value }))} />
+                </div>
               </div>
             </div>
             <div className="p-4 border-t flex justify-between bg-muted/30">
               <Button variant="ghost" onClick={() => {
-                setAdvancedFilters({ gender: "", marital_status: "", sector_id: "", role: "", unit: "", status: "", admission_start: "", admission_end: "", dismissed_start: "", dismissed_end: "" });
+                setAdvancedFilters({ gender: "", marital_status: "", sector_id: "", department_id: "", role: "", unit: "", status: "", admission_start: "", admission_end: "", dismissed_start: "", dismissed_end: "" });
                 setPage(0);
               }}>Limpar Filtros</Button>
               <div className="flex gap-2">
