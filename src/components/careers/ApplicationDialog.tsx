@@ -124,56 +124,48 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       }
     }
 
-    // Attempt to find existing candidate by email first to avoid duplicate email constraint error
-    let { data: candidateData, error: candidateError } = await supabase
+    // Sem .select() após o insert: anon não tem policy de SELECT em candidates
+    // (protege PII), e PostgREST precisa reler a linha pra devolver representation.
+    // Sem essa leitura o insert inteiro estoura RLS e dá rollback. Gerando o id no
+    // client evita depender de ler a linha de volta.
+    const candidateId = crypto.randomUUID();
+    const { error: candidateError } = await supabase
       .from("candidates")
-      .select("id")
-      .eq("email", candidate.email.trim())
-      .single();
+      .insert({
+        id: candidateId,
+        full_name: candidate.full_name.trim(),
+        first_name: firstName,
+        last_name: lastParts.join(" ") || firstName,
+        email: candidate.email.trim(),
+        phone: candidate.phone.trim() || null,
+        city: candidate.city.trim() || null,
+        state: candidate.state.trim() || null,
+        linkedin_url: candidate.linkedin_url.trim() || null,
+        birth_date: candidate.birth_date || null,
+        cpf: candidate.cpf.trim() || null,
+        address: candidate.address.trim() || null,
+        salary_expectation: candidate.salary_expectation.trim() || null,
+        has_cnh: candidate.has_cnh,
+        is_pcd: candidate.is_pcd,
+        pcd_description: candidate.is_pcd ? candidate.pcd_description.trim() || null : null,
+        role_interest: job.profile?.title || null,
+        search_tags: [job.profile?.title, job.department, job.cost_center].filter(Boolean),
+        resume_url: resumePath,
+      });
 
-    if (!candidateData) {
-      const res = await supabase
-        .from("candidates")
-        .insert({
-          full_name: candidate.full_name.trim(),
-          first_name: firstName,
-          last_name: lastParts.join(" ") || firstName,
-          email: candidate.email.trim(),
-          phone: candidate.phone.trim() || null,
-          city: candidate.city.trim() || null,
-          state: candidate.state.trim() || null,
-          linkedin_url: candidate.linkedin_url.trim() || null,
-          birth_date: candidate.birth_date || null,
-          cpf: candidate.cpf.trim() || null,
-          address: candidate.address.trim() || null,
-          salary_expectation: candidate.salary_expectation.trim() || null,
-          has_cnh: candidate.has_cnh,
-          is_pcd: candidate.is_pcd,
-          pcd_description: candidate.is_pcd ? candidate.pcd_description.trim() || null : null,
-          role_interest: job.profile?.title || null,
-          search_tags: [job.profile?.title, job.department, job.cost_center].filter(Boolean),
-          resume_url: resumePath,
-        })
-        .select("id")
-        .single();
-      candidateData = res.data;
-      candidateError = res.error;
-    } else if (resumePath) {
-      // Candidato já existia: anon não tem policy de UPDATE em candidates, então isto é
-      // best-effort (provavelmente vira no-op por RLS) — não bloqueia a candidatura.
-      const { error: resumeUpdateError } = await supabase.from("candidates").update({ resume_url: resumePath }).eq("id", candidateData.id);
-      if (resumeUpdateError) console.warn("Erro ao vincular currículo:", resumeUpdateError.message);
-    }
-
-    if (candidateError || !candidateData) {
+    if (candidateError) {
       setSaving(false);
-      setError("Não foi possível cadastrar seus dados. Confira o e-mail e tente novamente.");
+      setError(
+        candidateError.code === "23505"
+          ? "Este e-mail já está cadastrado em uma candidatura. Use outro e-mail ou avise o RH."
+          : "Não foi possível cadastrar seus dados. Confira o e-mail e tente novamente."
+      );
       return;
     }
 
     if (parsedAcademics.length > 0) {
       const educations = parsedAcademics.map((item) => ({
-        candidate_id: candidateData.id,
+        candidate_id: candidateId,
         institution_name: item.institution || "Não informada",
         degree: item.course || "Não informado",
         start_date: item.start_date,
@@ -185,7 +177,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
 
     if (parsedExperiences.length > 0) {
       const experiences = parsedExperiences.map((item) => ({
-        candidate_id: candidateData.id,
+        candidate_id: candidateId,
         company_name: item.company || "Não informada",
         position_title: item.role || "Não informado",
         start_date: item.start_date,
@@ -199,7 +191,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
 
     const { error: applicationError } = await supabase
       .from("job_applications")
-      .insert({ candidate_id: candidateData.id, job_opening_id: job.id, status: "Nova Aplicação" });
+      .insert({ candidate_id: candidateId, job_opening_id: job.id, status: "Nova Aplicação" });
 
     setSaving(false);
     if (applicationError) {
@@ -207,10 +199,9 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       return;
     }
 
-    const newCandidateId = candidateData.id;
     onOpenChange(false);
     reset();
-    window.location.assign(`/candidato/teste-personalidade?candidate_id=${newCandidateId}`);
+    window.location.assign(`/candidato/teste-personalidade?candidate_id=${candidateId}`);
   };
 
   return (

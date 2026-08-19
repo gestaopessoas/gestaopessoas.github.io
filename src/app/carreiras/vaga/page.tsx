@@ -63,11 +63,12 @@ function JobDetailContent() {
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="mx-auto max-w-5xl space-y-4">
         <Link href="/carreiras">
           <Button variant="ghost" size="sm" className="-ml-2"><ArrowLeft className="mr-2 h-4 w-4" />Voltar</Button>
         </Link>
 
+        <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <h1 className="text-xl font-semibold">{career.profile?.title || "Vaga sem título"}</h1>
           <p className="text-sm text-muted-foreground">ACPO Empreendimentos</p>
@@ -126,6 +127,7 @@ function JobDetailContent() {
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <h2 className="mb-2 font-semibold">Localização</h2>
           <p className="flex items-center gap-2 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{location} · Pelotas - RS, Brasil</p>
+        </div>
         </div>
 
         <Button size="lg" className="w-full" onClick={() => setIsApplicationOpen(true)}>
