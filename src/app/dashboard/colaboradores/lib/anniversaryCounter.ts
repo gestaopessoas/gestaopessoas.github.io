@@ -1,25 +1,41 @@
 import { isValid } from "date-fns";
 import type { Employee } from "../components/types";
 
-export const countWorkAnniversaries = (
+const ACTIVE_STATUSES = ["Ativo", "Férias", "Afastado"];
+
+export interface WorkAnniversary {
+  employee: Employee;
+  info: { month: number; date: Date; day: number; years: number };
+}
+
+// Fonte única do "aniversário de casa": o cartão de contagem e a lista da aba
+// precisam concordar. O fallback pra admission_date cobre os registros salvos
+// antes da coluna company_anniversary existir.
+export const listWorkAnniversaries = (
   employees: Employee[],
   referenceMonthIndex: number // 0-11
-) => {
+): WorkAnniversary[] => {
   const currentYear = new Date().getFullYear();
 
-  return employees.filter((e) => {
-    // Must be active
-    if (!["Ativo", "Férias", "Afastado"].includes(e.status ?? "")) return false;
-    
-    if (!e.company_anniversary) return false;
-    const adm = new Date(e.company_anniversary + "T12:00:00");
-    if (!isValid(adm)) return false;
+  return employees
+    .flatMap((employee) => {
+      if (!ACTIVE_STATUSES.includes(employee.status ?? "")) return [];
 
-    // Must be in the reference month
-    if (adm.getMonth() !== referenceMonthIndex) return false;
+      const dateStr = employee.company_anniversary || employee.admission_date;
+      if (!dateStr) return [];
+      const date = new Date(dateStr + "T12:00:00");
+      if (!isValid(date)) return [];
 
-    // Must be at least 1 year (0 years is not an anniversary)
-    const years = currentYear - adm.getFullYear();
-    return years > 0;
-  }).length;
+      if (date.getMonth() !== referenceMonthIndex) return [];
+
+      // Ano de admissão não é aniversário — só a partir do primeiro ano completo.
+      const years = currentYear - date.getFullYear();
+      if (years <= 0) return [];
+
+      return [{ employee, info: { month: date.getMonth(), date, day: date.getDate(), years } }];
+    })
+    .sort((a, b) => a.info.day - b.info.day);
 };
+
+export const countWorkAnniversaries = (employees: Employee[], referenceMonthIndex: number) =>
+  listWorkAnniversaries(employees, referenceMonthIndex).length;

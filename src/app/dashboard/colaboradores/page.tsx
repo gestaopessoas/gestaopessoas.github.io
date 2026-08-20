@@ -20,6 +20,7 @@ import { normalizeRole } from "./lib/normalizeRole.mjs";
 import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, isValidCpf, levelFieldOptions, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput, SENIORITY_OPTIONS, seniorityForLevel, seniorityOptionsFromRules } from "./lib/employeeFormRules.mjs";
 import { openTrialPeriods } from "./lib/trialPeriodRules.mjs";
 import { exportBirthdaysPdf } from "./birthdaysPdf";
+import { listWorkAnniversaries } from "./lib/anniversaryCounter";
 
 type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; seniority: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
 type TrialPeriod = { id: string; name: string; daysRemaining: number; endDate: string; isWarning: boolean; isOverdue: boolean };
@@ -221,7 +222,7 @@ export default function ColaboradoresPage() {
     const supabase = createClient();
     let request = supabase
       .from("employees")
-      .select(`status, birthday, admission_date, aso_date, workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)`)
+      .select(`status, birthday, admission_date, company_anniversary, aso_date, workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)`)
       .limit(10000);
 
     if (advancedFilters.status) {
@@ -570,13 +571,7 @@ export default function ColaboradoresPage() {
     })
     .sort((a, b) => a.info.day - b.info.day);
 
-  const workAnniversariesThisMonth = employees
-    .flatMap((employee) => {
-      const info = getBirthdayInfo(employee.admission_date as string | null);
-      if (!info || info.month !== selectedMonth) return [];
-      return differenceInYears(new Date(), info.date) > 0 ? [{ employee, info }] : []; // pelo menos 1 ano de casa
-    })
-    .sort((a, b) => a.info.day - b.info.day);
+  const workAnniversariesThisMonth = listWorkAnniversaries(employees, selectedMonth);
 
   const exportBirthdaysCsv = () => {
     if (birthdaysThisMonth.length === 0) return;
@@ -961,7 +956,7 @@ export default function ColaboradoresPage() {
                 {workAnniversariesThisMonth.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum aniversário de casa neste mês.</p>
                 ) : workAnniversariesThisMonth.map(({ employee, info }) => {
-                  const years = differenceInYears(new Date(), info.date);
+                  const years = info.years;
                   return (
                     <div key={employee.id} className="flex items-center justify-between rounded-md border bg-background p-3 shadow-sm">
                       <div>
