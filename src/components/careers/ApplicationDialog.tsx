@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { createClient } from "@/utils/supabase/client";
 import { Send, Loader2, FileUp, CheckCircle2, GraduationCap, BriefcaseBusiness, ClipboardCheck } from "lucide-react";
 import { useState } from "react";
-import { itemsToText } from "@/lib/resumeParser";
+import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
 import { parseResumeLocally, type ParsedResumeAcademic, type ParsedResumeExperience } from "@/lib/resumeAI";
 import type { Career } from "./types";
 
@@ -38,6 +38,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
   const [resumeError, setResumeError] = useState("");
   const [parsedAcademics, setParsedAcademics] = useState<ParsedResumeAcademic[]>([]);
   const [parsedExperiences, setParsedExperiences] = useState<ParsedResumeExperience[]>([]);
+  const [resumeSummary, setResumeSummary] = useState({ professional_summary: "", experience_summary: "" });
   const [isDraggingResume, setIsDraggingResume] = useState(false);
 
   const reset = () => {
@@ -46,6 +47,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     setResumeError("");
     setParsedAcademics([]);
     setParsedExperiences([]);
+    setResumeSummary({ professional_summary: "", experience_summary: "" });
     setError("");
   };
 
@@ -95,6 +97,18 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       }));
       setParsedAcademics(parsed.academic_list);
       setParsedExperiences(parsed.experience_list);
+      // parseResumeLocally não propaga os resumos; o parser cru extrai os dois.
+      // Em try próprio: currículo fora do formato esperado não pode derrubar o
+      // parse que já deu certo acima nem mostrar erro para o candidato.
+      try {
+        const raw = parseSolidesResume(text);
+        setResumeSummary({
+          professional_summary: raw.professional_summary || "",
+          experience_summary: raw.experience_summary || "",
+        });
+      } catch {
+        // sem resumo: a ficha continua válida, só não terá o texto extraído.
+      }
     } catch {
       setResumeError("Não foi possível ler o currículo automaticamente, preencha os campos manualmente.");
     } finally {
@@ -151,6 +165,8 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         role_interest: job.profile?.title || null,
         search_tags: [job.profile?.title, job.department, job.cost_center].filter(Boolean),
         resume_url: resumePath,
+        professional_summary: resumeSummary.professional_summary || null,
+        experience_summary: resumeSummary.experience_summary || null,
       });
 
     if (candidateError) {

@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
+import { ARCHIVE_STATUSES, saveArchiveBox } from "@/lib/archiveBox";
 import { Archive, RotateCcw, Search, Package, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -153,7 +154,7 @@ export default function ArquivoMortoPage() {
             id, name, cpf, rg, role, unit, dismissed_at,
             employee_archives ( physical_boxes ( code ) )
           `, { count: "exact" })
-          .eq("status", "Desligado")
+          .in("status", ARCHIVE_STATUSES)
           .order("name")
           .range(page * pageSize, page * pageSize + pageSize - 1);
         
@@ -181,28 +182,8 @@ export default function ArquivoMortoPage() {
   }, [page, query, refresh]);
 
   const saveBox = async (employee: Employee, archiveBox: string) => {
-    const boxCode = archiveBox.trim();
-    const sb = createClient();
-    
-    if (!boxCode) {
-      const { error: delError } = await sb.from("employee_archives").delete().eq("employee_id", employee.id);
-      if (delError) setError(delError.message); else setRefresh((value) => value + 1);
-      return;
-    }
-
-    // Upsert box and get ID
-    let { data: box } = await sb.from("physical_boxes").select("id").eq("code", boxCode).single();
-    if (!box) {
-      const { data: newBox, error: newBoxError } = await sb.from("physical_boxes").insert({ code: boxCode, description: `Caixa ${boxCode}` }).select("id").single();
-      if (newBoxError) { setError(newBoxError.message); return; }
-      box = newBox;
-    }
-    
-    // Clear old box link and insert new one
-    await sb.from("employee_archives").delete().eq("employee_id", employee.id);
-    const { error: saveError } = await sb.from("employee_archives").insert({ employee_id: employee.id, box_id: box!.id });
-    
-    if (saveError) setError(saveError.message); else setRefresh((value) => value + 1);
+    const saveError = await saveArchiveBox(employee.id, archiveBox);
+    if (saveError) setError(saveError); else setRefresh((value) => value + 1);
   };
 
   const reactivate = (employee: Employee) => {
@@ -245,7 +226,7 @@ export default function ArquivoMortoPage() {
       <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
         <Archive className="h-6 w-6 text-primary" />Arquivo Morto
       </h1>
-      <p className="text-sm text-muted-foreground mt-1">{!query ? "Caixas físicas do arquivo morto." : "Resultados da busca em colaboradores desligados."}</p>
+      <p className="text-sm text-muted-foreground mt-1">{!query ? "Caixas físicas do arquivo morto." : "Resultados da busca em colaboradores inativos ou desligados."}</p>
     </header>
     
     {error && <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}

@@ -3,7 +3,7 @@ import { Briefcase, Building2, type LucideIcon, Users, ArrowRight } from "lucide
 import Link from "next/link";
 
 const cards: { title: string; text: string; Icon: LucideIcon }[] = [
-  { title: "ATS", text: "Requisições, vagas, kanban e triagem de candidatos.", Icon: Briefcase },
+  { title: "ATS", text: "Requisições, vagas, candidatos por vaga e triagem.", Icon: Briefcase },
   { title: "Core HR", text: "Colaboradores ligados a empresa, obra e centro de custo.", Icon: Users },
   { title: "Estrutura ACPO", text: "CNPJs, obras e alocação financeira separados.", Icon: Building2 },
 ];

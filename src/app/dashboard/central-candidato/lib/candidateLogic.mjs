@@ -5,6 +5,37 @@
 
 export const UNLOCK_STAGES = ["Reprovado", "Desistente", "Banco de Talentos", "Contratado"];
 
+/**
+ * Caixa e acento não são informação aqui: "Banco de talentos" gravado pelo modal e
+ * "Banco de Talentos" gravado pela tela de Entrevistas são a mesma etapa.
+ * Comparação é sempre por igualdade do valor normalizado — nunca por substring,
+ * senão a tag "Aprovado para Banco de Talentos" (candidate_future) casaria com a etapa.
+ */
+export function normalizeStage(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim()
+    .toLowerCase();
+}
+
+export function sameStage(a, b) {
+  return normalizeStage(a) === normalizeStage(b);
+}
+
+export function isUnlockStage(stage) {
+  const normalized = normalizeStage(stage);
+  return UNLOCK_STAGES.some((s) => normalizeStage(s) === normalized);
+}
+
+/** Etapas que encerram o processo e devem refletir no destino da entrevista. */
+export const TERMINAL_STAGES = ["Banco de Talentos", "Reprovado", "Desistente"];
+
+export function isTerminalStage(stage) {
+  const normalized = normalizeStage(stage);
+  return TERMINAL_STAGES.some((s) => normalizeStage(s) === normalized);
+}
+
 // Agrupa as etapas granulares gravadas em candidate_interviews.stage nos baldes que o
 // administrativo de obra precisa enxergar. A etapa exata continua visível na linha —
 // o balde existe só para filtrar e contar.
@@ -16,6 +47,22 @@ export const STAGE_BUCKETS = {
   documentacao: ["Coleta de Documentos & Exames", "Coleta de documentos", "Aguardando ASO"],
   contratacao: ["Contratado"],
 };
+
+/**
+ * Fonte única das etapas oferecidas nos selects (modal do candidato, nova entrevista,
+ * avanço de etapa). Ordem = ordem dos baldes, terminais no fim.
+ */
+export const STAGE_OPTIONS = [
+  ...new Set([
+    ...Object.values(STAGE_BUCKETS).flat(),
+    ...UNLOCK_STAGES,
+    "Recusado pela Obra",
+    "Outros",
+  ]),
+];
+
+/** Etapas que quem não é do RH pode registrar no histórico. */
+export const LIMITED_STAGE_OPTIONS = ["Banco de Talentos", "Em proposta"];
 
 export const BUCKET_ORDER = ["livre", "entrevista", "encaminhado", "obras", "proposta", "documentacao", "contratacao"];
 
@@ -34,11 +81,11 @@ export const BUCKET_LABELS = {
  * que não aparecem na Central.
  */
 export function candidateBucket(status, etapaAtual) {
-  if (status === "Banco de Talentos") return "livre";
-  if (status !== "Em Processo") return "encerrado";
+  if (sameStage(status, "Banco de Talentos")) return "livre";
+  if (!sameStage(status, "Em Processo")) return "encerrado";
 
   for (const bucket of BUCKET_ORDER) {
-    if (STAGE_BUCKETS[bucket]?.includes(etapaAtual)) return bucket;
+    if (STAGE_BUCKETS[bucket]?.some((s) => sameStage(s, etapaAtual))) return bucket;
   }
   // Etapa ativa porém não mapeada (ex.: "Outros") ainda é um processo em andamento.
   return "entrevista";
@@ -52,7 +99,7 @@ export function latestInterview(interviews = []) {
 }
 
 export function isLockedByInterview(latest) {
-  return !!latest && !UNLOCK_STAGES.includes(latest.stage);
+  return !!latest && !isUnlockStage(latest.stage);
 }
 
 export function deriveCandidateStatus(interviews = []) {
@@ -60,19 +107,21 @@ export function deriveCandidateStatus(interviews = []) {
   if (!latest) {
     return { status: "Banco de Talentos", etapa_atual: null, obra_atual: null, ultimo_chamado: "Nenhum contato" };
   }
-  const isTerminal = UNLOCK_STAGES.includes(latest.stage);
+  const isTerminal = isUnlockStage(latest.stage);
   const base = {
     obra_atual: latest.workplace_name || null,
     ultimo_chamado: `${latest.interviewer_name || "Desconhecido"} - ${latest.workplace_name || "Obra não informada"}`,
   };
-  const future = String(latest.candidate_future || "").trim().toLowerCase();
+  // Igualdade exata do valor normalizado: a tag "Aprovado para Banco de Talentos"
+  // não é o destino "Banco de Talentos" e não pode casar aqui.
+  const future = normalizeStage(latest.candidate_future);
   if (future === "livre" || future === "banco de talentos") {
     return { status: "Banco de Talentos", etapa_atual: null, ...base };
   }
   if (future === "encerrar processo") {
     return { status: "Encerrado", etapa_atual: null, ...base };
   }
-  if (latest.stage === "Contratado") {
+  if (sameStage(latest.stage, "Contratado")) {
     return { status: "Contratado", etapa_atual: null, ...base };
   }
   if (isTerminal) {
@@ -108,7 +157,7 @@ export function resolveCandidateStatus(candidate = {}) {
   }
 
   // Marcação explícita de Banco de Talentos vence a derivação.
-  if (tags.includes("Banco de Talentos")) status = "Banco de Talentos";
+  if (tags.some((t) => sameStage(t, "Banco de Talentos"))) status = "Banco de Talentos";
 
   return { ...derived, status, ultimo_chamado };
 }

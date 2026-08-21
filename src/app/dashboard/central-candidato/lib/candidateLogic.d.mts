@@ -1,8 +1,17 @@
 export const UNLOCK_STAGES: string[];
+export const TERMINAL_STAGES: string[];
+export const STAGE_OPTIONS: string[];
+export const LIMITED_STAGE_OPTIONS: string[];
+
+export function normalizeStage(value: unknown): string;
+export function sameStage(a: unknown, b: unknown): boolean;
+export function isUnlockStage(stage: unknown): boolean;
+export function isTerminalStage(stage: unknown): boolean;
 
 export interface InterviewLike {
   created_at: string;
   stage?: string;
+  candidate_future?: string | null;
   workplace_name?: string | null;
   interviewer_name?: string | null;
 }
@@ -18,7 +27,7 @@ export function latestInterview(interviews?: InterviewLike[] | null): InterviewL
 export function isLockedByInterview(latest: InterviewLike | null): boolean;
 
 export interface CandidateStatus {
-  status: "Banco de Talentos" | "Em Processo" | "Contratado";
+  status: "Banco de Talentos" | "Em Processo" | "Contratado" | "Encerrado";
   etapa_atual: string | null;
   obra_atual: string | null;
   ultimo_chamado: string;

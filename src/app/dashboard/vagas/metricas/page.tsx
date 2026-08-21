@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Clock, Users, Target, Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { PIPELINE_STAGES, normalizeStage } from "../lib/stages";
 
 export default function MetricasVagasPage() {
   const supabase = createClient();
@@ -38,15 +39,14 @@ export default function MetricasVagasPage() {
       // Taxa de Conversão (Contratados / Total de Aplicações)
       const taxaConversao = apps?.length ? (totalContratados / apps.length) * 100 : 0;
 
-      // Funil (Contagem por status fixo do Kanban)
-      const COLUMNS = ["Sugestões", "Nova", "Triagem", "Entrevista", "Proposta", "Contratado"];
+      // Funil (contagem por etapa do funil da vaga)
       const stageCounts = (apps || []).reduce<Record<string, number>>((acc, a) => {
-        const stage = a.status || 'Nova';
+        const stage = normalizeStage(a.status);
         acc[stage] = (acc[stage] || 0) + 1;
         return acc;
       }, {});
-      
-      const funil = COLUMNS.map(col => ({
+
+      const funil = PIPELINE_STAGES.map(col => ({
         stage: col,
         count: stageCounts[col] || 0
       }));
@@ -123,7 +123,7 @@ export default function MetricasVagasPage() {
         <Card className="shadow-xs border-border/50">
           <CardHeader>
             <CardTitle>Funil de Candidatos</CardTitle>
-            <CardDescription>Visualização da retenção por etapa do Kanban</CardDescription>
+            <CardDescription>Visualização da retenção por etapa do funil</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? <p className="text-sm text-muted-foreground">Carregando dados do funil...</p> : (

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { resolveCandidateStatus, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { errorMessage } from "@/lib/utils";
+import { fetchInterviewProgress } from "@/lib/candidateHistory.mjs";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +58,22 @@ export default function BancoTalentosPage() {
 
   const supabase = createClient();
 
+  // Situação/Destino vivem em `interviews`, ligados ao candidato por e-mail — o modal
+  // só mostra o bloco quando recebe a prop.
+  const [loadedProgress, setLoadedProgress] = useState<{ id: string; progress: { status: string; result: string; destination?: string } } | null>(null);
+  useEffect(() => {
+    if (!selectedCandidateId) return;
+    const row = candidates.find((c) => c.id === selectedCandidateId);
+    let active = true;
+    fetchInterviewProgress(supabase, { email: row?.email, fullName: row?.full_name }).then((progress) => {
+      if (active && progress) setLoadedProgress({ id: selectedCandidateId, progress });
+    });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCandidateId]);
+  // Amarrado ao id: sem isso a situação do candidato anterior vazava para o próximo.
+  const selectedProgress = loadedProgress?.id === selectedCandidateId ? loadedProgress.progress : undefined;
+
 
 
   const fetchCandidates = async () => {
@@ -74,7 +91,7 @@ export default function BancoTalentosPage() {
           search_tags,
           behavioral_tags,
           available_worksites,
-          candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, created_at),
+          candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, candidate_future, created_at),
           candidate_educations(candidate_id, degree, start_date, end_date)
         `)
         .order('created_at', { ascending: false });
@@ -323,6 +340,7 @@ export default function BancoTalentosPage() {
       {selectedCandidateId && (
         <CandidateProfileModal
           candidateId={selectedCandidateId}
+          interviewProgress={selectedProgress}
           initialTab="curriculum"
           isEditable={true}
           onClose={() => setSelectedCandidateId(null)}

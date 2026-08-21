@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { errorMessage } from "@/lib/utils";
+import { useToast } from "@/contexts/ToastContext";
 import { itemsToText, parseSolidesResume, type ParsedResume } from "@/lib/resumeParser";
 import { buildResumeExtractionPrompt, parseExtractionResponse } from "@/lib/resumeExtractionPrompt";
 import { DEFAULT_RESUME_MODEL, fetchResumeModel, geminiGenerateUrl } from "@/lib/resumeModelSettings";
@@ -527,6 +528,7 @@ const TEST_OPTIONS: Record<string, { table_name: string; demographic_type?: stri
 };
 
 export default function EntrevistasPage() {
+  const { toast } = useToast();
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [worksites, setWorksites] = useState<string[]>([]);
@@ -1089,85 +1091,95 @@ Destino: ${form.destination || "N/I"}
       updated_at: new Date().toISOString()
     };
     
-    let isSuccess = false;
+    // O setError renderiza atrás do overlay do modal, que continua aberto em erro:
+    // o aviso de verdade é o toast. `handled` evita que o modal repita a mensagem.
+    // Tipo explícito na const: sem ele o TS não sabe que a chamada interrompe o fluxo.
+    const fail: (message: string, variant?: "error" | "warning") => never = (message, variant = "error") => {
+      setError(message);
+      toast(message, variant);
+      setSaving(false);
+      throw Object.assign(new Error(message), { handled: true });
+    };
+
     let savedInterviewId = editingId;
-    
+
     if (editingId) {
       let query = supabase.from("interviews").update(payload).eq("id", editingId);
       if (currentUpdatedAt) {
         query = query.eq("updated_at", currentUpdatedAt);
       }
       const { data, error: saveError } = await query.select("id");
-      
-      if (saveError) setError("Erro ao atualizar entrevista: " + saveError.message);
-      else if (!data || data.length === 0) setError("Conflito: A entrevista foi modificada por outro usuário. Por favor, cancele e abra novamente.");
-      else { isSuccess = true; }
+
+      if (saveError) fail("Erro ao atualizar entrevista: " + saveError.message);
+      else if (!data || data.length === 0) fail("Conflito: A entrevista foi modificada por outro usuário. Por favor, cancele e abra novamente.");
     } else {
       const { data, error: saveError } = await supabase.from("interviews").insert(payload).select("id").single();
-      if (saveError) setError("Erro ao salvar entrevista: " + saveError.message);
-      else { savedInterviewId = data.id; isSuccess = true; }
+      if (saveError) fail("Erro ao salvar entrevista: " + saveError.message);
+      else savedInterviewId = data.id;
     }
 
-    if (isSuccess && savedInterviewId) {
+    if (savedInterviewId) {
       const { data: assessment, error: assessmentError } = await supabase
         .from("interview_assessments")
         .upsert({ interview_id: savedInterviewId }, { onConflict: "interview_id" })
         .select("id")
         .single();
-      if (assessmentError) { setError("Erro ao salvar avaliação: " + assessmentError.message); isSuccess = false; }
-      else {
+      // A entrevista já gravou aqui: falha do parecer é salvamento parcial (amarelo).
+      if (assessmentError || !assessment) fail("Entrevista salva, mas o parecer não: " + (assessmentError?.message || "avaliação não encontrada."), "warning");
+      const values = assessmentToRows({ ...assessmentForm, ...assessmentData, dependents_notes: formData.dependents_notes || null }).map((value) => ({ ...value, assessment_id: assessment.id }));
+      // Só apaga quando há linhas novas para gravar — parecer vazio zerava o que existia.
+      if (values.length) {
         const { error: clearError } = await supabase.from("interview_assessment_values").delete().eq("assessment_id", assessment.id);
-        const values = assessmentToRows({ ...assessmentForm, ...assessmentData, dependents_notes: formData.dependents_notes || null }).map((value) => ({ ...value, assessment_id: assessment.id }));
-        const { error: valuesError } = values.length ? await supabase.from("interview_assessment_values").insert(values) : { error: null };
-        if (clearError || valuesError) { setError("Erro ao salvar avaliação: " + (clearError || valuesError)?.message); isSuccess = false; }
+        const { error: valuesError } = clearError ? { error: clearError } : await supabase.from("interview_assessment_values").insert(values);
+        if (clearError || valuesError) fail("Entrevista salva, mas o parecer não: " + (clearError || valuesError)!.message, "warning");
       }
     }
-    
-    if (isSuccess) {
-      const payloadAny = payload as unknown as Record<string, any>;
-      // Toda entrevista salva reflete um registro na Central do Candidato,
-      // independente do Destino escolhido — não só Aprovado/Banco de Talentos.
-      if (payloadAny.candidate_name) {
-        const parts = payloadAny.candidate_name.split(" ");
-        const tag = payloadAny.destination || (payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : payloadAny.result === "Reprovado" ? "Reprovado na Entrevista" : "Entrevistado");
 
-        const { data: upsertData, error: upsertError } = await supabase.from("candidates").upsert({
-          full_name: payloadAny.candidate_name,
-          first_name: parts[0] || "",
-          last_name: parts.slice(1).join(" ") || "",
-          email: payloadAny.email || `${parts[0]?.toLowerCase() || 'candidato'}@sememail.com`,
-          phone: payloadAny.phone,
-          role_interest: payloadAny.role,
-          city: assessmentData.worksite || "",
-          available_worksites: assessmentData.worksite_type === "all" ? ["Todas as Obras"] : (assessmentData.available_worksites || []),
-          search_tags: [tag, assessmentData.selection_stage || "Importado de Entrevistas"].filter(Boolean),
-          birth_date: formData.birth_date || null,
-          cpf: formData.cpf || null,
-          marital_status: formData.marital_status || null,
-          birthplace: formData.birthplace || null,
-          gender_identity: formData.gender_identity || null,
-          sexual_orientation: formData.sexual_orientation || null,
-          race_declaration: formData.race_declaration || null,
-          salary_expectation: formData.salary_expectation || null,
-          has_cnh: formData.has_cnh ?? null,
-          cnh_categories: formData.cnh_categories ? [formData.cnh_categories] : [],
-          languages: formData.languages || null,
-          has_dependents: formData.has_dependents ?? null,
-          dependents_count: formData.dependents_count ?? null,
-          uniform_size: formData.uniform_size || null,
-          boot_size: formData.boot_size || null
-        }, { onConflict: "email" }).select("id").single();
-        if (upsertError) console.error("Erro ao enviar para candidatos:", upsertError);
-        else if (upsertData) {
-          setIsModalOpen(false);
-          loadInterviews();
-          setSaving(false);
-          return upsertData.id;
-        }
+    toast("Parecer e entrevista salvos com sucesso.", "success");
+
+    const payloadAny = payload as unknown as Record<string, any>;
+    // Toda entrevista salva reflete um registro na Central do Candidato,
+    // independente do Destino escolhido — não só Aprovado/Banco de Talentos.
+    if (payloadAny.candidate_name) {
+      const parts = payloadAny.candidate_name.split(" ");
+      const tag = payloadAny.destination || (payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : payloadAny.result === "Reprovado" ? "Reprovado na Entrevista" : "Entrevistado");
+
+      const { data: upsertData, error: upsertError } = await supabase.from("candidates").upsert({
+        full_name: payloadAny.candidate_name,
+        first_name: parts[0] || "",
+        last_name: parts.slice(1).join(" ") || "",
+        email: payloadAny.email || `${parts[0]?.toLowerCase() || 'candidato'}@sememail.com`,
+        phone: payloadAny.phone,
+        role_interest: payloadAny.role,
+        city: assessmentData.worksite || "",
+        available_worksites: assessmentData.worksite_type === "all" ? ["Todas as Obras"] : (assessmentData.available_worksites || []),
+        search_tags: [tag, assessmentData.selection_stage || "Importado de Entrevistas"].filter(Boolean),
+        birth_date: formData.birth_date || null,
+        cpf: formData.cpf || null,
+        marital_status: formData.marital_status || null,
+        birthplace: formData.birthplace || null,
+        gender_identity: formData.gender_identity || null,
+        sexual_orientation: formData.sexual_orientation || null,
+        race_declaration: formData.race_declaration || null,
+        salary_expectation: formData.salary_expectation || null,
+        has_cnh: formData.has_cnh ?? null,
+        cnh_categories: formData.cnh_categories ? [formData.cnh_categories] : [],
+        languages: formData.languages || null,
+        has_dependents: formData.has_dependents ?? null,
+        dependents_count: formData.dependents_count ?? null,
+        uniform_size: formData.uniform_size || null,
+        boot_size: formData.boot_size || null
+      }, { onConflict: "email" }).select("id").single();
+      if (upsertError) console.error("Erro ao enviar para candidatos:", upsertError);
+      else if (upsertData) {
+        setIsModalOpen(false);
+        loadInterviews();
+        setSaving(false);
+        return upsertData.id;
       }
-      setIsModalOpen(false);
-      loadInterviews();
     }
+    setIsModalOpen(false);
+    loadInterviews();
     setSaving(false);
   };
   
@@ -1629,6 +1641,7 @@ Destino: ${form.destination || "N/I"}
           interviewProgress={{ status: form.status, result: form.result, destination: form.destination }}
           isEditable={true}
           defaultEditMode={true}
+          canSaveAssessment={true}
           onClose={() => setIsModalOpen(false)}
           onSave={handleModalSave}
         />

@@ -329,9 +329,9 @@ export default function VagasAdminPage() {
                       <Button variant="outline" size="sm" onClick={() => { setEditError(""); setIsEditing(true); }}>
                         <Edit3 className="w-4 h-4 mr-2" /> Editar
                       </Button>
-                      <Link href={`/dashboard/vagas/kanban?id=${selectedJob.id}`}>
+                      <Link href={`/dashboard/vagas/candidatos?id=${selectedJob.id}`}>
                         <Button variant="default" size="sm" className="bg-primary text-primary-foreground">
-                          Kanban
+                          Candidatos
                         </Button>
                       </Link>
                       {selectedJob.status !== "Arquivada" ? (

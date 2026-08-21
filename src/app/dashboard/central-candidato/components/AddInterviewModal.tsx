@@ -21,7 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UNLOCK_STAGES } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { STAGE_OPTIONS, UNLOCK_STAGES } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+
+// Rótulos mais longos que o valor gravado — o valor continua vindo de STAGE_OPTIONS.
+const STAGE_LABELS: Record<string, string> = {
+  "Entrevista RH": "Entrevista RH (Gestão de Pessoas)",
+  Proposta: "Proposta / Aguardando Contratação",
+};
 import { errorMessage } from "@/lib/utils";
 
 type AddInterviewModalProps = {
@@ -333,17 +339,9 @@ export default function AddInterviewModal({
                   <SelectValue placeholder="Selecione a etapa" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Triagem">Triagem</SelectItem>
-                  <SelectItem value="Entrevista RH">Entrevista RH (Gestão de Pessoas)</SelectItem>
-                  <SelectItem value="Entrevista Gestor">Entrevista Gestor</SelectItem>
-                  <SelectItem value="Testagem Psicológica">Testagem Psicológica</SelectItem>
-                  <SelectItem value="Coleta de Documentos & Exames">Coleta de Documentos & Exames</SelectItem>
-                  <SelectItem value="Proposta">Proposta / Aguardando Contratação</SelectItem>
-                  <SelectItem value="Contratado">Contratado</SelectItem>
-                  <SelectItem value="Banco de Talentos">Banco de Talentos</SelectItem>
-                  <SelectItem value="Reprovado">Reprovado</SelectItem>
-                  <SelectItem value="Desistente">Desistente</SelectItem>
-                  <SelectItem value="Outros">Outros</SelectItem>
+                  {STAGE_OPTIONS.map((option: string) => (
+                    <SelectItem key={option} value={option}>{STAGE_LABELS[option] || option}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

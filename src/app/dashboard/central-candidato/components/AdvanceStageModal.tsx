@@ -22,8 +22,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createClient } from "@/utils/supabase/client";
-import { STAGE_BUCKETS, BUCKET_ORDER, BUCKET_LABELS } from "../lib/candidateLogic.mjs";
+import { STAGE_BUCKETS, BUCKET_ORDER, BUCKET_LABELS, TERMINAL_STAGES } from "../lib/candidateLogic.mjs";
 import { errorMessage } from "@/lib/utils";
+import { syncInterviewDestination } from "@/lib/candidateHistory.mjs";
 
 export default function AdvanceStageModal({
   isOpen,
@@ -83,9 +84,10 @@ export default function AdvanceStageModal({
       stages.push(...STAGE_BUCKETS[nextBucket as keyof typeof STAGE_BUCKETS]);
     }
 
-    // Add contratado if not already there, just in case
-    if (!stages.includes("Contratado")) {
-      stages.push("Contratado");
+    // Etapas terminais encerram o processo a partir de qualquer balde — sem elas
+    // "Banco de Talentos" era inalcançável por aqui (issue #41).
+    for (const stage of ["Contratado", ...TERMINAL_STAGES]) {
+      if (!stages.includes(stage)) stages.push(stage);
     }
 
     return stages;
@@ -120,6 +122,8 @@ export default function AdvanceStageModal({
       });
 
       if (insertError) throw insertError;
+      // Etapa terminal reflete no Destino da entrevista (issue #41, opção b).
+      await syncInterviewDestination(supabase, { fullName: candidateName, stage: selectedStage });
       onSuccess();
       setSelectedStage("");
       setNotes("");

@@ -19,7 +19,10 @@ import { buildResumeExtractionPrompt, parseExtractionResponse } from "@/lib/resu
 import { fetchResumeModel, geminiGenerateUrl } from "@/lib/resumeModelSettings";
 import { normalizeResumeDate } from "@/lib/resumeDate";
 import { usePermissions } from "@/hooks/usePermissions";
-import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
+import { useToast } from "@/contexts/ToastContext";
+import { errorMessage } from "@/lib/utils";
+import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId, syncInterviewDestination } from "@/lib/candidateHistory.mjs";
+import { deriveCandidateStatus, LIMITED_STAGE_OPTIONS, STAGE_OPTIONS } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 
@@ -77,6 +80,8 @@ type ProfilePerson = {
   search_tags?: string[] | null;
   behavioral_tags?: string[] | null;
   resume_url?: string | null;
+  professional_summary?: string | null;
+  experience_summary?: string | null;
   isFromInterview?: boolean;
 };
 
@@ -207,6 +212,8 @@ type CandidateProfileModalProps = {
   initialData?: Partial<ProfilePerson>;
   initialAssessmentData?: any;
   interviewProgress?: { status: string; result: string; destination?: string };
+  /** Só a tela que sabe gravar o parecer (entrevistas) libera a edição da aba Parecer. */
+  canSaveAssessment?: boolean;
   onSave?: (data: ProfilePerson, assessmentData: any, interviewProgress?: { status: string; result: string; destination?: string }) => Promise<string | void>;
 };
 
@@ -218,24 +225,30 @@ export function CandidateProfileModal({
   candidateName,
   initialTab = "curriculum",
   onClose,
-  isEditable = false,
+  isEditable: isEditableProp = false,
   defaultEditMode = false,
   initialData,
   initialAssessmentData,
   interviewProgress,
+  canSaveAssessment = false,
   onSave
 }: CandidateProfileModalProps) {
+  // Sem onSave o "Salvar" não grava nada: a ficha vira somente leitura em vez de
+  // oferecer um botão morto (telas que abrem o modal só para consulta).
+  const isEditable = isEditableProp && !!onSave;
   const [activeTab, setActiveTab] = useState<"curriculum" | "assessment" | "behavioral" | "history">(initialTab);
   const [person, setPerson] = useState<ProfilePerson | null>(initialData ? (initialData as ProfilePerson) : null);
   const [resolvedCandidateId, setResolvedCandidateId] = useState<string | null>(candidateId || null);
   const [formData, setFormData] = useState<ProfilePerson>(initialData || {});
   const [assessmentData, setAssessmentData] = useState<any>(initialAssessmentData || {});
   const [progress, setProgress] = useState(() => normalizeInterviewProgress(interviewProgress || { status: "Aguardando", result: "N/C", destination: "" }));
-  const [isEditing, setIsEditing] = useState(defaultEditMode);
+  const [isEditing, setIsEditing] = useState(defaultEditMode && !!onSave);
   const [isSaving, setIsSaving] = useState(false);
+  const [assessmentLoadError, setAssessmentLoadError] = useState("");
   const [isParsingCv, setIsParsingCv] = useState(false);
   
   const { level } = usePermissions();
+  const { toast } = useToast();
   
   const [isAddingHistory, setIsAddingHistory] = useState(false);
   const [historyForm, setHistoryForm] = useState({ stage: "", reason: "", notes: "", workplaceName: "", interviewerName: "", candidateFuture: "" });
@@ -283,15 +296,23 @@ export function CandidateProfileModal({
       ]);
 
       if (error) throw error;
-      
+
+      // Etapa terminal também manda no Destino da entrevista (issue #41, opção b).
+      const sync = await syncInterviewDestination(supabase, {
+        email: person?.email || email || "",
+        fullName: person?.full_name || person?.name || candidateName || "",
+        stage: historyForm.stage,
+      });
+      if (sync?.error) toast(`Etapa salva, mas o destino da entrevista não: ${errorMessage(sync.error)}`, "warning");
+
       // Reload history
       const { data } = await supabase.from("candidate_interviews").select("*").eq("candidate_id", targetCandId).order("created_at", { ascending: false });
       if (data) setCandidateInterviews(data);
-      
+
       setIsAddingHistory(false);
       setHistoryForm({ stage: "", reason: "", notes: "", workplaceName: "", interviewerName: "", candidateFuture: "" });
     } catch (err: any) {
-      alert(`Erro ao salvar histórico: ${err?.message || "tente novamente."}`);
+      toast(`Erro ao salvar histórico: ${errorMessage(err) || "tente novamente."}`, "error");
     } finally {
       setIsSavingHistory(false);
     }
@@ -655,7 +676,10 @@ export function CandidateProfileModal({
   };
 
   const handleSave = async () => {
-    if (!onSave) return;
+    if (!onSave) {
+      toast("Esta tela não permite salvar alterações da ficha.", "error");
+      return;
+    }
     setIsSaving(true);
     try {
       const returnedId = await onSave(formData, assessmentData, progress);
@@ -672,8 +696,10 @@ export function CandidateProfileModal({
       // candidate_id na hora de importar, então não dava para gravá-las antes.
       await flushImportedEntries(targetId);
       setIsEditing(false);
-    } catch {
-      // onSave já mostra o alerta de validação; só evita deixar o botão travado.
+    } catch (err) {
+      // `handled` marca o erro que o pai já avisou (ex.: salvamento parcial em
+      // amarelo); sem isso o mesmo problema apareceria em dois toasts.
+      if (!(err as { handled?: boolean })?.handled) toast(errorMessage(err, "Não foi possível salvar."), "error");
     } finally {
       setIsSaving(false);
     }
@@ -750,6 +776,7 @@ export function CandidateProfileModal({
       let experiencesData: ProfileExperience[] = [];
       let interviewsData: ProfileInterview[] = [];
       let candidateInterviewsData: CandidateInterview[] = [];
+      let loadError = "";
 
       // 1. Resolver dados da Pessoa
       if (candidateId) {
@@ -860,7 +887,10 @@ export function CandidateProfileModal({
         } else if (personName) {
           intQuery = intQuery.ilike("candidate_name", personName);
         }
-        const { data } = await intQuery;
+        // Sem checar o error, uma leitura negada pela RLS virava "parecer vazio":
+        // o formulário abria em branco e o próximo salvar apagava o que existia.
+        const { data, error: interviewsError } = await intQuery;
+        if (interviewsError) loadError = interviewsError.message;
         if (data) interviewsData = data.map((interview: any) => ({
           ...interview,
           assessment: rowsToAssessment(interview.interview_assessments?.interview_assessment_values ?? []),
@@ -911,9 +941,10 @@ export function CandidateProfileModal({
       
       setPerson(personData);
       setResolvedCandidateId(resolvedId);
+      setAssessmentLoadError(loadError);
       if (interviewsData.length > 0 && interviewsData[0].assessment) {
         setAssessmentData(interviewsData[0].assessment);
-      } else {
+      } else if (!loadError) {
         setAssessmentData({});
       }
       setFormData(personData || {});
@@ -1145,6 +1176,36 @@ export function CandidateProfileModal({
                 {activeTab === "curriculum" && (
                   <div className="space-y-6 animate-in fade-in duration-200">
                     <h2 className="text-2xl font-bold mb-6">Currículo & Dados Pessoais</h2>
+
+                    {/* Resumo extraído do currículo enviado na candidatura. Candidato antigo
+                        (ou currículo sem as seções) não tem nada gravado — mostra o vazio
+                        explícito em vez de sumir com o bloco. */}
+                    <div className="rounded-xl border bg-card shadow-sm p-5 space-y-4">
+                      <div className="flex items-center gap-2 font-bold text-foreground">
+                        <FileText className="h-5 w-5 text-primary" />
+                        Resumo do Currículo
+                      </div>
+                      {formData.professional_summary || formData.experience_summary ? (
+                        <div className="space-y-4 text-sm">
+                          {formData.professional_summary && (
+                            <div className="space-y-1.5">
+                              <span className="text-xs text-muted-foreground block font-medium">Resumo profissional</span>
+                              <p className="whitespace-pre-line text-foreground">{formData.professional_summary}</p>
+                            </div>
+                          )}
+                          {formData.experience_summary && (
+                            <div className="space-y-1.5">
+                              <span className="text-xs text-muted-foreground block font-medium">Experiência profissional</span>
+                              <p className="whitespace-pre-line text-foreground">{formData.experience_summary}</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Sem resumo extraído. {person.resume_url ? "Use o botão “Ver Currículo PDF” para abrir o arquivo original." : "Nenhum currículo foi anexado a esta candidatura."}
+                        </p>
+                      )}
+                    </div>
 
                     {interviewProgress && (
                       <details open className="group rounded-xl border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden">
@@ -1605,7 +1666,18 @@ export function CandidateProfileModal({
                 {activeTab === "assessment" && (
                   <div className="space-y-6 animate-in fade-in duration-200">
                     <h2 className="text-2xl font-bold mb-6">Parecer & Avaliação</h2>
-                    {isEditing ? (
+                    {isEditing && !canSaveAssessment && !assessmentLoadError && (
+                      <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+                        O parecer só pode ser editado pela tela de Entrevistas — aqui ele é somente leitura.
+                      </div>
+                    )}
+                    {assessmentLoadError ? (
+                      <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-5 text-sm text-destructive">
+                        <p className="font-semibold">Não foi possível carregar o parecer.</p>
+                        <p className="mt-1">{assessmentLoadError}</p>
+                        <p className="mt-1">Feche e abra a ficha novamente. Editar agora pode sobrescrever o parecer existente.</p>
+                      </div>
+                    ) : isEditing && canSaveAssessment ? (
                       <CandidateAssessmentTab 
                         assessmentData={assessmentData} 
                         isEditing={true} 
@@ -1697,8 +1769,16 @@ export function CandidateProfileModal({
                 {activeTab === "history" && (
                   <div className="space-y-6 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-2xl font-bold">Histórico de Etapas</h2>
-                      {(level >= 30 || isEditable) && (
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-bold">Histórico de Etapas</h2>
+                        {/* Efeito da etapa escolhida: o status é derivado, não digitado. */}
+                        <span className="rounded-full border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
+                          Status atual: {deriveCandidateStatus(candidateInterviews).status}
+                        </span>
+                      </div>
+                      {/* O histórico grava direto em candidate_interviews, sem passar pelo
+                          onSave do pai — por isso usa a permissão crua, não o isEditable. */}
+                      {(level >= 30 || isEditableProp) && (
                         <Button onClick={() => setIsAddingHistory(!isAddingHistory)} variant={isAddingHistory ? "outline" : "default"} size="sm">
                           {isAddingHistory ? "Cancelar" : "Registrar Mudança de Etapa"}
                         </Button>
@@ -1718,20 +1798,9 @@ export function CandidateProfileModal({
                               onChange={e => setHistoryForm(prev => ({ ...prev, stage: e.target.value }))}
                             >
                               <option value="">Selecione...</option>
-                              {level >= 2 ? (
-                                <>
-                                  <option value="Em entrevista">Em entrevista</option>
-                                  <option value="Processo de MPs">Processo de MPs</option>
-                                  <option value="Coleta de documentos">Coleta de documentos</option>
-                                  <option value="Aguardando ASO">Aguardando ASO</option>
-                                  <option value="Banco de talentos">Banco de talentos</option>
-                                </>
-                              ) : (
-                                <>
-                                  <option value="Banco de talentos">Banco de talentos</option>
-                                  <option value="Em proposta">Em proposta</option>
-                                </>
-                              )}
+                              {(level >= 2 ? STAGE_OPTIONS : LIMITED_STAGE_OPTIONS).map((stage: string) => (
+                                <option key={stage} value={stage}>{stage}</option>
+                              ))}
                             </select>
                           </div>
                           <div className="space-y-2">
@@ -1785,7 +1854,7 @@ export function CandidateProfileModal({
                           >
                             <option value="">Selecione...</option>
                             <option value="Livre">Livre</option>
-                            <option value="Banco de talentos">Manter no banco de talentos</option>
+                            <option value="Banco de Talentos">Manter no banco de talentos</option>
                             <option value="Avançar no processo">Avançar no processo</option>
                             <option value="Encerrar processo">Encerrar processo</option>
                           </select>

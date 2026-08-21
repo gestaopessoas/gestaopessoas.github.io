@@ -9,8 +9,11 @@ import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, 
 import { useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import { usePermissions } from "@/hooks/usePermissions";
 import { findCode } from "@/lib/codeLookup";
 import cboData from "@/data/cbo.json";
+import { ARCHIVE_STATUSES } from "@/lib/archiveBox";
+import { ArchiveBoxModal, type ArchiveTarget } from "./components/ArchiveBoxModal";
 import { RelatedRecords } from "./components/RelatedRecords";
 import { Section, Field, Select } from "./components/FormHelpers";
 import { StatsCards } from "./components/StatsCards";
@@ -134,6 +137,9 @@ export default function ColaboradoresPage() {
   const [cpfError, setCpfError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
   const [duplicateCpf, setDuplicateCpf] = useState<Employee | null>(null);
+  // Colaborador que acabou de ir para Inativo/Desligado e ainda precisa da caixa do arquivo morto.
+  const [archiveTarget, setArchiveTarget] = useState<ArchiveTarget | null>(null);
+  const { can } = usePermissions();
   
   // Modals state
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
@@ -322,7 +328,8 @@ export default function ColaboradoresPage() {
       updated.department = profile?.is_operational ? "Direto" : "Indireto";
     }
 
-    if (field === "status" && value !== "Desligado" && value !== "Arquivo Morto") {
+    // "Inativo" é uma saída como "Desligado": a data de desligamento continua valendo.
+    if (field === "status" && !ARCHIVE_STATUSES.includes(value) && value !== "Arquivo Morto") {
       updated.dismissed_at = "";
     }
 
@@ -458,6 +465,8 @@ export default function ColaboradoresPage() {
     const isNew = !editingId;
     const original = editingId ? employees.find((e) => e.id === editingId) : null;
     const isDismissed = form.status === "Desligado" && original?.status !== "Desligado";
+    // Entrou no arquivo morto agora: só aí faz sentido perguntar a caixa.
+    const isArchived = ARCHIVE_STATUSES.includes(form.status) && !ARCHIVE_STATUSES.includes(original?.status ?? "");
     const isPromoted = !isNew && !isDismissed && (form.role !== original?.role || form.level !== original?.level || form.department_id !== original?.department_id || form.workplace_id !== original?.workplace_id);
 
     const result = editingId
@@ -507,6 +516,11 @@ export default function ColaboradoresPage() {
     setBirthdayError("");
     setConfirmDelete(null);
     setRefresh((value) => value + 1);
+
+    // Depois do save dar certo, e só para quem consegue gravar em arquivo morto (RLS).
+    if (isArchived && can("arquivo_morto", "edit")) {
+      setArchiveTarget({ id: result.data.id, name: form.name.trim() });
+    }
   };
 
   const deleteEmployee = async (id: string) => {
@@ -1151,8 +1165,11 @@ export default function ColaboradoresPage() {
         </DialogContent>
       </Dialog>
 
+      {/* `key` remonta o modal a cada colaborador: o campo nasce vazio em vez de herdar a caixa do anterior. */}
+      <ArchiveBoxModal key={archiveTarget?.id} target={archiveTarget} onClose={() => setArchiveTarget(null)} />
+
       {selectedEmployeeId && (
-        <CandidateProfileModal 
+        <CandidateProfileModal
           employeeId={selectedEmployeeId} 
           onClose={() => setSelectedEmployeeId(null)} 
         />

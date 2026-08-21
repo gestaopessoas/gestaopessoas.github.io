@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Search, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
+import { ToastProvider } from "@/contexts/ToastContext";
 import { cn } from "@/lib/utils";
 
 const breadcrumbMap: Record<string, string> = {
@@ -122,6 +123,7 @@ export default function DashboardLayout({
 
   return (
     <PermissionsProvider>
+      <ToastProvider>
       <div className="flex h-screen overflow-hidden bg-background print:h-auto print:block print:bg-transparent">
         {/* Sidebar - fixed on desktop */}
         <Sidebar collapsed={isCollapsed} onToggle={() => setIsCollapsed((c) => !c)} />
@@ -159,6 +161,7 @@ export default function DashboardLayout({
           </main>
         </div>
       </div>
+      </ToastProvider>
     </PermissionsProvider>
   );
 }

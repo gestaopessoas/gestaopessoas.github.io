@@ -134,3 +134,35 @@ test("latestEducationDegree: último por data; fallback sem datas", () => {
   assert.equal(latestEducationDegree([{ degree: "Médio" }]), "Médio");
   assert.equal(latestEducationDegree([]), null);
 });
+
+// Issue #41
+test("etapa gravada em minúsculo conta como Banco de Talentos", () => {
+  const derived = deriveCandidateStatus([int("banco de talentos", "2026-08-14")]);
+  assert.equal(derived.status, "Banco de Talentos");
+  assert.equal(derived.etapa_atual, null);
+  assert.equal(candidateBucket(derived.status, derived.etapa_atual), "livre");
+  assert.equal(isLockedByInterview({ stage: "Banco de talentos" }), false);
+});
+
+test("tag prefixada em candidate_future não vira destino Banco de Talentos", () => {
+  const derived = deriveCandidateStatus([
+    int("Entrevista RH", "2026-08-14", { candidate_future: "Aprovado para Banco de Talentos" }),
+  ]);
+  assert.equal(derived.status, "Em Processo");
+  assert.equal(derived.etapa_atual, "Entrevista RH");
+  // Já o valor exato (com outra caixa) é destino de verdade.
+  assert.equal(
+    deriveCandidateStatus([int("Entrevista RH", "2026-08-14", { candidate_future: "BANCO DE TALENTOS" })]).status,
+    "Banco de Talentos"
+  );
+});
+
+test("candidato sem entrevistas cai no Banco de Talentos", () => {
+  for (const entrevistas of [[], null, undefined]) {
+    const derived = deriveCandidateStatus(entrevistas);
+    assert.equal(derived.status, "Banco de Talentos");
+    assert.equal(derived.etapa_atual, null);
+    assert.equal(derived.ultimo_chamado, "Nenhum contato");
+  }
+  assert.equal(resolveCandidateStatus({}).status, "Banco de Talentos");
+});

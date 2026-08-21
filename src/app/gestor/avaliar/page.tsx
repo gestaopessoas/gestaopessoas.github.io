@@ -47,9 +47,7 @@ type Interview = {
   selection_stage?: string;
   interview_date?: string;
   notes?: string;
-  curriculum_summary?: string;
-  professional_experiences?: unknown[];
-  academic_records?: unknown[];
+  candidates?: { professional_summary: string | null; experience_summary: string | null }[] | null;
 };
 
 const STAGES_FOR_MANAGER = ["Entrevista Gestor", "Entrevista com Gestor", "Entrevista com a Gestão"];
@@ -84,7 +82,9 @@ export default function PortalGestorPage() {
       // Fallback: se a tabela estiver vazia, busca de candidate_interviews com estágio gestor
       const { data: interviewList, error: intErr } = await supabase
         .from("candidate_interviews")
-        .select("id, candidate_id, selection_stage, interview_date, notes, curriculum_summary, professional_experiences, academic_records")
+        // O resumo do currículo mora em `candidates`; `candidate_interviews` nunca teve
+        // colunas de resumo (o select antigo apontava para colunas inexistentes).
+        .select("id, candidate_id, selection_stage, interview_date, notes, candidates (professional_summary, experience_summary)")
         .in("selection_stage", STAGES_FOR_MANAGER)
         .order("interview_date", { ascending: false });
 
