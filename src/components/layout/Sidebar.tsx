@@ -8,8 +8,12 @@ import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, Layou
 import { usePermissions } from "@/hooks/usePermissions"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { createClient } from "@/utils/supabase/client"
+import type { ModuleKey } from "@/lib/modules"
 
-const sidebarGroups = [
+type NavItem = { name: string; href: string; icon: React.ComponentType<{ className?: string }>; module?: ModuleKey }
+type NavGroup = { name: string; items: NavItem[] }
+
+const sidebarGroups: NavGroup[] = [
   {
     name: "Geral",
     items: [

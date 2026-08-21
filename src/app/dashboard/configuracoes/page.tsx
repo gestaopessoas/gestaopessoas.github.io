@@ -14,8 +14,8 @@ import { GlobalHistoryTab } from "@/components/configuracoes/GlobalHistoryTab"
 import { AiModelTab } from "@/components/configuracoes/AiModelTab"
 import { PontoHistoryTab } from "@/components/configuracoes/PontoHistoryTab"
 import { errorMessage } from "@/lib/utils";
+import { MODULES } from "@/lib/modules";
 
-const MODULES = ["colaboradores", "arquivo_morto", "mp", "vagas", "central_candidato", "recrutamento", "armarios", "uniformes", "ponto", "rgs", "ilhas", "admissao", "onboarding", "centros_de_custo", "departamentos", "cargos", "empresas", "obras", "beneficios", "treinamentos", "ferias", "holerites", "avaliacoes", "clima", "metas", "pdi", "competencias", "turnover", "analytics", "salarios", "configuracoes", "financeiro"] as const
 const ACTIONS = ["view", "create", "edit", "delete"] as const
 
 type UserPerms = Record<string, Record<string, boolean>>
