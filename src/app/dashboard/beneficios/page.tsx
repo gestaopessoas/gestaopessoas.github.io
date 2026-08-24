@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { exportLunchListPdf } from "./lunchListPdf";
 import { MonthlyBenefitsTab } from "./MonthlyBenefitsTab";
+import { PharmacyBenefitsTab } from "./PharmacyBenefitsTab";
 import { buildVrCutList } from "./lib/vrCutList";
 import {
   Download,
@@ -25,6 +26,7 @@ import {
   Search,
   UserPlus,
   DollarSign,
+  Pill,
 } from "lucide-react";
 
 type Employee = { id: string; name: string; status: string; admission_date: string; cost_center?: string; department?: string; workplaceType?: string };
@@ -516,7 +518,7 @@ export default function BeneficiosPage() {
       </div>
 
       <Tabs defaultValue="planos" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-4">
+        <TabsList className="grid w-full grid-cols-6 mb-4">
           <TabsTrigger value="planos" className="flex gap-2 relative">
             <HeartPulse className="w-4 h-4" />
             <span>Inclusão Pendente</span>
@@ -546,6 +548,10 @@ export default function BeneficiosPage() {
           <TabsTrigger value="mensal" className="flex gap-2">
             <DollarSign className="w-4 h-4" />
             <span>Lançamentos Mensais</span>
+          </TabsTrigger>
+          <TabsTrigger value="farmacia" className="flex gap-2">
+            <Pill className="w-4 h-4" />
+            <span>Farmácia</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1027,6 +1033,10 @@ export default function BeneficiosPage() {
 
         <TabsContent value="mensal" className="space-y-4">
           <MonthlyBenefitsTab />
+        </TabsContent>
+
+        <TabsContent value="farmacia" className="space-y-4">
+          <PharmacyBenefitsTab />
         </TabsContent>
       </Tabs>
     </div>
