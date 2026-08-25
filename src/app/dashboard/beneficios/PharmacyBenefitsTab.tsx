@@ -130,8 +130,12 @@ export function PharmacyBenefitsTab() {
 
       // Map with employees
       const mappedData = parsed.map(row => {
-        // find employee by matricula
-        const emp = employees.find(e => e.registration_number === row.matricula);
+        // find employee by matricula OR card_number
+        // (The pharmacy sometimes exports the card number under the "Matricula" column)
+        const emp = employees.find(e => 
+          e.registration_number === row.matricula || 
+          e.card_number === row.matricula
+        );
         return {
           ...row,
           employee_id: emp?.id,
