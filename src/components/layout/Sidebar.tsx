@@ -28,6 +28,7 @@ const sidebarGroups: NavGroup[] = [
       { name: "Entrevistas", href: "/dashboard/entrevistas", icon: Users, module: "entrevistas" },
       { name: "Central do Candidato", href: "/dashboard/central-candidato", icon: Contact, module: "central_candidato" },
       { name: "Banco de Talentos", href: "/dashboard/banco-talentos", icon: Database, module: "central_candidato" },
+      { name: "Métricas de Recrutamento", href: "/dashboard/metricas-recrutamento", icon: BarChart3, module: "vagas" },
     ]
   },
   {

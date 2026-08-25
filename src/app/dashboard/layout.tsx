@@ -45,6 +45,7 @@ const breadcrumbMap: Record<string, string> = {
   "/dashboard/cargos": "Cargos",
   "/dashboard/empresas": "Empresas",
   "/dashboard/obras": "Obras",
+  "/dashboard/metricas-recrutamento": "Métricas de Recrutamento",
   "/dashboard/financeiro": "Resumo Financeiro",
   "/dashboard/analytics": "Analytics",
   "/dashboard/configuracoes": "Configurações",

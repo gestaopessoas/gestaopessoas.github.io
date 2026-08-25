@@ -12,7 +12,7 @@ type Candidate = { id: string; created_at: string | null; role_interest: string 
 type Application = { id: string; status: string | null; created_at: string | null };
 type JobOpening = { id: string; status: string | null };
 
-export default function AnalyticsPage() {
+export default function MetricasRecrutamentoPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [requests, setRequests] = useState<JobRequest[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
