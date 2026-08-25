@@ -36,6 +36,7 @@ type HistoryRow = {
   employee_name: string;
   registration_number: string;
   company_name: string;
+  card_number?: string;
 };
 
 export function PharmacyBenefitsTab() {
