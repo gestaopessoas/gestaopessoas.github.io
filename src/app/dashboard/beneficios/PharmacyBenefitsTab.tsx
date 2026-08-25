@@ -14,6 +14,7 @@ type EmployeeData = {
   name: string;
   registration_number: string;
   company_name: string;
+  card_number?: string;
 };
 
 type CsvRow = {
@@ -23,6 +24,7 @@ type CsvRow = {
   cupons: number;
   employee_id?: string;
   company_name?: string;
+  card_number?: string;
 };
 
 type HistoryRow = {
@@ -61,15 +63,24 @@ export function PharmacyBenefitsTab() {
       setLoading(true);
       const { data } = await supabase
         .from("employees")
-        .select("id, name, registration_number, companies(name, trading_name)");
+        .select("id, name, registration_number, companies(name, trading_name), employee_benefits(benefit_name)");
       
       if (data) {
-        const mapped = data.map((e: any) => ({
-          id: e.id,
-          name: e.name,
-          registration_number: e.registration_number,
-          company_name: e.companies?.trading_name || e.companies?.name || "Sem Empresa",
-        }));
+        const mapped = data.map((e: any) => {
+          const farmaciaBenefit = e.employee_benefits?.find((b: any) => b.benefit_name.toLowerCase().includes("farmácia") || b.benefit_name.toLowerCase().includes("farmacia"));
+          let card_number = "-";
+          if (farmaciaBenefit) {
+            const cardMatch = farmaciaBenefit.benefit_name.match(/- Cartão (.*)/i);
+            if (cardMatch) card_number = cardMatch[1].trim();
+          }
+          return {
+            id: e.id,
+            name: e.name,
+            registration_number: e.registration_number,
+            company_name: e.companies?.trading_name || e.companies?.name || "Sem Empresa",
+            card_number
+          };
+        });
         setEmployees(mapped);
       }
       setLoading(false);
@@ -124,6 +135,7 @@ export function PharmacyBenefitsTab() {
           ...row,
           employee_id: emp?.id,
           company_name: emp?.company_name || "Desconhecida",
+          card_number: emp?.card_number || "-",
         };
       });
 
@@ -170,21 +182,30 @@ export function PharmacyBenefitsTab() {
       .from("employee_pharmacy_benefits")
       .select(`
         id, employee_id, reference_month, value, coupons,
-        employees (name, registration_number, companies(name, trading_name))
+        employees (name, registration_number, companies(name, trading_name), employee_benefits(benefit_name))
       `)
       .eq("reference_month", historyMonth);
 
     if (data) {
-      const mapped = data.map((r: any) => ({
-        id: r.id,
-        employee_id: r.employee_id,
-        reference_month: r.reference_month,
-        value: r.value,
-        coupons: r.coupons,
-        employee_name: r.employees?.name || "Desconhecido",
-        registration_number: r.employees?.registration_number || "",
-        company_name: r.employees?.companies?.trading_name || r.employees?.companies?.name || "Sem Empresa"
-      }));
+      const mapped = data.map((r: any) => {
+        const farmaciaBenefit = r.employees?.employee_benefits?.find((b: any) => b.benefit_name.toLowerCase().includes("farmácia") || b.benefit_name.toLowerCase().includes("farmacia"));
+        let card_number = "-";
+        if (farmaciaBenefit) {
+          const cardMatch = farmaciaBenefit.benefit_name.match(/- Cartão (.*)/i);
+          if (cardMatch) card_number = cardMatch[1].trim();
+        }
+        return {
+          id: r.id,
+          employee_id: r.employee_id,
+          reference_month: r.reference_month,
+          value: r.value,
+          coupons: r.coupons,
+          employee_name: r.employees?.name || "Desconhecido",
+          registration_number: r.employees?.registration_number || "",
+          company_name: r.employees?.companies?.trading_name || r.employees?.companies?.name || "Sem Empresa",
+          card_number
+        };
+      });
       setHistoryData(mapped);
     }
     setLoadingHistory(false);
@@ -279,6 +300,7 @@ export function PharmacyBenefitsTab() {
                           <tr>
                             <th className="p-2 text-left font-medium">Matrícula</th>
                             <th className="p-2 text-left font-medium">Colaborador</th>
+                            <th className="p-2 text-left font-medium">Cartão</th>
                             <th className="p-2 text-right font-medium">Valor (R$)</th>
                             <th className="p-2 text-right font-medium">Cupons</th>
                             <th className="p-2 text-center font-medium">Status</th>
@@ -288,12 +310,13 @@ export function PharmacyBenefitsTab() {
                           {groupedImport.keys.map(company => (
                             <React.Fragment key={company}>
                               <tr className="bg-muted/50">
-                                <td colSpan={5} className="p-2 font-bold text-primary">{company}</td>
+                                <td colSpan={6} className="p-2 font-bold text-primary">{company}</td>
                               </tr>
                               {groupedImport.groups[company].map((row, idx) => (
                                 <tr key={`${company}-${idx}`} className="border-t hover:bg-muted/30">
                                   <td className="p-2">{row.matricula}</td>
                                   <td className="p-2">{row.nome}</td>
+                                  <td className="p-2">{row.card_number || "-"}</td>
                                   <td className="p-2 text-right">{row.valor.toFixed(2)}</td>
                                   <td className="p-2 text-right">{row.cupons}</td>
                                   <td className="p-2 text-center">
@@ -381,6 +404,7 @@ export function PharmacyBenefitsTab() {
                       <tr>
                         <th className="p-2 text-left font-medium">Matrícula</th>
                         <th className="p-2 text-left font-medium">Colaborador</th>
+                        <th className="p-2 text-left font-medium">Cartão</th>
                         <th className="p-2 text-left font-medium">Empresa</th>
                         <th className="p-2 text-right font-medium">Valor (R$)</th>
                         <th className="p-2 text-right font-medium">Cupons</th>
@@ -389,13 +413,14 @@ export function PharmacyBenefitsTab() {
                     <tbody>
                       {loadingHistory ? (
                         <tr>
-                          <td colSpan={5} className="p-4 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></td>
+                          <td colSpan={6} className="p-4 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></td>
                         </tr>
                       ) : filteredHistory.length > 0 ? (
                         filteredHistory.map((row) => (
                           <tr key={row.id} className="border-t hover:bg-muted/30">
                             <td className="p-2">{row.registration_number}</td>
                             <td className="p-2">{row.employee_name}</td>
+                            <td className="p-2">{row.card_number || "-"}</td>
                             <td className="p-2">{row.company_name}</td>
                             <td className="p-2 text-right">{row.value.toFixed(2)}</td>
                             <td className="p-2 text-right">{row.coupons}</td>
@@ -403,7 +428,7 @@ export function PharmacyBenefitsTab() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="p-4 text-center text-muted-foreground">Nenhum registro para este mês.</td>
+                          <td colSpan={6} className="p-4 text-center text-muted-foreground">Nenhum registro para este mês.</td>
                         </tr>
                       )}
                     </tbody>

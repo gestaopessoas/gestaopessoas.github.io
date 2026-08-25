@@ -445,6 +445,11 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
   // For benefit levels selection
   const [levelSelectBenefit, setLevelSelectBenefit] = useState<{ id: string, name: string, level_values: Record<string, number> } | null>(null);
   const [selectedLevelForBenefit, setSelectedLevelForBenefit] = useState<string>("");
+  
+  // For benefit card selection
+  const [cardSelectBenefit, setCardSelectBenefit] = useState<{ id: string, name: string } | null>(null);
+  const [selectedCardForBenefit, setSelectedCardForBenefit] = useState<string>("");
+  
   const [benefitError, setBenefitError] = useState("");
 
   const load = useCallback(async () => {
@@ -531,6 +536,37 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
           </DialogContent>
         </Dialog>
       )}
+
+      {cardSelectBenefit && (
+        <Dialog open={!!cardSelectBenefit} onOpenChange={(open) => { if (!open) setCardSelectBenefit(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Número do Cartão - {cardSelectBenefit.name}</DialogTitle>
+              <DialogDescription>Informe o número do cartão para este benefício.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-3">
+              <Label>Número do Cartão / Cadastro</Label>
+              <Input 
+                value={selectedCardForBenefit} 
+                onChange={(e) => setSelectedCardForBenefit(e.target.value)} 
+                placeholder="Ex: 123456789"
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCardSelectBenefit(null)}>Cancelar</Button>
+              <Button type="button" disabled={!selectedCardForBenefit} onClick={async () => {
+                if (selectedCardForBenefit && cardSelectBenefit) {
+                  const saved = await add("employee_benefits", {
+                    benefit_name: `${cardSelectBenefit.name} - Cartão ${selectedCardForBenefit}`,
+                  });
+                  if (saved !== false) setCardSelectBenefit(null);
+                }
+              }}>Confirmar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       
       <details className="rounded-md border p-3" open>
         <summary className="cursor-pointer font-medium select-none">Benefícios ({benefits.length})</summary>
@@ -550,6 +586,9 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
                         if (b.level_values && Object.keys(b.level_values).length > 0) {
                           setSelectedLevelForBenefit("");
                           setLevelSelectBenefit({ id: b.id, name: b.name, level_values: b.level_values });
+                        } else if (b.name.toLowerCase().includes("farmácia") || b.name.toLowerCase().includes("farmacia")) {
+                          setSelectedCardForBenefit("");
+                          setCardSelectBenefit({ id: b.id, name: b.name });
                         } else {
                           add("employee_benefits", { benefit_name: b.name });
                         }
