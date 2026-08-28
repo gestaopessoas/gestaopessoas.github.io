@@ -62,3 +62,9 @@ verify-permissions.mjs
 
 # stray files
 /types.ts
+/playwright-report
+/.superpowers
+/playwright-report
+/playwright-report
+/playwright-report
+/test-results
