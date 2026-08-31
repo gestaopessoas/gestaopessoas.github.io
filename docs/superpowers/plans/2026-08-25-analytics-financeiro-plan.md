@@ -167,7 +167,7 @@ git commit -m "refactor(ui): update financeiro page"
 - Consumes: `get_global_analytics_data`
 - Produces: New dashboard at `/dashboard/analytics`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // e2e/global-analytics.spec.ts
@@ -178,21 +178,21 @@ test('Global analytics page renders charts', async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx playwright test e2e/global-analytics.spec.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `analytics/page.tsx`. Use `get_global_analytics_data`. Implement total summary cards and Recharts graphs.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx playwright test e2e/global-analytics.spec.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/dashboard/analytics e2e/global-analytics.spec.ts
