@@ -1,33 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { calculateFinancialCosts, type EmployeeBenefitStatus } from "./lib/financialCosts";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Download, Save, Undo2, Lock } from "lucide-react";
+import { Download, Undo2 } from "lucide-react";
 
 type FinancialRecord = {
   employee_id: string;
   name: string;
-  registration_number: string;
   company_name: string;
   cost_center_name: string;
+  department_name: string;
   base_salary: number;
   variable_salary: number;
   commission: number;
   encargos: number;
-  alimentacao: number;
-  vr: number;
-  seguro: number;
-  odonto: number;
-  sulclinica: number;
-  total: number;
-  status: string;
+  benefit_seguro: number;
+  benefit_odonto: number;
+  benefit_vr: number;
+  benefit_va: number;
+  uniform_count: number;
+  absence_days: number;
+  absence_cost: number;
+  termination_estimate: number;
 };
 
 const MONTHS = [
@@ -40,181 +39,78 @@ export default function FinanceiroPage() {
   const [loading, setLoading] = useState(false);
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [status, setStatus] = useState<string>("Em Andamento");
-  const [seguroUnitCost, setSeguroUnitCost] = useState<number>(15);
-  const [almocoUnitCost, setAlmocoUnitCost] = useState<number>(25);
-  const [benefitStats, setBenefitStats] = useState({ seguroTotal: 0, almocoTotal: 0, seguroCount: 0, almocoCount: 0 });
 
-  const [isRevertModalOpen, setIsRevertModalOpen] = useState(false);
-  const [password, setPassword] = useState("");
-  const [reverting, setReverting] = useState(false);
-
-  const [saving, setSaving] = useState(false);
-  const [isSaveConfirmOpen, setIsSaveConfirmOpen] = useState(false);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
-    const { data: records, error } = await supabase.rpc("get_employee_financials", {
+    const { data: records, error } = await supabase.rpc("get_global_analytics_data", {
       p_month: month,
       p_year: year
     });
-    
+
     if (error) {
       console.error(error);
       alert("Erro ao carregar dados financeiros.");
     } else {
-      setData(records || []);
-      if (records && records.length > 0) {
-        setStatus(records[0].status);
-      } else {
-        setStatus("Em Andamento");
-      }
+      setData((records as FinancialRecord[]) || []);
     }
     setLoading(false);
-  };
+  }, [month, year]);
 
   useEffect(() => {
     const run = async () => { await loadData(); };
     run();
-  }, [month, year]);
-
-  // Seguro de Vida (employee_benefits) e Almoço (lunch_lists confirmado no mês) —
-  // colaborador desligado no meio do período conta o custo cheio, sem pró-rata
-  // (calculateFinancialCosts não olha status/data, só se tem o benefício).
-  useEffect(() => {
-    const run = async () => {
-      if (data.length === 0) {
-        setBenefitStats({ seguroTotal: 0, almocoTotal: 0, seguroCount: 0, almocoCount: 0 });
-        return;
-      }
-      const supabase = createClient();
-      const employeeIds = data.map((d) => d.employee_id);
-      const monthStr = String(month).padStart(2, "0");
-      const monthStart = `${year}-${monthStr}-01`;
-      const monthEnd = new Date(year, month, 0).toISOString().split("T")[0];
-
-      const [{ data: seguroRows }, { data: lunchRows }] = await Promise.all([
-        supabase.from("employee_benefits").select("employee_id").eq("benefit_name", "Seguro de Vida").in("employee_id", employeeIds),
-        supabase.from("lunch_lists").select("employee_id").eq("status", "CONFIRMED").gte("lunch_date", monthStart).lte("lunch_date", monthEnd).in("employee_id", employeeIds),
-      ]);
-
-      const seguroIds = new Set((seguroRows ?? []).map((r) => r.employee_id));
-      const almocoIds = new Set((lunchRows ?? []).map((r) => r.employee_id));
-
-      const employeesForCalc: EmployeeBenefitStatus[] = data.map((d) => ({
-        id: d.employee_id,
-        name: d.name,
-        hasSeguroVida: seguroIds.has(d.employee_id),
-        hasAlmoco: almocoIds.has(d.employee_id),
-        status: d.status,
-      }));
-
-      setBenefitStats(calculateFinancialCosts(employeesForCalc, seguroUnitCost, almocoUnitCost));
-    };
-    run();
-  }, [data, seguroUnitCost, almocoUnitCost, month, year]);
-
-  const handleSaveSnapshot = async () => {
-    setSaving(true);
-    const supabase = createClient();
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) {
-      alert("Sessão expirada.");
-      return;
-    }
-    
-    const { error } = await supabase.rpc("save_financial_snapshot", {
-      p_month: month,
-      p_year: year,
-      p_user_id: user.user.id
-    });
-
-    setSaving(false);
-    if (error) {
-      alert("Erro ao salvar fechamento: " + error.message);
-    } else {
-      alert("Fechamento realizado com sucesso!");
-      loadData();
-    }
-  };
-
-  const handleRevert = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setReverting(true);
-    const supabase = createClient();
-    const { data: user } = await supabase.auth.getUser();
-    
-    if (!user.user?.email) return;
-
-    // Verify password by attempting to sign in
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: user.user.email,
-      password: password
-    });
-
-    if (authError) {
-      alert("Senha incorreta.");
-      setReverting(false);
-      return;
-    }
-
-    // Password correct, proceed to revert
-    const { error: deleteError } = await supabase
-      .from("financial_snapshots")
-      .delete()
-      .eq("month", month)
-      .eq("year", year);
-
-    // Log the revert action
-    await supabase.from("system_audit_logs").insert({
-      action_type: "REVERT_FINANCIAL_SNAPSHOT",
-      entity_name: "financial_snapshots",
-      user_identifier: user.user.email,
-    });
-
-    setReverting(false);
-    setIsRevertModalOpen(false);
-    setPassword("");
-
-    if (deleteError) {
-      alert("Erro ao reverter fechamento: " + deleteError.message);
-    } else {
-      alert("Fechamento revertido com sucesso.");
-      loadData();
-    }
-  };
+  }, [loadData]);
 
   const exportCsv = () => {
     if (data.length === 0) return;
     const headers = [
-      "Colaborador", "Matrícula", "Empresa", "Centro de Custo", 
-      "Salário Base", "Variável", "Comissão", "Encargos", 
-      "Alimentação", "VR", "Seguro", "Odonto", "Sulclinica", "Custo Total"
+      "Colaborador", "Empresa", "Centro de Custo", "Setor",
+      "Salário Base", "Variável", "Comissão", "Encargos",
+      "Seguro", "Odonto", "VR", "VA",
+      "Uniformes (qtd)", "Dias de Falta", "Custo de Faltas",
+      "Rescisão Estimada", "Custo Total"
     ];
-    
-    const rows = data.map(r => [
-      `"${r.name || ''}"`, 
-      `"${r.registration_number || ''}"`, 
-      `"${r.company_name || ''}"`, 
-      `"${r.cost_center_name || ''}"`, 
-      r.base_salary || 0,
-      r.variable_salary || 0,
-      r.commission || 0,
-      r.encargos || 0,
-      r.alimentacao || 0,
-      r.vr || 0,
-      r.seguro || 0,
-      r.odonto || 0,
-      r.sulclinica || 0,
-      r.total || 0
-    ].join(","));
-    
+
+    const rows = data.map(r => {
+      const total =
+        Number(r.base_salary || 0) +
+        Number(r.variable_salary || 0) +
+        Number(r.commission || 0) +
+        Number(r.encargos || 0) +
+        Number(r.benefit_seguro || 0) +
+        Number(r.benefit_odonto || 0) +
+        Number(r.benefit_vr || 0) +
+        Number(r.benefit_va || 0) +
+        Number(r.absence_cost || 0) +
+        Number(r.termination_estimate || 0);
+
+      return [
+        `"${r.name || ''}"`,
+        `"${r.company_name || ''}"`,
+        `"${r.cost_center_name || ''}"`,
+        `"${r.department_name || ''}"`,
+        r.base_salary || 0,
+        r.variable_salary || 0,
+        r.commission || 0,
+        r.encargos || 0,
+        r.benefit_seguro || 0,
+        r.benefit_odonto || 0,
+        r.benefit_vr || 0,
+        r.benefit_va || 0,
+        r.uniform_count || 0,
+        r.absence_days || 0,
+        r.absence_cost || 0,
+        r.termination_estimate || 0,
+        total
+      ].join(",");
+    });
+
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `financeiro_${MONTHS[month-1]}_${year}.csv`);
+    link.setAttribute("download", `financeiro_${MONTHS[month - 1]}_${year}.csv`);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -229,42 +125,44 @@ export default function FinanceiroPage() {
     acc.variable_salary += Number(curr.variable_salary || 0);
     acc.commission += Number(curr.commission || 0);
     acc.encargos += Number(curr.encargos || 0);
-    acc.alimentacao += Number(curr.alimentacao || 0);
-    acc.vr += Number(curr.vr || 0);
-    acc.seguro += Number(curr.seguro || 0);
-    acc.odonto += Number(curr.odonto || 0);
-    acc.sulclinica += Number(curr.sulclinica || 0);
-    acc.total += Number(curr.total || 0);
+    acc.benefit_seguro += Number(curr.benefit_seguro || 0);
+    acc.benefit_odonto += Number(curr.benefit_odonto || 0);
+    acc.benefit_vr += Number(curr.benefit_vr || 0);
+    acc.benefit_va += Number(curr.benefit_va || 0);
+    acc.absence_cost += Number(curr.absence_cost || 0);
+    acc.termination_estimate += Number(curr.termination_estimate || 0);
     return acc;
   }, {
-    base_salary: 0, variable_salary: 0, commission: 0, encargos: 0, 
-    alimentacao: 0, vr: 0, seguro: 0, odonto: 0, sulclinica: 0, total: 0
+    base_salary: 0, variable_salary: 0, commission: 0, encargos: 0,
+    benefit_seguro: 0, benefit_odonto: 0, benefit_vr: 0, benefit_va: 0,
+    absence_cost: 0, termination_estimate: 0
   });
+
+  const grandTotal =
+    totals.base_salary +
+    totals.variable_salary +
+    totals.commission +
+    totals.encargos +
+    totals.benefit_seguro +
+    totals.benefit_odonto +
+    totals.benefit_vr +
+    totals.benefit_va +
+    totals.absence_cost +
+    totals.termination_estimate;
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
-            Resumo Financeiro e Fechamento
-            {status === 'Fechado' && <span className="ml-2 inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">Fechado</span>}
-            {status !== 'Fechado' && <span className="ml-2 inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20">Aberto</span>}
+            Resumo Financeiro
           </h1>
-          <p className="text-sm text-muted-foreground">Visualize e realize o fechamento do custo de pessoal mês a mês.</p>
+          <p className="text-sm text-muted-foreground">Visualize o custo de pessoal mês a mês de forma analítica.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportCsv} disabled={data.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          {status === 'Fechado' ? (
-            <Button variant="destructive" onClick={() => setIsRevertModalOpen(true)}>
-              <Undo2 className="mr-2 h-4 w-4" /> Reverter Fechamento
-            </Button>
-          ) : (
-            <Button onClick={() => setIsSaveConfirmOpen(true)} disabled={saving || data.length === 0}>
-              <Save className="mr-2 h-4 w-4" /> {saving ? "Salvando..." : "Salvar Fechamento"}
-            </Button>
-          )}
         </div>
       </header>
 
@@ -272,8 +170,8 @@ export default function FinanceiroPage() {
         <div className="space-y-1">
           <Label>Mês</Label>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="icon"
               onClick={() => {
                 if (month === 1) {
@@ -286,8 +184,8 @@ export default function FinanceiroPage() {
             >
               <Undo2 className="h-4 w-4" />
             </Button>
-            <select 
-              value={month} 
+            <select
+              value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
               className="flex h-10 w-32 rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
@@ -295,8 +193,8 @@ export default function FinanceiroPage() {
                 <option key={m} value={i + 1}>{m}</option>
               ))}
             </select>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="icon"
               onClick={() => {
                 if (month === 12) {
@@ -317,33 +215,40 @@ export default function FinanceiroPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-muted-foreground" /> 
-              Custo: Seguro de Vida
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              Total de Encargos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(benefitStats.seguroTotal)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {benefitStats.seguroCount} elegíveis × <input type="number" className="w-16 h-6 border rounded px-1 text-right inline-block ml-1" value={seguroUnitCost} onChange={(e) => setSeguroUnitCost(Number(e.target.value))} /> /cada
-            </p>
+            <div className="text-2xl font-bold">{formatCurrency(totals.encargos)}</div>
           </CardContent>
         </Card>
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-muted-foreground" /> 
-              Custo: Almoço na Empresa
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              Total de Benefícios
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(benefitStats.almocoTotal)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {benefitStats.almocoCount} elegíveis × <input type="number" className="w-16 h-6 border rounded px-1 text-right inline-block ml-1" value={almocoUnitCost} onChange={(e) => setAlmocoUnitCost(Number(e.target.value))} /> /cada
-            </p>
+            <div className="text-2xl font-bold">
+              {formatCurrency(totals.benefit_seguro + totals.benefit_odonto + totals.benefit_vr + totals.benefit_va)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              Custo Total da Folha
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(grandTotal)}</div>
           </CardContent>
         </Card>
       </div>
@@ -353,98 +258,83 @@ export default function FinanceiroPage() {
           <thead className="border-b bg-muted/40 text-left">
             <tr>
               <th className="p-3 font-medium">Colaborador</th>
+              <th className="p-3 font-medium">Setor</th>
               <th className="p-3 font-medium text-right">Salário Base</th>
               <th className="p-3 font-medium text-right">Variável/Comissão</th>
               <th className="p-3 font-medium text-right">Encargos</th>
               <th className="p-3 font-medium text-right text-muted-foreground text-xs">VA/VR</th>
               <th className="p-3 font-medium text-right text-muted-foreground text-xs">Saúde/Odonto</th>
               <th className="p-3 font-medium text-right text-muted-foreground text-xs">Seguro</th>
+              <th className="p-3 font-medium text-right text-muted-foreground text-xs">Uniformes</th>
+              <th className="p-3 font-medium text-right text-muted-foreground text-xs">Faltas</th>
+              <th className="p-3 font-medium text-right text-muted-foreground text-xs">Rescisão</th>
               <th className="p-3 font-medium text-right font-bold">Custo Total</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">Carregando dados financeiros...</td></tr>
+              <tr><td colSpan={12} className="p-8 text-center text-muted-foreground">Carregando dados financeiros...</td></tr>
             ) : data.length === 0 ? (
-              <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">Nenhum registro encontrado para este período.</td></tr>
+              <tr><td colSpan={12} className="p-8 text-center text-muted-foreground">Nenhum registro encontrado para este período.</td></tr>
             ) : (
               <>
-                {data.map((r, i) => (
-                  <tr key={`${r.employee_id}-${i}`} className="border-b last:border-0 hover:bg-muted/30">
-                    <td className="p-3">
-                      <div className="font-medium">{r.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {r.company_name} {r.cost_center_name ? `• ${r.cost_center_name}` : ''}
-                      </div>
-                    </td>
-                    <td className="p-3 text-right">{formatCurrency(r.base_salary)}</td>
-                    <td className="p-3 text-right">{formatCurrency(Number(r.variable_salary) + Number(r.commission))}</td>
-                    <td className="p-3 text-right text-purple-700">{formatCurrency(r.encargos)}</td>
-                    <td className="p-3 text-right text-muted-foreground">{formatCurrency(Number(r.alimentacao) + Number(r.vr))}</td>
-                    <td className="p-3 text-right text-muted-foreground">{formatCurrency(Number(r.odonto) + Number(r.sulclinica))}</td>
-                    <td className="p-3 text-right text-muted-foreground">{formatCurrency(r.seguro)}</td>
-                    <td className="p-3 text-right font-bold">{formatCurrency(r.total)}</td>
-                  </tr>
-                ))}
+                {data.map((r, i) => {
+                  const total =
+                    Number(r.base_salary || 0) +
+                    Number(r.variable_salary || 0) +
+                    Number(r.commission || 0) +
+                    Number(r.encargos || 0) +
+                    Number(r.benefit_seguro || 0) +
+                    Number(r.benefit_odonto || 0) +
+                    Number(r.benefit_vr || 0) +
+                    Number(r.benefit_va || 0) +
+                    Number(r.absence_cost || 0) +
+                    Number(r.termination_estimate || 0);
+
+                  return (
+                    <tr key={`${r.employee_id}-${i}`} className="border-b last:border-0 hover:bg-muted/30">
+                      <td className="p-3">
+                        <div className="font-medium">{r.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {r.company_name} {r.cost_center_name ? `• ${r.cost_center_name}` : ''}
+                        </div>
+                      </td>
+                      <td className="p-3 text-muted-foreground">{r.department_name}</td>
+                      <td className="p-3 text-right">{formatCurrency(r.base_salary)}</td>
+                      <td className="p-3 text-right">{formatCurrency(Number(r.variable_salary) + Number(r.commission))}</td>
+                      <td className="p-3 text-right text-purple-700">{formatCurrency(r.encargos)}</td>
+                      <td className="p-3 text-right text-muted-foreground">{formatCurrency(Number(r.benefit_va) + Number(r.benefit_vr))}</td>
+                      <td className="p-3 text-right text-muted-foreground">{formatCurrency(Number(r.benefit_odonto))}</td>
+                      <td className="p-3 text-right text-muted-foreground">{formatCurrency(r.benefit_seguro)}</td>
+                      <td className="p-3 text-right text-muted-foreground">{r.uniform_count || 0}</td>
+                      <td className="p-3 text-right text-muted-foreground">
+                        {r.absence_days || 0} <span className="text-xs">({formatCurrency(r.absence_cost)})</span>
+                      </td>
+                      <td className="p-3 text-right text-muted-foreground">{formatCurrency(r.termination_estimate)}</td>
+                      <td className="p-3 text-right font-bold">{formatCurrency(total)}</td>
+                    </tr>
+                  );
+                })}
                 {/* Total Row */}
                 <tr className="bg-muted/60 border-t-2 font-bold">
                   <td className="p-3">TOTAIS DA EMPRESA</td>
+                  <td className="p-3" />
                   <td className="p-3 text-right">{formatCurrency(totals.base_salary)}</td>
                   <td className="p-3 text-right">{formatCurrency(totals.variable_salary + totals.commission)}</td>
                   <td className="p-3 text-right text-purple-700">{formatCurrency(totals.encargos)}</td>
-                  <td className="p-3 text-right">{formatCurrency(totals.alimentacao + totals.vr)}</td>
-                  <td className="p-3 text-right">{formatCurrency(totals.odonto + totals.sulclinica)}</td>
-                  <td className="p-3 text-right">{formatCurrency(totals.seguro)}</td>
-                  <td className="p-3 text-right text-lg text-primary">{formatCurrency(totals.total + benefitStats.seguroTotal + benefitStats.almocoTotal)}</td>
+                  <td className="p-3 text-right">{formatCurrency(totals.benefit_va + totals.benefit_vr)}</td>
+                  <td className="p-3 text-right">{formatCurrency(totals.benefit_odonto)}</td>
+                  <td className="p-3 text-right">{formatCurrency(totals.benefit_seguro)}</td>
+                  <td className="p-3 text-right" />
+                  <td className="p-3 text-right">{formatCurrency(totals.absence_cost)}</td>
+                  <td className="p-3 text-right">{formatCurrency(totals.termination_estimate)}</td>
+                  <td className="p-3 text-right text-lg text-primary">{formatCurrency(grandTotal)}</td>
                 </tr>
               </>
             )}
           </tbody>
         </table>
       </div>
-
-      <Dialog open={isRevertModalOpen} onOpenChange={setIsRevertModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive"><Lock className="h-5 w-5" /> Autenticação Necessária</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm mb-4 text-muted-foreground">
-              Para reverter o fechamento, é necessário confirmar sua senha de administrador. Esta ação será registrada no painel de logs do administrador.
-            </p>
-            <form onSubmit={handleRevert} id="revert-form">
-              <Label>Senha atual</Label>
-              <Input 
-                type="password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                required 
-                className="mt-1"
-                placeholder="Digite sua senha de login"
-              />
-            </form>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRevertModalOpen(false)}>Cancelar</Button>
-            <Button type="submit" form="revert-form" variant="destructive" disabled={reverting}>
-              {reverting ? "Autenticando..." : "Confirmar e Reverter"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isSaveConfirmOpen} onOpenChange={setIsSaveConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Realizar fechamento do mês?</DialogTitle>
-            <DialogDescription>Deseja realizar o fechamento deste mês? Os valores serão congelados no histórico.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSaveConfirmOpen(false)}>Cancelar</Button>
-            <Button onClick={() => { setIsSaveConfirmOpen(false); void handleSaveSnapshot(); }}>Confirmar Fechamento</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

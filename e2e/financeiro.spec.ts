@@ -13,16 +13,21 @@ test.describe('Financeiro (Issue #29)', () => {
     await page.waitForURL('**/dashboard**', { timeout: 10000 });
   });
 
-  test('Deve exibir cards de Seguro de Vida e Almoço', async ({ page }) => {
-    // Ir para Financeiro
+  test('Financeiro page renders without snapshot buttons', async ({ page }) => {
     await page.goto('http://localhost:3000/dashboard/financeiro');
-    
-    // Aguardar o texto dos cards
-    await expect(page.locator('text=Custo: Seguro de Vida')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('text=Custo: Almoço na Empresa')).toBeVisible();
-    
-    // Verificar se existe um input editável para cada
-    const inputs = page.locator('input[type="number"]');
-    await expect(inputs).toHaveCount(3); // Ano, Seguro Unit, Almoço Unit
+
+    // Snapshot/fechamento UI must be gone
+    await expect(page.locator('text=Salvar Fechamento')).toHaveCount(0);
+    await expect(page.locator('text=Reverter Fechamento')).toHaveCount(0);
+
+    // Heading and table load
+    await expect(page.locator('h1')).toContainText('Resumo Financeiro');
+    await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
+
+    // New analytical columns are present
+    await expect(page.locator('th:has-text("Setor")')).toBeVisible();
+    await expect(page.locator('th:has-text("Uniformes")')).toBeVisible();
+    await expect(page.locator('th:has-text("Faltas")')).toBeVisible();
+    await expect(page.locator('th:has-text("Rescisão")')).toBeVisible();
   });
 });
