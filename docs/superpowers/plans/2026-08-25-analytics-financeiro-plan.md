@@ -72,7 +72,7 @@ git commit -m "refactor: rename analytics to metricas-recrutamento"
 - Consumes: `employees`, `companies`, `cost_centers`, `departments`, `employee_benefits`, `employee_uniforms`, `time_logs`
 - Produces: `get_global_analytics_data(p_month integer, p_year integer)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```javascript
 // test-global-analytics-rpc.mjs
@@ -90,21 +90,21 @@ async function run() {
 run();
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node test-global-analytics-rpc.mjs`
 Expected: FAIL
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Write `supabase/migrations/20260825_create_global_analytics_rpc.sql` returning employee details, salários, encargos, benefícios, uniformes e faltas estimadas. Apply the migration using Supabase CLI.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node test-global-analytics-rpc.mjs`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add supabase/migrations/ test-global-analytics-rpc.mjs
