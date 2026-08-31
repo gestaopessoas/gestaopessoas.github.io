@@ -68,3 +68,5 @@ verify-permissions.mjs
 /playwright-report
 /playwright-report
 /test-results
+/test-results
+/playwright-report
