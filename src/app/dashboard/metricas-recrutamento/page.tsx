@@ -12,7 +12,8 @@ const MONTH_LABELS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "s
 // Guard: datas absurdas (ano < 1950 ou > 2030) são lixo de migração — mesmo critério de turnover/page.tsx
 const isReasonableDate = (d: Date) => d.getFullYear() >= 1950 && d.getFullYear() <= 2030;
 
-type Employee = { id: string; status: string | null; admission_date: string | null; workplaces: { name: string }[]; cost_centers: { name: string }[] };
+type Employee = { id: string; status: string | null; admission_date: string | null; dismissed_at: string | null; workplaces: { name: string } | null; cost_centers: { name: string } | null };
+type StatusChange = { change_date: string; new_value: unknown };
 type JobRequest = { id: string; status: string | null; urgency: string | null; created_at: string | null };
 type Candidate = { id: string; created_at: string | null; role_interest: string | null };
 type Application = { id: string; status: string | null; created_at: string | null };
@@ -24,6 +25,7 @@ export default function MetricasRecrutamentoPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [openings, setOpenings] = useState<JobOpening[]>([]);
+  const [leaveChanges, setLeaveChanges] = useState<StatusChange[]>([]);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -32,27 +34,30 @@ export default function MetricasRecrutamentoPage() {
 
     const load = async () => {
       const supabase = createClient();
-      const [employeeResult, requestResult, candidateResult, applicationResult, openingResult] = await Promise.all([
-        supabase.from("employees").select("id,status,admission_date,workplaces!employees_workplace_id_fkey(name),cost_centers(name:code)").limit(10000),
+      const [employeeResult, requestResult, candidateResult, applicationResult, openingResult, leaveResult] = await Promise.all([
+        supabase.from("employees").select("id,status,admission_date,dismissed_at,workplaces!employees_workplace_id_fkey(name),cost_centers(name:code)").limit(10000),
         supabase.from("job_requests").select("id,status,urgency,created_at").limit(10000),
         supabase.from("candidates").select("id,created_at,role_interest").limit(10000),
         supabase.from("job_applications").select("id,status,created_at").limit(10000),
         supabase.from("job_openings").select("id,status").limit(10000),
+        supabase.from("employee_history").select("change_date,new_value").eq("column_name", "status").eq("new_value", '"Afastado"').limit(10000),
       ]);
 
       if (!active) return;
       setLoading(false);
-      setEmployees((employeeResult.data ?? []) as Employee[]);
+      setEmployees((employeeResult.data ?? []) as unknown as Employee[]);
       setRequests((requestResult.data ?? []) as JobRequest[]);
       setCandidates((candidateResult.data ?? []) as Candidate[]);
       setApplications((applicationResult.data ?? []) as Application[]);
       setOpenings((openingResult.data ?? []) as JobOpening[]);
+      setLeaveChanges((leaveResult.data ?? []) as StatusChange[]);
       setErrors([
         employeeResult.error && `Colaboradores (${employeeResult.error.message})`,
         requestResult.error && `Solicitações de vaga (${requestResult.error.message})`,
         candidateResult.error && `Banco de talentos (${candidateResult.error.message})`,
         applicationResult.error && `Candidaturas/admissão (${applicationResult.error.message})`,
         openingResult.error && `Vagas abertas (${openingResult.error.message})`,
+        leaveResult.error && `Histórico de afastamentos (${leaveResult.error.message})`,
       ].filter(Boolean) as string[]);
     };
 
@@ -82,9 +87,9 @@ export default function MetricasRecrutamentoPage() {
   const applicationStatus = countBy(applications.map((item) => item.status || "Sem status"));
   
   const activeForUnits = employees.filter((item) => !["Inativo", "Desligado", "Arquivo Morto", "inactive"].includes(item.status ?? ""));
-  const units = countBy(activeForUnits.map((item) => item.workplaces?.[0]?.name || item.cost_centers?.[0]?.name || "Sem alocação"));
+  const units = countBy(activeForUnits.map((item) => item.workplaces?.name || item.cost_centers?.name || "Sem alocação"));
 
-  const admissionsByMonth = useMemo(() => {
+  const buildMonthlyBuckets = (dates: (string | null | undefined)[]) => {
     const now = new Date();
     const buckets: { key: string; label: string; count: number }[] = [];
     for (let i = 11; i >= 0; i -= 1) {
@@ -92,16 +97,29 @@ export default function MetricasRecrutamentoPage() {
       buckets.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: `${MONTH_LABELS[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`, count: 0 });
     }
     const byKey = new Map(buckets.map((b) => [b.key, b]));
-    employees.forEach((emp) => {
-      if (!emp.admission_date) return;
-      const d = new Date(emp.admission_date);
+    dates.forEach((raw) => {
+      if (!raw) return;
+      const d = new Date(raw);
       if (!isReasonableDate(d)) return;
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       const bucket = byKey.get(key);
       if (bucket) bucket.count += 1;
     });
     return buckets;
-  }, [employees]);
+  };
+
+  const admissionsByMonth = useMemo(
+    () => buildMonthlyBuckets(employees.map((emp) => emp.admission_date)),
+    [employees]
+  );
+  const dismissalsByMonth = useMemo(
+    () => buildMonthlyBuckets(employees.filter((emp) => emp.status === "Desligado").map((emp) => emp.dismissed_at)),
+    [employees]
+  );
+  const leavesByMonth = useMemo(
+    () => buildMonthlyBuckets(leaveChanges.map((c) => c.change_date)),
+    [leaveChanges]
+  );
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -130,25 +148,11 @@ export default function MetricasRecrutamentoPage() {
           <StatusCard title="Headcount por alocação" description={`${activeForUnits.length} colaboradores ativos`} data={units} limit={8} />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg"><TrendingUp className="h-5 w-5" /> Admissões por mês</CardTitle>
-            <CardDescription>Últimos 12 meses, por data de admissão do colaborador.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[240px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={admissionsByMonth} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="label" tick={{ fill: "currentColor", fontSize: 11 }} />
-                  <YAxis allowDecimals={false} tick={{ fill: "currentColor", fontSize: 11 }} />
-                  <Tooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
-                  <Bar dataKey="count" name="Admissões" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <MonthlyBarCard title="Admissões por mês" description="Últimos 12 meses, por data de admissão do colaborador." data={admissionsByMonth} seriesName="Admissões" color="#6366f1" />
+          <MonthlyBarCard title="Demissões por mês" description="Últimos 12 meses, por data de desligamento do colaborador." data={dismissalsByMonth} seriesName="Demissões" color="#ef4444" />
+          <MonthlyBarCard title="Afastamentos por mês" description="Últimos 12 meses, por data de início do afastamento." data={leavesByMonth} seriesName="Afastamentos" color="#f59e0b" />
+        </div>
 
         <Card>
           <CardHeader>
@@ -203,6 +207,42 @@ function StatusCard({ title, description, data, limit = 6 }: { title: string; de
             </div>
           </div>
         ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MonthlyBarCard({
+  title,
+  description,
+  data,
+  seriesName,
+  color
+}: {
+  title: string;
+  description: string;
+  data: { label: string; count: number }[];
+  seriesName: string;
+  color: string;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg"><TrendingUp className="h-5 w-5" /> {title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[240px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="label" tick={{ fill: "currentColor", fontSize: 11 }} />
+              <YAxis allowDecimals={false} tick={{ fill: "currentColor", fontSize: 11 }} />
+              <Tooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
+              <Bar dataKey="count" name={seriesName} fill={color} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   );
