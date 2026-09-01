@@ -1,0 +1,48 @@
+{
+  "run_id": "20260901-175750",
+  "state": "COMPLETED",
+  "runtime": "claude-code",
+  "resolved_models": {
+    "economy": "haiku (Haiku 4.5)",
+    "balanced": "sonnet (Sonnet 5)",
+    "frontier": "opus (Opus 5)"
+  },
+  "repository": {
+    "remote": "https://github.com/gestaopessoas/gestaopessoas.github.io.git",
+    "branch": "main",
+    "base_sha": "af7c003931349ee1a9a631803407b10edbba126c",
+    "working_tree": "clean",
+    "branch_protection": "none (direct push to main is the effective policy)"
+  },
+  "roadmap": "tasks/plan.md - entire file verified already implemented (Fase 1 and Fase 2); no task contract was ever created since there was no remaining implementation work",
+  "current_task": null,
+  "accepted_tasks": [],
+  "correction_cycle": 0,
+  "worktree": null,
+  "last_safe_state": "PREFLIGHT",
+  "next_step": "none - run complete. tasks/plan.md checkbox corrections committed and pushed. Two additional candidates checked and rejected: docs/specs/kanban-recrutamento.md contradicts accepted docs/adr/0003 (kanban was built, found broken, replaced by a list view - reviving it needs a fresh explicit product decision); docs/specs/2026-07-27-reconciliation-engine-design.md has real partial groundwork (scripts/reconciliation_engine/, 4 of ~7 needed parsers, last touched 2026-08-12, no dashboard staging screen) but the spec file has corrupted/garbled text at the end and no test fixtures (real company spreadsheets) are available in this environment - user declined to proceed with it this run.",
+  "active_gates": {
+    "deploy": ".github/workflows/deploy.yml (GitHub Pages, static export, triggers on push to main, no automated health-check step, no automated rollback)",
+    "migrations": "supabase/migrations/*.sql applied directly to production project bnwwdseczwrmmuvallml via Supabase CLI (supabase db push / db query --linked); no staging project",
+    "local_verification": ["npm run lint (eslint)", "npx tsc --noEmit", "npm run build", "npx playwright test (e2e; needs dev server + real Supabase, no isolated test DB)"],
+    "disposable_db": "NOT AVAILABLE - Docker not installed locally, supabase db start / shadow DB unusable; mutating tests would run against the live production Supabase project",
+    "env_vars_local": ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_GEMINI_API_KEY"],
+    "env_vars_ci_secrets": ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "NEXT_PUBLIC_GEMINI_API_KEY", "VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"],
+    "gh_auth": "authenticated as psibrunosg, scopes: gist, read:org, repo, workflow"
+  },
+  "blockers": [
+    {
+      "type": "missing_reproducible_prerequisite",
+      "description": "Selected roadmap (Fase 1) requires migrating live data out of interviews.assessment (JSONB) into new relational tables without loss. No disposable/staging database exists to rehearse this migration safely: Docker is not installed locally (confirmed via bash and PowerShell), so `supabase db start` / shadow-DB diffing is unavailable, and there is no separate staging Supabase project. Any mutating test would run directly against the live production project (bnwwdseczwrmmuvallml).",
+      "asked": "How to obtain a safe rehearsal environment before the migration touches production: install Docker, stand up a throwaway Supabase project, or accept testing directly against production with a verified backup first.",
+      "resolution": "User accepted testing directly against production with a backup first. Superseded before acting on it: verification (see next entry) found Fase 1 already fully implemented, so no migration was performed and this risk was never taken."
+    },
+    {
+      "type": "roadmap_item_already_complete",
+      "description": "Verification before contract creation found supabase/migrations/20260814201509_normalize_interview_assessments.sql (applied to production weeks before this run) already created interview_assessments/interview_assessment_values with RLS, migrated all existing interviews.assessment JSON data losslessly via a recursive flatten function, and DROPPED the interviews.assessment column entirely. src/app/dashboard/entrevistas/page.tsx already reads via the relational join and writes via delete+insert into interview_assessment_values; no JSON write path remains. All 4 Fase 1 checklist items in tasks/plan.md are satisfied in the codebase; the plan file's checkboxes were simply never updated (same stale-checkbox pattern found earlier in docs/superpowers/plans/2026-08-25-analytics-financeiro-plan.md).",
+      "asked": "How to proceed: mark Fase 1 done in tasks/plan.md and stop, or select Fase 2 (candidate tags, benefit levels, onboarding status, training metrics, Big Five ideal profiles) as the roadmap item for this run instead.",
+      "resolution": "User chose Fase 2. Same verification approach applied before contract creation: all 5 Fase 2 items also already implemented on 2026-08-14 (20260814202424_normalize_candidate_tags_and_benefit_levels.sql, 20260814202133_normalize_employee_onboarding_tasks.sql, 20260814202932_normalize_training_satisfaction_metrics.sql, 20260814203145_normalize_big_five_profiles.sql), each dropping the superseded JSON/scalar column as proof. tasks/plan.md Fase 1 and Fase 2 checkboxes corrected accordingly (uncommitted). Fase 3 is explicitly gated on an undecided retention policy per the plan's own text, not implementation work, and is out of scope to infer per protocol. No task contract was created; no implementer was dispatched."
+    }
+  ],
+  "notes": "No open GitHub issues (checked ready-for-agent label and full open list, both empty). Roadmap candidates identified from docs/superpowers/plans/ and tasks/plan.md."
+}

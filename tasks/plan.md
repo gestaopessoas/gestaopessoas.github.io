@@ -15,16 +15,16 @@ Substituir o JSON persistido no parecer/avaliação de entrevistas por tabelas r
 
 ### Fase 1: Parecer e avaliação de entrevista
 
-- [ ] Criar tabelas relacionais, RLS e índices para avaliação, formações, experiências e testes.
-- [ ] Migrar dados de `interviews.assessment` sem perda de registros.
-- [ ] Atualizar a tela de entrevistas e o modal para carregar, editar e salvar nas novas tabelas.
-- [ ] Remover a escrita em JSON e validar edição de uma entrevista existente.
+- [x] Criar tabelas relacionais, RLS e índices para avaliação, formações, experiências e testes. (`supabase/migrations/20260814201509_normalize_interview_assessments.sql`)
+- [x] Migrar dados de `interviews.assessment` sem perda de registros. (mesma migration, função recursiva de flatten do JSON pras linhas relacionais)
+- [x] Atualizar a tela de entrevistas e o modal para carregar, editar e salvar nas novas tabelas. (`src/app/dashboard/entrevistas/page.tsx`, via `@/lib/interviewAssessment.mjs`)
+- [x] Remover a escrita em JSON e validar edição de uma entrevista existente. (coluna `interviews.assessment` foi dropada na mesma migration; não há mais como escrever nela)
 
 ### Fase 2: Dados operacionais JSON
 
-- [ ] Migrar tags de candidatos, benefícios por nível, status de onboarding e métricas de treinamento para modelos relacionais.
-- [ ] Migrar perfis ideais Big Five de cargos e requisições para campos/tabelas relacionais.
-- [ ] Atualizar consultas, filtros e formulários desses domínios.
+- [x] Migrar tags de candidatos, benefícios por nível, status de onboarding e métricas de treinamento para modelos relacionais. (`20260814202424_normalize_candidate_tags_and_benefit_levels.sql`, `20260814202133_normalize_employee_onboarding_tasks.sql`, `20260814202932_normalize_training_satisfaction_metrics.sql` — todas dropam a coluna/tipo JSON antigo)
+- [x] Migrar perfis ideais Big Five de cargos e requisições para campos/tabelas relacionais. (`20260814203145_normalize_big_five_profiles.sql`)
+- [x] Atualizar consultas, filtros e formulários desses domínios. (código em produção já usa exclusivamente as tabelas/colunas relacionais; colunas JSON antigas não existem mais)
 
 ### Fase 3: Registros técnicos e históricos
 
