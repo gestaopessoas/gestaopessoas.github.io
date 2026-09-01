@@ -5,8 +5,14 @@ import { createClient } from "@/utils/supabase/client";
 import { countBy } from "@/lib/metrics";
 import { BarChart3, Briefcase, Clock, TrendingUp, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 
-type Employee = { id: string; status: string | null; workplaces: { name: string }[]; cost_centers: { name: string }[] };
+const MONTH_LABELS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+// Guard: datas absurdas (ano < 1950 ou > 2030) são lixo de migração — mesmo critério de turnover/page.tsx
+const isReasonableDate = (d: Date) => d.getFullYear() >= 1950 && d.getFullYear() <= 2030;
+
+type Employee = { id: string; status: string | null; admission_date: string | null; workplaces: { name: string }[]; cost_centers: { name: string }[] };
 type JobRequest = { id: string; status: string | null; urgency: string | null; created_at: string | null };
 type Candidate = { id: string; created_at: string | null; role_interest: string | null };
 type Application = { id: string; status: string | null; created_at: string | null };
@@ -27,7 +33,7 @@ export default function MetricasRecrutamentoPage() {
     const load = async () => {
       const supabase = createClient();
       const [employeeResult, requestResult, candidateResult, applicationResult, openingResult] = await Promise.all([
-        supabase.from("employees").select("id,status,workplaces!employees_workplace_id_fkey(name),cost_centers(name:code)").limit(10000),
+        supabase.from("employees").select("id,status,admission_date,workplaces!employees_workplace_id_fkey(name),cost_centers(name:code)").limit(10000),
         supabase.from("job_requests").select("id,status,urgency,created_at").limit(10000),
         supabase.from("candidates").select("id,created_at,role_interest").limit(10000),
         supabase.from("job_applications").select("id,status,created_at").limit(10000),
@@ -78,6 +84,25 @@ export default function MetricasRecrutamentoPage() {
   const activeForUnits = employees.filter((item) => !["Inativo", "Desligado", "Arquivo Morto", "inactive"].includes(item.status ?? ""));
   const units = countBy(activeForUnits.map((item) => item.workplaces?.[0]?.name || item.cost_centers?.[0]?.name || "Sem alocação"));
 
+  const admissionsByMonth = useMemo(() => {
+    const now = new Date();
+    const buckets: { key: string; label: string; count: number }[] = [];
+    for (let i = 11; i >= 0; i -= 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: `${MONTH_LABELS[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`, count: 0 });
+    }
+    const byKey = new Map(buckets.map((b) => [b.key, b]));
+    employees.forEach((emp) => {
+      if (!emp.admission_date) return;
+      const d = new Date(emp.admission_date);
+      if (!isReasonableDate(d)) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const bucket = byKey.get(key);
+      if (bucket) bucket.count += 1;
+    });
+    return buckets;
+  }, [employees]);
+
   return (
     <div className="flex h-full flex-col bg-background">
       <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-8">
@@ -104,6 +129,26 @@ export default function MetricasRecrutamentoPage() {
           <StatusCard title="Funil de candidaturas" description={`${applications.length} candidaturas`} data={applicationStatus} />
           <StatusCard title="Headcount por alocação" description={`${activeForUnits.length} colaboradores ativos`} data={units} limit={8} />
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg"><TrendingUp className="h-5 w-5" /> Admissões por mês</CardTitle>
+            <CardDescription>Últimos 12 meses, por data de admissão do colaborador.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[240px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={admissionsByMonth} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="label" tick={{ fill: "currentColor", fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fill: "currentColor", fontSize: 11 }} />
+                  <Tooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
+                  <Bar dataKey="count" name="Admissões" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

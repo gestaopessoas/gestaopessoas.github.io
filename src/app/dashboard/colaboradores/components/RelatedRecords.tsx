@@ -3,7 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Trash2, TrendingUp, Package, Activity, Plus, Printer } from "lucide-react";
+import { Trash2, TrendingUp, Package, Activity, Plus, Printer, Users, ImageUp, Link as LinkIcon } from "lucide-react";
+import { differenceInYears } from "date-fns";
 import { useCallback, useEffect, useState } from "react";
 import { getEmployeeBenefitLevelLabel, matchesEmployeeBenefit } from "../lib/benefitRules.mjs";
 import { Select } from "./FormHelpers";
@@ -34,7 +35,7 @@ type UniformDeliveryRow = {
 
 type CompanyBenefit = { id: string; name: string; level_values?: Record<string, number> | null };
 
-type DeleteTable = "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams" | "employee_promotions";
+type DeleteTable = "employee_benefits" | "employee_epis" | "vacations" | "occupational_exams" | "employee_promotions" | "employee_dependents";
 
 function BfiBar({ label, score }: { label: string, score: number | null }) {
   const percent = (((score ?? 0) - 1) / 4) * 100;
@@ -188,6 +189,87 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
           )}
         </DialogContent>
       </Dialog>
+    </details>
+  );
+}
+
+const PHOTO_PURPOSES: { key: "aniversario" | "admissao"; label: string }[] = [
+  { key: "aniversario", label: "Aniversário" },
+  { key: "admissao", label: "Admissão" },
+];
+
+function EmployeePhotoLinks({ employeeId }: { employeeId: string }) {
+  const [files, setFiles] = useState<Record<string, { name: string }[]>>({ aniversario: [], admissao: [] });
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const supabase = createClient();
+    const [aniversario, admissao] = await Promise.all([
+      supabase.storage.from("employee-photos").list(`${employeeId}/aniversario`),
+      supabase.storage.from("employee-photos").list(`${employeeId}/admissao`),
+    ]);
+    setFiles({
+      aniversario: (aniversario.data ?? []).filter((f) => f.name && f.id),
+      admissao: (admissao.data ?? []).filter((f) => f.name && f.id),
+    });
+    setLoading(false);
+  }, [employeeId]);
+
+  useEffect(() => {
+    const run = async () => { await load(); };
+    run();
+  }, [load]);
+
+  const copyLink = (purpose: string) => {
+    const link = `${window.location.origin}/enviar-foto?employee=${employeeId}&tipo=${purpose}`;
+    navigator.clipboard.writeText(link);
+    alert("Link copiado para a área de transferência!\n\nEnvie este link para o colaborador enviar a foto pelo celular ou computador.");
+  };
+
+  const viewFile = async (purpose: string, fileName: string) => {
+    const supabase = createClient();
+    const { data, error } = await supabase.storage.from("employee-photos").createSignedUrl(`${employeeId}/${purpose}/${fileName}`, 60);
+    if (error || !data) {
+      alert("Não foi possível abrir a foto: " + (error?.message ?? "erro desconhecido"));
+      return;
+    }
+    window.open(data.signedUrl, "_blank");
+  };
+
+  const total = files.aniversario.length + files.admissao.length;
+
+  return (
+    <details className="rounded-md border p-3">
+      <summary className="cursor-pointer font-medium flex items-center gap-2">
+        <ImageUp className="w-4 h-4 text-muted-foreground" /> Fotos (Aniversário/Admissão) ({total})
+      </summary>
+      <div className="mt-3 space-y-4">
+        {loading ? (
+          <div className="text-sm text-muted-foreground">Carregando...</div>
+        ) : (
+          PHOTO_PURPOSES.map(({ key, label }) => (
+            <div key={key} className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">{label}</span>
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => copyLink(key)}>
+                  <LinkIcon className="w-3 h-3 mr-1" /> Copiar link
+                </Button>
+              </div>
+              {files[key].length === 0 ? (
+                <p className="text-xs italic text-muted-foreground">Nenhuma foto enviada ainda.</p>
+              ) : (
+                files[key].map((f) => (
+                  <div key={f.name} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm">
+                    <span className="truncate">{f.name}</span>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => viewFile(key, f.name)}>Ver</Button>
+                  </div>
+                ))
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </details>
   );
 }
@@ -436,11 +518,13 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
   const [vacations, setVacations] = useState<RelatedRow[]>([]);
   const [exams, setExams] = useState<RelatedRow[]>([]);
   const [promotions, setPromotions] = useState<RelatedRow[]>([]);
-  
+  const [dependents, setDependents] = useState<RelatedRow[]>([]);
+
   const [epi, setEpi] = useState({ epi_name: "", ca_number: "", received_date: "" });
   const [vacation, setVacation] = useState({ start_date: "", end_date: "" });
   const [exam, setExam] = useState({ exam_type: "Admissional", exam_name: "", exam_date: "" });
   const [promotion, setPromotion] = useState({ previous_role: "", new_role: "", previous_level: "", new_level: "", promotion_date: new Date().toISOString().split('T')[0] });
+  const [dependent, setDependent] = useState({ name: "", birth_date: "", relationship: "Filho(a)" });
 
   // For benefit levels selection
   const [levelSelectBenefit, setLevelSelectBenefit] = useState<{ id: string, name: string, level_values: Record<string, number> } | null>(null);
@@ -454,13 +538,14 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
 
   const load = useCallback(async () => {
     const supabase = createClient();
-    const [cb, b, e, v, x, p] = await Promise.all([
+    const [cb, b, e, v, x, p, dep] = await Promise.all([
       supabase.from("company_benefits").select("*, company_benefit_levels(level_code,amount)").order("name"),
       supabase.from("employee_benefits").select("*").eq("employee_id", employeeId).order("created_at"),
       supabase.from("employee_epis").select("*").eq("employee_id", employeeId).order("created_at"),
       supabase.from("vacations").select("*").eq("employee_id", employeeId).order("start_date", { ascending: false }),
       supabase.from("occupational_exams").select("*").eq("employee_id", employeeId).order("exam_date", { ascending: false }),
       supabase.from("employee_promotions").select("*").eq("employee_id", employeeId).order("promotion_date", { ascending: false }),
+      supabase.from("employee_dependents").select("*").eq("employee_id", employeeId).order("created_at"),
     ]);
     setCompanyBenefits((cb.data ?? []).map((benefit: any) => ({
       ...benefit,
@@ -471,6 +556,7 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
     setVacations((v.data ?? []) as RelatedRow[]); 
     setExams((x.data ?? []) as RelatedRow[]);
     setPromotions((p.data ?? []) as RelatedRow[]);
+    setDependents((dep.data ?? []) as RelatedRow[]);
   }, [employeeId]);
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
@@ -619,12 +705,24 @@ export function RelatedRecords({ employeeId }: { employeeId: string }) {
         <Button type="button" variant="outline" onClick={() => { if (promotion.new_role && promotion.promotion_date) { void add("employee_promotions", promotion); setPromotion({ previous_role: "", new_role: "", previous_level: "", new_level: "", promotion_date: new Date().toISOString().split('T')[0] }); } }}>Adicionar</Button>
       </Related>
 
+      <Related title="Filhos/Enteados" icon={Users} rows={dependents} render={(row) => {
+        const birth = typeof row.birth_date === "string" ? row.birth_date : null;
+        const age = birth ? differenceInYears(new Date(), new Date(birth + "T12:00:00")) : null;
+        return `${row.name} · ${row.relationship}${birth ? ` · ${new Date(birth + "T12:00:00").toLocaleDateString('pt-BR')}` : " · sem data de nascimento"}${age !== null ? ` · ${age} ano(s)` : ""}`;
+      }} onRemove={(id) => remove("employee_dependents", id)}>
+        <Input value={dependent.name} onChange={(e) => setDependent({ ...dependent, name: e.target.value })} placeholder="Nome" />
+        <Input type="date" value={dependent.birth_date} onChange={(e) => setDependent({ ...dependent, birth_date: e.target.value })} />
+        <Select value={dependent.relationship} onChange={(value) => setDependent({ ...dependent, relationship: value })} options={["Filho(a)", "Enteado(a)"]} />
+        <Button type="button" variant="outline" onClick={() => { if (dependent.name) { void add("employee_dependents", { ...dependent, birth_date: dependent.birth_date || null }); setDependent({ name: "", birth_date: "", relationship: "Filho(a)" }); } }}>Adicionar</Button>
+      </Related>
+
       <Related title="EPIs" rows={epis} render={(row) => `${row.epi_name} · CA ${row.ca_number || "-"} · ${row.received_date || "sem data"}`} onRemove={(id) => remove("employee_epis", id)}>
         <Input value={epi.epi_name} onChange={(e) => setEpi({ ...epi, epi_name: e.target.value })} placeholder="EPI" /><Input value={epi.ca_number} onChange={(e) => setEpi({ ...epi, ca_number: e.target.value })} placeholder="Número CA" /><Input type="date" value={epi.received_date} onChange={(e) => setEpi({ ...epi, received_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (epi.epi_name) { void add("employee_epis", { ...epi, received_date: epi.received_date || null, status: "Ativo" }); setEpi({ epi_name: "", ca_number: "", received_date: "" }); } }}>Adicionar</Button>
       </Related>
       
       <EmployeeUniforms employeeId={employeeId} />
       <EmployeePersonality employeeId={employeeId} />
+      <EmployeePhotoLinks employeeId={employeeId} />
       
       <Related title="Férias" rows={vacations} render={(row) => `${row.start_date} até ${row.end_date} · ${row.status || "Programada"}`} onRemove={(id) => remove("vacations", id)}>
         <Input type="date" value={vacation.start_date} onChange={(e) => setVacation({ ...vacation, start_date: e.target.value })} /><Input type="date" value={vacation.end_date} onChange={(e) => setVacation({ ...vacation, end_date: e.target.value })} /><Button type="button" variant="outline" onClick={() => { if (vacation.start_date && vacation.end_date) { void add("vacations", { ...vacation, status: "Programada" }); setVacation({ start_date: "", end_date: "" }); } }}>Adicionar</Button>

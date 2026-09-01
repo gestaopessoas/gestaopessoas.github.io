@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -56,6 +57,7 @@ type AuditLog = {
 
 export default function BeneficiosPage() {
   const supabase = createClient();
+  const router = useRouter();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [benefits, setBenefits] = useState<Benefit[]>([]);
@@ -610,7 +612,11 @@ export default function BeneficiosPage() {
                     </thead>
                     <tbody className="divide-y">
                       {elegiveisPlanos.map((emp) => (
-                        <tr key={emp.id} className="hover:bg-muted/50">
+                        <tr
+                          key={emp.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => router.push(`/dashboard/colaboradores?edit=${emp.id}`)}
+                        >
                           <td className="px-4 py-3 font-medium">{emp.name}</td>
                           <td className="px-4 py-3">{emp.department || "-"}</td>
                           <td className="px-4 py-3 tabular-nums">
@@ -621,7 +627,7 @@ export default function BeneficiosPage() {
                               size="sm"
                               variant="outline"
                               className="text-muted-foreground hover:text-red-500"
-                              onClick={() => handleIgnore(emp.id)}
+                              onClick={(e) => { e.stopPropagation(); handleIgnore(emp.id); }}
                             >
                               <EyeOff className="mr-1 h-3.5 w-3.5" /> Ignorar
                             </Button>
