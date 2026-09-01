@@ -87,6 +87,10 @@ export default function EnviarFotoPage() {
         <Button type="submit" className="mt-5 w-full" disabled={!file || sending}>
           {sending ? "Enviando..." : "Enviar foto"}
         </Button>
+        <p className="mt-4 text-xs leading-5 text-muted-foreground">
+          Esta foto ficará armazenada para uso do RH da ACPO neste contexto ({PURPOSE_LABELS[purpose!]}).
+          Você pode solicitar a exclusão dela a qualquer momento, falando diretamente com o RH.
+        </p>
       </form>
     </main>
   );
