@@ -76,21 +76,16 @@ export default function BigFiveTestPage() {
     setSaving(true);
     
     const candidateId = new URLSearchParams(window.location.search).get("candidate_id") || new URLSearchParams(window.location.search).get("id") || null;
-    
+
     const supabase = createClient();
-    const { error: insertError } = await supabase
-      .from("candidate_big_five_results")
-      .insert([
-        {
-          candidate_id: candidateId,
-          raw_answers: answers,
-        }
-      ]);
-      
+    const { error: submitError } = await supabase
+      .rpc("submit_bfi_candidate_answers", { p_candidate_id: candidateId, p_answers: answers })
+      .single();
+
     setSaving(false);
-    
-    if (insertError) {
-      console.error(insertError);
+
+    if (submitError) {
+      console.error(submitError);
       setError("Houve um erro ao salvar suas respostas. Tente novamente.");
     } else {
       setCompleted(true);

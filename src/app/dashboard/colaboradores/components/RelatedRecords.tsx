@@ -14,7 +14,7 @@ type RelatedRow = Record<string, string | number | boolean | null> & { id: strin
 type BigFiveRow = {
   id: string;
   created_at: string;
-  raw_answers: Record<string, number> | null;
+  expires_at: string | null;
   openness_score: number | null;
   conscientiousness_score: number | null;
   extraversion_score: number | null;
@@ -54,6 +54,9 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
   const [history, setHistory] = useState<BigFiveRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<BigFiveRow | null>(null);
+  const [isGenerateOpen, setIsGenerateOpen] = useState(false);
+  const [expiryDate, setExpiryDate] = useState("");
+  const [pendingDeleteLink, setPendingDeleteLink] = useState<BigFiveRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,7 +73,11 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
 
   const generateLink = async () => {
     const supabase = createClient();
-    const { data, error } = await supabase.from("candidate_big_five_results").insert({ employee_id: employeeId }).select("id").single();
+    const { data, error } = await supabase
+      .from("candidate_big_five_results")
+      .insert({ employee_id: employeeId, expires_at: expiryDate ? new Date(`${expiryDate}T23:59:59`).toISOString() : null })
+      .select("id")
+      .single();
     if (error) {
       alert("Erro ao gerar link: " + error.message);
       return;
@@ -78,6 +85,17 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
     const link = `${window.location.origin}/colaborador/teste-personalidade?session=${data.id}`;
     navigator.clipboard.writeText(link);
     alert("Link copiado para a área de transferência!\n\nEnvie este link para o colaborador preencher o teste de personalidade (BFI). O link é de uso único.");
+    setIsGenerateOpen(false);
+    setExpiryDate("");
+    load();
+  };
+
+  const confirmDeleteLink = async () => {
+    if (!pendingDeleteLink) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("candidate_big_five_results").delete().eq("id", pendingDeleteLink.id);
+    if (error) alert("Erro ao excluir link: " + error.message);
+    setPendingDeleteLink(null);
     load();
   };
 
@@ -92,22 +110,33 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
           size="sm"
           variant="outline"
           className="h-7 text-xs"
-          onClick={(e) => { e.preventDefault(); generateLink(); }}
+          onClick={(e) => { e.preventDefault(); setExpiryDate(""); setIsGenerateOpen(true); }}
         >
           <Plus className="w-3 h-3 mr-1" /> Gerar Novo Link
         </Button>
       </summary>
       <div className="mt-3 space-y-4">
         {loading ? <div className="text-sm text-muted-foreground">Carregando...</div> : history.length === 0 ? <div className="text-sm italic text-muted-foreground">Nenhum teste registrado para este colaborador.</div> : history.map((row) => {
-          const isCompleted = row.raw_answers && Object.keys(row.raw_answers).length > 0;
+          const isCompleted = row.openness_score !== null;
+          const isExpired = !isCompleted && row.expires_at && new Date(row.expires_at) < new Date();
           return (
             <div key={row.id} className="rounded border bg-muted/20 p-4 text-sm">
               <div className="flex justify-between items-center mb-3">
                 <span className="font-semibold">{new Date(row.created_at).toLocaleDateString('pt-BR')}</span>
-                <span className={`px-2 py-1 text-xs rounded-full ${isCompleted ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'}`}>
-                  {isCompleted ? 'Concluído' : 'Pendente'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-1 text-xs rounded-full ${isCompleted ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300' : isExpired ? 'bg-destructive/10 text-destructive' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'}`}>
+                    {isCompleted ? 'Concluído' : isExpired ? 'Expirado' : 'Pendente'}
+                  </span>
+                  <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setPendingDeleteLink(row)} aria-label="Excluir link">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
+              {!isCompleted && row.expires_at && (
+                <p className="mb-3 text-xs text-muted-foreground">
+                  {isExpired ? 'Expirou em' : 'Expira em'} {new Date(row.expires_at).toLocaleDateString('pt-BR')}
+                </p>
+              )}
               {isCompleted ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -121,7 +150,7 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
                     Visualizar Relatório Detalhado
                   </Button>
                 </div>
-              ) : (
+              ) : !isExpired ? (
                 <div className="text-xs text-muted-foreground flex items-center gap-2">
                   <span>O colaborador ainda não respondeu este teste.</span>
                   <Button type="button" variant="link" className="h-auto p-0 text-xs" onClick={() => {
@@ -130,12 +159,47 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
                     alert("Link copiado!");
                   }}>Copiar link novamente</Button>
                 </div>
-              )}
+              ) : null}
             </div>
           );
         })}
       </div>
-      
+
+      <Dialog open={isGenerateOpen} onOpenChange={setIsGenerateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gerar Link do Teste de Personalidade</DialogTitle>
+            <DialogDescription>O link é de uso único. Defina um prazo de validade opcional.</DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <Label htmlFor="bfi-expiry">Prazo de validade (opcional)</Label>
+            <Input id="bfi-expiry" type="date" value={expiryDate} min={new Date().toISOString().split('T')[0]} onChange={(e) => setExpiryDate(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsGenerateOpen(false)}>Cancelar</Button>
+            <Button type="button" onClick={generateLink}>Gerar e Copiar Link</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!pendingDeleteLink} onOpenChange={(open) => !open && setPendingDeleteLink(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir link do teste?</DialogTitle>
+            <DialogDescription>
+              {pendingDeleteLink?.openness_score !== null
+                ? "Este teste já foi respondido. Excluir removerá também o resultado registrado."
+                : "O link deixará de funcionar imediatamente para quem tentar respondê-lo."}
+              {" "}Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingDeleteLink(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => void confirmDeleteLink()}>Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!selectedReport} onOpenChange={(open) => !open && setSelectedReport(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto print-report-modal">
           <DialogHeader>

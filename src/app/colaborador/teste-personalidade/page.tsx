@@ -29,12 +29,12 @@ type BfiQuestion = {
 };
 
 type BfiSession = {
-  raw_answers: Record<string, number> | null;
   openness_score: number | null;
   conscientiousness_score: number | null;
   extraversion_score: number | null;
   agreeableness_score: number | null;
   neuroticism_score: number | null;
+  expires_at: string | null;
 };
 
 function TestContent() {
@@ -75,8 +75,14 @@ function TestContent() {
         setLoading(false);
         return;
       }
-      
-      if (sessionData.raw_answers && Object.keys(sessionData.raw_answers).length > 0) {
+
+      if (sessionData.expires_at && new Date(sessionData.expires_at) < new Date()) {
+        setSessionError("Este link expirou. Solicite um novo link.");
+        setLoading(false);
+        return;
+      }
+
+      if (sessionData.openness_score !== null) {
         // Already filled, show results!
         setResults(sessionData);
         setCompleted(true);
@@ -115,26 +121,16 @@ function TestContent() {
     setSaving(true);
     
     const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from("candidate_big_five_results")
-      .update({ raw_answers: answers })
-      .eq("id", sessionId);
-      
-    if (updateError) {
-      setSaving(false);
-      setError("Houve um erro ao salvar suas respostas. Tente novamente.");
+    const { data: updatedData, error: submitError } = await supabase
+      .rpc("submit_bfi_answers", { p_session_id: sessionId, p_answers: answers })
+      .single();
+
+    setSaving(false);
+
+    if (submitError || !updatedData) {
+      setError(submitError?.message || "Houve um erro ao salvar suas respostas. Tente novamente.");
     } else {
-      // Fetch the updated scores via the secure RPC function
-      const { data: updatedData, error: fetchError } = await supabase
-        .rpc("get_bfi_session", { session_id: sessionId })
-        .single();
-        
-      setSaving(false);
-      if (fetchError || !updatedData) {
-        setError("Erro ao carregar os resultados calculados.");
-      } else {
-        setResults(updatedData as BfiSession);
-      }
+      setResults(updatedData as BfiSession);
       setCompleted(true);
     }
   };
