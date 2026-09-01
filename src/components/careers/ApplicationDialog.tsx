@@ -181,7 +181,8 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     // (protege PII), e PostgREST precisa reler a linha pra devolver representation.
     // Sem essa leitura o insert inteiro estoura RLS e dá rollback. Gerando o id no
     // client evita depender de ler a linha de volta.
-    const candidateId = crypto.randomUUID();
+    let candidateId = crypto.randomUUID();
+    let isExistingCandidate = false;
     const { error: candidateError } = await withRetry(() => supabase
       .from("candidates")
       .insert({
@@ -223,49 +224,67 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       }));
 
     if (candidateError) {
-      setSaving(false);
-      setError(
-        candidateError.code === "23505"
-          ? "Este e-mail já está cadastrado em uma candidatura. Use outro e-mail ou avise o RH."
-          : "Não foi possível cadastrar seus dados. Confira o e-mail e tente novamente."
-      );
-      return;
+      // 23505 = e-mail já tem candidato cadastrado. Comum quando a candidatura anterior
+      // criou o candidato mas caiu antes de vincular a vaga (rede instável no celular) —
+      // em vez de travar o candidato num beco sem saída, reaproveita o cadastro existente
+      // e segue só pro vínculo com a vaga. find_candidate_id_by_email só devolve o id,
+      // nunca dados pessoais (anon não tem SELECT em candidates).
+      if (candidateError.code === "23505") {
+        const { data: existingId } = await supabase.rpc("find_candidate_id_by_email", {
+          p_email: sanitizeText(candidate.email, 255),
+        });
+        if (!existingId) {
+          setSaving(false);
+          setError("Este e-mail já está cadastrado em uma candidatura. Use outro e-mail ou avise o RH.");
+          return;
+        }
+        candidateId = existingId as string;
+        isExistingCandidate = true;
+      } else {
+        setSaving(false);
+        setError("Não foi possível cadastrar seus dados. Confira o e-mail e tente novamente.");
+        return;
+      }
     }
 
-    const validEducations = educations.filter((row) => row.level.trim());
-    if (validEducations.length > 0) {
-      const { error: eduError } = await supabase.from("candidate_educations").insert(
-        validEducations.map((row) => ({
-          candidate_id: candidateId,
-          institution_name: sanitizeText(row.institution, 200) || "Não informada",
-          degree: row.level,
-        }))
-      );
-      if (eduError) console.warn("Erro ao salvar escolaridade:", eduError.message);
+    if (!isExistingCandidate) {
+      const validEducations = educations.filter((row) => row.level.trim());
+      if (validEducations.length > 0) {
+        const { error: eduError } = await supabase.from("candidate_educations").insert(
+          validEducations.map((row) => ({
+            candidate_id: candidateId,
+            institution_name: sanitizeText(row.institution, 200) || "Não informada",
+            degree: row.level,
+          }))
+        );
+        if (eduError) console.warn("Erro ao salvar escolaridade:", eduError.message);
+      }
+
+      if (validExperiences.length > 0) {
+        const { error: expError } = await supabase.from("candidate_experiences").insert(
+          validExperiences.map((row) => ({
+            candidate_id: candidateId,
+            company_name: sanitizeText(row.company, 200) || "Não informado",
+            position_title: sanitizeText(row.role, 200) || "Não informado",
+            description: sanitizeText(row.description, 2000) || null,
+          }))
+        );
+        if (expError) console.warn("Erro ao salvar experiência:", expError.message);
+      }
     }
 
-    if (validExperiences.length > 0) {
-      const { error: expError } = await supabase.from("candidate_experiences").insert(
-        validExperiences.map((row) => ({
-          candidate_id: candidateId,
-          company_name: sanitizeText(row.company, 200) || "Não informado",
-          position_title: sanitizeText(row.role, 200) || "Não informado",
-          description: sanitizeText(row.description, 2000) || null,
-        }))
-      );
-      if (expError) console.warn("Erro ao salvar experiência:", expError.message);
-    }
-
-    const validLanguages = languages.filter((row) => row.language.trim());
-    if (validLanguages.length > 0) {
-      const { error: langError } = await supabase.from("candidate_languages").insert(
-        validLanguages.map((row) => ({
-          candidate_id: candidateId,
-          language: sanitizeText(row.language, 100),
-          proficiency: row.proficiency || null,
-        }))
-      );
-      if (langError) console.warn("Erro ao salvar idiomas:", langError.message);
+    if (!isExistingCandidate) {
+      const validLanguages = languages.filter((row) => row.language.trim());
+      if (validLanguages.length > 0) {
+        const { error: langError } = await supabase.from("candidate_languages").insert(
+          validLanguages.map((row) => ({
+            candidate_id: candidateId,
+            language: sanitizeText(row.language, 100),
+            proficiency: row.proficiency || null,
+          }))
+        );
+        if (langError) console.warn("Erro ao salvar idiomas:", langError.message);
+      }
     }
 
     const { error: applicationError } = await withRetry(() => supabase
