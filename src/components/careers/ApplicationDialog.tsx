@@ -232,7 +232,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
 
   return (
     <Dialog open={open} onOpenChange={(next) => { onOpenChange(next); if (!next) reset(); }}>
-      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-5xl sm:max-w-5xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Candidatar-se a {job?.profile?.title || "esta vaga"}</DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-1.5">
