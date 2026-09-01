@@ -45,9 +45,6 @@ const emptyCandidate = {
   neighborhood: "",
   city: "",
   state: "",
-  education_level: "",
-  education_institution: "",
-  experience_summary: "",
   gender_identity: "",
   sexual_orientation: "",
   race_declaration: "",
@@ -63,10 +60,34 @@ const emptyCandidate = {
 };
 
 type LanguageRow = { language: string; proficiency: string };
+type EducationRow = { level: string; institution: string };
+type ExperienceRow = { company: string; role: string; description: string };
+
+const emptyEducationRow: EducationRow = { level: "", institution: "" };
+const emptyExperienceRow: ExperienceRow = { company: "", role: "", description: "" };
+
+// Erro sem `code` = falha de rede/transiente (fetch caiu no meio do caminho), não
+// violação de constraint. Comum em quem preenche esse formulário pelo celular.
+// Retry curto evita perder o vínculo candidato-vaga por uma queda de conexão.
+const isTransientError = (error: { code?: string } | null) => !!error && !error.code;
+
+async function withRetry<T extends { error: { code?: string } | null }>(
+  fn: () => PromiseLike<T>,
+  attempts = 3
+): Promise<T> {
+  let result = await fn();
+  for (let i = 1; i < attempts && isTransientError(result.error); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 400 * i));
+    result = await fn();
+  }
+  return result;
+}
 
 export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | null; open: boolean; onOpenChange: (open: boolean) => void }) {
   const [candidate, setCandidate] = useState(emptyCandidate);
   const [languages, setLanguages] = useState<LanguageRow[]>([{ language: "", proficiency: "" }]);
+  const [educations, setEducations] = useState<EducationRow[]>([{ ...emptyEducationRow }]);
+  const [experiences, setExperiences] = useState<ExperienceRow[]>([{ ...emptyExperienceRow }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [cpfError, setCpfError] = useState("");
@@ -76,6 +97,8 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
   const reset = () => {
     setCandidate(emptyCandidate);
     setLanguages([{ language: "", proficiency: "" }]);
+    setEducations([{ ...emptyEducationRow }]);
+    setExperiences([{ ...emptyExperienceRow }]);
     setError("");
     setCpfError("");
     setCepError("");
@@ -117,6 +140,18 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     setLanguages((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   };
 
+  const addEducationRow = () => setEducations((prev) => [...prev, { ...emptyEducationRow }]);
+  const removeEducationRow = (index: number) => setEducations((prev) => prev.filter((_, i) => i !== index));
+  const updateEducationRow = (index: number, field: keyof EducationRow, value: string) => {
+    setEducations((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  };
+
+  const addExperienceRow = () => setExperiences((prev) => [...prev, { ...emptyExperienceRow }]);
+  const removeExperienceRow = (index: number) => setExperiences((prev) => prev.filter((_, i) => i !== index));
+  const updateExperienceRow = (index: number, field: keyof ExperienceRow, value: string) => {
+    setExperiences((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  };
+
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!job) return;
@@ -137,7 +172,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     // Sem essa leitura o insert inteiro estoura RLS e dá rollback. Gerando o id no
     // client evita depender de ler a linha de volta.
     const candidateId = crypto.randomUUID();
-    const { error: candidateError } = await supabase
+    const { error: candidateError } = await withRetry(() => supabase
       .from("candidates")
       .insert({
         id: candidateId,
@@ -160,7 +195,6 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         address_number: sanitizeText(candidate.address_number, 20) || null,
         address_complement: sanitizeText(candidate.address_complement, 100) || null,
         neighborhood: sanitizeText(candidate.neighborhood, 150) || null,
-        experience_summary: sanitizeText(candidate.experience_summary, 2000) || null,
         gender_identity: sanitizeText(candidate.gender_identity, 200) || null,
         sexual_orientation: sanitizeText(candidate.sexual_orientation, 200) || null,
         race_declaration: sanitizeText(candidate.race_declaration, 200) || null,
@@ -175,7 +209,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         boot_size: sanitizeText(candidate.boot_size, 20) || null,
         role_interest: job.profile?.title || null,
         search_tags: [job.profile?.title, job.department, job.cost_center].filter(Boolean),
-      });
+      }));
 
     if (candidateError) {
       setSaving(false);
@@ -187,13 +221,29 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       return;
     }
 
-    if (candidate.education_level) {
-      const { error: eduError } = await supabase.from("candidate_educations").insert({
-        candidate_id: candidateId,
-        institution_name: sanitizeText(candidate.education_institution, 200) || "Não informada",
-        degree: candidate.education_level,
-      });
+    const validEducations = educations.filter((row) => row.level.trim());
+    if (validEducations.length > 0) {
+      const { error: eduError } = await supabase.from("candidate_educations").insert(
+        validEducations.map((row) => ({
+          candidate_id: candidateId,
+          institution_name: sanitizeText(row.institution, 200) || "Não informada",
+          degree: row.level,
+        }))
+      );
       if (eduError) console.warn("Erro ao salvar escolaridade:", eduError.message);
+    }
+
+    const validExperiences = experiences.filter((row) => row.company.trim() || row.role.trim());
+    if (validExperiences.length > 0) {
+      const { error: expError } = await supabase.from("candidate_experiences").insert(
+        validExperiences.map((row) => ({
+          candidate_id: candidateId,
+          company_name: sanitizeText(row.company, 200) || "Não informado",
+          position_title: sanitizeText(row.role, 200) || "Não informado",
+          description: sanitizeText(row.description, 2000) || null,
+        }))
+      );
+      if (expError) console.warn("Erro ao salvar experiência:", expError.message);
     }
 
     const validLanguages = languages.filter((row) => row.language.trim());
@@ -208,9 +258,9 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       if (langError) console.warn("Erro ao salvar idiomas:", langError.message);
     }
 
-    const { error: applicationError } = await supabase
+    const { error: applicationError } = await withRetry(() => supabase
       .from("job_applications")
-      .insert({ candidate_id: candidateId, job_opening_id: job.id, status: "Nova Aplicação" });
+      .insert({ candidate_id: candidateId, job_opening_id: job.id, status: "Nova Aplicação" }));
 
     setSaving(false);
     if (applicationError) {
@@ -299,16 +349,39 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
 
             <div className="space-y-6">
               <FormSection title="Formação e experiência">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Field label="Escolaridade">
-                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.education_level} onChange={(event) => update("education_level", event.target.value)}>
-                      <option value="">Selecione...</option>
-                      {EDUCATION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Instituição"><Input value={candidate.education_institution} onChange={(event) => update("education_institution", event.target.value)} /></Field>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Escolaridade</Label>
+                  {educations.map((row, index) => (
+                    <div key={index} className="flex gap-2">
+                      <select className="flex h-10 w-48 shrink-0 rounded-md border border-input bg-background px-3 text-sm" value={row.level} onChange={(event) => updateEducationRow(index, "level", event.target.value)}>
+                        <option value="">Selecione...</option>
+                        {EDUCATION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                      <Input placeholder="Instituição" value={row.institution} onChange={(event) => updateEducationRow(index, "institution", event.target.value)} />
+                      {educations.length > 1 && (
+                        <Button type="button" variant="outline" size="icon" onClick={() => removeEducationRow(index)}><X className="h-4 w-4" /></Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={addEducationRow}><Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar escolaridade</Button>
                 </div>
-                <Field label="Experiência profissional"><Textarea rows={4} placeholder="Conte um pouco das suas experiências anteriores" value={candidate.experience_summary} onChange={(event) => update("experience_summary", event.target.value)} /></Field>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Experiência profissional</Label>
+                  {experiences.map((row, index) => (
+                    <div key={index} className="space-y-2 rounded-md border border-input p-3">
+                      <div className="flex gap-2">
+                        <Input placeholder="Empresa" value={row.company} onChange={(event) => updateExperienceRow(index, "company", event.target.value)} />
+                        <Input placeholder="Cargo" value={row.role} onChange={(event) => updateExperienceRow(index, "role", event.target.value)} />
+                        {experiences.length > 1 && (
+                          <Button type="button" variant="outline" size="icon" onClick={() => removeExperienceRow(index)}><X className="h-4 w-4" /></Button>
+                        )}
+                      </div>
+                      <Textarea rows={2} placeholder="Conte um pouco das atividades" value={row.description} onChange={(event) => updateExperienceRow(index, "description", event.target.value)} />
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={addExperienceRow}><Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar experiência</Button>
+                </div>
 
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Idiomas</Label>
