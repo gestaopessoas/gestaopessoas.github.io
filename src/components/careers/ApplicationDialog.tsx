@@ -167,6 +167,16 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     const [firstName, ...lastParts] = candidate.full_name.trim().split(/\s+/);
     const supabase = createClient();
 
+    // A lista de candidatos por vaga (dashboard/vagas/candidatos) mostra um resumo de
+    // uma linha lido de candidates.experience_summary — não sabe ler candidate_experiences.
+    // Gerar esse resumo aqui evita reescrever a tela só pra ela enxergar experiências
+    // que já viraram linhas estruturadas.
+    const validExperiences = experiences.filter((row) => row.company.trim() || row.role.trim());
+    const experienceSummary = validExperiences
+      .map((row) => [row.role.trim(), row.company.trim()].filter(Boolean).join(" na "))
+      .filter(Boolean)
+      .join("; ");
+
     // Sem .select() após o insert: anon não tem policy de SELECT em candidates
     // (protege PII), e PostgREST precisa reler a linha pra devolver representation.
     // Sem essa leitura o insert inteiro estoura RLS e dá rollback. Gerando o id no
@@ -195,6 +205,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         address_number: sanitizeText(candidate.address_number, 20) || null,
         address_complement: sanitizeText(candidate.address_complement, 100) || null,
         neighborhood: sanitizeText(candidate.neighborhood, 150) || null,
+        experience_summary: sanitizeText(experienceSummary, 2000) || null,
         gender_identity: sanitizeText(candidate.gender_identity, 200) || null,
         sexual_orientation: sanitizeText(candidate.sexual_orientation, 200) || null,
         race_declaration: sanitizeText(candidate.race_declaration, 200) || null,
@@ -233,7 +244,6 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       if (eduError) console.warn("Erro ao salvar escolaridade:", eduError.message);
     }
 
-    const validExperiences = experiences.filter((row) => row.company.trim() || row.role.trim());
     if (validExperiences.length > 0) {
       const { error: expError } = await supabase.from("candidate_experiences").insert(
         validExperiences.map((row) => ({
