@@ -3,140 +3,134 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Send, Loader2, FileUp, CheckCircle2, GraduationCap, BriefcaseBusiness, ClipboardCheck } from "lucide-react";
+import { Send, Loader2, ClipboardCheck, Plus, X } from "lucide-react";
 import { useState } from "react";
-import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
-import { parseResumeLocally, type ParsedResumeAcademic, type ParsedResumeExperience } from "@/lib/resumeAI";
+import { maskCpf, maskPhone, maskCep, onlyDigits } from "@/lib/masks";
+import { isValidCpf, maskCurrencyInput } from "@/app/dashboard/colaboradores/lib/employeeFormRules.mjs";
 import type { Career } from "./types";
+
+const MARITAL_STATUS_OPTIONS = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"];
+const EDUCATION_OPTIONS = [
+  "Fundamental Incompleto", "Fundamental Completo",
+  "Médio Incompleto", "Médio Completo",
+  "Técnico", "Superior Incompleto", "Superior Completo",
+  "Pós-graduação", "Mestrado", "Doutorado",
+];
+const LANGUAGE_LEVELS = ["Básico", "Intermediário", "Avançado", "Fluente", "Nativo"];
+
+// Hardening defensivo (não corrige vulnerabilidade real: o insert já é
+// parametrizado via PostgREST). Corta em caracteres de controle e no
+// tamanho da coluna de destino no banco.
+const sanitizeText = (value: string, maxLen: number) => value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").trim().slice(0, maxLen);
 
 const emptyCandidate = {
   full_name: "",
   email: "",
+  secondary_email: "",
   phone: "",
-  city: "",
-  state: "",
-  linkedin_url: "",
+  secondary_phone: "",
   birth_date: "",
   cpf: "",
+  birthplace: "",
+  marital_status: "",
+  linkedin_url: "",
+  cep: "",
   address: "",
+  address_number: "",
+  address_complement: "",
+  neighborhood: "",
+  city: "",
+  state: "",
+  education_level: "",
+  education_institution: "",
+  experience_summary: "",
+  gender_identity: "",
+  sexual_orientation: "",
+  race_declaration: "",
   salary_expectation: "",
   has_cnh: false,
   is_pcd: false,
   pcd_description: "",
+  has_dependents: false,
+  dependents_count: "",
+  dependents_notes: "",
+  uniform_size: "",
+  boot_size: "",
 };
+
+type LanguageRow = { language: string; proficiency: string };
 
 export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | null; open: boolean; onOpenChange: (open: boolean) => void }) {
   const [candidate, setCandidate] = useState(emptyCandidate);
+  const [languages, setLanguages] = useState<LanguageRow[]>([{ language: "", proficiency: "" }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [parsingResume, setParsingResume] = useState(false);
-  const [resumeError, setResumeError] = useState("");
-  const [parsedAcademics, setParsedAcademics] = useState<ParsedResumeAcademic[]>([]);
-  const [parsedExperiences, setParsedExperiences] = useState<ParsedResumeExperience[]>([]);
-  const [resumeSummary, setResumeSummary] = useState({ professional_summary: "", experience_summary: "" });
-  const [isDraggingResume, setIsDraggingResume] = useState(false);
+  const [cpfError, setCpfError] = useState("");
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cepError, setCepError] = useState("");
 
   const reset = () => {
     setCandidate(emptyCandidate);
-    setResumeFile(null);
-    setResumeError("");
-    setParsedAcademics([]);
-    setParsedExperiences([]);
-    setResumeSummary({ professional_summary: "", experience_summary: "" });
+    setLanguages([{ language: "", proficiency: "" }]);
     setError("");
+    setCpfError("");
+    setCepError("");
   };
 
-  const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    await processResumeFile(file);
+  const update = <K extends keyof typeof emptyCandidate>(field: K, value: typeof emptyCandidate[K]) => {
+    setCandidate((prev) => ({ ...prev, [field]: value }));
   };
 
-  const processResumeFile = async (file: File) => {
-    setResumeFile(file);
-    setResumeError("");
-    setParsingResume(true);
-
+  const lookupCep = async (rawCep: string) => {
+    const digits = onlyDigits(rawCep);
+    if (digits.length !== 8) return;
+    setCepLoading(true);
+    setCepError("");
     try {
-      let text = "";
-      if (file.type === "application/pdf") {
-        // Import dinâmico: pdfjs-dist toca DOMMatrix (API só de browser) na avaliação do
-        // módulo, o que quebra o SSR desta página pública se importado no topo do arquivo.
-        const pdfjsLib = await import("pdfjs-dist");
-        if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-        }
-        const buffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const content = await page.getTextContent();
-          text += itemsToText(content.items) + "\n";
-        }
-      } else {
-        text = await file.text();
+      const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      const data = await response.json();
+      if (data.erro) {
+        setCepError("CEP não encontrado.");
+        return;
       }
-
-      if (!text.trim()) throw new Error("Texto vazio");
-
-      const parsed = parseResumeLocally(text);
-
       setCandidate((prev) => ({
         ...prev,
-        full_name: prev.full_name || parsed.name,
-        email: prev.email || parsed.email,
-        phone: prev.phone || parsed.phone,
-        city: prev.city || parsed.city,
-        state: prev.state || parsed.state,
-        linkedin_url: prev.linkedin_url || parsed.linkedin_url,
+        address: data.logradouro || prev.address,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.localidade || prev.city,
+        state: data.uf || prev.state,
       }));
-      setParsedAcademics(parsed.academic_list);
-      setParsedExperiences(parsed.experience_list);
-      // parseResumeLocally não propaga os resumos; o parser cru extrai os dois.
-      // Em try próprio: currículo fora do formato esperado não pode derrubar o
-      // parse que já deu certo acima nem mostrar erro para o candidato.
-      try {
-        const raw = parseSolidesResume(text);
-        setResumeSummary({
-          professional_summary: raw.professional_summary || "",
-          experience_summary: raw.experience_summary || "",
-        });
-      } catch {
-        // sem resumo: a ficha continua válida, só não terá o texto extraído.
-      }
     } catch {
-      setResumeError("Não foi possível ler o currículo automaticamente, preencha os campos manualmente.");
+      setCepError("Não foi possível consultar o CEP agora. Preencha o endereço manualmente.");
     } finally {
-      setParsingResume(false);
+      setCepLoading(false);
     }
+  };
+
+  const addLanguageRow = () => setLanguages((prev) => [...prev, { language: "", proficiency: "" }]);
+  const removeLanguageRow = (index: number) => setLanguages((prev) => prev.filter((_, i) => i !== index));
+  const updateLanguageRow = (index: number, field: keyof LanguageRow, value: string) => {
+    setLanguages((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   };
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!job) return;
+
+    if (candidate.cpf && !isValidCpf(candidate.cpf)) {
+      setCpfError("CPF inválido.");
+      return;
+    }
+    setCpfError("");
     setSaving(true);
     setError("");
 
     const [firstName, ...lastParts] = candidate.full_name.trim().split(/\s+/);
     const supabase = createClient();
-
-    // Upload antes do insert: anon só tem policy de INSERT em candidates (sem UPDATE),
-    // então gravar resume_url via update() depois falharia silenciosamente por RLS para
-    // candidatos novos. Fazendo o upload primeiro, o path entra direto no insert.
-    let resumePath: string | null = null;
-    if (resumeFile) {
-      resumePath = `${crypto.randomUUID()}/${resumeFile.name}`;
-      const { error: uploadError } = await supabase.storage.from("resumes").upload(resumePath, resumeFile);
-      if (uploadError) {
-        console.warn("Erro ao enviar currículo:", uploadError.message);
-        resumePath = null;
-      }
-    }
 
     // Sem .select() após o insert: anon não tem policy de SELECT em candidates
     // (protege PII), e PostgREST precisa reler a linha pra devolver representation.
@@ -147,26 +141,40 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       .from("candidates")
       .insert({
         id: candidateId,
-        full_name: candidate.full_name.trim(),
-        first_name: firstName,
-        last_name: lastParts.join(" ") || firstName,
-        email: candidate.email.trim(),
-        phone: candidate.phone.trim() || null,
-        city: candidate.city.trim() || null,
-        state: candidate.state.trim() || null,
-        linkedin_url: candidate.linkedin_url.trim() || null,
+        full_name: sanitizeText(candidate.full_name, 200),
+        first_name: sanitizeText(firstName || "", 100),
+        last_name: sanitizeText(lastParts.join(" ") || firstName || "", 100),
+        email: sanitizeText(candidate.email, 255),
+        secondary_email: sanitizeText(candidate.secondary_email, 255) || null,
+        phone: sanitizeText(candidate.phone, 20) || null,
+        secondary_phone: sanitizeText(candidate.secondary_phone, 20) || null,
+        city: sanitizeText(candidate.city, 100) || null,
+        state: sanitizeText(candidate.state, 50) || null,
+        linkedin_url: sanitizeText(candidate.linkedin_url, 500) || null,
         birth_date: candidate.birth_date || null,
-        cpf: candidate.cpf.trim() || null,
-        address: candidate.address.trim() || null,
-        salary_expectation: candidate.salary_expectation.trim() || null,
+        cpf: onlyDigits(candidate.cpf) || null,
+        birthplace: sanitizeText(candidate.birthplace, 200) || null,
+        marital_status: candidate.marital_status || null,
+        cep: onlyDigits(candidate.cep) || null,
+        address: sanitizeText(candidate.address, 300) || null,
+        address_number: sanitizeText(candidate.address_number, 20) || null,
+        address_complement: sanitizeText(candidate.address_complement, 100) || null,
+        neighborhood: sanitizeText(candidate.neighborhood, 150) || null,
+        experience_summary: sanitizeText(candidate.experience_summary, 2000) || null,
+        gender_identity: sanitizeText(candidate.gender_identity, 200) || null,
+        sexual_orientation: sanitizeText(candidate.sexual_orientation, 200) || null,
+        race_declaration: sanitizeText(candidate.race_declaration, 200) || null,
+        salary_expectation: sanitizeText(candidate.salary_expectation, 50) || null,
         has_cnh: candidate.has_cnh,
         is_pcd: candidate.is_pcd,
-        pcd_description: candidate.is_pcd ? candidate.pcd_description.trim() || null : null,
+        pcd_description: candidate.is_pcd ? sanitizeText(candidate.pcd_description, 500) || null : null,
+        has_dependents: candidate.has_dependents,
+        dependents_count: candidate.has_dependents ? Number(onlyDigits(candidate.dependents_count)) || null : null,
+        dependents_notes: candidate.has_dependents ? sanitizeText(candidate.dependents_notes, 500) || null : null,
+        uniform_size: sanitizeText(candidate.uniform_size, 20) || null,
+        boot_size: sanitizeText(candidate.boot_size, 20) || null,
         role_interest: job.profile?.title || null,
         search_tags: [job.profile?.title, job.department, job.cost_center].filter(Boolean),
-        resume_url: resumePath,
-        professional_summary: resumeSummary.professional_summary || null,
-        experience_summary: resumeSummary.experience_summary || null,
       });
 
     if (candidateError) {
@@ -179,30 +187,25 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       return;
     }
 
-    if (parsedAcademics.length > 0) {
-      const educations = parsedAcademics.map((item) => ({
+    if (candidate.education_level) {
+      const { error: eduError } = await supabase.from("candidate_educations").insert({
         candidate_id: candidateId,
-        institution_name: item.institution || "Não informada",
-        degree: item.course || "Não informado",
-        start_date: item.start_date,
-        end_date: item.in_progress ? null : item.end_date,
-      }));
-      const { error: eduError } = await supabase.from("candidate_educations").insert(educations);
-      if (eduError) console.warn("Erro ao salvar formações:", eduError.message);
+        institution_name: sanitizeText(candidate.education_institution, 200) || "Não informada",
+        degree: candidate.education_level,
+      });
+      if (eduError) console.warn("Erro ao salvar escolaridade:", eduError.message);
     }
 
-    if (parsedExperiences.length > 0) {
-      const experiences = parsedExperiences.map((item) => ({
-        candidate_id: candidateId,
-        company_name: item.company || "Não informada",
-        position_title: item.role || "Não informado",
-        start_date: item.start_date,
-        end_date: item.is_current ? null : item.end_date,
-        is_current: item.is_current,
-        description: item.description || "",
-      }));
-      const { error: expError } = await supabase.from("candidate_experiences").insert(experiences);
-      if (expError) console.warn("Erro ao salvar experiências:", expError.message);
+    const validLanguages = languages.filter((row) => row.language.trim());
+    if (validLanguages.length > 0) {
+      const { error: langError } = await supabase.from("candidate_languages").insert(
+        validLanguages.map((row) => ({
+          candidate_id: candidateId,
+          language: sanitizeText(row.language, 100),
+          proficiency: row.proficiency || null,
+        }))
+      );
+      if (langError) console.warn("Erro ao salvar idiomas:", langError.message);
     }
 
     const { error: applicationError } = await supabase
@@ -211,7 +214,14 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
 
     setSaving(false);
     if (applicationError) {
-      setError("Dados recebidos, mas não foi possível vincular à vaga. Avise o RH.");
+      console.error("Erro ao vincular candidatura à vaga:", applicationError);
+      setError(
+        applicationError.code === "23503"
+          ? "Esta vaga não está mais disponível. Atualize a página e escolha outra."
+          : applicationError.code === "23505"
+          ? "Você já se candidatou a esta vaga."
+          : "Dados recebidos, mas não foi possível vincular à vaga. Avise o RH."
+      );
       return;
     }
 
@@ -222,7 +232,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
 
   return (
     <Dialog open={open} onOpenChange={(next) => { onOpenChange(next); if (!next) reset(); }}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Candidatar-se a {job?.profile?.title || "esta vaga"}</DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-1.5">
@@ -233,83 +243,128 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         <form onSubmit={submit} className="space-y-6">
           {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
-          <FormSection title="Currículo" description="Envie um arquivo e preenchemos os campos automaticamente.">
-            <label
-              htmlFor="resume-upload"
-              onDragOver={(event) => { event.preventDefault(); if (job && !parsingResume) setIsDraggingResume(true); }}
-              onDragLeave={() => setIsDraggingResume(false)}
-              onDrop={(event) => {
-                event.preventDefault();
-                setIsDraggingResume(false);
-                const file = event.dataTransfer.files?.[0];
-                if (file && job && !parsingResume) processResumeFile(file);
-              }}
-              className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-                isDraggingResume ? "border-primary bg-primary/5" : resumeFile ? "border-green-500/40 bg-green-500/5" : "border-input hover:bg-muted/40"
-              } ${!job || parsingResume ? "pointer-events-none opacity-60" : ""}`}
-            >
-              {parsingResume ? (
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              ) : resumeFile ? (
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
-              ) : (
-                <FileUp className="h-6 w-6 text-muted-foreground" />
-              )}
-              <span className="text-sm font-medium">
-                {parsingResume ? "Lendo currículo..." : resumeFile ? resumeFile.name : "Arraste seu currículo aqui ou clique para escolher"}
-              </span>
-              <span className="text-xs text-muted-foreground">PDF ou TXT · opcional, mas acelera o preenchimento</span>
-            </label>
-            <input
-              id="resume-upload"
-              type="file"
-              accept=".pdf,.txt"
-              className="hidden"
-              disabled={!job || parsingResume}
-              onChange={handleResumeUpload}
-            />
-            {resumeError && <p className="text-xs text-destructive">{resumeError}</p>}
-            {(parsedAcademics.length > 0 || parsedExperiences.length > 0) && (
-              <div className="flex flex-wrap gap-2">
-                {parsedAcademics.length > 0 && (
-                  <Badge variant="secondary"><GraduationCap className="h-3.5 w-3.5" /> {parsedAcademics.length} formação(ões) importada(s)</Badge>
-                )}
-                {parsedExperiences.length > 0 && (
-                  <Badge variant="secondary"><BriefcaseBusiness className="h-3.5 w-3.5" /> {parsedExperiences.length} experiência(s) importada(s)</Badge>
-                )}
-              </div>
-            )}
-          </FormSection>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-6">
+              <FormSection title="Dados pessoais">
+                <Field label="Nome completo *"><Input required disabled={!job} value={candidate.full_name} onChange={(event) => update("full_name", event.target.value)} /></Field>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="E-mail *"><Input required disabled={!job} type="email" value={candidate.email} onChange={(event) => update("email", event.target.value)} /></Field>
+                  <Field label="E-mail secundário"><Input disabled={!job} type="email" value={candidate.secondary_email} onChange={(event) => update("secondary_email", event.target.value)} /></Field>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Telefone *"><Input required disabled={!job} inputMode="numeric" placeholder="(00) 00000-0000" value={candidate.phone} onChange={(event) => update("phone", maskPhone(event.target.value))} /></Field>
+                  <Field label="Telefone secundário"><Input disabled={!job} inputMode="numeric" placeholder="(00) 00000-0000" value={candidate.secondary_phone} onChange={(event) => update("secondary_phone", maskPhone(event.target.value))} /></Field>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Data de nascimento"><Input type="date" value={candidate.birth_date} onChange={(event) => update("birth_date", event.target.value)} /></Field>
+                  <Field label="CPF">
+                    <Input inputMode="numeric" placeholder="000.000.000-00" value={candidate.cpf} onChange={(event) => { setCpfError(""); update("cpf", maskCpf(event.target.value)); }} aria-invalid={!!cpfError} />
+                    {cpfError && <p role="alert" className="text-xs text-destructive">{cpfError}</p>}
+                  </Field>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Naturalidade"><Input value={candidate.birthplace} onChange={(event) => update("birthplace", event.target.value)} /></Field>
+                  <Field label="Estado civil">
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.marital_status} onChange={(event) => update("marital_status", event.target.value)}>
+                      <option value="">Selecione...</option>
+                      {MARITAL_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                <Field label="LinkedIn"><Input disabled={!job} value={candidate.linkedin_url} onChange={(event) => update("linkedin_url", event.target.value)} /></Field>
+              </FormSection>
 
-          <FormSection title="Dados pessoais">
-            <Field label="Nome completo *"><Input required disabled={!job} value={candidate.full_name} onChange={(event) => setCandidate({ ...candidate, full_name: event.target.value })} /></Field>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="E-mail *"><Input required disabled={!job} type="email" value={candidate.email} onChange={(event) => setCandidate({ ...candidate, email: event.target.value })} /></Field>
-              <Field label="Telefone"><Input disabled={!job} value={candidate.phone} onChange={(event) => setCandidate({ ...candidate, phone: event.target.value })} /></Field>
+              <FormSection title="Endereço" description="Informe o CEP para preencher automaticamente.">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="CEP">
+                    <div className="relative">
+                      <Input inputMode="numeric" placeholder="00000-000" value={candidate.cep} onChange={(event) => { setCepError(""); update("cep", maskCep(event.target.value)); }} onBlur={(event) => lookupCep(event.target.value)} />
+                      {cepLoading && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
+                    </div>
+                    {cepError && <p className="text-xs text-destructive">{cepError}</p>}
+                  </Field>
+                  <Field label="Bairro"><Input value={candidate.neighborhood} onChange={(event) => update("neighborhood", event.target.value)} /></Field>
+                </div>
+                <Field label="Logradouro"><Input value={candidate.address} onChange={(event) => update("address", event.target.value)} /></Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Número"><Input value={candidate.address_number} onChange={(event) => update("address_number", event.target.value)} /></Field>
+                  <Field label="Complemento"><Input value={candidate.address_complement} onChange={(event) => update("address_complement", event.target.value)} /></Field>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Cidade"><Input disabled={!job} value={candidate.city} onChange={(event) => update("city", event.target.value)} /></Field>
+                  <Field label="UF"><Input disabled={!job} maxLength={2} value={candidate.state} onChange={(event) => update("state", event.target.value.toUpperCase())} /></Field>
+                </div>
+              </FormSection>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Data de nascimento"><Input type="date" value={candidate.birth_date} onChange={(event) => setCandidate({ ...candidate, birth_date: event.target.value })} /></Field>
-              <Field label="CPF"><Input inputMode="numeric" value={candidate.cpf} onChange={(event) => setCandidate({ ...candidate, cpf: event.target.value })} /></Field>
-            </div>
-            <Field label="LinkedIn"><Input disabled={!job} value={candidate.linkedin_url} onChange={(event) => setCandidate({ ...candidate, linkedin_url: event.target.value })} /></Field>
-          </FormSection>
 
-          <FormSection title="Endereço e disponibilidade">
-            <Field label="Endereço"><Input value={candidate.address} onChange={(event) => setCandidate({ ...candidate, address: event.target.value })} /></Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Cidade"><Input disabled={!job} value={candidate.city} onChange={(event) => setCandidate({ ...candidate, city: event.target.value })} /></Field>
-              <Field label="UF"><Input disabled={!job} value={candidate.state} onChange={(event) => setCandidate({ ...candidate, state: event.target.value })} /></Field>
+            <div className="space-y-6">
+              <FormSection title="Formação e experiência">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Escolaridade">
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.education_level} onChange={(event) => update("education_level", event.target.value)}>
+                      <option value="">Selecione...</option>
+                      {EDUCATION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Instituição"><Input value={candidate.education_institution} onChange={(event) => update("education_institution", event.target.value)} /></Field>
+                </div>
+                <Field label="Experiência profissional"><Textarea rows={4} placeholder="Conte um pouco das suas experiências anteriores" value={candidate.experience_summary} onChange={(event) => update("experience_summary", event.target.value)} /></Field>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Idiomas</Label>
+                  {languages.map((row, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input placeholder="Idioma" value={row.language} onChange={(event) => updateLanguageRow(index, "language", event.target.value)} />
+                      <select className="flex h-10 w-40 shrink-0 rounded-md border border-input bg-background px-3 text-sm" value={row.proficiency} onChange={(event) => updateLanguageRow(index, "proficiency", event.target.value)}>
+                        <option value="">Nível...</option>
+                        {LANGUAGE_LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}
+                      </select>
+                      {languages.length > 1 && (
+                        <Button type="button" variant="outline" size="icon" onClick={() => removeLanguageRow(index)}><X className="h-4 w-4" /></Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={addLanguageRow}><Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar idioma</Button>
+                </div>
+              </FormSection>
+
+              <FormSection title="Perfil complementar">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Autodeclaração de gênero"><Input value={candidate.gender_identity} onChange={(event) => update("gender_identity", event.target.value)} /></Field>
+                  <Field label="Orientação sexual"><Input value={candidate.sexual_orientation} onChange={(event) => update("sexual_orientation", event.target.value)} /></Field>
+                </div>
+                <Field label="Autodeclaração de raça"><Input value={candidate.race_declaration} onChange={(event) => update("race_declaration", event.target.value)} /></Field>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Pretensão salarial"><Input value={candidate.salary_expectation} onChange={(event) => update("salary_expectation", maskCurrencyInput(event.target.value))} /></Field>
+                  <Field label="Possui CNH?">
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.has_cnh ? "sim" : "nao"} onChange={(event) => update("has_cnh", event.target.value === "sim")}>
+                      <option value="nao">Não</option>
+                      <option value="sim">Sim</option>
+                    </select>
+                  </Field>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Tamanho uniforme"><Input value={candidate.uniform_size} onChange={(event) => update("uniform_size", event.target.value)} /></Field>
+                  <Field label="Tamanho botina"><Input value={candidate.boot_size} onChange={(event) => update("boot_size", event.target.value)} /></Field>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={candidate.is_pcd} onCheckedChange={(checked) => update("is_pcd", checked === true)} />
+                  Pessoa com deficiência (PcD)
+                </label>
+                {candidate.is_pcd && <Field label="Descrição PcD"><Input value={candidate.pcd_description} onChange={(event) => update("pcd_description", event.target.value)} /></Field>}
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={candidate.has_dependents} onCheckedChange={(checked) => update("has_dependents", checked === true)} />
+                  Possui dependentes?
+                </label>
+                {candidate.has_dependents && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Quantidade"><Input inputMode="numeric" value={candidate.dependents_count} onChange={(event) => update("dependents_count", onlyDigits(event.target.value))} /></Field>
+                    <Field label="Observações"><Input value={candidate.dependents_notes} onChange={(event) => update("dependents_notes", event.target.value)} /></Field>
+                  </div>
+                )}
+              </FormSection>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Pretensão salarial"><Input value={candidate.salary_expectation} onChange={(event) => setCandidate({ ...candidate, salary_expectation: event.target.value })} /></Field>
-              <Field label="Possui CNH?"><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.has_cnh ? "sim" : "nao"} onChange={(event) => setCandidate({ ...candidate, has_cnh: event.target.value === "sim" })}><option value="nao">Não</option><option value="sim">Sim</option></select></Field>
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={candidate.is_pcd} onCheckedChange={(checked) => setCandidate({ ...candidate, is_pcd: checked === true })} />
-              Pessoa com deficiência (PcD)
-            </label>
-            {candidate.is_pcd && <Field label="Descrição PcD"><Input value={candidate.pcd_description} onChange={(event) => setCandidate({ ...candidate, pcd_description: event.target.value })} /></Field>}
-          </FormSection>
+          </div>
 
           <Button type="submit" className="w-full" size="lg" disabled={!job || saving}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
