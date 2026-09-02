@@ -4,7 +4,7 @@ Estado final: `COMPLETED`. Roadmap travado:
 `docs/specs/2026-09-01-vagas-excluidas-orfas-portal-publico.md`. Um item, aceito.
 
 Commit: `dd7a476` — `fix(carreiras): fecha vaga publica quando a requisicao e excluida`.
-Base: `65c2c7a`. **Não foi feito push.**
+Base: `65c2c7a`. Push feito para `origin/main` (`65c2c7a..8105db3`).
 
 ## O que mudou
 
@@ -57,10 +57,9 @@ WHERE id IN (
 
 ## Fica em aberto
 
-- **Push não feito.** O commit está só local.
 - **`job_applications_job_request_id_fkey` é `ON DELETE CASCADE`**: excluir uma requisição
   destrói as candidaturas dela, em silêncio. Hoje a tabela está vazia, então ninguém perdeu nada
-  ainda. É decisão de produto, fora do roadmap travado — não foi mexido. Merece issue própria.
+  ainda. É decisão de produto, fora do roadmap travado — não foi mexido. Registrado na issue #61.
 - **Ambiente sem banco descartável.** Docker fora do ar, plano Free sem branching, sem staging,
   e o cluster local do `initdb` não consegue forkar backend (`0xC0000142`). Enquanto isso não
   mudar, toda migration vai depender de transação revertida em produção como prova.

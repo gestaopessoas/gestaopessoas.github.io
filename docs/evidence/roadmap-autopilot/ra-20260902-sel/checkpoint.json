@@ -92,6 +92,14 @@
     {
       "command": "git commit dd7a476",
       "exit_code": 0
+    },
+    {
+      "command": "gh issue create (issue 61, CASCADE em job_applications)",
+      "exit_code": 0
+    },
+    {
+      "command": "git push origin main (65c2c7a..8105db3)",
+      "exit_code": 0
     }
   ],
   "evidence": [
@@ -101,14 +109,14 @@
     "supabase/migrations/20260902120000_close_job_opening_on_job_request_delete.sql",
     "docs/evidence/roadmap-autopilot/ra-20260902-sel/run-summary.md"
   ],
-  "last_safe_state": "COMPLETED",
+  "last_safe_state": "RELEASED",
   "next_allowed_step": "stop",
   "active_gates": [
     "GATE-PROD-DB: AUTORIZADO pelo usuario 2026-09-02, escopo desta run. Sequencia so do arbitro: teste em transacao revertida -> supabase db push -> reconferencia do aceite. Nenhum worker tocou no banco. Rollback: DROP TRIGGER trg_close_job_opening_on_job_request_delete + DROP FUNCTION close_job_opening_on_job_request_delete, e UPDATE job_openings SET status='Aberta' para os 3 ids registrados em findings.md.",
-    "GATE-PUBLISH: nao autorizado. Commit local feito (dd7a476); push nao foi feito."
+    "GATE-PUBLISH: AUTORIZADO pelo usuario 2026-09-02. Push feito para origin/main (65c2c7a..8105db3). Issue 61 aberta no mesmo aval."
   ],
   "blockers": [
-    "Registrado, nao tratado (decisao de produto fora do roadmap travado): job_applications_job_request_id_fkey e ON DELETE CASCADE, entao excluir uma requisicao destroi as candidaturas dela em silencio. job_applications esta vazia hoje, entao nada corre risco agora. Merece issue propria.",
+    "Registrado como issue 61 (decisao de produto, fora do roadmap travado): job_applications_job_request_id_fkey e ON DELETE CASCADE, entao excluir uma requisicao destroi as candidaturas dela em silencio. job_applications esta vazia hoje.",
     "Sem banco descartavel neste ambiente: daemon do Docker fora do ar, plano Free sem branching, sem staging, e cluster local do initdb nao consegue forkar backend (0xC0000142). A prova forward/rollback saiu de transacao revertida em producao.",
     "Alias de modelo por worker nao pode ser fixado neste ambiente (erro Nvidia-OC); workers herdam o padrao frontier."
   ]
