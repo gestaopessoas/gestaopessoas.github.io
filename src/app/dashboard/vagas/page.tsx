@@ -17,6 +17,8 @@ type JobRequest = {
   requester_whatsapp: string | null;
   position_title: string | null;
   unit: string | null;
+  workplace_id: string | null;
+  workplace: { name: string } | null;
   quantity: number | null;
   contract_type: string | null;
   urgency: string | null;
@@ -44,6 +46,10 @@ type JobRequest = {
   seniority: string | null;
   notes: string | null;
 };
+
+// Mesma projecao na leitura e na gravacao: sem isso o join da Obra some depois de salvar.
+const JOB_REQUEST_SELECT =
+  "id, requester_name, requester_area, requester_whatsapp, position_title, unit, workplace_id, workplace:workplaces(name), quantity, contract_type, urgency, status, created_at, behavioral_tags, search_tags, required_requirements, desired_requirements, manager_expectations, profile_id, department_id, target_date, salary_min, salary_max, salary_notes, work_schedule, work_mode, is_pcd_eligible, affirmative_tags, benefits, reason, level_min, level_max, seniority, notes";
 
 const statusStyle: Record<string, string> = {
   Nova: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
@@ -76,7 +82,7 @@ export default function VagasAdminPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("job_requests")
-        .select("id, requester_name, requester_area, requester_whatsapp, position_title, unit, quantity, contract_type, urgency, status, created_at, behavioral_tags, search_tags, required_requirements, desired_requirements, manager_expectations, profile_id, department_id, target_date, salary_min, salary_max, salary_notes, work_schedule, work_mode, is_pcd_eligible, affirmative_tags, benefits, reason, level_min, level_max, seniority, notes")
+        .select(JOB_REQUEST_SELECT)
         .order("created_at", { ascending: false });
 
       if (!active) return;
@@ -85,7 +91,7 @@ export default function VagasAdminPage() {
         setError("Não foi possível carregar as solicitações. Confira login, permissões e migração do Supabase.");
         return;
       }
-      setRequests((data ?? []) as JobRequest[]);
+      setRequests((data ?? []) as unknown as JobRequest[]);
     };
 
     loadInitialRequests();
@@ -155,6 +161,7 @@ export default function VagasAdminPage() {
       position_title: values.position_title,
       requested_role: values.position_title,
       unit: values.unit || null,
+      workplace_id: values.workplace_id || null,
       quantity: Number(values.quantity) || 1,
       contract_type: values.contract_type,
       reason: values.reason,
@@ -179,7 +186,12 @@ export default function VagasAdminPage() {
       seniority: meta.selectedSeniority || null,
     };
 
-    const { error } = await supabase.from("job_requests").update(updatePayload).eq("id", selectedJob.id);
+    const { data: saved, error } = await supabase
+      .from("job_requests")
+      .update(updatePayload)
+      .eq("id", selectedJob.id)
+      .select(JOB_REQUEST_SELECT)
+      .single();
 
     setIsSaving(false);
 
@@ -188,7 +200,7 @@ export default function VagasAdminPage() {
       return;
     }
 
-    const merged = { ...selectedJob, ...updatePayload };
+    const merged = (saved ?? { ...selectedJob, ...updatePayload }) as unknown as JobRequest;
     setRequests(prev => prev.map(item => item.id === selectedJob.id ? merged : item));
     setSelectedJob(merged);
     setIsEditing(false);
@@ -280,7 +292,7 @@ export default function VagasAdminPage() {
                   <div>
                     <h3 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors">{request.position_title || "Sem título"}</h3>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {request.unit || "Unidade não informada"} • {request.quantity ?? 1} vaga(s)
+                      {request.workplace?.name || request.unit || "Obra não informada"} • {request.quantity ?? 1} vaga(s)
                     </p>
                   </div>
                   <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusStyle[request.status || "Nova"] ?? ""}`}>
@@ -373,10 +385,17 @@ export default function VagasAdminPage() {
 
                         <div>
                           <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-primary" /> Unidade / Obra
+                            <MapPin className="h-4 w-4 text-primary" /> Obra
                           </h4>
                           <div className="rounded-md border bg-muted/20 p-3 text-sm text-foreground">
-                            {selectedJob.unit || "Não informada"}
+                            {selectedJob.workplace?.name || "Não informada"}
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="text-sm font-semibold text-foreground mb-2">Unidade / Centro de Custo</h4>
+                          <div className="rounded-md border bg-muted/20 p-3 text-sm text-foreground">
+                            {selectedJob.unit || "Não informado"}
                           </div>
                         </div>
                         
@@ -420,6 +439,7 @@ export default function VagasAdminPage() {
                       sector_id: selectedJob.department_id || "",
                       position_title: selectedJob.position_title || "",
                       unit: selectedJob.unit || "",
+                      workplace_id: selectedJob.workplace_id || "",
                       quantity: String(selectedJob.quantity ?? 1),
                       contract_type: selectedJob.contract_type || "CLT",
                       reason: selectedJob.reason || "Substituição",

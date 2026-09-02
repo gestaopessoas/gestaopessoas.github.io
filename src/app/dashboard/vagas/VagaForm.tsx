@@ -33,6 +33,7 @@ export type SalaryRow = {
 
 export type Department = { id: string; name: string };
 export type CostCenter = { id: string; name: string; code: string };
+export type Workplace = { id: string; name: string; status: string | null };
 
 const behavioralTags = [
   "Adaptabilidade", "Aprendizado técnico", "Autonomia", "Comprometimento",
@@ -72,6 +73,7 @@ export const initialForm = {
   sector_id: "",
   position_title: "",
   unit: "",
+  workplace_id: "",
   quantity: "1",
   contract_type: "CLT",
   reason: "Substituição",
@@ -125,6 +127,7 @@ export default function VagaForm({
   const [salaryTable, setSalaryTable] = useState<SalaryRow[]>([]);
   const [workSchedules, setWorkSchedules] = useState<string[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [companyBenefits, setCompanyBenefits] = useState<{ name: string }[]>([]);
 
   const [availableLevels, setAvailableLevels] = useState<string[]>([]);
@@ -146,13 +149,14 @@ export default function VagaForm({
     const fetchOptions = async () => {
       const supabase = createClient();
 
-      const [profilesResult, departmentsResult, salaryResult, settingsResult, costCentersResult, benefitsResult] = await Promise.all([
+      const [profilesResult, departmentsResult, salaryResult, settingsResult, costCentersResult, benefitsResult, workplacesResult] = await Promise.all([
         supabase.from("job_profiles").select("id, profile_code, title, min_education, desired_education, min_experience, desired_experience, cnh, knowledge, competencies").order("title"),
         supabase.from("departments").select("id, name").order("name"),
         supabase.from("salary_table").select("*").order("role_name"),
         supabase.from("system_setting_entries").select("path, value_text").eq("setting_key", "work_schedules").order("path"),
         supabase.from("cost_centers").select("id, name, code").order("name"),
         supabase.from("company_benefits").select("name").order("name"),
+        supabase.from("workplaces").select("id, name, status").order("name"),
       ]);
 
       if (!active) return;
@@ -167,6 +171,7 @@ export default function VagaForm({
       setSectors((departmentsResult.data ?? []) as Department[]);
       setSalaryTable((salaryResult.data ?? []) as SalaryRow[]);
       setCostCenters((costCentersResult.data ?? []) as CostCenter[]);
+      setWorkplaces((workplacesResult.data ?? []) as Workplace[]);
       setCompanyBenefits((benefitsResult.data ?? []) as { name: string }[]);
       let scheds: string[] = (settingsResult.data ?? []).sort((a, b) => Number(a.path[0]) - Number(b.path[0])).map((entry) => entry.value_text ?? "");
       if (!scheds || !scheds.length) {
@@ -395,6 +400,14 @@ export default function VagaForm({
               <select value={form.sector_id} onChange={(event) => set("sector_id", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                 <option value="">Selecione...</option>
                 {sectors.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Obra *">
+              <select required value={form.workplace_id} onChange={(event) => set("workplace_id", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <option value="">Selecione...</option>
+                {workplaces.filter(workplace => workplace.status === "Ativo" || workplace.id === form.workplace_id).map(workplace => (
+                  <option key={workplace.id} value={workplace.id}>{workplace.name}</option>
+                ))}
               </select>
             </Field>
             <Field label="Unidade / Centro de Custo">

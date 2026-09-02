@@ -75,6 +75,7 @@ export default function NovaVagaPage() {
           position_title: form.position_title,
           requested_role: form.position_title,
           unit: form.unit || null,
+          workplace_id: form.workplace_id || null,
           quantity: Number(form.quantity) || 1,
           contract_type: form.contract_type,
           reason: form.reason,
