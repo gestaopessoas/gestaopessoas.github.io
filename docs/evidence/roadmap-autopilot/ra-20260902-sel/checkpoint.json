@@ -1,0 +1,76 @@
+{
+  "run_id": "ra-20260902-sel",
+  "runtime": "claude-code-win32-powershell",
+  "resolved_models": {
+    "arbiter": "claude-opus-5 (frontier, main thread)",
+    "workers": "inherited default — explicit alias override unavailable in this environment (see blockers)"
+  },
+  "repository": "gestaopessoas.github.io (origin https://github.com/gestaopessoas/gestaopessoas.github.io.git)",
+  "selected_roadmap": "docs/specs/2026-09-01-vagas-excluidas-orfas-portal-publico.md (locked by user 2026-09-02)",
+  "current_task": "vagas-orfas-task-1-trigger — BLOCKED before implementation: no disposable database for mutating migration tests",
+  "last_accepted_task": "none in this run (previous run ra-20260831-afin COMPLETED at ea19e71f3d3da0076cb11f1fc2a88bae7ee5912f)",
+  "correction_cycle": 0,
+  "worktree": "C:/Users/ACPO Empreendimentos/Documents/Github/gestaopessoas.github.io",
+  "branch": "main",
+  "base_sha": "1e540838568c86174680cad05e98a3d435198978",
+  "head_sha": "1e540838568c86174680cad05e98a3d435198978",
+  "verdicts": [],
+  "commands": [
+    {
+      "command": "git remote -v",
+      "exit_code": 0
+    },
+    {
+      "command": "git rev-parse HEAD",
+      "exit_code": 0
+    },
+    {
+      "command": "git status --porcelain",
+      "exit_code": 0
+    },
+    {
+      "command": "gh issue list --state open",
+      "exit_code": 0
+    },
+    {
+      "command": "gh auth status",
+      "exit_code": 0
+    },
+    {
+      "command": "supabase --version",
+      "exit_code": 0
+    },
+    {
+      "command": "node -v / npm -v",
+      "exit_code": 0
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run lint (eslint, pre-existing baseline failure)",
+      "exit_code": 1
+    },
+    {
+      "command": "docker info --format {{.ServerVersion}} (daemon not running)",
+      "exit_code": 1
+    }
+  ],
+  "evidence": [
+    "docs/evidence/roadmap-autopilot/ra-20260902-sel/preflight.md",
+    "docs/evidence/roadmap-autopilot/ra-20260902-sel/baseline.md"
+  ],
+  "last_safe_state": "BLOCKED",
+  "next_allowed_step": "resume",
+  "active_gates": [
+    "GATE-PROD-DB: NOT AUTHORIZED for this run. Any migration, backfill or db push requires fresh explicit user authorization.",
+    "GATE-PUBLISH: NOT AUTHORIZED for this run. No commit/push until user selects a roadmap and authorizes publication."
+  ],
+  "blockers": [
+    "No disposable database for mutating migration tests: Docker CLI 29.7.2 installed but daemon not running, so `supabase start` cannot run; supabase/.temp/project-ref points at production and there is no staging project. Safe condition to change: start Docker Desktop so a local stack can host forward/rollback tests, or authorize an alternative tested path.",
+    "GATE-PROD-DB not authorized for this run. The trigger and the backfill both change production data.",
+    "Worker model alias cannot be pinned in this environment: Agent model override returns 'issue with the selected model (Nvidia-OC)'. Workers inherit the frontier default — no silent downgrade, but no economy/balanced tiering (cost impact).",
+    "Working tree not clean (docs only): docs/adr/0006 and CONTEXT.md untracked, docs/adr/0004 and docs/agents/domain.md modified. None overlap the roadmap allowlist."
+  ]
+}

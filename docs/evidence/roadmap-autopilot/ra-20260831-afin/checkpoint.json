@@ -1,0 +1,44 @@
+{
+  "run_id": "ra-20260831-afin",
+  "runtime": "opencode-win32-powershell",
+  "resolved_models": {
+    "arbiter": "opencode-go/glm-5.3",
+    "workers": "opencode-go/glm-5.3 (roadmap-implementer/reviewer/qa/corrector/retester, balanced tier)"
+  },
+  "repository": "gestaopessoas.github.io (origin github.com/gestaopessoas/gestaopessoas.github.io)",
+  "selected_roadmap": "docs/superpowers/plans/2026-08-25-analytics-financeiro-plan.md (spec: docs/superpowers/specs/2026-08-25-analytics-financeiro-design.md)",
+  "current_task": "none — roadmap completed",
+  "last_accepted_task": "analytics-financeiro-task-4-global-dashboard (ACCEPTED 2026-08-31: reviewer PASS, retest PASS, commit ea19e71f3d3da0076cb11f1fc2a88bae7ee5912f)",
+  "correction_cycle": 0,
+  "worktree": "C:\\Users\\ACPO Empreendimentos\\Documents\\Github\\gestaopessoas.github.io",
+  "branch": "main",
+  "base_sha": "8cf7b2727d32efc394cab7aaf0b89d971d4e3258",
+  "head_sha": "ea19e71f3d3da0076cb11f1fc2a88bae7ee5912f",
+  "verdicts": [
+    { "task_id": "analytics-financeiro-task-2-rpc", "verdict": "PASS" },
+    { "task_id": "analytics-financeiro-task-3-financeiro", "verdict": "PASS" },
+    { "task_id": "analytics-financeiro-task-4-global-dashboard", "verdict": "PASS" }
+  ],
+  "commands": [
+    { "command": "git status --porcelain", "exit_code": 0 },
+    { "command": "npx tsc --noEmit", "exit_code": 0 },
+    { "command": "eslint src e2e (baseline)", "exit_code": 1 },
+    { "command": "supabase db push --dry-run", "exit_code": 0 },
+    { "command": "supabase db push (apply 20260825_create_global_analytics_rpc.sql)", "exit_code": 0 },
+    { "command": "node test-global-analytics-rpc.mjs (post-apply acceptance)", "exit_code": 0 },
+    { "command": "git commit (task 2)", "exit_code": 0 }
+  ],
+  "evidence": [
+    "docs/evidence/roadmap-autopilot/ra-20260831-afin/preflight.md",
+    "docs/evidence/roadmap-autopilot/ra-20260831-afin/task2-implementer-handoff.json",
+    "docs/evidence/roadmap-autopilot/ra-20260831-afin/task2-reviewer-handoff.json",
+    "docs/evidence/roadmap-autopilot/ra-20260831-afin/task2-frontier-gate.md",
+    "docs/evidence/roadmap-autopilot/ra-20260831-afin/run-summary.md"
+  ],
+  "last_safe_state": "COMPLETED",
+  "next_allowed_step": "stop",
+  "active_gates": [
+    "GATE-PROD-DB: AUTHORIZED by user 2026-08-31. Arbiter-only sequence: implementer delivers migration file -> `supabase db push --dry-run` (read-only) -> arbiter applies to production -> arbiter reruns acceptance. Rollback: DROP FUNCTION get_global_analytics_data. Workers must never run db push."
+  ],
+  "blockers": []
+}

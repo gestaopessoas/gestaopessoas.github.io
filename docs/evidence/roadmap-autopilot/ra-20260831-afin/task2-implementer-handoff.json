@@ -1,0 +1,38 @@
+{
+  "task_id": "analytics-financeiro-task-2-rpc",
+  "role": "implementer",
+  "runtime": "opencode-win32-powershell",
+  "model_tier": "balanced",
+  "base_sha": "8cf7b2727d32efc394cab7aaf0b89d971d4e3258",
+  "head_sha": "8cf7b2727d32efc394cab7aaf0b89d971d4e3258",
+  "verdict": "PASS",
+  "files": ["supabase/migrations/20260825_create_global_analytics_rpc.sql", "test-global-analytics-rpc.mjs"],
+  "commands": [
+    { "command": "node test-global-analytics-rpc.mjs", "exit_code": 1 },
+    { "command": "npx tsc --noEmit", "exit_code": 0 },
+    { "command": "eslint test-global-analytics-rpc.mjs", "exit_code": 0 }
+  ],
+  "positive_tests": "After arbiter applies the migration, node test-global-analytics-rpc.mjs calls get_global_analytics_data(8, 2026) with the anon key and exits 0 with a row count.",
+  "negative_tests": "Before migration apply, node test-global-analytics-rpc.mjs fails with 'Could not find the function public.get_global_analytics_data(p_month, p_year) in the schema cache' and exits 1.",
+  "findings": [
+    { "severity": "info", "evidence": "Studied baseline RPC public.get_employee_financials: SECURITY INVOKER, companies.tax_rate_clt/tax_rate_prolabore by contract_type, granted to anon/authenticated/service_role. New RPC mirrors this pattern." },
+    { "severity": "info", "evidence": "Migration uses CREATE OR REPLACE FUNCTION, SET search_path = public, pg_temp, rollback comment, additive, OWNER TO postgres plus grants matching existing financeiro RPC." },
+    { "severity": "info", "evidence": "Schema-driven assumptions documented in migration comments: employee_benefits has no month columns so active benefits summed as recurring; employee_uniforms/uniform_items have no unit price so uniform_cost is 0; absences inferred from time_logs rows with all NULL punch times; termination estimate simplified to base_salary + encargos." },
+    { "severity": "warn", "evidence": "Migration not applied locally; final PASS depends on arbiter running supabase db push and rerunning the test." }
+  ],
+  "evidence": [
+    "supabase/migrations/20260825_create_global_analytics_rpc.sql",
+    "test-global-analytics-rpc.mjs",
+    "node test-global-analytics-rpc.mjs before apply: RPC error: Could not find the function public.get_global_analytics_data(p_month, p_year) in the schema cache",
+    "npx tsc --noEmit: No errors found",
+    "eslint test-global-analytics-rpc.mjs: exit 0"
+  ],
+  "remaining_risks": [
+    "Migration must be applied by the arbiter; implementer did not run supabase db push.",
+    "uniform_cost hardcoded to 0 because schema stores quantity_delivered but no unit price.",
+    "Benefit costs not filtered by month because employee_benefits lacks month/year columns.",
+    "Absence detection assumes a time_logs row with NULL punch times is an absence.",
+    "Termination estimate is a simplified base_salary + encargos proxy."
+  ],
+  "next_allowed_step": "review"
+}

@@ -22,4 +22,5 @@ gestaopessoas.github.io/
 ## Notes
 
 - No monorepo signals found — single-context is correct for this repo
-- `CONTEXT.md` does not yet exist; it should be created as the first ADR-adjacent task
+- `CONTEXT.md` existe desde 2026-09-02. A seção "Termos pendentes" lista o que ainda não
+  tem definição acordada — não invente uma, resolva e mova para cima.

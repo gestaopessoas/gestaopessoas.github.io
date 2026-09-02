@@ -4,7 +4,10 @@ Data: 2026-08-21
 
 ## Status
 
-Aceito
+Superado pelo [ADR 0006](./0006-etapa-unica-na-candidatura.md) em 2026-09-02. O gatilho de
+revisão previsto em "Consequências" — o vínculo por e-mail virar identificador de verdade —
+foi acionado: o destino passa a ser Etapa Terminal da Candidatura, não coluna persistida em
+`interviews`.
 
 ## Contexto
 
