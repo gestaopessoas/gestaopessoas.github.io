@@ -1,0 +1,109 @@
+{
+  "run_id": "ra-20260902-nx",
+  "runtime": "claude-code-win32-powershell",
+  "resolved_models": {
+    "arbiter": "claude-opus-5 (frontier, thread principal)",
+    "workers": "herdam o padrao — override de alias indisponivel neste ambiente (ver blockers)"
+  },
+  "repository": "gestaopessoas.github.io (origin https://github.com/gestaopessoas/gestaopessoas.github.io.git)",
+  "selected_roadmap": "docs/adr/0006-etapa-unica-na-candidatura.md, secao Exclusividade de Obra / issue 55 (travado pelo usuario 2026-09-02)",
+  "current_task": "nenhuma — Fase 0 aceita; proximo item da epica e a issue 56 (Fase 1), fora do escopo desta run",
+  "last_accepted_task": "eixo-etapa-fase0-workplace-id (ACCEPTED 2026-09-02: retestador PASS, diff do trigger reconferido pelo arbitro contra a funcao em producao, commit 72a028b66709ee01356a6cb200204f30d41424e3)",
+  "correction_cycle": 1,
+  "worktree": "C:/Users/ACPO Empreendimentos/Documents/Github/gestaopessoas.github.io",
+  "branch": "main",
+  "base_sha": "df66f0dc99748aabeccff77ea9008712c52aeba0",
+  "head_sha": "72a028b66709ee01356a6cb200204f30d41424e3",
+  "verdicts": [
+    {
+      "task_id": "eixo-etapa-fase0-workplace-id",
+      "verdict": "PASS"
+    }
+  ],
+  "commands": [
+    {
+      "command": "git rev-parse HEAD / git status --porcelain (arvore limpa)",
+      "exit_code": 0
+    },
+    {
+      "command": "git rev-parse origin/main (em dia)",
+      "exit_code": 0
+    },
+    {
+      "command": "gh issue list --state open",
+      "exit_code": 0
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0
+    },
+    {
+      "command": "npx eslint src/app/dashboard/vagas (1 warning pre-existente, DialogHeader)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql -f fase0-test.sql (BEGIN + migration + 5 assercoes + ROLLBACK)",
+      "exit_code": 0
+    },
+    {
+      "command": "supabase db push (apply 20260902160000)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql (aceite pos-apply: 2 colunas, 2 FKs, 2 indices, 8 vagas NULL, trigger com workplace_id)",
+      "exit_code": 0
+    },
+    {
+      "command": "revisor independente (FAIL, 1 alto sobre RLS de workplaces)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql (confirmacao do achado: workplaces_select_perm so aceita obras/beneficios)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql -f rls-test.sql (BEGIN + policy + assercoes + ROLLBACK)",
+      "exit_code": 0
+    },
+    {
+      "command": "supabase db push (apply 20260902170000, policy)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql (policy com 3 clausulas, workplaces_write_perm intacta)",
+      "exit_code": 0
+    },
+    {
+      "command": "node (embed workplace:workplaces(name) resolve autenticado, 14 obras legiveis)",
+      "exit_code": 0
+    },
+    {
+      "command": "retestador independente (PASS)",
+      "exit_code": 0
+    },
+    {
+      "command": "diff do arbitro: funcao em producao 17->18 INSERT, 15->16 DO UPDATE, nada removido",
+      "exit_code": 0
+    },
+    {
+      "command": "git commit 72a028b",
+      "exit_code": 0
+    }
+  ],
+  "evidence": [
+    "docs/evidence/roadmap-autopilot/ra-20260902-nx/preflight.md",
+    "docs/evidence/roadmap-autopilot/ra-20260902-nx/fase0.md"
+  ],
+  "last_safe_state": "ACCEPTED",
+  "next_allowed_step": "stop",
+  "active_gates": [
+    "GATE-PROD-DB: AUTORIZADO pelo usuario 2026-09-02 para a Fase 0. Ambas as migrations aplicadas (20260902160000 e 20260902170000), cada uma provada antes em transacao revertida. Nenhum worker tocou no banco.",
+    "GATE-PUBLISH: NAO autorizado. Commit local 72a028b feito; push NAO foi feito."
+  ],
+  "blockers": [
+    "Push nao feito e issue 55 nao fechada: falta GATE-PUBLISH.",
+    "A tela renderizada nunca foi vista: navegacao para localhost negada neste ambiente e /dashboard exige login em formulario, que eu nao faco. O caminho de dados foi provado por outro meio.",
+    "Fora do escopo, observado: job_openings volta vazia para usuario autenticado (a unica policy de SELECT e a publica). Nao afeta a Fase 0, mas atrapalha a Fase 1.",
+    "Sem banco descartavel; alias de modelo por worker indisponivel (Nvidia-OC)."
+  ]
+}
