@@ -88,22 +88,29 @@
     {
       "command": "git commit 72a028b",
       "exit_code": 0
+    },
+    {
+      "command": "git push origin main (df66f0d..d9a5300)",
+      "exit_code": 0
+    },
+    {
+      "command": "gh issue close 55",
+      "exit_code": 0
     }
   ],
   "evidence": [
     "docs/evidence/roadmap-autopilot/ra-20260902-nx/preflight.md",
     "docs/evidence/roadmap-autopilot/ra-20260902-nx/fase0.md"
   ],
-  "last_safe_state": "ACCEPTED",
+  "last_safe_state": "RELEASED",
   "next_allowed_step": "stop",
   "active_gates": [
     "GATE-PROD-DB: AUTORIZADO pelo usuario 2026-09-02 para a Fase 0. Ambas as migrations aplicadas (20260902160000 e 20260902170000), cada uma provada antes em transacao revertida. Nenhum worker tocou no banco.",
-    "GATE-PUBLISH: NAO autorizado. Commit local 72a028b feito; push NAO foi feito."
+    "GATE-PUBLISH: AUTORIZADO pelo usuario 2026-09-02. Push feito (df66f0d..d9a5300) e issue 55 fechada com o resumo da entrega."
   ],
   "blockers": [
-    "Push nao feito e issue 55 nao fechada: falta GATE-PUBLISH.",
-    "A tela renderizada nunca foi vista: navegacao para localhost negada neste ambiente e /dashboard exige login em formulario, que eu nao faco. O caminho de dados foi provado por outro meio.",
-    "Fora do escopo, observado: job_openings volta vazia para usuario autenticado (a unica policy de SELECT e a publica). Nao afeta a Fase 0, mas atrapalha a Fase 1.",
+    "A tela renderizada nunca foi vista: navegacao para localhost negada neste ambiente e /dashboard exige login em formulario, que eu nao faco. O caminho de dados foi provado autenticado, por script.",
+    "Fora do escopo, observado e registrado na issue 55: job_openings volta vazia para usuario autenticado (a unica policy de SELECT e a publica). Nao afeta a Fase 0, atrapalha a Fase 1 (issue 56).",
     "Sem banco descartavel; alias de modelo por worker indisponivel (Nvidia-OC)."
   ]
 }
