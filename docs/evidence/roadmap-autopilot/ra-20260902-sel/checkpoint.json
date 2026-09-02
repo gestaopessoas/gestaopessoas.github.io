@@ -7,14 +7,19 @@
   },
   "repository": "gestaopessoas.github.io (origin https://github.com/gestaopessoas/gestaopessoas.github.io.git)",
   "selected_roadmap": "docs/specs/2026-09-01-vagas-excluidas-orfas-portal-publico.md (locked by user 2026-09-02)",
-  "current_task": "vagas-orfas-task-1-trigger — BLOCKED before implementation: no disposable database for mutating migration tests",
-  "last_accepted_task": "none in this run (previous run ra-20260831-afin COMPLETED at ea19e71f3d3da0076cb11f1fc2a88bae7ee5912f)",
+  "current_task": "none — roadmap concluido",
+  "last_accepted_task": "vagas-orfas-task-1-trigger-e-backfill (ACCEPTED 2026-09-02: reviewer PASS, aceite reconferido pelo arbitro direto no banco, commit dd7a47639cac7ce1abb6da199af7d092befdbecc)",
   "correction_cycle": 0,
   "worktree": "C:/Users/ACPO Empreendimentos/Documents/Github/gestaopessoas.github.io",
   "branch": "main",
-  "base_sha": "1e540838568c86174680cad05e98a3d435198978",
-  "head_sha": "1e540838568c86174680cad05e98a3d435198978",
-  "verdicts": [],
+  "base_sha": "65c2c7a7151bc18934df9b32fe92cf66043edc45",
+  "head_sha": "dd7a47639cac7ce1abb6da199af7d092befdbecc",
+  "verdicts": [
+    {
+      "task_id": "vagas-orfas-task-1-trigger-e-backfill",
+      "verdict": "PASS"
+    }
+  ],
   "commands": [
     {
       "command": "git remote -v",
@@ -55,22 +60,56 @@
     {
       "command": "docker info --format {{.ServerVersion}} (daemon not running)",
       "exit_code": 1
+    },
+    {
+      "command": "psql (read-only SELECT probes on production: FKs, triggers, row counts, orphan ids)",
+      "exit_code": 0
+    },
+    {
+      "command": "initdb + pg_ctl disposable cluster (backends die with 0xC0000142)",
+      "exit_code": 1
+    },
+    {
+      "command": "supabase db push --dry-run",
+      "exit_code": 0
+    },
+    {
+      "command": "psql -f trigger-test.sql (BEGIN + migration + assercoes + ROLLBACK)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql (reconferencia pos-rollback: producao intacta)",
+      "exit_code": 0
+    },
+    {
+      "command": "supabase db push (apply 20260902120000)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql (aceite pos-apply: trigger, 5 Aberta / 3 Fechada, get_public_careers = 5)",
+      "exit_code": 0
+    },
+    {
+      "command": "git commit dd7a476",
+      "exit_code": 0
     }
   ],
   "evidence": [
     "docs/evidence/roadmap-autopilot/ra-20260902-sel/preflight.md",
-    "docs/evidence/roadmap-autopilot/ra-20260902-sel/baseline.md"
+    "docs/evidence/roadmap-autopilot/ra-20260902-sel/baseline.md",
+    "docs/evidence/roadmap-autopilot/ra-20260902-sel/findings.md",
+    "supabase/migrations/20260902120000_close_job_opening_on_job_request_delete.sql",
+    "docs/evidence/roadmap-autopilot/ra-20260902-sel/run-summary.md"
   ],
-  "last_safe_state": "BLOCKED",
-  "next_allowed_step": "resume",
+  "last_safe_state": "COMPLETED",
+  "next_allowed_step": "stop",
   "active_gates": [
-    "GATE-PROD-DB: NOT AUTHORIZED for this run. Any migration, backfill or db push requires fresh explicit user authorization.",
-    "GATE-PUBLISH: NOT AUTHORIZED for this run. No commit/push until user selects a roadmap and authorizes publication."
+    "GATE-PROD-DB: AUTORIZADO pelo usuario 2026-09-02, escopo desta run. Sequencia so do arbitro: teste em transacao revertida -> supabase db push -> reconferencia do aceite. Nenhum worker tocou no banco. Rollback: DROP TRIGGER trg_close_job_opening_on_job_request_delete + DROP FUNCTION close_job_opening_on_job_request_delete, e UPDATE job_openings SET status='Aberta' para os 3 ids registrados em findings.md.",
+    "GATE-PUBLISH: nao autorizado. Commit local feito (dd7a476); push nao foi feito."
   ],
   "blockers": [
-    "No disposable database for mutating migration tests: Docker CLI 29.7.2 installed but daemon not running, so `supabase start` cannot run; supabase/.temp/project-ref points at production and there is no staging project. Safe condition to change: start Docker Desktop so a local stack can host forward/rollback tests, or authorize an alternative tested path.",
-    "GATE-PROD-DB not authorized for this run. The trigger and the backfill both change production data.",
-    "Worker model alias cannot be pinned in this environment: Agent model override returns 'issue with the selected model (Nvidia-OC)'. Workers inherit the frontier default — no silent downgrade, but no economy/balanced tiering (cost impact).",
-    "Working tree not clean (docs only): docs/adr/0006 and CONTEXT.md untracked, docs/adr/0004 and docs/agents/domain.md modified. None overlap the roadmap allowlist."
+    "Registrado, nao tratado (decisao de produto fora do roadmap travado): job_applications_job_request_id_fkey e ON DELETE CASCADE, entao excluir uma requisicao destroi as candidaturas dela em silencio. job_applications esta vazia hoje, entao nada corre risco agora. Merece issue propria.",
+    "Sem banco descartavel neste ambiente: daemon do Docker fora do ar, plano Free sem branching, sem staging, e cluster local do initdb nao consegue forkar backend (0xC0000142). A prova forward/rollback saiu de transacao revertida em producao.",
+    "Alias de modelo por worker nao pode ser fixado neste ambiente (erro Nvidia-OC); workers herdam o padrao frontier."
   ]
 }
