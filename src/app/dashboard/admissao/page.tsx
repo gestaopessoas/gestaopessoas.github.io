@@ -72,8 +72,10 @@ const requiredDocuments = [
   "Exame toxicológico"
 ];
 
-function DocumentItem({ candidateId, docType, existingDoc, onUpdate }: { candidateId: string, docType: string, existingDoc?: CandidateDocument, onUpdate: () => void }) {
+function DocumentItem({ candidateId, docType, existingDoc, onDocUploaded }: { candidateId: string, docType: string, existingDoc?: CandidateDocument, onDocUploaded: (doc: CandidateDocument) => void }) {
   const [saving, setSaving] = useState(false);
+  const [viewUrl, setViewUrl] = useState<string | null>(null);
+  const [loadingUrl, setLoadingUrl] = useState(false);
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -81,39 +83,53 @@ function DocumentItem({ candidateId, docType, existingDoc, onUpdate }: { candida
 
     setSaving(true);
     const supabase = createClient();
-    
+
     const fileExt = file.name.split('.').pop();
     const fileName = `${docType.replace(/\s+/g, '_')}_${Date.now()}.${fileExt}`;
     const filePath = `${candidateId}/${fileName}`;
-    
-    // Upload the file
-    const { data: uploadData, error: uploadError } = await supabase.storage.from("documents").upload(filePath, file);
-    
+
+    const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, file);
+
     if (uploadError) {
       alert(`Erro ao fazer upload: ${uploadError.message}`);
       setSaving(false);
       return;
     }
 
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage.from("documents").getPublicUrl(filePath);
+    // Grava só o path — signed URL gerada on-demand. Bucket deve ser privado.
+    const payload = { candidate_id: candidateId, document_type: docType, status: "entregue", file_url: filePath, notes: null as string | null };
 
-    const payload = {
-      candidate_id: candidateId,
-      document_type: docType,
-      status: "entregue",
-      file_url: publicUrl,
-      notes: null,
-    };
-    
+    let saved: CandidateDocument | null = null;
     if (existingDoc?.id) {
-      await supabase.from("candidate_documents").update(payload).eq("id", existingDoc.id);
+      const { data } = await supabase.from("candidate_documents")
+        .update(payload).eq("id", existingDoc.id)
+        .select("id, document_type, status, file_url, notes").single();
+      saved = data as CandidateDocument;
     } else {
-      await supabase.from("candidate_documents").insert(payload);
+      const { data } = await supabase.from("candidate_documents")
+        .insert(payload)
+        .select("id, document_type, status, file_url, notes").single();
+      saved = data as CandidateDocument;
     }
-    
+
     setSaving(false);
-    onUpdate();
+    setViewUrl(null); // invalida cache de signed url do arquivo anterior
+    if (saved) onDocUploaded(saved);
+  };
+
+  const handleView = async () => {
+    if (!existingDoc?.file_url) return;
+    if (viewUrl) { window.open(viewUrl, '_blank'); return; }
+    setLoadingUrl(true);
+    const supabase = createClient();
+    const { data } = await supabase.storage.from("documents").createSignedUrl(existingDoc.file_url, 300);
+    setLoadingUrl(false);
+    if (data?.signedUrl) {
+      setViewUrl(data.signedUrl);
+      // invalida cache após 4min30s para não servir link expirado
+      setTimeout(() => setViewUrl(null), 270_000);
+      window.open(data.signedUrl, '_blank');
+    }
   };
 
   const isDone = existingDoc?.status === "entregue";
@@ -128,9 +144,9 @@ function DocumentItem({ candidateId, docType, existingDoc, onUpdate }: { candida
       <div className="flex gap-2 items-center">
         {!hasFile ? (
           <div className="relative w-full">
-            <input 
-              type="file" 
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" 
+            <input
+              type="file"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
               onChange={handleUpload}
               disabled={saving}
               accept=".pdf,.jpg,.jpeg,.png"
@@ -142,14 +158,14 @@ function DocumentItem({ candidateId, docType, existingDoc, onUpdate }: { candida
           </div>
         ) : (
           <div className="flex w-full gap-2">
-            <Button size="sm" variant="outline" className="flex-1 h-8 gap-2" onClick={() => window.open(existingDoc.file_url || '', '_blank')}>
-              <ExternalLink className="h-4 w-4" />
+            <Button size="sm" variant="outline" className="flex-1 h-8 gap-2" onClick={handleView} disabled={loadingUrl}>
+              {loadingUrl ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
               Visualizar
             </Button>
             <div className="relative">
-              <input 
-                type="file" 
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" 
+              <input
+                type="file"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                 onChange={handleUpload}
                 disabled={saving}
                 accept=".pdf,.jpg,.jpeg,.png"
@@ -197,7 +213,7 @@ export default function AdmissaoDigitalPage() {
       .select(`
         id, full_name, email, phone,
         candidate_interviews(stage, created_at),
-        candidate_documents(*)
+        candidate_documents(id, document_type, status, file_url, notes)
       `);
       
     setLoadingDocs(false);
@@ -267,7 +283,8 @@ export default function AdmissaoDigitalPage() {
     });
     setSavingId(null);
     if (!error) {
-      fetchDocs();
+      // Remove o candidato da lista local — não precisa rebuscar toda a base
+      setActiveCandidates(prev => prev.filter(c => c.id !== candidate.id));
     }
   };
 
@@ -330,15 +347,27 @@ export default function AdmissaoDigitalPage() {
                          <p className="mt-1 text-sm text-muted-foreground">Coleta de Documentos & Exames</p>
                        </div>
                        <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-                         {requiredDocuments.map(doc => (
-                           <DocumentItem 
-                             key={doc} 
-                             candidateId={candidate.id} 
-                             docType={doc} 
-                             existingDoc={candidate.candidate_documents?.find(d => d.document_type === doc)}
-                             onUpdate={fetchDocs}
-                           />
-                         ))}
+                          {requiredDocuments.map(doc => (
+                            <DocumentItem
+                              key={doc}
+                              candidateId={candidate.id}
+                              docType={doc}
+                              existingDoc={candidate.candidate_documents?.find(d => d.document_type === doc)}
+                              onDocUploaded={(saved) => {
+                                setActiveCandidates(prev => prev.map(c => {
+                                  if (c.id !== candidate.id) return c;
+                                  const docs = c.candidate_documents ?? [];
+                                  const idx = docs.findIndex(d => d.id === saved.id);
+                                  return {
+                                    ...c,
+                                    candidate_documents: idx >= 0
+                                      ? docs.map(d => d.id === saved.id ? saved : d)
+                                      : [...docs, saved],
+                                  };
+                                }));
+                              }}
+                            />
+                          ))}
                        </div>
                      </CardContent>
                    </Card>

@@ -149,7 +149,7 @@ export const LogoCropperModal: React.FC<LogoCropperModalProps> = ({ isOpen, onCl
       const { data, error } = await supabase.storage
         .from("partner_logos")
         .upload(fileName, croppedBlob, {
-          cacheControl: "3600",
+          cacheControl: "31536000",
           upsert: false,
           contentType: "image/webp"
         });

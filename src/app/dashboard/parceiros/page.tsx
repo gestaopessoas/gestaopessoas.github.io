@@ -88,19 +88,19 @@ export default function ParceirosAdminPage() {
     // Fetch parceiros
     const { data: pData, error: pErr } = await supabase
       .from("discount_partners")
-      .select("*")
+      .select("id, name, category, discount_rules, contact_info, how_to_use, logo_url, logo_position, logo_dark_mask, instagram_url, is_active, created_at, updated_at")
       .order("name", { ascending: true });
 
     // Fetch leads e funcionários para cruzar nomes
     const { data: lData, error: lErr } = await supabase
       .from("partner_leads")
-      .select("*")
+      .select("id, partner_id, employee_id, created_at, status")
       .order("created_at", { ascending: false });
 
     // Fetch prospects
     const { data: prosData, error: prosErr } = await supabase
       .from("partner_prospects")
-      .select("*")
+      .select("id, company_name, contact_name, email, phone, status, created_at, discount_proposal, how_to_use_proposal, category_preference, website_or_social")
       .order("created_at", { ascending: false });
 
     const { data: emps } = await supabase
@@ -213,7 +213,6 @@ export default function ParceirosAdminPage() {
       console.error(err);
     } finally {
       setSaving(false);
-      await fetchData();
     }
   };
 

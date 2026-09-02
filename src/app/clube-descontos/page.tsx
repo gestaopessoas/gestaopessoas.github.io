@@ -42,7 +42,7 @@ export default function ClubeDescontosPage() {
     try {
       const { data, error } = await supabase
         .from("discount_partners")
-        .select("*")
+        .select("id, name, category, discount_rules, contact_info, how_to_use, logo_url, logo_position, logo_dark_mask, instagram_url, is_active")
         .eq("is_active", true)
         .order("name");
 
