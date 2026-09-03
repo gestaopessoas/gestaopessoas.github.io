@@ -1,0 +1,119 @@
+{
+  "run_id": "ra-20260902-p3",
+  "runtime": "claude-code-win32-powershell",
+  "resolved_models": {
+    "arbiter": "claude-opus-5 (frontier, thread principal)",
+    "workers": "herdam o padrao — override de alias indisponivel neste ambiente"
+  },
+  "repository": "gestaopessoas.github.io (origin https://github.com/gestaopessoas/gestaopessoas.github.io.git)",
+  "selected_roadmap": "docs/adr/0006-etapa-unica-na-candidatura.md, Plano de migracao / issue 56 (Fase 1, travado pelo usuario 2026-09-02)",
+  "current_task": "eixo-etapa-fase1 — encerrada FAILED: 3 revisoes reprovadas, 2 ciclos de correcao consumidos",
+  "last_accepted_task": "nenhuma nesta run (ra-20260902-nx terminou RELEASED, Fase 0 aceita em 72a028b)",
+  "correction_cycle": 2,
+  "worktree": "C:/Users/ACPO Empreendimentos/Documents/Github/gestaopessoas.github.io",
+  "branch": "main",
+  "base_sha": "9bc85445fe6ea39f4bf1a2c9500c0d4ff1aab09d",
+  "head_sha": "9bc85445fe6ea39f4bf1a2c9500c0d4ff1aab09d",
+  "verdicts": [
+    {
+      "task_id": "eixo-etapa-fase1-schema-backfill-triggers",
+      "verdict": "FAIL"
+    }
+  ],
+  "commands": [
+    {
+      "command": "git rev-parse HEAD / origin/main / status --porcelain (arvore limpa, em dia)",
+      "exit_code": 0
+    },
+    {
+      "command": "gh issue list --state open",
+      "exit_code": 0
+    },
+    {
+      "command": "psql (contagem de linhas das tabelas da Fase 1, somente leitura)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql -f fase1-test.sql (BEGIN + 3 migrations + 11 assercoes + ROLLBACK)",
+      "exit_code": 0
+    },
+    {
+      "command": "supabase db push (apply das 3 — REVERTIDO depois)",
+      "exit_code": 0
+    },
+    {
+      "command": "node --test test-stage-map.mjs (6/6 contra producao)",
+      "exit_code": 0
+    },
+    {
+      "command": "revisor independente (FAIL, 10 achados, 3 altos)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql -f fase1-rollback.sql (reversao com 6 assercoes, COMMIT)",
+      "exit_code": 0
+    },
+    {
+      "command": "supabase migration repair --status reverted (3 versoes)",
+      "exit_code": 0
+    },
+    {
+      "command": "supabase db push --dry-run (as 3 voltaram a pendentes)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql -f fase1-test.sql (regressao dos 10 achados, BEGIN + ROLLBACK)",
+      "exit_code": 0
+    },
+    {
+      "command": "retestador independente (FAIL, 5 achados, 1 alto + 1 de seguranca)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql (confirmacao: producao limpa, igual a c333990)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql -f fase1r-test.sql (recorte reduzido, 11 assercoes + idempotencia, ROLLBACK)",
+      "exit_code": 0
+    },
+    {
+      "command": "revisor independente do recorte reduzido (FAIL, 4 achados, 3 altos)",
+      "exit_code": 0
+    },
+    {
+      "command": "psql (confirmacao: telas leem job_applications em agregado, sem filtro)",
+      "exit_code": 0
+    },
+    {
+      "command": "gh issue comment 56 (conclusao das 3 revisoes)",
+      "exit_code": 0
+    },
+    {
+      "command": "emenda proposta anexada a docs/adr/0006",
+      "exit_code": 0
+    },
+    {
+      "command": "migrations movidas para fora de supabase/migrations (run FAILED)",
+      "exit_code": 0
+    }
+  ],
+  "evidence": [
+    "docs/evidence/roadmap-autopilot/ra-20260902-p3/preflight.md",
+    "docs/evidence/roadmap-autopilot/ra-20260902-p3/achado-precedencia.md",
+    "docs/evidence/roadmap-autopilot/ra-20260902-p3/fase1.md",
+    "docs/evidence/roadmap-autopilot/ra-20260902-p3/fronteira-fase1-fase2.md",
+    "docs/evidence/roadmap-autopilot/ra-20260902-p3/conclusao.md"
+  ],
+  "last_safe_state": "FAILED",
+  "next_allowed_step": "stop",
+  "active_gates": [
+    "GATE-PROD-DB: autorizado nesta run e USADO apenas para provas em transacao revertida. O unico apply foi revertido em seguida. Producao identica a 9bc8544.",
+    "GATE-PUBLISH: AUTORIZADO pelo usuario 2026-09-02, escopo limitado a registrar a conclusao na issue 56 e propor a emenda ao ADR 0006."
+  ],
+  "blockers": [
+    "Conclusao registrada na issue 56 e como emenda PROPOSTA (nao aceita) no ADR 0006: nao existe recorte de banco que a Fase 1 entregue sozinha. job_applications e lida em agregado e sem filtro por admissao, vagas/metricas e gestor/avaliar.",
+    "As 2 migrations e o teste NAO estao em supabase/migrations: foram para docs/evidence/roadmap-autopilot/ra-20260902-p3/migrations-nao-aplicadas/ para que nenhum db push as aplique. Ver o LEIA-ME de la sobre o que e aproveitavel.",
+    "Armadilhas registradas para quem reescrever: Banco de Talentos nao pode virar candidatura via coalesce, e trg_check_active_workplace_lock dispara em qualquer UPDATE de candidate_interviews."
+  ]
+}

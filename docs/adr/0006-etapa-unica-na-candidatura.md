@@ -240,3 +240,71 @@ na tradução, não na tela.
   exatamente o que produziu o bug do reprovado.
 - `check_active_workplace_lock` é reescrito sobre a Candidatura, com join até
   `job_openings.workplace_id`, e o trigger antigo cai junto com a fase 2.
+
+## Emenda proposta (2026-09-02): a fronteira entre Fase 1 e Fase 2
+
+**Status: proposta, não aceita.** Levantada ao tentar executar a Fase 1 (issue #56) na run
+`ra-20260902-p3`, que terminou em `FAILED` depois de três revisões independentes reprovarem duas
+versões do recorte. Nada foi para produção. Evidência em
+`docs/evidence/roadmap-autopilot/ra-20260902-p3/`.
+
+### O que esta decisão errou
+
+A Fase 1 foi descrita como fase só de banco, sustentada pelo trigger de tradução: *"um trigger
+`BEFORE` traduz vocabulário velho → canônico, para que tela ainda não migrada não quebre o check"*.
+
+O trigger de tradução protege a **escrita** contra o check. Não faz nada pela **leitura**. E as
+telas não migradas leem:
+
+- `admissao/page.tsx:228` — exige `stage === 'Coleta de Documentos & Exames'` na linha mais recente
+  de `candidate_interviews`; a linha do trigger de histórico vira a mais recente e esvazia a fila.
+- `vagas/candidatos/page.tsx:210` — grava `'Entrevista'`; traduzido para `'Entrevista RH'`,
+  `normalizeStage` devolve `'Nova'` na leitura e o card volta para a primeira coluna.
+- `central-candidato/lib/candidateLogic.mjs:105` — `deriveCandidateStatus` não conhece `Nova`,
+  `Documentação` nem `Processo de MP`.
+
+Não traduzir também não fecha: `'Entrevista'` não está entre as Etapas canônicas, e o check a
+rejeita. **Traduzir quebra a leitura; não traduzir quebra a escrita.**
+
+### E encolher também não resolve
+
+Um recorte reduzido — só as funções do mapa, as publicações sintéticas, as candidaturas do
+histórico órfão e o vínculo, sem check, tradução, histórico ou trava — reprovou pelo mesmo motivo,
+um nível mais fundo: três telas leem `job_applications` **em agregado e sem filtro**.
+
+- `admissao/page.tsx:195-199` — 100 mais recentes, sem filtro de status.
+- `vagas/metricas/page.tsx:44` — `apps.length` como denominador da taxa de conversão.
+- `gestor/avaliar/page.tsx:78` — fila de aprovação por `'Entrevista Gestor'`.
+
+`job_applications` não é uma tabela silenciosa. Até inserir linha nela é observável.
+
+### Emenda
+
+**Não existe recorte de banco que a Fase 1 entregue sozinha.** Ou a Fase 1 e a Fase 2 viram uma
+entrega só — banco e as quatro telas juntos —, ou a Fase 1 se limita ao que nenhuma tela toca, que
+na prática são só `canonical_stage()` e `is_terminal_stage()`, e sozinhas elas não entregam valor.
+
+A Fase 0 continua válida e já foi entregue (`72a028b`): ela era mesmo independente.
+
+### Correção à precedência do backfill
+
+A precedência `interviews.destination` > `interviews.result` > `candidates.search_tags` **não tem
+por onde ligar**. Medido em produção: `interviews` não tem FK para `candidates`, CPF está vazio nos
+dois lados (0 de 3 e 0 de 3), e o casamento por nome pega 1 de 3. Inventar esse join é o dead-end
+por texto livre que este mesmo ADR condena ao criticar `workplace_name`.
+
+A precedência fica: `candidate_interviews.stage` decide, e `candidates.search_tags` só opina quando
+o stage não resolve numa Etapa — nunca antes dele. Testar a tag primeiro faz um candidato
+`Contratado` com tag velha `Reprovado` virar terminal e irreversível.
+
+### Duas armadilhas para quem escrever a migração
+
+1. **`Banco de Talentos` não pode virar candidatura.** `canonical_stage` devolve `NULL` para ele de
+   propósito, coerente com "deixa de ser Etapa". Um `coalesce(..., 'Nova')` o ressuscita como
+   candidatura **ativa** — na tentativa desta run, 2 das 3 candidaturas do backfill eram gente do
+   banco de talentos virando candidata ativa. O backfill precisa **pular** essas linhas.
+2. **`trg_check_active_workplace_lock` é `BEFORE INSERT OR UPDATE` sem `UPDATE OF`**
+   (baseline:3307). Qualquer `UPDATE` em `candidate_interviews`, inclusive só para popular
+   `job_application_id`, dispara a trava e revalida `candidate_interviews_stage_check` — que é
+   `NOT VALID` justamente porque há linha legada fora da lista. Uma dessas aborta a migração
+   inteira.
