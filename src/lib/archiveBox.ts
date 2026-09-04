@@ -1,8 +1,13 @@
 import { createClient } from "@/utils/supabase/client";
 
-// Status que mandam o colaborador para o arquivo morto. "inactive" é o legado em inglês,
-// que ainda convive no banco com "Inativo".
-export const ARCHIVE_STATUSES = ["Inativo", "Desligado", "inactive"];
+// Status que mandam o colaborador para o arquivo morto.
+//
+// "inactive" saiu da lista: a migration 20260904190000 normalizou as 4.505 linhas
+// legadas em inglês para "Inativo", e o formulário nunca gravou o valor minúsculo.
+//
+// "Arquivo Morto" entrou. Sem ele, quem recebesse esse status pelo formulário sumia
+// da própria tela /dashboard/arquivo-morto, que busca justamente por esta lista.
+export const ARCHIVE_STATUSES = ["Inativo", "Desligado", "Arquivo Morto"];
 
 /** Código da caixa física em que o colaborador está guardado, ou "" se não estiver em nenhuma. */
 export async function getArchiveBoxCode(employeeId: string): Promise<string> {

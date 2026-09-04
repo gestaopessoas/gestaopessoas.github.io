@@ -104,7 +104,9 @@ export default function ParceirosAdminPage() {
       .order("created_at", { ascending: false });
 
     const { data: emps } = await supabase
-      .from("employees")
+      // View do quadro atual: sem ela vinham as 4.839 linhas de employees (cortadas
+      // em 1.000 pelo PostgREST) so para mapear nome de colaborador.
+      .from("colaboradores")
       .select("id, name");
 
     if (pErr) {

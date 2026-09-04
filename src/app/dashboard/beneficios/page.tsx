@@ -96,7 +96,8 @@ export default function BeneficiosPage() {
     setLoading(true);
     // Fetch todos os funcionários para análise de ativos (inclusão) e desligados (corte)
     const { data: emps } = await supabase
-      .from("employees")
+      // View do quadro atual. Em employees eram 4.773 linhas cortadas em 1.000.
+      .from("colaboradores")
       .select(`id, name, status, admission_date, cost_center, sectors(name), workplaces!employees_workplace_id_fkey(type)`)
       .not("admission_date", "is", null);
 

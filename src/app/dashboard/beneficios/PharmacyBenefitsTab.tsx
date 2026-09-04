@@ -63,7 +63,9 @@ export function PharmacyBenefitsTab() {
     const fetchEmployees = async () => {
       setLoading(true);
       const { data } = await supabase
-        .from("employees")
+        // View do quadro atual. Em employees eram 4.839 linhas, e o PostgREST cortava
+        // em 1.000: a aba listava um recorte arbitrario da base sem avisar.
+        .from("colaboradores")
         .select("id, name, registration_number, companies(name, trading_name), employee_benefits(benefit_name)");
       
       if (data) {

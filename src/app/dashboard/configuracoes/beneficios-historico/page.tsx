@@ -36,7 +36,8 @@ export default function BeneficiosHistoricoPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const { data: emps } = await supabase
-      .from("employees")
+      // View do quadro atual. Em employees eram 4.773 linhas cortadas em 1.000.
+      .from("colaboradores")
       .select(`id, name, status, admission_date, sectors(name)`)
       .not("admission_date", "is", null);
 

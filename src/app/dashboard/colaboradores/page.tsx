@@ -107,7 +107,8 @@ const todayIso = () => new Date().toISOString().split("T")[0];
 const maritalStatusOptions = ["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"];
 const statusOptions = ["Ativo", "Férias", "Afastado", "Inativo", "Desligado"];
 // Registros legados gravaram o status em inglês; ambos convivem no banco.
-const INACTIVE_STATUSES = ["Inativo", "inactive"];
+// "inactive" saiu daqui: normalizado para "Inativo" pela migration 20260904190000.
+const INACTIVE_STATUSES = ["Inativo"];
 const HIDDEN_STATUSES = ["Desligado", "Arquivo Morto", ...INACTIVE_STATUSES];
 
 const canonicalizeEmployeeForm = (employee: Employee) => {
@@ -330,7 +331,9 @@ export default function ColaboradoresPage() {
     }
 
     // "Inativo" é uma saída como "Desligado": a data de desligamento continua valendo.
-    if (field === "status" && !ARCHIVE_STATUSES.includes(value) && value !== "Arquivo Morto") {
+    // "Arquivo Morto" agora faz parte de ARCHIVE_STATUSES, então não precisa mais do
+    // teste avulso que existia aqui.
+    if (field === "status" && !ARCHIVE_STATUSES.includes(value)) {
       updated.dismissed_at = "";
     }
 
