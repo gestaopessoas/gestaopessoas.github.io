@@ -4,53 +4,33 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Activity, AlertTriangle, TrendingDown } from "lucide-react";
-import { endOfMonth, format, startOfMonth } from "date-fns";
+import { format } from "date-fns";
+
+// Os números vêm agregados do banco (issue #62). Antes a tela puxava a tabela
+// employees inteira e contava no browser — o PostgREST corta em 1.000 linhas, então
+// headcount, saídas e índice saíam calculados sobre ~20% da base.
+type DismissedEmployee = { id: string; name: string; dismissed_at: string | null; observation: string | null };
+type TurnoverMetrics = { total: number; desligados: number; turnover: number; history: DismissedEmployee[] };
 
 export default function TurnoverPage() {
-  const supabase = createClient();
   const [loading, setLoading] = useState(true);
-  type DismissedEmployee = { id: string; name: string; dismissed_at: string | null; observation: string | null };
-  const [metrics, setMetrics] = useState({ total: 0, desligados: 0, turnover: 0, history: [] as DismissedEmployee[] });
+  const [metrics, setMetrics] = useState<TurnoverMetrics>({ total: 0, desligados: 0, turnover: 0, history: [] });
 
   useEffect(() => {
-    async function fetchData() {
-      const { data: emps } = await supabase
-        .from('employees')
-        .select('id, name, status, dismissed_at, admission_date, observation');
+    let active = true;
 
-      const now = new Date();
-      const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-      // Guard: datas absurdas (ano < 1950 ou > 2030) são lixo de migração — ignorar
-      const isReasonableDate = (d: Date) => d.getFullYear() >= 1950 && d.getFullYear() <= 2030;
-
-      const ativos = emps?.filter(e => ['Ativo', 'Férias', 'Afastado'].includes(e.status ?? '')) || [];
-
-      const desligadosUltimoAno = (emps || []).filter(e => {
-        if (e.status !== 'Desligado' || !e.dismissed_at) return false;
-        const d = new Date(e.dismissed_at);
-        return isReasonableDate(d) && d >= oneYearAgo && d <= now;
+    createClient()
+      .rpc("get_turnover_metrics")
+      .then(({ data }) => {
+        if (!active) return;
+        setLoading(false);
+        if (data) setMetrics(data as TurnoverMetrics);
       });
 
-      // Admissões do último ano — usa admission_date (não created_at que é timestamp de inserção no banco)
-      const admissoesUltimoAno = (emps || []).filter(e => {
-        if (!e.admission_date) return false;
-        const d = new Date(e.admission_date);
-        return isReasonableDate(d) && d >= oneYearAgo && d <= now;
-      });
-
-      // Headcount do último ano (ativos hoje + desligados no último ano)
-      const total = ativos.length + desligadosUltimoAno.length;
-
-      // Turnover = ((Admissões + Demissões) / 2) / Headcount * 100
-      const turnoverRate = total > 0
-        ? (((admissoesUltimoAno.length + desligadosUltimoAno.length) / 2) / total * 100).toFixed(1)
-        : 0;
-
-      setMetrics({ total, desligados: desligadosUltimoAno.length, turnover: Number(turnoverRate), history: desligadosUltimoAno });
-      setLoading(false);
-    }
-    fetchData();
-  }, [supabase]);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="space-y-6 p-6">
