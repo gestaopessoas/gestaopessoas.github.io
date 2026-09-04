@@ -5,142 +5,54 @@ import { Bell, UserX, AlertTriangle, Briefcase, ChevronRight, HeartPulse, Dollar
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import {
-  TrialNotification,
-  RgsNotification,
-  BenefitNotification,
-  MonthlyBenefitNotification,
-  PendingProfileNotification,
-  UserPreferences,
-  EmployeeData,
-  RgsData,
-  BenefitData,
-  generatePendingProfileNotifications,
-  generateTrialNotifications,
-  generateRgsNotifications,
-  generateBenefitNotifications,
-  generateMonthlyBenefitNotifications
+  NotificationSummary,
+  EMPTY_NOTIFICATION_SUMMARY
 } from "@/lib/notifications";
-import { errorMessage } from "@/lib/utils";
+
+// O sino roda no layout do dashboard, ou seja, em toda página e em toda aba.
+// Antes ele baixava a tabela employees inteira (1,4 MB) a cada 60s para calcular
+// as notificações no browser — sozinho, ~700 MB/dia de egress. Agora é uma RPC
+// que devolve só o resumo (~9 KB), com intervalo maior e pausada em aba oculta.
+const POLL_MS = 5 * 60_000;
 
 export function NotificationBell() {
-  const [trialNotifications, setTrialNotifications] = useState<TrialNotification[]>([]);
-  const [rgsNotifications, setRgsNotifications] = useState<RgsNotification[]>([]);
-  const [benefitNotifications, setBenefitNotifications] = useState<BenefitNotification[]>([]);
-  const [monthlyBenefitNotifications, setMonthlyBenefitNotifications] = useState<MonthlyBenefitNotification[]>([]);
-  const [pendingProfiles, setPendingProfiles] = useState<PendingProfileNotification[]>([]);
-  const [pendingLeads, setPendingLeads] = useState<number>(0);
-  const [_preferences, setPreferences] = useState<UserPreferences>({ trial: true, rgs: true, benefits: true, profile: true });
+  const [summary, setSummary] = useState<NotificationSummary>(EMPTY_NOTIFICATION_SUMMARY);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => {
+    let cancelled = false;
+    let lastFetch = 0;
+
     const fetchNotifications = async () => {
+      lastFetch = Date.now();
       const supabase = createClient();
+      const { data, error } = await supabase.rpc("get_notification_summary", { p_item_limit: 100 });
+      if (cancelled || error || !data) return;
+      setSummary(data as NotificationSummary);
+    };
 
-      const { data: authData } = await supabase.auth.getUser();
-      let userPrefs = { trial: true, rgs: true, benefits: true, profile: true };
-
-      if (authData.user?.id) {
-        const { data: prof } = await supabase.from('profile_preferences').select('notify_trial, notify_rgs, notify_benefits, notify_profile').eq('profile_id', authData.user.id).maybeSingle();
-        if (prof) {
-          userPrefs = { ...userPrefs, trial: prof.notify_trial, rgs: prof.notify_rgs, benefits: prof.notify_benefits, profile: prof.notify_profile };
-          setPreferences(userPrefs);
-        }
-      }
-
-      // employees tem ~4.8k registros; o PostgREST limita a 1000 por query.
-      // Paginamos via .range() para nao perder colaboradores (bug do badge estatico).
-      const EMP_PAGE = 1000;
-      let empData: EmployeeData[] = [];
-      let empError: { message: string } | null = null;
-      try {
-        for (let from = 0; from < 10000; from += EMP_PAGE) {
-          const { data, error } = await supabase
-            .from("employees")
-            .select("id, name, admission_date, contract_type, status, registration_number, birthday, cost_center_id, company_id, workplace_id, dismissed_at")
-            .neq("status", "Arquivo Morto")
-            .range(from, from + EMP_PAGE - 1);
-          if (error) { empError = error; break; }
-          empData = empData.concat((data ?? []) as unknown as EmployeeData[]);
-          if ((data || []).length < EMP_PAGE) break; // última página
-        }
-      } catch (e) { empError = { message: errorMessage(e) }; }
-
-      const referenceMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-
-      const [
-        { data: rgsData, error: rgsError },
-        { data: bens },
-        { data: igs },
-        { data: leadsData },
-        { data: reminderEntries },
-        { data: monthlyData }
-      ] = await Promise.all([
-        supabase
-          .from("rgs_processes")
-          .select("id, employee_name, process_type, created_at, status")
-          .eq("status", "Pendente"),
-        supabase.from("employee_benefits").select("employee_id, benefit_name"),
-        supabase.from("benefit_ignores").select("employee_id"),
-        supabase.from("partner_leads").select("id").neq("status", "atendido"),
-        supabase
-          .from("system_setting_entries")
-          .select("path, value_text")
-          .eq("setting_key", "monthly_benefits"),
-        supabase
-          .from("employee_monthly_benefits")
-          .select("employee_id, benefit_name, reference_month")
-          .eq("reference_month", referenceMonth)
-      ]);
-
-      setPendingLeads(leadsData ? leadsData.length : 0);
-
-      if (!empError && empData) {
-        const ignoredIds = (igs || []).map(i => (i as { employee_id: string }).employee_id);
-        setPendingProfiles(generatePendingProfileNotifications(empData, userPrefs));
-        setTrialNotifications(generateTrialNotifications(empData, userPrefs));
-        setBenefitNotifications(generateBenefitNotifications(empData, (bens ?? []) as unknown as BenefitData[], userPrefs, ignoredIds));
-        
-        const reminderEntry = (reminderEntries ?? []).find((e: { path: string[] }) => e.path[0] === "reminder_day") as { value_text?: string } | undefined;
-        const reminderDay = reminderEntry?.value_text ? Number(reminderEntry.value_text) : 15;
-        const monthlyNotes = generateMonthlyBenefitNotifications(
-          empData,
-          bens as any,
-          (monthlyData ?? []) as any,
-          referenceMonth,
-          reminderDay
-        );
-        setMonthlyBenefitNotifications(monthlyNotes);
-      }
-
-      if (!rgsError && rgsData) {
-        setRgsNotifications(generateRgsNotifications(rgsData as unknown as RgsData[], userPrefs));
+    // Aba oculta não gasta egress; ao voltar, atualiza se o dado já venceu.
+    const tick = () => {
+      if (document.visibilityState === "visible") fetchNotifications();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastFetch >= POLL_MS) {
+        fetchNotifications();
       }
     };
 
     fetchNotifications();
     window.addEventListener("notificationsUpdated", fetchNotifications);
-
-    // Polling periódico (60s): atualiza o sino mesmo sem Realtime ativo.
-    // O canal postgres_changes abaixo depende da extensão realtime instalada
-    // (hoje ausente no projeto) — o interval é o mecanismo garantido de refresh.
-    const pollId = window.setInterval(fetchNotifications, 60_000);
-
-    // Supabase Realtime (redundante quando a extensão estiver ativa)
-    const supabase = createClient();
-    const channel = supabase
-      .channel('notifications-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => fetchNotifications())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rgs_processes' }, () => fetchNotifications())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_benefits' }, () => fetchNotifications())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'partner_leads' }, () => fetchNotifications())
-      .subscribe();
+    document.addEventListener("visibilitychange", onVisibility);
+    const pollId = window.setInterval(tick, POLL_MS);
 
     return () => {
+      cancelled = true;
       window.removeEventListener("notificationsUpdated", fetchNotifications);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.clearInterval(pollId);
-      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -154,10 +66,24 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const totalCount = trialNotifications.length + rgsNotifications.length + benefitNotifications.length + monthlyBenefitNotifications.length + pendingProfiles.length + pendingLeads;
-  
-  const cutsCount = benefitNotifications.filter(b => b.type === "CORTE").length;
-  const inclusionsCount = benefitNotifications.filter(b => b.type === "INCLUSAO").length;
+  // A RPC devolve contagem exata + os primeiros 100 itens de cada seção; o badge
+  // usa a contagem, as listas usam os itens.
+  const pendingProfiles = summary.profiles.items;
+  const trialNotifications = summary.trial.items;
+  const rgsNotifications = summary.rgs.items;
+  const monthlyBenefitNotifications = summary.monthly.items;
+  const pendingLeads = summary.pending_leads;
+  const inclusionsCount = summary.benefits.inclusions;
+  const cutsCount = summary.benefits.cuts;
+  const benefitCount = inclusionsCount + cutsCount;
+
+  const totalCount =
+    summary.trial.count +
+    summary.rgs.count +
+    benefitCount +
+    summary.monthly.count +
+    summary.profiles.count +
+    pendingLeads;
 
   return (
     <div className="relative flex items-center" ref={dropdownRef}>
@@ -181,13 +107,13 @@ export function NotificationBell() {
           ) : (
             <div className="flex flex-col">
               {/* Pendências de Cadastro */}
-              {pendingProfiles.length > 0 && (
+              {summary.profiles.count > 0 && (
                 <div className="border-b last:border-b-0 pb-2">
                   <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
                     <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <UserX className="h-3.5 w-3.5 text-purple-500" /> Cadastro Incompleto
                     </h3>
-                    <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pendingProfiles.length}</span>
+                    <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{summary.profiles.count}</span>
                   </div>
                   <div className="px-2 pt-2 flex flex-col gap-1 max-h-[160px] overflow-y-auto">
                     {pendingProfiles.map(n => (
@@ -238,13 +164,13 @@ export function NotificationBell() {
               )}
 
               {/* Lançamentos Mensais */}
-              {monthlyBenefitNotifications.length > 0 && (
+              {summary.monthly.count > 0 && (
                 <div className="border-b last:border-b-0 pb-2">
                   <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
                     <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <DollarSign className="h-3.5 w-3.5 text-amber-500" /> Benefícios Mensais
                     </h3>
-                    <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{monthlyBenefitNotifications.length}</span>
+                    <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{summary.monthly.count}</span>
                   </div>
                   <div className="px-2 pt-2 flex flex-col gap-1">
                     {monthlyBenefitNotifications.map((n) => (
@@ -258,13 +184,13 @@ export function NotificationBell() {
               )}
 
               {/* Benefícios */}
-              {benefitNotifications.length > 0 && (
+              {benefitCount > 0 && (
                 <div className="border-b last:border-b-0 pb-2">
                   <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
                     <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <HeartPulse className="h-3.5 w-3.5 text-pink-500" /> Benefícios
                     </h3>
-                    <span className="bg-pink-100 text-pink-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{benefitNotifications.length}</span>
+                    <span className="bg-pink-100 text-pink-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{benefitCount}</span>
                   </div>
                   <div className="px-2 pt-2 flex flex-col gap-1">
                     {inclusionsCount > 0 && (
@@ -303,13 +229,13 @@ export function NotificationBell() {
               )}
 
               {/* RGS Pendentes */}
-              {rgsNotifications.length > 0 && (
+              {summary.rgs.count > 0 && (
                 <div className="border-b last:border-b-0 pb-2">
                   <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
                     <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> RGS Pendentes
                     </h3>
-                    <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{rgsNotifications.length}</span>
+                    <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{summary.rgs.count}</span>
                   </div>
                   <div className="px-2 pt-2 flex flex-col gap-1">
                     {rgsNotifications.map(n => (
@@ -333,13 +259,13 @@ export function NotificationBell() {
               )}
 
               {/* Fim de Experiência */}
-              {trialNotifications.length > 0 && (
+              {summary.trial.count > 0 && (
                 <div className="pb-2">
                   <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
                     <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <Briefcase className="h-3.5 w-3.5 text-blue-500" /> Fim de Experiência
                     </h3>
-                    <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{trialNotifications.length}</span>
+                    <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{summary.trial.count}</span>
                   </div>
                   <div className="px-2 pt-2 flex flex-col gap-1">
                     {trialNotifications.map(n => (
