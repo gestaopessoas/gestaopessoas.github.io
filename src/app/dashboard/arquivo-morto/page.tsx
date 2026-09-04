@@ -11,21 +11,29 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { ARCHIVE_STATUSES, saveArchiveBox } from "@/lib/archiveBox";
+import { addArchiveBox, removeArchiveBox } from "@/lib/archiveBox";
 import { Archive, RotateCcw, Search, Package, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type EmployeeArchive = { physical_boxes: { code: string } | null };
-type Employee = { 
-  id: string; 
-  name: string; 
-  cpf: string | null; 
-  rg: string | null; 
-  role: string | null; 
-  unit: string | null; 
-  dismissed_at: string | null; 
+// Uma passagem arquivada. O mesmo colaborador pode ter várias — readmissão, ou saída
+// de CLT com volta como PJ — e cada uma pode estar numa caixa diferente.
+type EmployeeArchive = { id: string; label: string | null; physical_boxes: { code: string } | null };
+type Employee = {
+  id: string;
+  name: string;
+  cpf: string | null;
+  rg: string | null;
+  role: string | null;
+  unit: string | null;
+  status: string | null;
+  dismissed_at: string | null;
   employee_archives: EmployeeArchive[];
 };
+
+// A tela lista dossiês, não pessoas: quem tem duas caixas aparece nas duas. Quem está
+// inativo e ainda não foi encaixotado aparece uma vez, com `archive` nulo — é assim que
+// o RH acha quem falta arquivar.
+type ArchiveEntry = { employee: Employee; archive: EmployeeArchive | null };
 
 type BoxData = {
   id: string;
@@ -33,7 +41,8 @@ type BoxData = {
   count: number;
 };
 
-type SaveBoxHandler = (employee: Employee, archiveBox: string) => void;
+type AddBoxHandler = (employee: Employee, archiveBox: string) => void;
+type RemoveBoxHandler = (archiveId: string) => void;
 type ReactivateHandler = (employee: Employee) => void;
 
 const pageSize = 100;
@@ -148,13 +157,14 @@ export default function ArquivoMortoPage() {
         setError("");
       } else {
         // Fetch employees for search
+        // A view `arquivo_morto` junta os dois critérios: status de saída OU dossiê em
+        // alguma caixa. O segundo cobre quem continua ativo com passagem arquivada.
         let request = sb
-          .from("employees")
+          .from("arquivo_morto")
           .select(`
-            id, name, cpf, rg, role, unit, dismissed_at,
-            employee_archives ( physical_boxes ( code ) )
+            id, name, cpf, rg, role, unit, status, dismissed_at,
+            employee_archives ( id, label, physical_boxes ( code ) )
           `, { count: "exact" })
-          .in("status", ARCHIVE_STATUSES)
           .order("name")
           .range(page * pageSize, page * pageSize + pageSize - 1);
         
@@ -181,9 +191,14 @@ export default function ArquivoMortoPage() {
     return () => window.clearTimeout(timer);
   }, [page, query, refresh]);
 
-  const saveBox = async (employee: Employee, archiveBox: string) => {
-    const saveError = await saveArchiveBox(employee.id, archiveBox);
+  const addBox = async (employee: Employee, archiveBox: string) => {
+    const saveError = await addArchiveBox(employee.id, archiveBox);
     if (saveError) setError(saveError); else setRefresh((value) => value + 1);
+  };
+
+  const removeBox = async (archiveId: string) => {
+    const removeError = await removeArchiveBox(archiveId);
+    if (removeError) setError(removeError); else setRefresh((value) => value + 1);
   };
 
   const reactivate = (employee: Employee) => {
@@ -198,7 +213,8 @@ export default function ArquivoMortoPage() {
     if (saveError) {
       setError(saveError.message);
     } else {
-      await sb.from("employee_archives").delete().eq("employee_id", employee.id);
+      // As caixas ficam. O dossiê da passagem anterior continua no arquivo mesmo com o
+      // colaborador reativado — é justamente o caso da readmissão.
       setRefresh((value) => value + 1);
     }
   };
@@ -208,25 +224,27 @@ export default function ArquivoMortoPage() {
   };
   const isBoxExpanded = (box: string) => !collapsedBoxes.includes(box);
 
+  // Uma entrada por dossiê. Sem caixa nenhuma, entra uma vez em "Sem Caixa".
   const groupedSearchEmployees = rows.reduce((acc, emp) => {
-    let box = "Sem Caixa";
-    if (emp.employee_archives && emp.employee_archives.length > 0) {
-      const firstArchive = emp.employee_archives[0];
-      if (firstArchive.physical_boxes && firstArchive.physical_boxes.code) {
-        box = firstArchive.physical_boxes.code;
-      }
+    const archives = emp.employee_archives ?? [];
+    const entries: ArchiveEntry[] = archives.length
+      ? archives.map((archive) => ({ employee: emp, archive }))
+      : [{ employee: emp, archive: null }];
+
+    for (const entry of entries) {
+      const box = entry.archive?.physical_boxes?.code || "Sem Caixa";
+      if (!acc[box]) acc[box] = [];
+      acc[box].push(entry);
     }
-    if (!acc[box]) acc[box] = [];
-    acc[box].push(emp);
     return acc;
-  }, {} as Record<string, Employee[]>);
+  }, {} as Record<string, ArchiveEntry[]>);
 
   return <div className="space-y-6">
     <header>
       <h1 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
         <Archive className="h-6 w-6 text-primary" />Arquivo Morto
       </h1>
-      <p className="text-sm text-muted-foreground mt-1">{!query ? "Caixas físicas do arquivo morto." : "Resultados da busca em colaboradores inativos ou desligados."}</p>
+      <p className="text-sm text-muted-foreground mt-1">{!query ? "Caixas físicas do arquivo morto." : "Um dossiê por passagem pela empresa — quem foi readmitido aparece uma vez por caixa."}</p>
     </header>
     
     {error && <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
@@ -244,7 +262,7 @@ export default function ArquivoMortoPage() {
       ) : (
         <div className="space-y-4">
           {boxes.map(box => (
-            <LazyBoxRow key={box.id} box={box} onSave={saveBox} onReactivate={reactivate} />
+            <LazyBoxRow key={box.id} box={box} onAdd={addBox} onRemove={removeBox} onReactivate={reactivate} />
           ))}
         </div>
       )
@@ -264,7 +282,7 @@ export default function ArquivoMortoPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg text-foreground">{boxName}</h3>
-                  <p className="text-sm text-muted-foreground font-medium">{emps.length} colaborador(es) encontrado(s)</p>
+                  <p className="text-sm text-muted-foreground font-medium">{emps.length} dossiê(s) encontrado(s)</p>
                 </div>
               </div>
               <div className="p-2 rounded-full hover:bg-border/50 transition-colors">
@@ -285,8 +303,15 @@ export default function ArquivoMortoPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {emps.map((employee) => (
-                      <ArchiveRow key={employee.id} employee={employee} onSave={saveBox} onReactivate={reactivate} />
+                    {emps.map((entry) => (
+                      <ArchiveRow
+                        key={entry.archive?.id ?? entry.employee.id}
+                        employee={entry.employee}
+                        archive={entry.archive}
+                        onAdd={addBox}
+                        onRemove={removeBox}
+                        onReactivate={reactivate}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -308,7 +333,9 @@ export default function ArquivoMortoPage() {
         <DialogHeader>
           <DialogTitle>Reativar colaborador</DialogTitle>
           <DialogDescription>
-            Deseja reativar <strong>{reactivateTarget?.name}</strong>? O colaborador voltará ao status &quot;Ativo&quot; e será removido do arquivo morto.
+            Deseja reativar <strong>{reactivateTarget?.name}</strong>? O colaborador volta ao status
+            &quot;Ativo&quot;, mas os dossiês já arquivados <strong>continuam nas caixas</strong> — a
+            passagem anterior faz parte do histórico. Para tirar da caixa, use o botão Remover na linha.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -322,9 +349,9 @@ export default function ArquivoMortoPage() {
   </div>;
 }
 
-function LazyBoxRow({ box, onSave, onReactivate }: { box: BoxData, onSave: SaveBoxHandler, onReactivate: ReactivateHandler }) {
+function LazyBoxRow({ box, onAdd, onRemove, onReactivate }: { box: BoxData, onAdd: AddBoxHandler, onRemove: RemoveBoxHandler, onReactivate: ReactivateHandler }) {
   const [expanded, setExpanded] = useState(false);
-  const [employees, setEmployees] = useState<Employee[] | null>(null);
+  const [employees, setEmployees] = useState<ArchiveEntry[] | null>(null);
   // Aberta e ainda sem lista carregada é exatamente o estado "carregando".
   const loading = expanded && employees === null;
 
@@ -332,18 +359,21 @@ function LazyBoxRow({ box, onSave, onReactivate }: { box: BoxData, onSave: SaveB
     if (expanded && employees === null) {
       const sb = createClient();
       sb.from("employee_archives")
-        .select(`employees(id, name, cpf, rg, role, unit, dismissed_at)`)
+        .select(`id, label, employees(id, name, cpf, rg, role, unit, status, dismissed_at)`)
         .eq("box_id", box.id)
         .then(({ data, error }) => {
            if (!error && data) {
-             const emps = data.map(d => ({
+             // Cada linha da caixa é um dossiê: a mesma pessoa pode aparecer duas vezes
+             // se arquivou duas passagens aqui.
+             const entries = data.map(d => {
                 // O select traz um objeto (relação to-one), mas os tipos-stub do
                 // supabase o descrevem como array — daí o passo por `unknown`.
-                ...(d.employees as unknown as Employee),
-                employee_archives: [{ physical_boxes: { code: box.code } }]
-             })) as Employee[];
-             emps.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-             setEmployees(emps);
+                const employee = d.employees as unknown as Employee;
+                const archive: EmployeeArchive = { id: d.id as string, label: (d.label as string | null) ?? null, physical_boxes: { code: box.code } };
+                return { employee: { ...employee, employee_archives: [archive] }, archive };
+             }) as ArchiveEntry[];
+             entries.sort((a, b) => (a.employee.name || "").localeCompare(b.employee.name || ""));
+             setEmployees(entries);
            } else {
              // Sem lista o estado derivado ficaria em "carregando" para sempre.
              setEmployees([]);
@@ -390,12 +420,14 @@ function LazyBoxRow({ box, onSave, onReactivate }: { box: BoxData, onSave: SaveB
                 </tr>
               </thead>
               <tbody>
-                {employees?.map((emp) => (
-                  <ArchiveRow 
-                    key={emp.id} 
-                    employee={emp} 
-                    onSave={(e, b) => { onSave(e, b); setEmployees(null); }} 
-                    onReactivate={(e) => { onReactivate(e); setEmployees(null); }} 
+                {employees?.map((entry) => (
+                  <ArchiveRow
+                    key={entry.archive?.id ?? entry.employee.id}
+                    employee={entry.employee}
+                    archive={entry.archive}
+                    onAdd={(e, b) => { onAdd(e, b); setEmployees(null); }}
+                    onRemove={(id) => { onRemove(id); setEmployees(null); }}
+                    onReactivate={(e) => { onReactivate(e); setEmployees(null); }}
                   />
                 ))}
               </tbody>
@@ -407,16 +439,19 @@ function LazyBoxRow({ box, onSave, onReactivate }: { box: BoxData, onSave: SaveB
   );
 }
 
-function ArchiveRow({ employee, onSave, onReactivate }: { employee: Employee; onSave: (employee: Employee, box: string) => void; onReactivate: (employee: Employee) => void }) {
-  let initialBox = "";
-  if (employee.employee_archives && employee.employee_archives.length > 0) {
-    const firstArchive = employee.employee_archives[0];
-    if (firstArchive.physical_boxes && firstArchive.physical_boxes.code) {
-      initialBox = firstArchive.physical_boxes.code;
-    }
-  }
+// Uma linha = um dossiê. Com `archive` preenchido a linha mostra em que caixa ele está e
+// deixa tirar de lá; sem `archive` é alguém que saiu e ainda não foi encaixotado, e a
+// linha vira o formulário de arquivar. Mover de caixa é o modal da tela de colaboradores.
+function ArchiveRow({ employee, archive, onAdd, onRemove, onReactivate }: {
+  employee: Employee;
+  archive: EmployeeArchive | null;
+  onAdd: (employee: Employee, box: string) => void;
+  onRemove: (archiveId: string) => void;
+  onReactivate: (employee: Employee) => void;
+}) {
+  const initialBox = archive?.physical_boxes?.code ?? "";
 
-  const [box, setBox] = useState(initialBox);
+  const [box, setBox] = useState("");
   const [expanded, setExpanded] = useState(false);
   
   return (
@@ -437,17 +472,29 @@ function ArchiveRow({ employee, onSave, onReactivate }: { employee: Employee; on
           {employee.dismissed_at ? new Date(`${employee.dismissed_at}T00:00:00`).toLocaleDateString("pt-BR") : "-"}
         </td>
         <td className="p-4" onClick={(e) => e.stopPropagation()}>
-          <div className="flex min-w-56 gap-2 items-center">
-            <Input 
-              value={box} 
-              onChange={(e) => setBox(e.target.value)} 
-              placeholder="Caixa / localização" 
-              className="h-9 bg-background focus-visible:ring-primary"
-            />
-            <Button size="sm" variant="secondary" onClick={() => onSave(employee, box)} className="h-9 font-semibold hover:bg-primary hover:text-primary-foreground border-border">
-              Salvar
-            </Button>
-          </div>
+          {archive ? (
+            <div className="flex min-w-56 items-center justify-between gap-2">
+              <div>
+                <div className="font-semibold text-foreground">{initialBox || "Sem caixa"}</div>
+                {archive.label && <div className="text-xs text-muted-foreground mt-0.5">{archive.label}</div>}
+              </div>
+              <Button size="sm" variant="outline" onClick={() => onRemove(archive.id)} className="h-9 font-semibold text-destructive hover:bg-destructive hover:text-destructive-foreground">
+                Remover
+              </Button>
+            </div>
+          ) : (
+            <div className="flex min-w-56 gap-2 items-center">
+              <Input
+                value={box}
+                onChange={(e) => setBox(e.target.value)}
+                placeholder="Caixa / localização"
+                className="h-9 bg-background focus-visible:ring-primary"
+              />
+              <Button size="sm" variant="secondary" disabled={!box.trim()} onClick={() => onAdd(employee, box)} className="h-9 font-semibold hover:bg-primary hover:text-primary-foreground border-border">
+                Arquivar
+              </Button>
+            </div>
+          )}
         </td>
         <td className="p-4 pr-6 text-right" onClick={(e) => e.stopPropagation()}>
           <Button size="sm" variant="outline" onClick={() => setExpanded(!expanded)} className="mr-2 h-9 font-semibold text-foreground hover:bg-muted transition-colors">
@@ -484,7 +531,11 @@ function ArchiveRow({ employee, onSave, onReactivate }: { employee: Employee; on
               </div>
               <div className="space-y-1">
                 <h4 className="text-sm font-semibold text-muted-foreground">Localização no Arquivo Morto</h4>
-                <p className="font-medium text-foreground">{initialBox || "Não guardado em caixa"}</p>
+                <p className="font-medium text-foreground">{initialBox || "Não guardado em caixa"}{archive?.label ? ` — ${archive.label}` : ""}</p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-muted-foreground">Situação atual</h4>
+                <p className="font-medium text-foreground">{employee.status ?? "Não informada"}</p>
               </div>
             </div>
           </td>

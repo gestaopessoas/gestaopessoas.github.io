@@ -114,11 +114,24 @@ operação lê de lá (ADR 0007).
 _Avoid_: ativos, headcount, quadro vivo
 
 **Arquivo Morto**:
-Quem já saiu — status `Inativo`, `Desligado` ou `Arquivo Morto`. Continua na mesma tabela
-`employees`, porque Turnover, Histórico e auditoria de benefícios precisam dele; o que muda
-é que a tela de operação não o enxerga (ADR 0007). Não confundir com `employee_archives`,
-que é a caixa física de papel onde o dossiê está guardado.
+Quem tem dossiê guardado — porque saiu (status `Inativo`, `Desligado`, `Arquivo Morto`)
+**ou** porque tem caixa física, mesmo seguindo ativo (ADR 0008). No banco é a view
+`arquivo_morto`. Continua na mesma tabela `employees`, porque Turnover, Histórico e
+auditoria de benefícios precisam dele; o que muda é que a tela de operação não o
+enxerga (ADR 0007).
 _Avoid_: inativos, desligados, ex-funcionários, arquivo
+
+**Dossiê**:
+Os papéis de **uma passagem** do Colaborador pela empresa, guardados numa Caixa. Quem foi
+readmitido, ou saiu de CLT e voltou como PJ, tem mais de um — e eles podem estar em caixas
+diferentes. Uma linha de `employee_archives` é um dossiê.
+_Avoid_: pasta, registro, arquivo do funcionário
+
+**Caixa**:
+A caixa física de papelão onde os Dossiês ficam, identificada por um código (`A39`, `C04`).
+É `physical_boxes`. Cuidado com o nome: `employee_archives` é o vínculo Dossiê↔Caixa, não
+um arquivo de dados.
+_Avoid_: pacote, box, container
 
 ## Termos pendentes
 

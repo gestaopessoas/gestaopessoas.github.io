@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History } from "lucide-react";
+import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History, Package } from "lucide-react";
 import { useEffect, useState } from "react";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
@@ -522,6 +522,8 @@ export default function ColaboradoresPage() {
     setRefresh((value) => value + 1);
 
     // Depois do save dar certo, e só para quem consegue gravar em arquivo morto (RLS).
+    // Abre sozinho só quando ele ACABOU de entrar no arquivo; nos demais casos o modal
+    // fica no botão da linha, porque arquivar não depende mais do status.
     if (isArchived && can("arquivo_morto", "edit")) {
       setArchiveTarget({ id: result.data.id, name: form.name.trim() });
     }
@@ -855,6 +857,13 @@ export default function ColaboradoresPage() {
                       <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); window.location.href = `/dashboard/historico?id=${employee.id}`; }} title="Ver Histórico">
                         <History className="h-3.5 w-3.5 text-primary" />
                       </Button>
+                      {/* Disponível mesmo com o colaborador ativo: quem sai de CLT e volta
+                          como PJ tem o dossiê antigo arquivado enquanto segue na empresa. */}
+                      {can("arquivo_morto", "edit") && (
+                        <Button size="sm" variant="outline" onClick={() => setArchiveTarget({ id: employee.id, name: String(employee.name || "Sem Nome") })} title="Caixas do arquivo morto">
+                          <Package className="h-3.5 w-3.5 text-primary" />
+                        </Button>
+                      )}
                       <Button size="sm" variant="destructive" onClick={() => setConfirmDelete({ id: employee.id, name: String(employee.name || "Sem Nome") })} title="Excluir Colaborador">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
