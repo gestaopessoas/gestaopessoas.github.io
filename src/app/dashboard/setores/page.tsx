@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { Edit3, Users, Plus, Search, X, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -195,14 +195,6 @@ export default function SetoresPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>
-      {children}
-    </div>
-  );
-}
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (

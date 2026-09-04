@@ -13,20 +13,24 @@ test.describe('Central do Candidato (Issue #39)', () => {
     await page.waitForURL('**/dashboard**', { timeout: 10000 });
   });
 
+  // A versão anterior esperava por `table tbody tr` e clicava na primeira linha. Só que
+  // os estados "carregando" e "nenhum candidato" também são <tr> — de uma célula só, com
+  // colSpan. Sem candidato no filtro, o teste clicava no aviso de lista vazia, o modal
+  // nunca abria e a falha aparecia no botão Editar, longe da causa.
+  //
+  // O filtro abaixo pega só linha de dado: estado vazio não tem segunda célula.
   test('Pode editar candidato existente', async ({ page }) => {
     await page.goto('http://localhost:3000/dashboard/central-candidato');
-    
-    // Esperar tabela carregar
     await page.waitForSelector('table tbody tr', { timeout: 15000 });
-    
-    // Clicar no primeiro candidato
-    const firstRow = page.locator('table tbody tr').first();
-    if (await firstRow.isVisible()) {
-      await firstRow.click();
-      
-      // O modal deve aparecer com o botão "Editar" (lápis icon ou text)
-      const editButton = page.locator('button:has(svg.lucide-edit3), button:has-text("Editar")').first();
-      await expect(editButton).toBeVisible({ timeout: 10000 });
+
+    const linhasDeDado = page.locator('table tbody tr').filter({ has: page.locator('td:nth-child(2)') });
+    if (await linhasDeDado.count() === 0) {
+      test.skip(true, 'Nenhum candidato na aba corrente — nada para abrir.');
     }
+
+    await linhasDeDado.first().click();
+
+    const botaoEditar = page.getByRole('button', { name: /Editar/ }).first();
+    await expect(botaoEditar).toBeVisible({ timeout: 10000 });
   });
 });

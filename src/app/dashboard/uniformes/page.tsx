@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Field as SharedField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { Edit3, Package, Plus, Search, X, Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -200,13 +200,9 @@ export default function UniformesPage() {
   );
 }
 
+// Visual próprio desta tela: espaçamento menor e rótulo sem caixa alta.
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      {children}
-    </div>
-  );
+  return <SharedField label={label} className="space-y-1" labelClassName="text-xs text-muted-foreground">{children}</SharedField>;
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {

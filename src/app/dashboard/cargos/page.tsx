@@ -1,10 +1,10 @@
 "use client";
 import { findCode } from "@/lib/codeLookup";
+import { Field } from "@/components/ui/field";
 import cboData from "@/data/cbo.json";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { Edit3, Briefcase, Plus, Search, X, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -306,14 +306,6 @@ export default function CargosPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>
-      {children}
-    </div>
-  );
-}
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (

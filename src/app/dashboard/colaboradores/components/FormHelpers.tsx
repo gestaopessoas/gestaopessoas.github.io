@@ -1,4 +1,4 @@
-import { Label } from "@/components/ui/label";
+import { Field as SharedField } from "@/components/ui/field";
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) { 
   return (
@@ -9,18 +9,20 @@ export function Section({ title, children }: { title: string; children: React.Re
   ); 
 }
 
-export function Field({ label, span, children }: { label: string; span?: boolean; children: React.ReactNode }) { 
+// Visual próprio do formulário de colaborador: espaçamento menor, rótulo sem caixa alta
+// e a opção de ocupar duas colunas do grid.
+export function Field({ label, span, children }: { label: string; span?: boolean; children: React.ReactNode }) {
   return (
-    <div className={span ? "space-y-1.5 md:col-span-2" : "space-y-1.5"}>
-      <Label>{label}</Label>
+    <SharedField label={label} className={span ? "space-y-1.5 md:col-span-2" : "space-y-1.5"} labelClassName="">
       {children}
-    </div>
-  ); 
+    </SharedField>
+  );
 }
 
-export function Select({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) { 
+// `id` existe para o Field conseguir associar o rótulo a este <select>.
+export function Select({ id, value, options, onChange }: { id?: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
       {options.map((option) => <option key={option}>{option}</option>)}
     </select>
   ); 

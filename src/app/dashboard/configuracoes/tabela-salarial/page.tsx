@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { Field } from "@/components/ui/field";
 import { createClient } from "@/utils/supabase/client";
 import { Plus, Search, Trash2, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import { formatCurrencyInput, maskCurrencyInput, parseCurrencyInput } from "../../colaboradores/lib/employeeFormRules.mjs";
@@ -317,52 +317,49 @@ export default function SalaryTablePage() {
           ) : (
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Código do Cargo</Label>
+                <Field label="Código do Cargo" labelClassName="">
                   <Input value={editingRow.role_code || ""} onChange={(e) => setEditingRow({ ...editingRow, role_code: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Nome do Cargo *</Label>
+                </Field>
+                <Field label="Nome do Cargo *" labelClassName="">
                   <Input value={editingRow.role_name || ""} onChange={(e) => setEditingRow({ ...editingRow, role_name: e.target.value })} />
-                </div>
+                </Field>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Estrutura do cargo</Label>
+                <Field label="Estrutura do cargo" labelClassName="">
                   <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.uses_level === false ? "sem-nivel" : "com-nivel"} onChange={(e) => setEditingRow({ ...editingRow, uses_level: e.target.value === "com-nivel" })}>
                     <option value="com-nivel">Com nível</option>
                     <option value="sem-nivel">Sem nível</option>
                   </select>
-                </div>
+                </Field>
                 {editingRow.uses_level !== false && (
                 <>
-                <div className="space-y-2">
-                  <Label>Nível</Label>
+                <Field label="Nível" labelClassName="">
                   <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.level || "Nível I"} onChange={(e) => setEditingRow({ ...editingRow, level: e.target.value })}>
                     {STANDARD_LEVELS.map((lvl) => <option key={lvl} value={lvl}>{lvl}</option>)}
                   </select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Senioridade</Label>
+                </Field>
+                <Field label="Senioridade" labelClassName="">
                   <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.seniority || ""} onChange={(e) => setEditingRow({ ...editingRow, seniority: e.target.value })}>
                     <option value="">Sem senioridade</option>
                     {SENIORITY_LEVELS.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
-                </div>
+                </Field>
                 </>
                 )}
-                <div className="space-y-2">
-                  <Label>Modalidade</Label>
+                <Field label="Modalidade" labelClassName="">
                   <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.modality || "CLT"} onChange={(e) => setEditingRow({ ...editingRow, modality: e.target.value })}>
                     <option value="CLT">CLT</option>
                     <option value="PJ">PJ</option>
                   </select>
-                </div>
+                </Field>
               </div>
-              {editingRow.uses_level !== false ? <div className="space-y-2">
-                <Label>Salário Base (R$) *</Label>
-                <Input inputMode="numeric" value={formatCurrencyInput(editingRow.salary || 0)} onChange={(e) => setEditingRow({ ...editingRow, salary: parseCurrencyInput(maskCurrencyInput(e.target.value)) })} />
-              </div> : <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Salário experiência (R$) *</Label><Input inputMode="numeric" value={editingRow.salary_experience == null ? "" : formatCurrencyInput(editingRow.salary_experience)} onChange={(e) => setEditingRow({ ...editingRow, salary_experience: parseCurrencyInput(maskCurrencyInput(e.target.value)) })} /></div><div className="space-y-2"><Label>Salário após 90 dias (R$) *</Label><Input inputMode="numeric" value={editingRow.salary_after_probation == null ? "" : formatCurrencyInput(editingRow.salary_after_probation)} onChange={(e) => setEditingRow({ ...editingRow, salary_after_probation: parseCurrencyInput(maskCurrencyInput(e.target.value)) })} /></div></div>}
+              {editingRow.uses_level !== false ? <Field label="Salário Base (R$) *" labelClassName="">
+                  <Input inputMode="numeric" value={formatCurrencyInput(editingRow.salary || 0)} onChange={(e) => setEditingRow({ ...editingRow, salary: parseCurrencyInput(maskCurrencyInput(e.target.value)) })} />
+                </Field> : <div className="grid grid-cols-2 gap-4"><Field label="Salário experiência (R$) *" labelClassName="">
+                  <Input inputMode="numeric" value={editingRow.salary_experience == null ? "" : formatCurrencyInput(editingRow.salary_experience)} onChange={(e) => setEditingRow({ ...editingRow, salary_experience: parseCurrencyInput(maskCurrencyInput(e.target.value)) })} />
+                </Field><Field label="Salário após 90 dias (R$) *" labelClassName="">
+                  <Input inputMode="numeric" value={editingRow.salary_after_probation == null ? "" : formatCurrencyInput(editingRow.salary_after_probation)} onChange={(e) => setEditingRow({ ...editingRow, salary_after_probation: parseCurrencyInput(maskCurrencyInput(e.target.value)) })} />
+                </Field></div>}
               {saveError && <p role="alert" className="rounded border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">{saveError}</p>}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>

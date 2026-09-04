@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Field as SharedField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { Save, Sparkles } from "lucide-react";
 import { useState } from "react";
@@ -577,11 +577,7 @@ export default function VagaForm({
   );
 }
 
+// O `className` das chamadas vira coluna do grid, então soma ao espaçamento padrão.
 function Field({ label, className = "", children }: { label: string; className?: string; children: React.ReactNode }) {
-  return (
-    <div className={`space-y-2 ${className}`}>
-      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>
-      {children}
-    </div>
-  );
+  return <SharedField label={label} className={`space-y-2 ${className}`}>{children}</SharedField>;
 }

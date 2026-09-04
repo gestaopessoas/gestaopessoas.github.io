@@ -14,33 +14,28 @@ test.describe('Benefícios Mensais (Issue #32)', () => {
     await page.waitForURL('**/dashboard**', { timeout: 10000 });
   });
 
-  test('Deve acessar a aba Lançamentos Mensais e permitir edição', async ({ page }) => {
-    // Ir para Benefícios
+  // Este teste NÃO salva. A versão anterior preenchia "200,00" e clicava em Salvar —
+  // e o dev server aponta para o banco de produção, então cada execução alterava o
+  // lançamento mensal de um colaborador de verdade. Aqui só abre o editor e confere
+  // que ele aparece.
+  //
+  // A versão anterior também esperava por `table`, que só existe quando há colaborador
+  // com Comissão ou Variável Garantida ativos no mês. Não havendo, a aba mostra um
+  // texto e o teste estourava o timeout — falha por falta de dado, não por bug.
+  test('Aba Lançamentos Mensais abre e permite editar', async ({ page }) => {
     await page.goto('http://localhost:3000/dashboard/beneficios');
-    
-    // Clicar na aba de Mensais
     await page.click('button:has-text("Lançamentos Mensais")');
-    
-    // Aguardar tabela carregar
-    await page.waitForSelector('table');
-    
-    // Se existir algum colaborador, clicar em editar no primeiro
-    const editBtn = page.locator('table tbody tr:first-child button').first();
-    if (await editBtn.isVisible()) {
-      await editBtn.click();
-      
-      // O input de valor deve estar visível
-      const input = page.locator('input[type="text"]').last();
-      await expect(input).toBeVisible();
-      
-      // Modificar o valor
-      await input.fill('200,00');
-      
-      // Clicar em Salvar
-      await page.click('button:has-text("Salvar")');
-      
-      // Deve mostrar notificação de sucesso
-      await expect(page.locator('text=Lançamento salvo com sucesso!')).toBeVisible({ timeout: 5000 });
+
+    const tabela = page.locator('table');
+    const vazio = page.getByText(/Nenhum colaborador com Comissão ou Variável Garantida/);
+    await expect(tabela.or(vazio).first()).toBeVisible({ timeout: 20000 });
+
+    if (await vazio.isVisible()) {
+      test.skip(true, 'Nenhum lançamento mensal no mês corrente — nada para editar.');
     }
+
+    await page.locator('table tbody tr:first-child button').first().click();
+    await expect(page.locator('table tbody tr:first-child input').first()).toBeVisible();
+    // Sai sem salvar: o banco é o de produção.
   });
 });

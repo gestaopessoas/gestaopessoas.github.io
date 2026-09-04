@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Field as SharedField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { PermissionsContext } from "@/contexts/PermissionsContext";
 import { ClipboardList, Plus, Search, X, ExternalLink, Download, Pencil } from "lucide-react";
@@ -303,6 +303,7 @@ export default function RgsPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>; }
+// Visual próprio desta tela: espaçamento menor e rótulo sem caixa alta.
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <SharedField label={label} className="space-y-1.5" labelClassName="">{children}</SharedField>; }
 function Filter({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) { return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">{options.map((option) => <option key={option}>{option}</option>)}</select>; }
 function formatDate(value: string | null) { return value ? new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR") : "-"; }
