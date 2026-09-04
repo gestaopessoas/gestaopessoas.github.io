@@ -222,20 +222,21 @@ export default function ColaboradoresPage() {
     }
   }, []);
 
-  // Query enxuta (só as colunas que os cartões consomem) mas com os MESMOS filtros
-  // da listagem — sem paginação (issue #25: cartões deviam refletir os filtros aplicados).
+  // Query enxuta (só as colunas que os cartões consomem) com os demais filtros da
+  // listagem — issue #25: os cartões refletem o que está filtrado.
+  //
+  // O filtro de status é a exceção deliberada (issue #62): os cartões descrevem sempre
+  // o quadro atual, que é o que cada rótulo significa — "Ativos", "Aniversariantes do
+  // mês", "ASO vencendo em 30d". Seguir o filtro para um status inativo pedia as 4.505
+  // linhas do arquivo, que o PostgREST corta em 1.000 (número errado, sem aviso) e que
+  // custavam 617 KB por tecla digitada na busca, já que este efeito não tem debounce.
   useEffect(() => {
     const supabase = createClient();
     let request = supabase
       .from("employees")
-      .select(`status, birthday, admission_date, company_anniversary, aso_date, workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)`)
-      .limit(10000);
+      .select(`status, birthday, admission_date, company_anniversary, aso_date, workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)`);
 
-    if (advancedFilters.status) {
-      request = request.eq("status", advancedFilters.status);
-    } else {
-      request = HIDDEN_STATUSES.reduce((acc, status) => acc.neq("status", status), request);
-    }
+    request = HIDDEN_STATUSES.reduce((acc, status) => acc.neq("status", status), request);
 
     const term = query.trim().replace(/[,%()]/g, " ");
     if (term) request = request.or(`name.ilike."%${term}%",cpf.ilike."%${term}%",rg.ilike."%${term}%",role.ilike."%${term}%"`);
