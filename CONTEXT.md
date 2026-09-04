@@ -107,6 +107,19 @@ Memorando de Pessoal — o documento que formaliza a entrada ou a movimentação
 Colaborador. Existe em duas formas: MP de contratação e MP de movimentação.
 _Avoid_: memorando, movimentação, requisição de pessoal
 
+**Quadro atual**:
+Os Colaboradores que a empresa tem hoje — status `Ativo`, `Férias` ou `Afastado`. É sobre
+eles que a operação diária do RH acontece. No banco é a view `colaboradores`; toda tela de
+operação lê de lá (ADR 0007).
+_Avoid_: ativos, headcount, quadro vivo
+
+**Arquivo Morto**:
+Quem já saiu — status `Inativo`, `Desligado` ou `Arquivo Morto`. Continua na mesma tabela
+`employees`, porque Turnover, Histórico e auditoria de benefícios precisam dele; o que muda
+é que a tela de operação não o enxerga (ADR 0007). Não confundir com `employee_archives`,
+que é a caixa física de papel onde o dossiê está guardado.
+_Avoid_: inativos, desligados, ex-funcionários, arquivo
+
 ## Termos pendentes
 
 Termos usados no código que ainda não têm definição acordada. Não invente uma —
