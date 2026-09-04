@@ -97,6 +97,8 @@ npx supabase db dump --linked -f supabase/migrations/00000000000000_baseline_pro
 - **Middleware não roda no build publicado.** `output: "export"` é incompatível com middleware dinâmico. A proteção de `/dashboard` é client-side (via `useEffect` no layout).
 - **Status convivem em português e inglês.** O banco tem registros legados `"inactive"`; o formulário salva `"Inativo"`. Qualquer filtro precisa considerar ambos (ver `INACTIVE_STATUSES` / `HIDDEN_STATUSES`).
 - **Cálculos client-side dependem do `pageSize`.** As abas Aniversariantes e Fim de Experiência calculam a partir do array carregado. Reduzir o `pageSize` global quebra essas abas.
+- **Agregação no browser custa egress de verdade.** O sino de notificações baixava a tabela `employees` inteira a cada 60s, em toda aba — 1,4 MB por ciclo, ~700 MB/dia, sozinho o suficiente para estourar o plano free (auditoria 2026-09-04). Contagem sobre tabela grande vai para RPC (`get_notification_summary`, `get_global_analytics_data`). O teste `e2e/notification-bell.spec.ts` guarda o orçamento da home.
+- **`max_rows = 1000` do PostgREST corta toda resposta.** `.limit(10000)` não traz 10.000 linhas, traz 1.000 — sem erro e sem aviso. Agregar em cima disso dá número errado (ver issue #62).
 - **Tema: a classe `.dark` no `<html>` é o gatilho.** A chave `acpo-theme` é compartilhada entre `app/layout.tsx` (script anti-FOUC) e `components/theme/ThemeProvider.tsx`. Mudar em um exige mudar no outro.
 
 ### Docker
