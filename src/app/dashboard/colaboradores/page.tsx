@@ -330,12 +330,18 @@ export default function ColaboradoresPage() {
       updated.department = profile?.is_operational ? "Direto" : "Indireto";
     }
 
-    // "Inativo" é uma saída como "Desligado": a data de desligamento continua valendo.
-    // "Arquivo Morto" agora faz parte de ARCHIVE_STATUSES, então não precisa mais do
-    // teste avulso que existia aqui.
-    if (field === "status" && !ARCHIVE_STATUSES.includes(value)) {
-      updated.dismissed_at = "";
-    }
+    // Aqui existia uma regra que zerava `dismissed_at` sempre que o status virava um valor
+    // ativo. Ela destruía a data de duas formas, ambas confirmadas no histórico de
+    // produção (396 apagamentos registrados em employee_history):
+    //
+    // - 338 na reativação: o colaborador volta para "Ativo" e a data da saída anterior
+    //   some. Com o modelo de passagens do ADR 0008, essa data é histórico e tem que ficar.
+    // - 58 ao vai-e-volta no próprio modal: mudar o status para "Ativo" e voltar para
+    //   "Desligado" antes de salvar limpava o campo e não devolvia — o registro era salvo
+    //   sem data mesmo tendo terminado como Desligado.
+    //
+    // `dismissed_at` passa a significar "data do último desligamento". Quem for readmitido
+    // carrega a data da passagem anterior até que alguém a altere de propósito.
 
     if (field === "role") {
       updated.senioridade = "";

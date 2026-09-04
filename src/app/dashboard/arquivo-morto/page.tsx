@@ -208,7 +208,9 @@ export default function ArquivoMortoPage() {
   const confirmReactivate = async (employee: Employee) => {
     setReactivateTarget(null);
     const sb = createClient();
-    const { error: saveError } = await sb.from("employees").update({ status: "Ativo", dismissed_at: null }).eq("id", employee.id);
+    // Só o status muda. A data do desligamento anterior é histórico da passagem e fica —
+    // apagá-la aqui foi a origem de 338 dos 396 sumiços registrados em employee_history.
+    const { error: saveError } = await sb.from("employees").update({ status: "Ativo" }).eq("id", employee.id);
 
     if (saveError) {
       setError(saveError.message);
@@ -334,8 +336,10 @@ export default function ArquivoMortoPage() {
           <DialogTitle>Reativar colaborador</DialogTitle>
           <DialogDescription>
             Deseja reativar <strong>{reactivateTarget?.name}</strong>? O colaborador volta ao status
-            &quot;Ativo&quot;, mas os dossiês já arquivados <strong>continuam nas caixas</strong> — a
-            passagem anterior faz parte do histórico. Para tirar da caixa, use o botão Remover na linha.
+            &quot;Ativo&quot;. Os dossiês já arquivados <strong>continuam nas caixas</strong> e a
+            <strong> data do desligamento anterior é preservada</strong> — a passagem anterior faz
+            parte do histórico. Para tirar da caixa, use o botão Remover na linha; para limpar a
+            data, edite o colaborador.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
