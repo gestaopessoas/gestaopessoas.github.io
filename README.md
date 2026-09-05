@@ -70,3 +70,6 @@ scripts/            → Scripts de import/migração
 ## Licença
 
 Creative free.
+
+
+<!-- Security scan triggered at 2026-09-05 07:48:42 -->
