@@ -156,6 +156,10 @@ const CRITICAL_FIELDS = [
   "workplace_id",
   "marital_status",
   "status",
+  // Entrou depois do bug que apagava a data de desligamento em silêncio: 396
+  // apagamentos registrados no histórico sem que ninguém percebesse na hora. Estando
+  // aqui, um salvamento que não persista a data para a tela com erro em vez de passar.
+  "dismissed_at",
 ];
 
 export const criticalFieldsMatch = (expected, persisted) =>

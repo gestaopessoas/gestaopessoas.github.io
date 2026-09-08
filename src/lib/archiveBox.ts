@@ -29,18 +29,20 @@ export type ArchiveBox = {
  * passagem.
  */
 export async function listArchiveBoxes(employeeId: string): Promise<ArchiveBox[]> {
+  // A view `arquivo_morto` ja vem com a caixa embutida no proprio registro. O join do
+  // PostgREST (`physical_boxes(code)`) nao atravessa view com UNION, e o dossie de quem
+  // saiu mora no schema arquivo depois da separacao.
   const { data } = await createClient()
-    .from("employee_archives")
-    .select("id, label, created_at, physical_boxes(code)")
-    .eq("employee_id", employeeId)
-    .order("created_at");
+    .from("arquivo_morto")
+    .select("archive_id, archive_label, box_code")
+    .eq("id", employeeId)
+    .not("archive_id", "is", null)
+    .order("archive_id");
 
   return (data ?? []).map((row) => ({
-    id: row.id as string,
-    // O select traz um objeto (relação to-one), mas os tipos-stub do supabase o
-    // descrevem como array — daí o passo por `unknown`.
-    code: (row.physical_boxes as unknown as { code?: string } | null)?.code ?? "",
-    label: (row.label as string | null) ?? null,
+    id: row.archive_id as string,
+    code: (row.box_code as string | null) ?? "",
+    label: (row.archive_label as string | null) ?? null,
   }));
 }
 
@@ -76,7 +78,7 @@ export async function addArchiveBox(
     box = newBox;
   }
 
-  const { error: saveError } = await sb.from("employee_archives").insert({
+  const { error: saveError } = await sb.from("employee_archives_todos").insert({
     employee_id: employeeId,
     box_id: box!.id,
     label: label?.trim() || null,
@@ -86,6 +88,6 @@ export async function addArchiveBox(
 
 /** Tira uma passagem do arquivo. Recebe o id da linha, não o do colaborador. */
 export async function removeArchiveBox(archiveId: string): Promise<string | null> {
-  const { error } = await createClient().from("employee_archives").delete().eq("id", archiveId);
+  const { error } = await createClient().from("employee_archives_todos").delete().eq("id", archiveId);
   return error?.message ?? null;
 }

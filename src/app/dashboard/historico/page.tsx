@@ -39,7 +39,8 @@ function HistoricoContent() {
       }
       
       const { data: empData } = await supabase
-        .from("employees")
+        // Historico costuma ser de quem ja saiu, entao le a base inteira.
+        .from("employees_todos")
         .select("id, name, registration_number")
         .eq("id", id)
         .single()
@@ -47,7 +48,7 @@ function HistoricoContent() {
       if (empData) setEmployee(empData)
 
       const { data: histData } = await supabase
-        .from("employee_history")
+        .from("employee_history_todos")
         .select("*, employee_history_value_entries(value_side, path, value_text, value_number, value_boolean)")
         .eq("employee_id", id)
         .order("change_date", { ascending: false })

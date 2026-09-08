@@ -211,7 +211,9 @@ export default function ColaboradoresPage() {
     const params = new URLSearchParams(window.location.search);
     const editId = params.get("edit");
     if (editId) {
-      supabase.from("employees").select("*").eq("id", editId).single().then(({ data }) => {
+      // employees_todos: o link "?edit=" das notificacoes tambem aponta para quem ja
+      // saiu, e essa pessoa mora no arquivo depois da separacao.
+      supabase.from("employees_todos").select("*").eq("id", editId).single().then(({ data }) => {
         if (data) {
           const emp = data as Employee;
           setEditingId(emp.id);
@@ -480,8 +482,10 @@ export default function ColaboradoresPage() {
     const isPromoted = !isNew && !isDismissed && (form.role !== original?.role || form.level !== original?.level || form.department_id !== original?.department_id || form.workplace_id !== original?.workplace_id);
 
     const result = editingId
-      ? await supabase.from("employees").update(payload).eq("id", editingId).select("id, ficha, rg, role, profile_code, level, company_id, workplace_id, marital_status, status").single()
-      : await supabase.from("employees").insert(payload).select("id, ficha, rg, role, profile_code, level, company_id, workplace_id, marital_status, status").single();
+      // Grava por employees_todos: o trigger INSTEAD OF manda para public ou para o
+      // arquivo conforme onde a pessoa esta. Cadastro novo nasce sempre em public.
+      ? await supabase.from("employees_todos").update(payload).eq("id", editingId).select("id, ficha, rg, role, profile_code, level, company_id, workplace_id, marital_status, status, dismissed_at").single()
+      : await supabase.from("employees_todos").insert(payload).select("id, ficha, rg, role, profile_code, level, company_id, workplace_id, marital_status, status, dismissed_at").single();
 
     if (result.error) {
       setSaving(false);
@@ -496,7 +500,7 @@ export default function ColaboradoresPage() {
     }
 
     if (!criticalFieldsMatch(payload, result.data)) {
-      if (isNew) await supabase.from("employees").delete().eq("id", result.data.id);
+      if (isNew) await supabase.from("employees_todos").delete().eq("id", result.data.id);
       setSaving(false);
       setError("O banco não confirmou todos os campos alterados. Revise RG, Cargo, Código do Perfil, Nível, Empresa, Obra/Unidade, Estado civil e Status.");
       return;
@@ -539,7 +543,7 @@ export default function ColaboradoresPage() {
     setSaving(true);
     setError("");
     const supabase = createClient();
-    const { error: deleteError } = await supabase.from("employees").delete().eq("id", id);
+    const { error: deleteError } = await supabase.from("employees_todos").delete().eq("id", id);
     setSaving(false);
     setConfirmDelete(null);
 

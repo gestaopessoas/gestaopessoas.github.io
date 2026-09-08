@@ -6,6 +6,11 @@ dotenv.config({ path: path.resolve(__dirname, '.env.local.txt') });
 
 export default defineConfig({
   testDir: './e2e',
+  // Esta config aponta o app para PRODUÇÃO, então só roda teste de leitura. Os specs
+  // `_local-*` gravam no banco (criam, desligam e apagam colaborador) e pertencem ao
+  // playwright.local.config.ts, que aponta para o Supabase local. Sem este testIgnore
+  // eles eram coletados aqui e rodavam contra produção.
+  testIgnore: /_local-.*\.spec\.ts/,
   timeout: 30 * 1000,
   expect: {
     timeout: 5000

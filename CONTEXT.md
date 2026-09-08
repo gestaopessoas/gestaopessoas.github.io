@@ -115,10 +115,10 @@ _Avoid_: ativos, headcount, quadro vivo
 
 **Arquivo Morto**:
 Quem tem dossiê guardado — porque saiu (status `Inativo`, `Desligado`, `Arquivo Morto`)
-**ou** porque tem caixa física, mesmo seguindo ativo (ADR 0008). No banco é a view
-`arquivo_morto`. Continua na mesma tabela `employees`, porque Turnover, Histórico e
-auditoria de benefícios precisam dele; o que muda é que a tela de operação não o
-enxerga (ADR 0007).
+**ou** porque tem caixa física, mesmo seguindo ativo (ADR 0008). Desde o ADR 0009 mora
+fisicamente no schema `arquivo`, fora de `public.employees`. Quem precisa da base inteira
+(Turnover, Histórico, auditoria de benefícios) lê a view `employees_todos`; a tela de
+arquivo lê `arquivo_morto`, que devolve uma linha por dossiê.
 _Avoid_: inativos, desligados, ex-funcionários, arquivo
 
 **Dossiê**:

@@ -35,6 +35,13 @@ type Employee = {
 // o RH acha quem falta arquivar.
 type ArchiveEntry = { employee: Employee; archive: EmployeeArchive | null };
 
+// Como a view `arquivo_morto` devolve: uma linha por dossiê, com a caixa já embutida.
+type FlatRow = {
+  id: string; name: string; cpf: string | null; rg: string | null;
+  role: string | null; unit: string | null; status: string | null; dismissed_at: string | null;
+  archive_id: string | null; archive_label: string | null; box_code: string | null;
+};
+
 type BoxData = {
   id: string;
   code: string;
@@ -116,7 +123,7 @@ function Pagination({ currentPage, totalPages, onPageChange }: { currentPage: nu
 
 export default function ArquivoMortoPage() {
   const [boxes, setBoxes] = useState<BoxData[]>([]);
-  const [rows, setRows] = useState<Employee[]>([]); // For search results
+  const [rows, setRows] = useState<ArchiveEntry[]>([]); // resultados da busca, um por dossiê
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
@@ -135,22 +142,18 @@ export default function ArquivoMortoPage() {
       
       if (!term) {
         // Fetch paginated boxes
+        // physical_boxes_contagem ja traz `dossies`: o count embutido do PostgREST nao
+        // atravessa a view com UNION que junta public e o schema arquivo.
         const { data, error: loadError, count } = await sb
-          .from("physical_boxes")
-          .select("id, code, employee_archives(count)", { count: "exact" })
+          .from("physical_boxes_contagem")
+          .select("id, code, dossies", { count: "exact" })
           .order("code")
           .range(page * pageSize, page * pageSize + pageSize - 1);
-          
+
         setLoading(false);
         if (loadError) { setError(loadError.message); return; }
-        
-        const mappedBoxes = (data || []).map(b => ({
-           id: b.id,
-           code: b.code,
-           count: Array.isArray(b.employee_archives) 
-                  ? b.employee_archives[0]?.count || 0 
-                  : (b.employee_archives as { count?: number } | null)?.count || 0
-        }));
+
+        const mappedBoxes = (data || []).map(b => ({ id: b.id, code: b.code, count: b.dossies ?? 0 }));
         setBoxes(mappedBoxes);
         setRows([]);
         setTotal(count ?? 0);
@@ -161,10 +164,8 @@ export default function ArquivoMortoPage() {
         // alguma caixa. O segundo cobre quem continua ativo com passagem arquivada.
         let request = sb
           .from("arquivo_morto")
-          .select(`
-            id, name, cpf, rg, role, unit, status, dismissed_at,
-            employee_archives ( id, label, physical_boxes ( code ) )
-          `, { count: "exact" })
+          .select("id, name, cpf, rg, role, unit, status, dismissed_at, archive_id, archive_label, box_code",
+                  { count: "exact" })
           .order("name")
           .range(page * pageSize, page * pageSize + pageSize - 1);
         
@@ -177,11 +178,14 @@ export default function ArquivoMortoPage() {
         setLoading(false);
         if (loadError) { setError(loadError.message); return; }
         
-        const typedData = (data ?? []).map(item => ({
-          ...item,
-          employee_archives: Array.isArray(item.employee_archives) ? item.employee_archives : item.employee_archives ? [item.employee_archives] : []
-        })) as unknown as Employee[];
-        
+        const typedData = (data ?? []).map((item) => {
+          const linha = item as unknown as FlatRow;
+          const archive: EmployeeArchive | null = linha.archive_id
+            ? { id: linha.archive_id, label: linha.archive_label, physical_boxes: linha.box_code ? { code: linha.box_code } : null }
+            : null;
+          return { employee: { ...linha, employee_archives: archive ? [archive] : [] } as Employee, archive };
+        });
+
         setRows(typedData); 
         setBoxes([]);
         setTotal(count ?? 0); 
@@ -208,9 +212,10 @@ export default function ArquivoMortoPage() {
   const confirmReactivate = async (employee: Employee) => {
     setReactivateTarget(null);
     const sb = createClient();
-    // Só o status muda. A data do desligamento anterior é histórico da passagem e fica —
-    // apagá-la aqui foi a origem de 338 dos 396 sumiços registrados em employee_history.
-    const { error: saveError } = await sb.from("employees").update({ status: "Ativo" }).eq("id", employee.id);
+    // A pessoa mora no schema `arquivo` depois da separação: a RPC traz de volta o
+    // registro e o histórico dela. A data do desligamento anterior e os dossiês nas
+    // caixas ficam — são o histórico da passagem (ADR 0008).
+    const { error: saveError } = await sb.rpc("reativar_colaborador", { p_id: employee.id });
 
     if (saveError) {
       setError(saveError.message);
@@ -226,18 +231,12 @@ export default function ArquivoMortoPage() {
   };
   const isBoxExpanded = (box: string) => !collapsedBoxes.includes(box);
 
-  // Uma entrada por dossiê. Sem caixa nenhuma, entra uma vez em "Sem Caixa".
-  const groupedSearchEmployees = rows.reduce((acc, emp) => {
-    const archives = emp.employee_archives ?? [];
-    const entries: ArchiveEntry[] = archives.length
-      ? archives.map((archive) => ({ employee: emp, archive }))
-      : [{ employee: emp, archive: null }];
-
-    for (const entry of entries) {
-      const box = entry.archive?.physical_boxes?.code || "Sem Caixa";
-      if (!acc[box]) acc[box] = [];
-      acc[box].push(entry);
-    }
+  // A view já devolve uma linha por dossiê; aqui só agrupa por caixa. Quem está
+  // arquivado e ainda não foi encaixotado cai em "Sem Caixa".
+  const groupedSearchEmployees = rows.reduce((acc, entry) => {
+    const box = entry.archive?.physical_boxes?.code || "Sem Caixa";
+    if (!acc[box]) acc[box] = [];
+    acc[box].push(entry);
     return acc;
   }, {} as Record<string, ArchiveEntry[]>);
 
@@ -362,20 +361,23 @@ function LazyBoxRow({ box, onAdd, onRemove, onReactivate }: { box: BoxData, onAd
   useEffect(() => {
     if (expanded && employees === null) {
       const sb = createClient();
-      sb.from("employee_archives")
-        .select(`id, label, employees(id, name, cpf, rg, role, unit, status, dismissed_at)`)
+      // A view já junta quadro atual e arquivo e traz a caixa embutida; o join do
+      // PostgREST não atravessa view com UNION.
+      sb.from("arquivo_morto")
+        .select("id, name, cpf, rg, role, unit, status, dismissed_at, archive_id, archive_label, box_code")
         .eq("box_id", box.id)
         .then(({ data, error }) => {
            if (!error && data) {
              // Cada linha da caixa é um dossiê: a mesma pessoa pode aparecer duas vezes
              // se arquivou duas passagens aqui.
-             const entries = data.map(d => {
-                // O select traz um objeto (relação to-one), mas os tipos-stub do
-                // supabase o descrevem como array — daí o passo por `unknown`.
-                const employee = d.employees as unknown as Employee;
-                const archive: EmployeeArchive = { id: d.id as string, label: (d.label as string | null) ?? null, physical_boxes: { code: box.code } };
-                return { employee: { ...employee, employee_archives: [archive] }, archive };
-             }) as ArchiveEntry[];
+             const entries = (data as unknown as FlatRow[]).map((linha) => {
+                const archive: EmployeeArchive = {
+                  id: linha.archive_id as string,
+                  label: linha.archive_label,
+                  physical_boxes: { code: linha.box_code ?? box.code },
+                };
+                return { employee: { ...linha, employee_archives: [archive] } as Employee, archive };
+             });
              entries.sort((a, b) => (a.employee.name || "").localeCompare(b.employee.name || ""));
              setEmployees(entries);
            } else {

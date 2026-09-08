@@ -175,6 +175,21 @@ test("confere os campos críticos devolvidos pelo banco", () => {
   assert.equal(criticalFieldsMatch(expected, { ...expected, ficha: null }), false);
 });
 
+test("a data de desligamento é campo crítico: banco que não a persiste reprova o salvamento", () => {
+  // Regressão do bug em que dismissed_at sumia sem ninguém perceber (396 vezes, segundo
+  // o histórico de produção). O salvamento agora falha alto em vez de perder a data.
+  const expected = { ficha: "1", rg: "1", role: "PEDREIRO", profile_code: "P1", level: null,
+    company_id: "c", workplace_id: "w", marital_status: "Solteiro", status: "Desligado",
+    dismissed_at: "2026-08-15" };
+  assert.equal(criticalFieldsMatch(expected, { ...expected }), true);
+  assert.equal(criticalFieldsMatch(expected, { ...expected, dismissed_at: null }), false);
+  assert.equal(criticalFieldsMatch(expected, { ...expected, dismissed_at: "2026-08-16" }), false);
+
+  // Reativado sem data continua coerente: os dois lados vazios.
+  const reativado = { ...expected, status: "Ativo", dismissed_at: null };
+  assert.equal(criticalFieldsMatch(reativado, { ...reativado }), true);
+});
+
 test("RG mantém somente os primeiros 15 dígitos e preserva zeros à esquerda", () => {
   assert.equal(sanitizeRgInput("00.123-ABC 4567890123456"), "001234567890123");
 });
