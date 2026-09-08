@@ -12,7 +12,6 @@ export default function MetricasVagasPage() {
   const [loading, setLoading] = useState(true);
   
   const [metrics, setMetrics] = useState({ 
-    slaMedio: 0, 
     totalAbertas: 0, 
     totalContratados: 0, 
     taxaConversao: 0,
@@ -25,16 +24,17 @@ export default function MetricasVagasPage() {
       const { data: jobRequests } = await supabase.from('job_requests').select('id, status');
       
       // Aplicações dos candidatos
-      const { data: apps } = await supabase.from('job_applications').select('id, status, created_at, updated_at');
+      // `updated_at` nunca existiu em job_applications: pedir a coluna devolvia HTTP 400
+      // e derrubava a consulta inteira, zerando TODOS os numeros desta tela.
+      const { data: apps } = await supabase.from('job_applications').select('id, status, created_at');
       
       const totalAbertas = jobRequests?.filter(j => j.status !== 'Finalizada' && j.status !== 'Cancelada').length || 0;
       const totalContratados = apps?.filter(a => a.status === 'Contratado').length || 0;
       
-      // SLA Medio (dias)
-      const contratados = apps?.filter(a => a.status === 'Contratado' && a.created_at) || [];
-      const slaMedio = contratados.length > 0 ? 
-        contratados.reduce((acc, c) => acc + (new Date(c.updated_at || c.created_at).getTime() - new Date(c.created_at).getTime()), 0) / contratados.length / (1000 * 3600 * 24)
-        : 0;
+      // Time-to-Hire nao e computavel: job_applications guarda quando a candidatura
+      // nasceu, mas nao quando virou contratacao. O calculo antigo usava `updated_at`,
+      // coluna inexistente, e por isso sempre deu zero. Mostrar "0 dias" e pior que
+      // admitir que o dado nao existe — ver issue de tempo de contratacao.
 
       // Taxa de Conversão (Contratados / Total de Aplicações)
       const taxaConversao = apps?.length ? (totalContratados / apps.length) * 100 : 0;
@@ -52,7 +52,6 @@ export default function MetricasVagasPage() {
       }));
 
       setMetrics({ 
-        slaMedio: Math.round(slaMedio), 
         totalAbertas, 
         totalContratados, 
         taxaConversao: Math.round(taxaConversao),
@@ -91,8 +90,10 @@ export default function MetricasVagasPage() {
             <Clock className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{metrics.slaMedio} dias</div>
-            <p className="text-xs text-muted-foreground mt-1">Média até contratação</p>
+            <div className="text-2xl font-bold text-muted-foreground">—</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Sem dado: a candidatura não registra quando virou contratação.
+            </p>
           </CardContent>
         </Card>
 
@@ -160,10 +161,11 @@ export default function MetricasVagasPage() {
                   <Activity className="h-12 w-12 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-3xl font-bold">R$ {(metrics.slaMedio * 125).toLocaleString('pt-BR')}</h3>
+                  <h3 className="text-3xl font-bold text-muted-foreground">—</h3>
                   <p className="text-sm text-muted-foreground mt-2">
-                    Custo estimado médio por vaga. <br/>
-                    (Considerando R$ 125,00 / dia de vaga aberta com base no manual de RH).
+                    O custo estimado depende do tempo médio até a contratação, que o
+                    sistema ainda não registra. <br/>
+                    (A conta seria R$ 125,00 por dia de vaga aberta, conforme o manual de RH.)
                   </p>
                 </div>
                 <div className="w-full bg-muted rounded-lg p-4 text-sm mt-4 text-left border">

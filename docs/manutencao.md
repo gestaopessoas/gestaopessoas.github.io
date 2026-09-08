@@ -27,6 +27,7 @@
 | `DESAFIOS.md` | Armadilhas descobertas em sessões anteriores |
 | `docs/auditoria-projeto.md` | Auditoria completa do repositório |
 | `task.md` | Tickets de desenvolvimento ativos |
+| `docs/qa/roteiro-de-qa.md` | Como caçar as falhas que não gritam — as oito classes, os guardas automáticos e o roteiro antes de publicar |
 
 ---
 
