@@ -97,10 +97,13 @@ ensaio, os dois teriam ido para produção silenciosamente.
 - **A aba "Inativos" da tela de colaboradores passa a significar literalmente o que diz**:
   quem está em `public` com status de saída, ou seja, quem ainda não foi arquivado. Depois
   de `arquivar_colaboradores()` ela fica vazia — e é assim que se descobre se sobrou alguém.
-- **A separação exige manutenção.** `arquivar_colaboradores()` precisa rodar de tempos em
-  tempos, ou `public.employees` volta a acumular desligados. Não há gatilho automático de
-  propósito: mover linha dentro de trigger de `UPDATE` é o tipo de mágica que ninguém
-  entende às 3 da manhã.
+- **A separação exige manutenção, e ela é automática.** Um agendamento `pg_cron` roda
+  `arquivo.rotina_arquivamento()` todo dia às 03:00 de Brasília; sem isso
+  `public.employees` voltaria a acumular desligados. Continua sem gatilho em `UPDATE` de
+  propósito: mover linha dentro do gatilho que a alterou é o tipo de mágica que ninguém
+  entende às 3 da manhã. Cada execução vira linha em `arquivo.arquivamentos`, e
+  `rotina_arquivamento_status()` responde se está viva — inclusive quantos estão esperando,
+  que é o sintoma de rotina morta.
 - **Coluna nova em `employees` não aparece nas views sozinha**, e a tabela espelho também
   não a ganha. Ao alterar `employees`, altere `arquivo.employees` e recrie as views.
 - **O deploy do código e o do banco andam juntos.** A view `arquivo_morto` mudou de formato
