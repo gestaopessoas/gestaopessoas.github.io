@@ -32,6 +32,7 @@ if (!API_URL || !ANON_KEY || !SERVICE_ROLE_KEY) {
 // funcionava por acidente da ordem de avaliação; aqui não depende disso.
 process.env.LOCAL_API_URL = API_URL;
 process.env.LOCAL_SERVICE_ROLE_KEY = SERVICE_ROLE_KEY;
+process.env.LOCAL_ANON_KEY = ANON_KEY;
 
 export default defineConfig({
   testDir: './e2e',
