@@ -49,11 +49,29 @@ function HistoricoContent() {
 
       const { data: histData } = await supabase
         .from("employee_history_todos")
-        .select("*, employee_history_value_entries(value_side, path, value_text, value_number, value_boolean)")
+        .select("*")
         .eq("employee_id", id)
         .order("change_date", { ascending: false })
 
-      if (histData) setHistory(histData)
+      // Os valores vêm numa segunda consulta: o join embutido do PostgREST não atravessa
+      // view com UNION, e o histórico de quem saiu mora no schema arquivo (ADR 0009).
+      if (histData) {
+        const ids = histData.map((h) => h.id)
+        const { data: valores } = ids.length
+          ? await supabase
+              .from("employee_history_value_entries_todos")
+              .select("history_id, value_side, path, value_text, value_number, value_boolean")
+              .in("history_id", ids)
+          : { data: [] }
+
+        const porHistorico = new Map<string, unknown[]>()
+        for (const v of valores ?? []) {
+          const lista = porHistorico.get(v.history_id) ?? []
+          lista.push(v)
+          porHistorico.set(v.history_id, lista)
+        }
+        setHistory(histData.map((h) => ({ ...h, employee_history_value_entries: porHistorico.get(h.id) ?? [] })))
+      }
       setLoading(false)
     }
     loadData()

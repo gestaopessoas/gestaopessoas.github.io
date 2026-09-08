@@ -43,6 +43,26 @@ BEGIN
       EXECUTE format('CREATE TABLE arquivo.%I (LIKE public.%I INCLUDING ALL)', r.t, r.t);
     END IF;
   END LOOP;
+
+  -- NETAS. Cascata desce quantos niveis existirem: employees -> employee_history ->
+  -- employee_history_value_entries. Espelhar so as filhas apagaria as netas em silencio
+  -- no DELETE final — foi o que aconteceu na primeira aplicacao desta migration, com
+  -- perda de 46.879 linhas de employee_history_value_entries e 121 de
+  -- benefit_audit_log_entries (recuperadas depois pela 20260908150000).
+  FOR r IN
+    SELECT DISTINCT cl.relname AS t
+    FROM pg_constraint c
+    JOIN pg_class cl ON cl.oid = c.conrelid
+    JOIN pg_class ref ON ref.oid = c.confrelid
+    JOIN pg_namespace nref ON nref.oid = ref.relnamespace
+    WHERE c.contype = 'f' AND c.confdeltype = 'c' AND nref.nspname = 'public'
+      AND ref.relname <> 'employees'
+      AND to_regclass('arquivo.' || quote_ident(ref.relname)) IS NOT NULL
+  LOOP
+    IF to_regclass('arquivo.' || quote_ident(r.t)) IS NULL THEN
+      EXECUTE format('CREATE TABLE arquivo.%I (LIKE public.%I INCLUDING ALL)', r.t, r.t);
+    END IF;
+  END LOOP;
 END $$;
 
 -- RLS em tudo. `LIKE ... INCLUDING ALL` NAO copia policy: sem isto o arquivo ficaria
@@ -87,6 +107,25 @@ BEGIN
     WHERE c.contype = 'f' AND c.confrelid = 'public.employees'::regclass AND c.confdeltype = 'c'
   LOOP
     EXECUTE format('INSERT INTO arquivo.%I SELECT x.* FROM public.%I x JOIN _mover m ON m.id = x.%I', r.t, r.t, r.col);
+  END LOOP;
+
+  -- Netas: a linha vai junto quando a mae ja foi para o arquivo.
+  FOR r IN
+    SELECT DISTINCT cl.relname AS t, a.attname AS col, ref.relname AS mae, refa.attname AS mae_col
+    FROM pg_constraint c
+    JOIN pg_class cl ON cl.oid = c.conrelid
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+    JOIN pg_class ref ON ref.oid = c.confrelid
+    JOIN pg_attribute refa ON refa.attrelid = c.confrelid AND refa.attnum = c.confkey[1]
+    JOIN pg_namespace nref ON nref.oid = ref.relnamespace
+    WHERE c.contype = 'f' AND c.confdeltype = 'c' AND nref.nspname = 'public'
+      AND ref.relname <> 'employees'
+      AND to_regclass('arquivo.' || quote_ident(ref.relname)) IS NOT NULL
+      AND to_regclass('arquivo.' || quote_ident(cl.relname)) IS NOT NULL
+  LOOP
+    EXECUTE format(
+      'INSERT INTO arquivo.%I SELECT x.* FROM public.%I x WHERE x.%I IN (SELECT %I FROM arquivo.%I)',
+      r.t, r.t, r.col, r.mae_col, r.mae);
   END LOOP;
 
   INSERT INTO arquivo.employees SELECT e.* FROM public.employees e JOIN _mover m ON m.id = e.id;

@@ -3,6 +3,10 @@ import { test, expect } from '@playwright/test';
 // Estes testes são de LEITURA. O dev server aponta para o banco de produção, então nada
 // aqui cria, move ou apaga caixa — o que se verifica é de onde a tela lê e o que ela diz.
 test.describe('Arquivo morto', () => {
+  // Login + navegacao + busca nao cabem no teto global de 30s do playwright.config.ts.
+  // O spec falhava por timeout do caso inteiro, nao pelo que ele verifica.
+  test.describe.configure({ timeout: 90_000 });
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
     await page.getByLabel('E-mail').fill(process.env.LOGIN_BRUNO || '');
@@ -32,9 +36,15 @@ test.describe('Arquivo morto', () => {
     const linhas = await (await resposta).json();
 
     expect(Array.isArray(linhas)).toBe(true);
-    // O embed tem que atravessar a view, senão a coluna "Caixa física" fica vazia.
     expect(linhas.length, 'a busca não trouxe ninguém').toBeGreaterThan(0);
-    expect(linhas[0]).toHaveProperty('employee_archives');
+
+    // A view vem achatada, uma linha por dossiê, com a caixa embutida no registro
+    // (ADR 0009): o join do PostgREST não atravessa view com UNION, e sem estas
+    // colunas a coluna "Caixa física" da tela fica vazia.
+    expect(linhas[0]).toHaveProperty('archive_id');
+    expect(linhas[0]).toHaveProperty('archive_label');
+    expect(linhas[0]).toHaveProperty('box_code');
+    expect(linhas[0]).toHaveProperty('status');
 
     await page.waitForTimeout(1000);
     const porStatus = rest.filter((u) => /\/rest\/v1\/employees\?/.test(u) && u.includes('status=in.'));
