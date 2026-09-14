@@ -2,7 +2,7 @@
 --   UPDATE public.employees SET cost_center = 'RESERVA' WHERE registration_number = '19882';
 --   UPDATE public.employees SET cost_center = 'RIVIERA' WHERE registration_number = '19572';
 --   UPDATE public.employees
---      SET cost_center = CASE name WHEN 'matricula 19460' THEN 'CD' ELSE 'RIVIERA' END,
+--      SET cost_center = CASE registration_number WHEN '19460' THEN 'CD' ELSE 'RIVIERA' END,
 --          cost_center_id = (SELECT id FROM public.cost_centers WHERE name = 'CONSTRUTORA MATRIZ')
 --    WHERE registration_number IN ('19460', '60');
 --
