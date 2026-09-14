@@ -50,52 +50,25 @@ type ProfessionalExperienceRecord = {
 };
 
 type Assessment = {
+  // Parecer é avaliação, não identidade: CPF, nascimento, CNH e afins moram em
+  // `candidates` (issues #77 e #79). As notas de hard/soft skill, o checklist, a
+  // senioridade e a bandeira cultural entram por chave dinâmica, direto da ficha.
   psychological_test: string;
   tests_details?: string;
   tests_list?: PsychologicalTestInput[];
   academic_list?: AcademicRecord[];
   experience_list?: ProfessionalExperienceRecord[];
-  age?: string | number;
   education?: string;
-  technical: string;
-  communication: string;
-  cultural_fit: string;
-  strengths: string;
-  weaknesses: string;
-  observations: string;
+  strengths?: string;
+  weaknesses?: string;
+  observations?: string;
   worksite?: string;
-  worksite_type?: "all" | "specific";
   available_worksites?: string[];
   selection_stage?: string;
   is_internal?: boolean;
-  location?: string;
-  professional_summary?: string;
-  experience_summary?: string;
-  cnh?: string;
-  cnh_category?: string;
-  birth_date?: string;
-  cpf?: string;
-  gender?: string;
-  address?: string;
-  marital_status?: string;
-  salary_expectation?: string;
-  birthplace?: string;
-  secondary_phone?: string;
-  secondary_email?: string;
-  emergency_contact_phone?: string;
-  emergency_contact_name?: string;
-  has_cnh?: boolean;
-  cnh_categories?: string[];
-  has_dependents?: boolean;
-  dependents_count?: number;
-  dependents_notes?: string;
-  uniform_size?: string;
-  boot_size?: string;
-  gender_identity?: string;
-  sexual_orientation?: string;
-  race_declaration?: string;
-  languages?: string;
+  [campoDaFicha: string]: unknown;
 };
+
 
 type Interview = {
   id: string;
@@ -112,22 +85,6 @@ type Interview = {
   assessment: Assessment | null;
   created_at: string;
   updated_at?: string;
-  birth_date?: string | null;
-  cpf?: string | null;
-  marital_status?: string | null;
-  birthplace?: string | null;
-  gender?: string | null;
-  gender_identity?: string | null;
-  sexual_orientation?: string | null;
-  race_declaration?: string | null;
-  salary_expectation?: string | null;
-  has_cnh?: boolean | null;
-  cnh_category?: string | null;
-  languages?: string | null;
-  has_dependents?: boolean | null;
-  dependents_count?: number | null;
-  uniform_size?: string | null;
-  boot_size?: string | null;
 };
 
 const statusStyle: Record<string, string> = {
@@ -156,32 +113,16 @@ const defaultAssessment: Assessment = {
   tests_list: [],
   academic_list: [],
   experience_list: [],
-  age: "",
   education: "Ensino Médio",
-  technical: "",
-  communication: "",
-  cultural_fit: "",
   strengths: "",
   weaknesses: "",
   observations: "",
   worksite: "",
-  // Sem padrão: disponibilidade de obra é informação do candidato, não do formulário (QA B3).
-  worksite_type: "specific",
   available_worksites: [],
   selection_stage: "",
   is_internal: false,
-  location: "",
-  professional_summary: "",
-  experience_summary: "",
-  cnh: "",
-  cnh_category: "",
-  birth_date: "",
-  cpf: "",
-  gender: "",
-  address: "",
-  marital_status: "",
-  salary_expectation: "",
 };
+
 
 export type AIProvider = {
   id: string;
@@ -463,22 +404,8 @@ export default function EntrevistasPage() {
       email: formData.email,
       phone: formData.phone,
       role: formData.role_interest || formData.role || form.role,
-      birth_date: formData.birth_date || null,
-      cpf: formData.cpf || null,
-      marital_status: formData.marital_status || null,
-      birthplace: formData.birthplace || null,
-      gender: formData.gender || null,
-      gender_identity: formData.gender_identity || null,
-      sexual_orientation: formData.sexual_orientation || null,
-      race_declaration: formData.race_declaration || null,
-      salary_expectation: formData.salary_expectation || null,
-      has_cnh: formData.has_cnh ?? null,
-      cnh_category: formData.cnh_categories ? (Array.isArray(formData.cnh_categories) ? formData.cnh_categories[0] : formData.cnh_categories) : null,
-      languages: formData.languages || null,
-      has_dependents: formData.has_dependents ?? null,
-      dependents_count: formData.dependents_count ?? null,
-      uniform_size: formData.uniform_size || null,
-      boot_size: formData.boot_size || null,
+      // O cadastro pessoal (CPF, nascimento, CNH, uniforme...) mora só em `candidates`:
+      // duas entrevistas da mesma pessoa criavam duas cópias que divergiam (issue #77).
       updated_at: new Date().toISOString()
     };
     
@@ -496,9 +423,12 @@ export default function EntrevistasPage() {
     // 1. O candidato vem primeiro: `interviews.candidate_id` é o vínculo de verdade desde a
     //    migração 20260914210000, então o candidato precisa existir antes da entrevista.
     let candidateId: string | null = null;
-    const disponibilidadeInformada: string[] = Array.isArray(assessmentData.available_worksites) && assessmentData.available_worksites.length > 0
-      ? assessmentData.available_worksites
-      : (assessmentData.worksite_type === "all" ? ["Todas as Obras"] : []);
+    // Disponibilidade só existe se alguém marcou obras. `worksite_type: "all"` era um campo
+    // fantasma do parecer — sem tela para preencher — que carimbava "Todas as Obras" em
+    // quem nunca declarou nada (QA B3).
+    const disponibilidadeInformada: string[] = Array.isArray(assessmentData.available_worksites)
+      ? (assessmentData.available_worksites as string[])
+      : [];
     if (payloadAny.candidate_name) {
       const parts = payloadAny.candidate_name.split(" ");
       const tag = payloadAny.destination || (payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : payloadAny.result === "Reprovado" ? "Reprovado na Entrevista" : "Entrevistado");
@@ -534,6 +464,7 @@ export default function EntrevistasPage() {
         languages: formData.languages || null,
         has_dependents: formData.has_dependents ?? null,
         dependents_count: formData.dependents_count ?? null,
+        dependents_notes: formData.dependents_notes || null,
         uniform_size: formData.uniform_size || null,
         boot_size: formData.boot_size || null
       };
@@ -601,7 +532,7 @@ export default function EntrevistasPage() {
         .single();
       // A entrevista já gravou aqui: falha do parecer é salvamento parcial (amarelo).
       if (assessmentError || !assessment) fail("Entrevista salva, mas o parecer não: " + (assessmentError?.message || "avaliação não encontrada."), "warning");
-      const values = assessmentToRows({ ...assessmentForm, ...assessmentData, dependents_notes: formData.dependents_notes || null }).map((value) => ({ ...value, assessment_id: assessment.id }));
+      const values = assessmentToRows({ ...assessmentForm, ...assessmentData }).map((value) => ({ ...value, assessment_id: assessment.id }));
       // Só apaga quando há linhas novas para gravar — parecer vazio zerava o que existia.
       if (values.length) {
         const { error: clearError } = await supabase.from("interview_assessment_values").delete().eq("assessment_id", assessment.id);
@@ -680,26 +611,7 @@ export default function EntrevistasPage() {
       result: interview.result || "N/C",
       destination: interview.destination || "",
     });
-    const assessment = interview.assessment || defaultAssessment;
-    setAssessmentForm({
-      ...assessment,
-      birth_date: interview.birth_date ?? assessment.birth_date,
-      cpf: interview.cpf ?? assessment.cpf,
-      marital_status: interview.marital_status ?? assessment.marital_status,
-      birthplace: interview.birthplace ?? assessment.birthplace,
-      gender: interview.gender ?? assessment.gender,
-      gender_identity: interview.gender_identity ?? assessment.gender_identity,
-      sexual_orientation: interview.sexual_orientation ?? assessment.sexual_orientation,
-      race_declaration: interview.race_declaration ?? assessment.race_declaration,
-      salary_expectation: interview.salary_expectation ?? assessment.salary_expectation,
-      has_cnh: interview.has_cnh ?? assessment.has_cnh,
-      cnh_category: interview.cnh_category ?? assessment.cnh_category,
-      languages: interview.languages ?? assessment.languages,
-      has_dependents: interview.has_dependents ?? assessment.has_dependents,
-      dependents_count: interview.dependents_count ?? assessment.dependents_count,
-      uniform_size: interview.uniform_size ?? assessment.uniform_size,
-      boot_size: interview.boot_size ?? assessment.boot_size,
-    });
+    setAssessmentForm(interview.assessment || defaultAssessment);
     setIsModalOpen(true);
   };
 

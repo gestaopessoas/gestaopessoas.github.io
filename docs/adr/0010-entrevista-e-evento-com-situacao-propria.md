@@ -56,6 +56,12 @@ Candidato:
   o registro correspondente em `interviews`. O parecer fica na ficha da entrevista, e não
   duplicado no formulário de avanço.
 
+**O cadastro pessoal mora só em `candidates`** (migração `20260914230000`). CPF, nascimento,
+estado civil, naturalidade, raça, pretensão, CNH, idiomas, dependentes e tamanhos de uniforme
+estavam em três lugares ao mesmo tempo — `candidates`, colunas próprias de `interviews` e
+campos soltos do parecer. As colunas de `interviews` caíram, o parecer passou a guardar só
+avaliação, e o que existia apenas no parecer foi consolidado no cadastro.
+
 **Quem é a mesma pessoa** passa a ser decidido por e-mail de verdade → CPF → telefone
 (`src/lib/candidateIdentity.mjs`). `candidates.email` é `NOT NULL UNIQUE` e a gravação usava
 `upsert` por um e-mail derivado do primeiro nome quando o Candidato não tinha e-mail: dois
@@ -74,6 +80,10 @@ chave própria.
   pelas Etapas Terminais na fase 3) e o vínculo por e-mail/nome, que vira vínculo por
   Candidatura. `interviews.candidate_id` sobrevive à migração e ajuda o backfill — é o que
   liga entrevista órfã ao Candidato sem depender de casar texto.
+- O parecer encolheu de 35 para 20 campos: notas, checklist, senioridade, bandeira cultural,
+  pontos fortes e fracos, formação, experiência e testes. `worksite_type` foi removido — era
+  campo sem tela, cujo padrão `"all"` carimbava "Todas as Obras" em quem nunca declarou
+  disponibilidade.
 - **`candidate_interviews` ganha linhas novas**: além do avanço de etapa, cada mudança de
   situação de entrevista escreve ali. São Registros de Etapa no sentido do glossário; o
   conteúdo da entrevista vai na nota da linha.

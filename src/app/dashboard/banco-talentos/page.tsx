@@ -39,7 +39,6 @@ type CandidateEditForm = {
   email: string;
   role_interest: string;
   available_worksites: string[];
-  worksite_type: "all" | "specific";
 };
 
 export default function BancoTalentosPage() {
