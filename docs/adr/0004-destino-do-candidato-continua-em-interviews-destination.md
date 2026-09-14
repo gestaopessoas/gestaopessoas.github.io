@@ -9,6 +9,12 @@ revisão previsto em "Consequências" — o vínculo por e-mail virar identifica
 foi acionado: o destino passa a ser Etapa Terminal da Candidatura, não coluna persistida em
 `interviews`.
 
+Encerrado na prática pelo [ADR 0010](./0010-entrevista-e-evento-com-situacao-propria.md) em
+2026-09-14: `interviews.candidate_id` existe (migração `20260914210000`) e
+`syncInterviewDestination` foi removida. `interviews.destination` continua gravado até a
+fase 3 do ADR 0006, mas como decisão daquele dia — nada mais o reescreve a partir do
+histórico.
+
 ## Contexto
 
 O status do candidato é derivado em tempo de leitura a partir de `candidate_interviews`

@@ -20,7 +20,9 @@ _Avoid_: vaga aberta, anúncio, opening
 
 **Candidato**:
 A pessoa. Existe independentemente de ter se candidatado a alguma coisa — pode entrar
-pelo portal público, por cadastro do recrutador ou por currículo importado.
+pelo portal público, por cadastro do recrutador ou por currículo importado. Duas fichas
+são a mesma pessoa quando batem por e-mail, CPF ou telefone, nessa ordem; sem nenhum
+desses, são pessoas diferentes, ainda que o nome seja igual (ADR 0010).
 _Avoid_: talento, currículo, aplicante, lead
 
 **Candidatura**:
@@ -44,17 +46,33 @@ _Avoid_: entrevista avulsa, cadastro direto, currículo espontâneo
 **Etapa**:
 Onde uma Candidatura está no processo seletivo. É o único eixo de progresso do sistema:
 não existe etapa do Candidato, nem destino, nem fase paralela. Uma Candidatura tem
-exatamente uma Etapa, e a mudança de Etapa é registrada no histórico.
-_Avoid_: status, fase, destino, situação, stage, selection_stage, resultado
+exatamente uma Etapa, e a mudança de Etapa é registrada no histórico. Não confundir com a
+Situação da Entrevista, que descreve um encontro e não o progresso.
+_Avoid_: status, fase, destino, stage, selection_stage, resultado
 
 **Entrevista**:
-O encontro agendado ou realizado entre recrutador e Candidato. Registra data,
-entrevistador, comparecimento e resultado.
+O encontro, marcado ou já realizado, entre recrutador e Candidato. Tem data e hora
+obrigatórias, entrevistador, Situação, resultado e Parecer próprio. É uma Entrevista por
+vaga: quem volta para outra vaga ganha registro novo, e o anterior continua inteiro
+(ADR 0010).
 _Avoid_: reunião, conversa, triagem
+
+**Situação da Entrevista**:
+O que aconteceu com aquele encontro: `Aguardando`, `Confirmado`, `Compareceu`,
+`Não compareceu` ou `Desistente`, mais o resultado (`Aprovado`, `Reprovado`, `N/C`).
+Descreve o evento, nunca a posição no processo — quem carrega progresso é a Etapa. Cada
+mudança de Situação vira Registro de Etapa, para não sumir na próxima edição.
+_Avoid_: etapa, status do candidato, fase, andamento
+
+**Agenda**:
+As Entrevistas marcadas de hoje e dos próximos sete dias — Situação `Aguardando` ou
+`Confirmado` com data a partir de hoje. É consulta, não tabela.
+_Avoid_: calendário, compromissos, próximas
 
 **Parecer**:
 A avaliação escrita produzida a partir de uma Entrevista — pontos fortes, fraquezas,
-aderência técnica e cultural, teste psicológico.
+aderência técnica e cultural, teste psicológico. É um por Entrevista: duas vagas, dois
+pareceres.
 _Avoid_: feedback, nota, avaliação, assessment
 
 **Decisão do Gestor**:
@@ -65,13 +83,16 @@ _Avoid_: aprovação, parecer do gestor, avaliação, veredito
 
 **Registro de Etapa**:
 Uma linha do histórico do Candidato: em que etapa ele entrou, quando, por quem e para
-qual Obra. É append-only — o histórico não é reescrito, só recebe linhas novas.
+qual Obra. É append-only — o histórico não é reescrito, só recebe linhas novas. Avançar
+de etapa gera uma; mudar a Situação de uma Entrevista também.
 _Avoid_: entrevista (a tabela se chama `candidate_interviews`, mas um Registro de Etapa
 não é uma Entrevista), movimentação, transição
 
 **Etapa Terminal**:
 A Etapa que encerra uma Candidatura: Contratado, Reprovado ou Desistente. Encerrada, a
 Candidatura não volta atrás — reconsiderar um Candidato é abrir uma Candidatura nova.
+Enquanto a fase 3 do ADR 0006 não chega, `interviews.destination` sobrevive como a decisão
+tomada naquela Entrevista — e só ela; nada o reescreve a partir do histórico (ADR 0010).
 _Avoid_: destino, desfecho, fim de processo
 
 **Banco de Talentos**:
