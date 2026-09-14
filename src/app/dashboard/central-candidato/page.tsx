@@ -270,7 +270,7 @@ export default function CentralCandidatoPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <Contact className="h-6 w-6 text-primary" />
@@ -338,7 +338,7 @@ export default function CentralCandidatoPage() {
                 <th className="px-6 py-4 font-medium">Escolaridade</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Último Chamado</th>
-                <th className="px-6 py-4 font-medium text-right">Ações</th>
+                <th className="sticky right-0 z-10 bg-card px-6 py-4 font-medium text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
@@ -403,7 +403,7 @@ export default function CentralCandidatoPage() {
                     <td className="px-6 py-4 text-muted-foreground text-xs">
                       {candidate.ultimo_chamado}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="sticky right-0 z-10 bg-card px-6 py-4 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]">
                       <div className="flex justify-end gap-2 items-center">
                         {/* Quem está livre também precisa de porta de entrada: sem isto o
                             Banco de Talentos virava lista de leitura (QA B5). */}

@@ -631,9 +631,9 @@ export default function EntrevistasPage() {
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex-1 p-8 space-y-6 max-w-7xl mx-auto w-full">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Registro de Entrevistas</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-balance">Registro de Entrevistas</h1>
             <p className="text-sm text-muted-foreground mt-1">
               Gerenciamento de candidatos, avaliações e pareceres.
             </p>
@@ -652,7 +652,7 @@ export default function EntrevistasPage() {
 
         {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
           <Metric icon={CalendarClock} label="Hoje" value={agendaHoje.length} />
           <Metric icon={User} label="Total Registros" value={filtered.length} />
           <Metric icon={Calendar} label="Confirmados" value={confirmados} />
@@ -942,8 +942,10 @@ function Metric({ icon: Icon, label, value }: { icon: typeof Briefcase; label: s
       <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
         <Icon className="h-4 w-4 text-primary" />
       </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
+      {/* O cartão tem largura mínima na grade e o rótulo quebra em duas linhas: antes ele
+          estourava a borda e saía cortado ("Total Registr", "Confir"). */}
+      <div className="min-w-0">
+        <p className="text-xs leading-tight text-muted-foreground break-words">{label}</p>
         <p className="text-xl font-bold">{value}</p>
       </div>
     </div>

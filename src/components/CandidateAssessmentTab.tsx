@@ -157,16 +157,18 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
       </div>
 
       {/* 1. GRÁFICOS DE RADAR E NOTAS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))]">
         {/* Hard Skills */}
         <div className="bg-card border rounded-xl p-5 shadow-sm">
           <h3 className="font-bold text-lg mb-4">Hard Skills (0 a 5)</h3>
           {isEditing ? (
             <div className="space-y-3">
               {HARD_SKILLS.map(skill => (
-                <div key={skill.id} className="flex items-center justify-between">
+                <div key={skill.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                   <span className="text-sm font-medium">{skill.label}</span>
-                  <div className="flex items-center gap-2 w-32">
+                  {/* O slider precisa de largura própria: em tela estreita ele quebra para a
+                      linha de baixo inteiro, em vez de encolher para 14px (issue #67). */}
+                  <div className="flex w-full min-w-[9rem] flex-1 items-center gap-2 sm:w-32 sm:flex-none">
                     <Input 
                       type="range" 
                       min="0" max="5" step="1"
@@ -199,9 +201,11 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
           {isEditing ? (
             <div className="space-y-3">
               {SOFT_SKILLS.map(skill => (
-                <div key={skill.id} className="flex items-center justify-between">
+                <div key={skill.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                   <span className="text-sm font-medium">{skill.label}</span>
-                  <div className="flex items-center gap-2 w-32">
+                  {/* O slider precisa de largura própria: em tela estreita ele quebra para a
+                      linha de baixo inteiro, em vez de encolher para 14px (issue #67). */}
+                  <div className="flex w-full min-w-[9rem] flex-1 items-center gap-2 sm:w-32 sm:flex-none">
                     <Input 
                       type="range" 
                       min="0" max="5" step="1"
@@ -232,13 +236,13 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
       {/* 2. CHECKLIST DE PRONTIDÃO */}
       <div className="bg-card border rounded-xl p-5 shadow-sm">
         <h3 className="font-bold text-lg mb-4">Checklist de Prontidão (Realidade)</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(13rem,1fr))]">
           {[
             { id: "salary_aligned", label: "Pretensão Salarial Alinhada?" },
             { id: "immediate_start", label: "Disponibilidade de Início?" },
             { id: "open_to_travel", label: "Aceita Viagem/Mudança?" }
           ].map(item => (
-            <div key={item.id} className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+            <div key={item.id} className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3">
               {isEditing ? (
                 <Checkbox 
                   checked={assessmentData[item.id] === "sim" || assessmentData[item.id] === true}
@@ -249,17 +253,17 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
                   <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : 
                   <X className="h-5 w-5 text-red-500" />
               )}
-              <span className="text-sm font-semibold">{item.label}</span>
+              <span className="text-sm font-semibold leading-tight">{item.label}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* 3. SENIORIDADE & FIT CULTURAL */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))]">
         <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4">
           <h3 className="font-bold text-lg">Senioridade</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(9rem,1fr))]">
             <div>
               <span className="text-xs text-muted-foreground block mb-1">Esperada (Vaga)</span>
               {isEditing ? (
@@ -334,21 +338,21 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
       </div>
 
       {/* 4. MÉTODO STAR: PONTOS FORTES E A DESENVOLVER */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))]">
         <div className="bg-card border border-emerald-500/20 rounded-xl p-5 shadow-sm">
           <h3 className="font-bold text-emerald-600 mb-4 flex items-center gap-2">
             <Check className="h-5 w-5" /> Pontos Fortes
           </h3>
           {isEditing ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))]">
               {STRENGTHS_LIST.map(item => (
-                <div key={item} className="flex items-center space-x-2">
+                <div key={item} className="flex items-start gap-2">
                   <Checkbox 
                     id={`s_${item}`} 
                     checked={strengthsArray.includes(item)}
                     onCheckedChange={(c) => handleCheckboxArrayChange('strengths', item, !!c)}
                   />
-                  <label htmlFor={`s_${item}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  <label htmlFor={`s_${item}`} className="text-sm font-medium leading-tight peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                     {item}
                   </label>
                 </div>
@@ -370,15 +374,15 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
             <AlertTriangle className="h-5 w-5" /> Pontos a Desenvolver
           </h3>
           {isEditing ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))]">
               {IMPROVEMENTS_LIST.map(item => (
-                <div key={item} className="flex items-center space-x-2">
+                <div key={item} className="flex items-start gap-2">
                   <Checkbox 
                     id={`i_${item}`} 
                     checked={improvementsArray.includes(item)}
                     onCheckedChange={(c) => handleCheckboxArrayChange('improvement_points', item, !!c)}
                   />
-                  <label htmlFor={`i_${item}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  <label htmlFor={`i_${item}`} className="text-sm font-medium leading-tight peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                     {item}
                   </label>
                 </div>

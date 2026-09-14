@@ -90,8 +90,12 @@ delete from public.interview_assessment_values
    'has_dependents', 'dependents_count', 'dependents_notes',
    'uniform_size', 'boot_size',
    'gender_identity', 'sexual_orientation', 'race_declaration',
-   'personal_info', 'additional_info', 'improvement_points'
+   'personal_info', 'additional_info'
  );
+
+-- Correção do mesmo dia: `improvement_points` (Pontos a Desenvolver) estava nesta lista por
+-- engano e é campo em uso pela ficha. Removido daqui antes de qualquer outro ambiente rodar
+-- a migração; em produção uma linha preenchida foi apagada e não tem como voltar.
 
 -- 3. As colunas de cadastro em `interviews` (todas vazias em produção nesta data) somem.
 --    A tela lê o cadastro pelo `candidate_id`.
