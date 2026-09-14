@@ -10,7 +10,7 @@ test.describe('Filtros e Contadores Colaboradores (Issues #25, #26, #27, #28, #6
     await page.fill('input[type="email"]', process.env.LOGIN_BRUNO as string);
     await page.fill('input[type="password"]', process.env.PASS_BRUNO as string);
     await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await page.waitForURL('**/dashboard**', { timeout: 30000 });
   });
 
   // Os cartões seguem os filtros avançados (#25) — menos o de status (#62). Cada rótulo
@@ -39,9 +39,14 @@ test.describe('Filtros e Contadores Colaboradores (Issues #25, #26, #27, #28, #6
     // status e localizado pela propria label "Situacao".
     await page.getByTitle('Filtros avançados').click();
     await expect(page.getByText('Filtros Avançados')).toBeVisible();
+    // "Afastado" e nao "Desligado": desde 2026-09-10 o filtro so oferece situacoes de
+    // quem esta no quadro atual. Desligado/Inativo/Arquivo Morto sairam da lista porque
+    // essa gente mora no schema `arquivo` e a opcao devolvia SEMPRE zero — a tela dizia
+    // "nenhum resultado" para quem existe. O que este teste guarda continua igual: o
+    // filtro muda a TABELA e nao mexe nos cartoes.
     await page
       .locator('xpath=//label[normalize-space()="Situação"]/following::select[1]')
-      .selectOption('Desligado');
+      .selectOption('Afastado');
     await page.getByRole('button', { name: 'Aplicar Filtros' }).click();
     await page.waitForTimeout(1500);
 

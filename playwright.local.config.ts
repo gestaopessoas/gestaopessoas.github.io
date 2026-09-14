@@ -47,6 +47,9 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Compila /login e /dashboard antes de qualquer teste medir tempo: sem isto o
+  // primeiro spec da fila paga a compilacao do `next dev` e estoura sozinho.
+  globalSetup: './e2e/aquece-servidor.ts',
   webServer: {
     // Porta própria: não briga com o dev server apontado para produção.
     command: 'npm run dev -- --port 3100',

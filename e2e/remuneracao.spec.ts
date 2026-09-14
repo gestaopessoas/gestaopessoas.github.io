@@ -11,7 +11,7 @@ test.describe('Benefícios Mensais (Issue #32)', () => {
     await page.fill('input[type="email"]', process.env.LOGIN_BRUNO as string);
     await page.fill('input[type="password"]', process.env.PASS_BRUNO as string);
     await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await page.waitForURL('**/dashboard**', { timeout: 30000 });
   });
 
   // Este teste NÃO salva. A versão anterior preenchia "200,00" e clicava em Salvar —

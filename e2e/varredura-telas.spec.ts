@@ -66,6 +66,11 @@ const TELAS = [
 const RUIDO = [
   /favicon/i,
   /Failed to load resource: net::ERR_/i,
+  // "Failed to load resource: ... 404" do console nao traz a URL, entao nunca foi
+  // acionavel — e o `next dev` produz esse 404 sozinho ao compilar uma rota aninhada
+  // sob demanda (some ao repetir a visita). Quem importa continua coberto: o handler
+  // de `response` abaixo pega qualquer 4xx/5xx de /rest/v1/ e /auth/v1/, com URL.
+  /Failed to load resource: the server responded with a status of 404/i,
   /Download the React DevTools/i,
   /\[Fast Refresh\]/i,
 ];

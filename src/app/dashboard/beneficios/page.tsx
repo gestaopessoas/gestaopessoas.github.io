@@ -163,7 +163,7 @@ export default function BeneficiosPage() {
     if (!["Ativo", "Férias", "Afastado"].includes(emp.status)) return false;
     if (ignores.includes(emp.id)) return false;
 
-    const days = differenceInDays(new Date(), new Date(emp.admission_date));
+    const days = differenceInDays(new Date(), new Date(`${emp.admission_date}T12:00:00`));
     if (days <= 90) return false;
 
     const hasSaude = hasBenefitKind(benefits, emp.id, "saude");
@@ -621,7 +621,7 @@ export default function BeneficiosPage() {
                           <td className="px-4 py-3 font-medium">{emp.name}</td>
                           <td className="px-4 py-3">{emp.department || "-"}</td>
                           <td className="px-4 py-3 tabular-nums">
-                            {format(new Date(emp.admission_date), "dd/MM/yyyy")}
+                            {format(new Date(`${emp.admission_date}T12:00:00`), "dd/MM/yyyy")}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <Button

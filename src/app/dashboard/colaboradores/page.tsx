@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
 import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History, Package } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -24,6 +25,7 @@ import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getSchedu
 import { openTrialPeriods } from "./lib/trialPeriodRules.mjs";
 import { exportBirthdaysPdf } from "./birthdaysPdf";
 import { listWorkAnniversaries } from "./lib/anniversaryCounter";
+import { buscarTudo } from "@/lib/paginacao";
 
 type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; seniority: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
 type TrialPeriod = { id: string; name: string; daysRemaining: number; endDate: string; isWarning: boolean; isOverdue: boolean };
@@ -38,6 +40,9 @@ type AdvancedFilters = {
   marital_status: string;
   sector_id: string;
   department_id: string;
+  company_id: string;
+  cost_center_id: string;
+  benefit: string;
   role: string;
   unit: string;
   status: string;
@@ -45,6 +50,26 @@ type AdvancedFilters = {
   admission_end: string;
   dismissed_start: string;
   dismissed_end: string;
+};
+
+// Um lugar só. Antes o estado vazio era escrito à mão em dois pontos (o `useState` e o
+// botão "Limpar"), e adicionar um filtro exigia lembrar dos dois — que é como um filtro
+// novo nasce sem ser limpo.
+const FILTROS_VAZIOS: AdvancedFilters = {
+  gender: "",
+  marital_status: "",
+  sector_id: "",
+  department_id: "",
+  company_id: "",
+  cost_center_id: "",
+  benefit: "",
+  role: "",
+  unit: "",
+  status: "",
+  admission_start: "",
+  admission_end: "",
+  dismissed_start: "",
+  dismissed_end: "",
 };
 
 // Aplica os filtros avançados a uma query de employees. Compartilhado entre a
@@ -57,6 +82,15 @@ function applyAdvancedFilters<T extends { eq: any; ilike: any; gte: any; lte: an
   if (filters.marital_status) r = r.eq("marital_status", filters.marital_status);
   if (filters.sector_id) r = r.eq("sector_id", filters.sector_id);
   if (filters.department_id) r = r.eq("department_id", filters.department_id);
+  if (filters.company_id) r = r.eq("company_id", filters.company_id);
+  if (filters.cost_center_id) r = r.eq("cost_center_id", filters.cost_center_id);
+  // Benefício vive em outra tabela. O `!inner` no select (ver `embedBeneficio`) faz o
+  // PostgREST transformar o vínculo em INNER JOIN, e aí estes dois filtros valem como
+  // "tem ESTE benefício, ativo" em vez de trazer todo mundo com a lista anexada.
+  if (filters.benefit) {
+    r = r.eq("employee_benefits.benefit_name", filters.benefit);
+    r = r.eq("employee_benefits.active", true);
+  }
   if (filters.role) r = r.ilike("role", `%${filters.role}%`);
   if (filters.unit) r = r.ilike("workplaces.name", `%${filters.unit}%`);
   if (filters.admission_start) r = r.gte("admission_date", filters.admission_start);
@@ -66,15 +100,20 @@ function applyAdvancedFilters<T extends { eq: any; ilike: any; gte: any; lte: an
   return r;
 }
 
+// Só entra no select quando há filtro de benefício: sem `!inner` o PostgREST devolve
+// todo mundo, com a lista de benefícios pendurada, e o filtro não recorta nada.
+const embedBeneficio = (filtros: AdvancedFilters) =>
+  filtros.benefit ? ", employee_benefits!inner(benefit_name, active)" : "";
+
 const fields = [
-  "id", "name", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "company_anniversary", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
+  "id", "name", "registered_name", "pharmacy_card", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "company_anniversary", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
 ].join(", ");
 
 const emptyForm = {
-  name: "", registration_number: "", ficha: "", profile_code: "", department_id: "", department: "", sector_id: "",
+  name: "", registered_name: "", registration_number: "", ficha: "", profile_code: "", department_id: "", department: "", sector_id: "",
   rhid_code: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
   email_personal: "", email_corporate: "", contract_type: "", admission_date: "", company_anniversary: "", shirt_size: "", boot_size: "",
-  gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", marital_status: "",
+  gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", pharmacy_card: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
   work_schedule_start_1: "", work_schedule_end_1: "", work_schedule_start_2: "", work_schedule_end_2: "", weekly_hours: "", work_days: "",
   base_salary: "", variable_salary: "", commission: ""
@@ -120,7 +159,11 @@ const canonicalizeEmployeeForm = (employee: Employee) => {
   return next;
 };
 
-export default function ColaboradoresPage() {
+function ColaboradoresPageInner() {
+  // `useSearchParams` e nao `window.location.search` num efeito de montagem: vindo da
+  // busca global (ou do sino) a navegacao para "?edit=" acontece SEM remontar a tela,
+  // entao o efeito de montagem nunca rodava de novo e a ficha simplesmente nao abria.
+  const searchParams = useSearchParams();
   const [employees, setEmployees] = useState<Employee[]>([]);
   // Os cartões de resumo descrevem a força de trabalho inteira, não a página atual.
   const [statsRows, setStatsRows] = useState<Employee[]>([]);
@@ -130,10 +173,27 @@ export default function ColaboradoresPage() {
   const [sectors, setSectors] = useState<Entity[]>([]);
   const [jobProfiles, setJobProfiles] = useState<any[]>([]);
   const [workplaces, setWorkplaces] = useState<Entity[]>([]);
+  const [benefitNames, setBenefitNames] = useState<string[]>([]);
+  const [exportando, setExportando] = useState(false);
+  // Colaborador cujo periodo de experiencia esta sendo concluido e que ainda nao tem o
+  // cadastro na farmacia. Os 90 dias sao o momento em que o RH tem esse numero em maos.
+  const [trialParaConcluir, setTrialParaConcluir] = useState<Employee | null>(null);
+  const [cartaoDigitado, setCartaoDigitado] = useState("");
   const [roles, setRoles] = useState<string[]>([]);
   const [salaryRules, setSalaryRules] = useState<SalaryRule[]>([]);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Registro como estava ao abrir o modal, JÁ no formato do formulário.
+  //
+  // Duas armadilhas, as duas abrindo processo de RGS fantasma a cada gravação:
+  //
+  // 1. procurar em `employees` na hora de salvar. Depois da separação do arquivo morto
+  //    quem já saiu não está na lista carregada, `find` devolvia `undefined`, e daí
+  //    `isDismissed`/`isPromoted` comparavam contra vazio e davam verdadeiro.
+  // 2. comparar o formulário contra o registro cru. `canonicalizeEmployeeForm` troca
+  //    `null` por `""`, então um cargo vazio virava `"" !== null` — "mudou o cargo".
+  //    Essa vale para qualquer campo em branco, não só para arquivado.
+  const [editingOriginal, setEditingOriginal] = useState<EmployeeForm | null>(null);
   const [birthdayError, setBirthdayError] = useState("");
   const [cpfError, setCpfError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
@@ -147,19 +207,7 @@ export default function ColaboradoresPage() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [advancedFilters, setAdvancedFilters] = useState({
-    gender: "",
-    marital_status: "",
-    sector_id: "",
-    department_id: "",
-    role: "",
-    unit: "",
-    status: "",
-    admission_start: "",
-    admission_end: "",
-    dismissed_start: "",
-    dismissed_end: "",
-  });
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(FILTROS_VAZIOS);
   
   const [activeTab, setActiveTab] = useState<"todos" | "aniversarios" | "experiencia" | "inativos">("todos");
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
@@ -190,8 +238,11 @@ export default function ColaboradoresPage() {
       supabase.from("companies").select("id, name, trading_name, tax_rate_clt, tax_rate_prolabore").order("name"),
       supabase.from("cost_centers").select("id, name:code").order("code"),
       supabase.from("workplaces").select("id, name, type").order("name"),
-      supabase.from("job_profiles").select("title, profile_code"),
-      supabase.from("salary_table").select("id, role_name, modality, level, seniority, salary, uses_level, salary_experience, salary_after_probation"),
+      supabase.from("job_profiles").select("title, profile_code, salary_role"),
+      // 2.464 linhas: sem paginar, o PostgREST devolve so as 1.000 primeiras em
+      // ordem arbitraria e o salario nao preenche para cargo que ficou de fora.
+      buscarTudo<SalaryRule>((de, ate) =>
+        supabase.from("salary_table").select("id, role_name, modality, level, seniority, salary, uses_level, salary_experience, salary_after_probation").order("role_name").range(de, ate)),
       supabase.from("sectors").select("id, name").order("name"),
       supabase.from("system_setting_entries").select("path, value_text").eq("setting_key", "colaboradores")
     ]).then(([depsRes, compsRes, ccRes, wpRes, rolesRes, salaryRes, sectorsRes, settingsRes]) => {
@@ -202,14 +253,32 @@ export default function ColaboradoresPage() {
       if (rolesRes.data) {
         setJobProfiles(rolesRes.data); setRoles(Array.from(new Set(rolesRes.data.map((d) => normalizeRole(d.title)))).sort() as string[]);
       }
-      if (salaryRes.data) setSalaryRules(salaryRes.data as SalaryRule[]);
+      setSalaryRules(salaryRes);
       if (sectorsRes.data) setSectors(sectorsRes.data as Entity[]);
       const birthdayModeEntry = (settingsRes.data ?? []).find((e: { path: string[] }) => e.path[0] === "birthday_mode");
       if (birthdayModeEntry?.value_text === "seguinte") setBirthdayMode("seguinte");
+    }).catch((e) => {
+      // Antes um erro aqui virava lista vazia sem aviso: o select de cargo abria sem
+      // opcao e o salario nao preenchia, sem nada na tela explicando.
+      setError(`Não foi possível carregar os dados de apoio (cargos, empresas, tabela salarial): ${e instanceof Error ? e.message : String(e)}`);
     });
 
-    const params = new URLSearchParams(window.location.search);
-    const editId = params.get("edit");
+    // Nomes de beneficio para o filtro. Vem da propria base em vez de lista fixa: sao
+    // cadastrados pelo RH e mudam ("VALE REFEICAO - NIVEL III" nasceu depois dos outros).
+    buscarTudo<{ benefit_name: string }>((de, ate) =>
+      supabase.from("employee_benefits").select("benefit_name").eq("active", true).order("benefit_name").range(de, ate))
+      .then((linhas) => setBenefitNames([...new Set(linhas.map((l) => l.benefit_name).filter(Boolean))].sort()))
+      .catch(() => setBenefitNames([]));
+
+  }, []);
+
+  // Abertura da ficha por "?edit=": efeito proprio, reagindo ao parametro. Antes vivia
+  // junto do carregamento dos cadastros, com dependencia vazia — abrir a ficha pela
+  // busca global estando JA na tela de colaboradores nao remonta nada, entao o efeito
+  // nunca rodava de novo e o clique parecia não fazer coisa alguma.
+  useEffect(() => {
+    const supabase = createClient();
+    const editId = searchParams.get("edit");
     if (editId) {
       // employees_todos: o link "?edit=" das notificacoes tambem aponta para quem ja
       // saiu, e essa pessoa mora no arquivo depois da separacao.
@@ -217,13 +286,14 @@ export default function ColaboradoresPage() {
         if (data) {
           const emp = data as Employee;
           setEditingId(emp.id);
+          setEditingOriginal(canonicalizeEmployeeForm(emp));
           setForm(canonicalizeEmployeeForm(emp));
           setIsEmployeeModalOpen(true);
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       });
     }
-  }, []);
+  }, [searchParams]);
 
   // Query enxuta (só as colunas que os cartões consomem) com os demais filtros da
   // listagem — issue #25: os cartões refletem o que está filtrado.
@@ -237,7 +307,7 @@ export default function ColaboradoresPage() {
     const supabase = createClient();
     let request = supabase
       .from("employees")
-      .select(`status, birthday, admission_date, company_anniversary, aso_date, workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)`);
+      .select(`status, birthday, admission_date, company_anniversary, aso_date, workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)${embedBeneficio(advancedFilters)}`);
 
     request = HIDDEN_STATUSES.reduce((acc, status) => acc.neq("status", status), request);
 
@@ -268,7 +338,7 @@ export default function ColaboradoresPage() {
       const supabase = createClient();
       let request = supabase
         .from("employees")
-        .select(`${fields}, departments(name), companies(name, trading_name), cost_centers(name:code), workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)`, { count: "exact" })
+        .select(`${fields}, departments(name), companies(name, trading_name), cost_centers(name:code), workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)${embedBeneficio(advancedFilters)}`, { count: "exact" })
         .order("name")
         .range(page * pageSize, page * pageSize + pageSize - 1);
       
@@ -356,7 +426,7 @@ export default function ColaboradoresPage() {
       const level = field === "level" ? value : (field === "role" ? "" : current.level);
 
       const candidates = salaryRules.filter(
-        (rule) => normalizeRole(rule.role_name) === normalizeRole(role) && rule.modality.toUpperCase() === modality.toUpperCase()
+        (rule) => normalizeRole(rule.role_name) === cargoDaFaixa(role) && rule.modality.toUpperCase() === modality.toUpperCase()
       );
       const noLevelRule = candidates.find((rule) => !rule.uses_level);
 
@@ -401,6 +471,7 @@ export default function ColaboradoresPage() {
 
   const startNew = () => {
     setEditingId(null);
+    setEditingOriginal(null);
     setForm(emptyForm);
     setBirthdayError("");
     setCpfError("");
@@ -409,6 +480,7 @@ export default function ColaboradoresPage() {
 
   const startEdit = (employee: Employee) => {
     setEditingId(employee.id);
+    setEditingOriginal(canonicalizeEmployeeForm(employee));
     setForm(canonicalizeEmployeeForm(employee));
     setBirthdayError("");
     setCpfError("");
@@ -475,7 +547,7 @@ export default function ColaboradoresPage() {
     const supabase = createClient();
     
     const isNew = !editingId;
-    const original = editingId ? employees.find((e) => e.id === editingId) : null;
+    const original = editingId ? editingOriginal : null;
     const isDismissed = form.status === "Desligado" && original?.status !== "Desligado";
     // Entrou no arquivo morto agora: só aí faz sentido perguntar a caixa.
     const isArchived = ARCHIVE_STATUSES.includes(form.status) && !ARCHIVE_STATUSES.includes(original?.status ?? "");
@@ -490,7 +562,22 @@ export default function ColaboradoresPage() {
     if (result.error) {
       setSaving(false);
       if (result.error.code === "23505" && result.error.message?.includes("employees_cpf_unique")) {
-        const existing = employees.find((e) => e.cpf === payload.cpf);
+        // `employees` e so a pagina carregada (25 linhas) e nao inclui o arquivo morto.
+        // O dono do CPF quase sempre esta fora dela — e desde a separacao pode estar em
+        // `arquivo.employees`. Sem esta consulta a tela dizia "ja existe" sem dizer quem.
+        // Os dois formatos: a base tem 243 CPFs com pontuacao e 79 so com digitos, e o
+        // formulario sempre envia com mascara. Procurar so pelo formato enviado achava
+        // o dono em uns casos e em outros nao — e ai a tela dizia "ja existe" sem dizer
+        // de quem, justamente no caso do ex-colaborador, que e o mais confuso para o RH.
+        const cpfDigitos = String(payload.cpf ?? "").replace(/\D/g, "");
+        const { data: dono } = await supabase
+          .from("employees_todos")
+          .select("*")
+          .or(`cpf.eq.${payload.cpf},cpf.eq.${cpfDigitos}`)
+          .neq("id", editingId ?? "00000000-0000-0000-0000-000000000000")
+          .limit(1)
+          .maybeSingle();
+        const existing = (dono as Employee | null) ?? employees.find((e) => e.cpf === payload.cpf);
         if (existing) { setDuplicateCpf(existing); return; }
         setError("Já existe um colaborador cadastrado com este CPF.");
       } else {
@@ -559,7 +646,7 @@ export default function ColaboradoresPage() {
     trialInfo,
   }));
 
-  const markTrialAsCompleted = async (employeeId: string) => {
+  const markTrialAsCompleted = async (employeeId: string, cartao?: string) => {
     setSaving(true);
     setError("");
     const supabase = createClient();
@@ -568,19 +655,64 @@ export default function ColaboradoresPage() {
       .from("employee_trial_reviews")
       .insert({ employee_id: employeeId, completed_by: authData.user?.id ?? null });
 
-    setSaving(false);
     if (completionError && completionError.code !== "23505") {
+      setSaving(false);
       setError(`Não foi possível concluir a experiência: ${completionError.message}`);
       return;
     }
+
+    // O cartão vai por `employees_todos`: se a pessoa já tiver sido arquivada entre a
+    // abertura da tela e o clique, a escrita cai no schema certo em vez de não achar
+    // ninguém e não avisar nada.
+    if (cartao && cartao.trim()) {
+      const { error: cartaoError } = await supabase
+        .from("employees_todos")
+        .update({ pharmacy_card: cartao.trim() })
+        .eq("id", employeeId)
+        .select("id");
+      if (cartaoError) {
+        setSaving(false);
+        setError(`Experiência concluída, mas o cartão da farmácia não foi salvo: ${cartaoError.message}`);
+        return;
+      }
+      setEmployees((atual) => atual.map((e) => (e.id === employeeId ? { ...e, pharmacy_card: cartao.trim() } : e)));
+    }
+
+    setSaving(false);
     setCompletedTrialIds((current) => new Set([...current, employeeId]));
   };
+
+  // Quem já tem o cadastro na farmácia conclui direto; quem não tem, o RH informa agora.
+  const concluirExperiencia = (employee: Employee) => {
+    if (employee.pharmacy_card && String(employee.pharmacy_card).trim()) {
+      void markTrialAsCompleted(employee.id);
+      return;
+    }
+    setCartaoDigitado("");
+    setTrialParaConcluir(employee);
+  };
+
+  // De qual cargo vem a faixa salarial deste cargo.
+  //
+  // Pedreiro, encanador, carpinteiro, pintor e ferreiro armador pagam pela faixa de
+  // OFICIAL — que é o estágio depois dos 90 dias, não outro cargo. `salary_role` no
+  // cadastro diz isso; vazio significa "paga pela faixa do próprio nome", que é o caso
+  // de todos os outros.
+  //
+  // Sem isto, esses 58 colaboradores não achavam faixa nenhuma e o salário não
+  // preenchia — era a maior lacuna da tabela salarial.
+  const cargoDaFaixa = useCallback((cargo: string | null | undefined) => {
+    const alvo = normalizeRole(String(cargo ?? ""));
+    const perfil = jobProfiles.find((p) => normalizeRole(String(p.title ?? "")) === alvo);
+    const paga = String(perfil?.salary_role ?? "").trim();
+    return paga ? normalizeRole(paga) : alvo;
+  }, [jobProfiles]);
 
   const salaryChangeAlerts = employees.flatMap((employee) => {
     if (employee.status !== "Ativo") return [];
     const rule = salaryRules.find((item) =>
       !item.uses_level
-      && normalizeRole(item.role_name) === normalizeRole(employee.role)
+      && normalizeRole(item.role_name) === cargoDaFaixa(employee.role)
       && item.modality.toUpperCase() === String(employee.contract_type ?? "").toUpperCase()
     );
     if (!rule || !salaryChangeDue(employee.admission_date, employee.base_salary, rule.salary_experience, rule.salary_after_probation)) return [];
@@ -602,6 +734,101 @@ export default function ColaboradoresPage() {
     .sort((a, b) => a.info.day - b.info.day);
 
   const workAnniversariesThisMonth = listWorkAnniversaries(employees, selectedMonth);
+
+  // Relatório do que está filtrado na tela, com a contagem no fim.
+  //
+  // Busca própria e paginada de propósito: a listagem mostra 25 por página, e exportar só
+  // o que está na tela seria um relatório que mente sobre o próprio total. `buscarTudo`
+  // pagina até acabar — sem isso o PostgREST cortaria em 1.000 sem avisar.
+  const exportarRelatorio = async () => {
+    setExportando(true);
+    setError("");
+    try {
+      const supabase = createClient();
+      const selecao = `name, cpf, role, status, admission_date, dismissed_at, sector_id,` +
+        ` departments(name), companies(name, trading_name), cost_centers(name:code),` +
+        ` workplaces!workplace_id${advancedFilters.unit ? '!inner' : ''}(name)` +
+        `${embedBeneficio(advancedFilters)}`;
+
+      const linhas = await buscarTudo<Record<string, unknown>>((de, ate) => {
+        let r = supabase.from("employees").select(selecao).order("name").range(de, ate);
+        if (activeTab === "inativos") r = r.in("status", INACTIVE_STATUSES);
+        else if (advancedFilters.status) r = r.eq("status", advancedFilters.status);
+        else r = HIDDEN_STATUSES.reduce((acc, st) => acc.neq("status", st), r);
+        const termo = query.trim().replace(/[,%()]/g, " ");
+        if (termo) r = r.or(`name.ilike."%${termo}%",cpf.ilike."%${termo}%",rg.ilike."%${termo}%",role.ilike."%${termo}%"`);
+        // O `select` é montado em tempo de execução (o embed de benefício entra ou não),
+        // então o cliente do Supabase não consegue inferir o formato da linha.
+        return applyAdvancedFilters(r, advancedFilters) as unknown as PromiseLike<{
+          data: Record<string, unknown>[] | null;
+          error: unknown;
+        }>;
+      });
+
+      const nomeSetor = new Map(sectors.map((x) => [x.id, x.name]));
+      const celula = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const dataBr = (v: unknown) => (v ? new Date(`${v}T12:00:00`).toLocaleDateString("pt-BR") : "");
+
+      const cabecalho = ["Colaborador", "CPF", "Cargo", "Situação", "Empresa", "Centro de Custo",
+        "Obra/Unidade", "Setor", "Departamento", "Admissão", "Desligamento"];
+
+      const corpo = linhas.map((e) => {
+        const emp = e.companies as { name?: string; trading_name?: string } | null;
+        const cc = e.cost_centers as { name?: string } | null;
+        const obra = e.workplaces as { name?: string } | null;
+        const dep = e.departments as { name?: string } | null;
+        return [
+          celula(e.name), celula(e.cpf), celula(e.role), celula(e.status),
+          celula(emp?.trading_name || emp?.name), celula(cc?.name), celula(obra?.name),
+          celula(nomeSetor.get(String(e.sector_id ?? ""))), celula(dep?.name),
+          celula(dataBr(e.admission_date)), celula(dataBr(e.dismissed_at)),
+        ].join(",");
+      });
+
+      // O recorte fica escrito no relatório: número solto, sem os filtros que o geraram,
+      // é o tipo de coisa que vira discussão três semanas depois.
+      const nomeDe = (lista: Entity[], id: string) => lista.find((x) => x.id === id)?.name ?? id;
+      const recorte: string[] = [];
+      if (advancedFilters.company_id) recorte.push(`Empresa: ${nomeDe(companies, advancedFilters.company_id)}`);
+      if (advancedFilters.cost_center_id) recorte.push(`Centro de custo: ${nomeDe(costCenters, advancedFilters.cost_center_id)}`);
+      if (advancedFilters.benefit) recorte.push(`Benefício: ${advancedFilters.benefit}`);
+      if (advancedFilters.sector_id) recorte.push(`Setor: ${nomeDe(sectors, advancedFilters.sector_id)}`);
+      if (advancedFilters.department_id) recorte.push(`Departamento: ${nomeDe(departments, advancedFilters.department_id)}`);
+      if (advancedFilters.status) recorte.push(`Situação: ${advancedFilters.status}`);
+      if (advancedFilters.role) recorte.push(`Cargo contém: ${advancedFilters.role}`);
+      if (advancedFilters.unit) recorte.push(`Obra contém: ${advancedFilters.unit}`);
+      if (advancedFilters.gender) recorte.push(`Gênero: ${advancedFilters.gender}`);
+      if (advancedFilters.marital_status) recorte.push(`Estado civil: ${advancedFilters.marital_status}`);
+      if (advancedFilters.admission_start) recorte.push(`Admitido a partir de: ${dataBr(advancedFilters.admission_start)}`);
+      if (advancedFilters.admission_end) recorte.push(`Admitido até: ${dataBr(advancedFilters.admission_end)}`);
+      if (advancedFilters.dismissed_start) recorte.push(`Desligado a partir de: ${dataBr(advancedFilters.dismissed_start)}`);
+      if (advancedFilters.dismissed_end) recorte.push(`Desligado até: ${dataBr(advancedFilters.dismissed_end)}`);
+      if (query.trim()) recorte.push(`Busca: ${query.trim()}`);
+      if (activeTab === "inativos") recorte.push("Aba: Inativos");
+
+      const rodape = [
+        "",
+        [celula("Total de colaboradores"), celula(linhas.length)].join(","),
+        [celula("Filtros aplicados"), celula(recorte.length ? recorte.join(" | ") : "nenhum")].join(","),
+        [celula("Gerado em"), celula(new Date().toLocaleString("pt-BR"))].join(","),
+      ];
+
+      const csv = "﻿" + [cabecalho.join(","), ...corpo, ...rodape].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `colaboradores_${new Date().toISOString().slice(0, 10)}_${linhas.length}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(`Não foi possível gerar o relatório: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExportando(false);
+    }
+  };
 
   const exportBirthdaysCsv = () => {
     if (birthdaysThisMonth.length === 0) return;
@@ -628,7 +855,7 @@ export default function ColaboradoresPage() {
   };
 
   const roleSalaryEntries = salaryRules.filter(
-    (rule) => normalizeRole(rule.role_name) === normalizeRole(form.role) &&
+    (rule) => normalizeRole(rule.role_name) === cargoDaFaixa(form.role) &&
               form.contract_type && rule.modality.toUpperCase() === form.contract_type.toUpperCase()
   );
   const { showSeniority, levelOptions: levelDisplayOptions } = levelFieldOptions(
@@ -722,6 +949,16 @@ export default function ColaboradoresPage() {
           <form onSubmit={save} className="mt-4">
             <Section title="Identificação">
               <Field label="Nome completo *" span><Input required value={form.name} onChange={(e) => update("name", e.target.value)} /></Field>
+              {/* Nome de registro: preencher SO quando for diferente do nome de uso. A tela,
+                  a busca e os relatorios seguem usando o nome acima; este aqui existe para o
+                  documento legal nao sair com o nome errado. */}
+              <Field label="Nome de registro" span>
+                <Input
+                  value={form.registered_name}
+                  placeholder="Só se for diferente do nome acima — usado apenas em documento legal"
+                  onChange={(e) => update("registered_name", e.target.value)}
+                />
+              </Field>
               <Field label="Matrícula"><Input value={form.registration_number} onChange={(e) => {
                 const value = e.target.value;
                 update("registration_number", value);
@@ -742,13 +979,13 @@ export default function ColaboradoresPage() {
 
             <Section title="Vínculo e lotação">
               <Field label="Status"><Select value={form.status} onChange={(value) => update("status", value)} options={statusOptions} /></Field>
-              <Field label="Cargo *"><select required value={form.role} onChange={(e) => update("role", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Selecione...</option>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
+              <Field label="Cargo *"><select required={!editingOriginal || !!editingOriginal.role} value={form.role} onChange={(e) => update("role", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Selecione...</option>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
               {showSeniority && (
                 <Field label="Senioridade"><Select value={form.senioridade} onChange={(value) => update("senioridade", value)} options={seniorityDisplayOptions} /></Field>
               )}
               <Field label="Nível"><Select value={form.level} onChange={(value) => update("level", value)} options={levelDisplayOptions} /></Field>
-              <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.trading_name || c.name}</option>)}</select></Field>
-              <Field label="Centro de Custo *"><select value={form.cost_center_id} onChange={(e) => update("cost_center_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required><option value="">Selecione...</option>{costCenters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+              <Field label="Empresa *"><select value={form.company_id} onChange={(e) => update("company_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required={!editingOriginal || !!editingOriginal.company_id}><option value="">Selecione...</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.trading_name || c.name}</option>)}</select></Field>
+              <Field label="Centro de Custo *"><select value={form.cost_center_id} onChange={(e) => update("cost_center_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm" required={!editingOriginal || !!editingOriginal.cost_center_id}><option value="">Selecione...</option>{costCenters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
               <Field label="Obra/Unidade"><select value={form.workplace_id} onChange={(e) => {
                 const workplaceId = e.target.value;
                 const schedule = getScheduleForWorkplaceType(workplaces.find((workplace) => workplace.id === workplaceId)?.type);
@@ -756,7 +993,7 @@ export default function ColaboradoresPage() {
               }} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{workplaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></Field>
               <Field label="Departamento"><select value={form.department_id} onChange={(e) => update("department_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
               <Field label="Setor"><select value={form.sector_id} onChange={(e) => update("sector_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{sectors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
-              <Field label="Tipo de contrato"><Select value={form.contract_type} onChange={(value) => update("contract_type", value)} options={["", "CLT", "MEI", "PJ", "Estágio", "Jovem Aprendiz"]} /></Field>
+              <Field label="Tipo de contrato"><Select value={form.contract_type} onChange={(value) => update("contract_type", value)} options={["", "CLT", "MEI", "PJ", "Pró-labore", "Estágio", "Jovem Aprendiz"]} /></Field>
               <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
               <Field label="Aniversário de empresa"><Input type="date" value={form.company_anniversary} onChange={(e) => update("company_anniversary", e.target.value)} /></Field>
               <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
@@ -799,6 +1036,10 @@ export default function ColaboradoresPage() {
               <Field label="CTPS"><Input value={form.ctps} onChange={(e) => update("ctps", e.target.value)} /></Field>
               <Field label="Série CTPS"><Input value={form.ctps_serie} onChange={(e) => update("ctps_serie", e.target.value)} /></Field>
               <Field label="PIS"><Input value={form.pis} onChange={(e) => update("pis", e.target.value)} /></Field>
+              {/* Cadastro do colaborador NA FARMACIA conveniada. Saiu do nome do
+                  beneficio (eram 146 "FARMÁCIA - CARTÃO x" virando 146 beneficios
+                  diferentes) e virou dado da pessoa. Pedido ao concluir os 90 dias. */}
+              <Field label="Cartão da farmácia"><Input value={form.pharmacy_card} onChange={(e) => update("pharmacy_card", e.target.value)} placeholder="nº do cadastro na farmácia" /></Field>
               <Field label="Código do RHID"><Input value={form.rhid_code} onChange={(e) => update("rhid_code", e.target.value)} /></Field>
               <Field label="Observações" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
             </Section>
@@ -821,6 +1062,18 @@ export default function ColaboradoresPage() {
           <SearchBar value={query} onChange={(value) => { setQuery(value); setPage(0); }}>
             <Button variant="outline" size="icon" onClick={() => setShowFilterModal(true)} title="Filtros avançados">
               <Filter className="h-4 w-4" />
+            </Button>
+            {/* Exporta o RECORTE ATUAL, não a página. O rótulo mostra o total justamente
+                para não haver dúvida do que vai sair no arquivo. */}
+            <Button
+              variant="outline"
+              onClick={exportarRelatorio}
+              disabled={exportando || total === 0}
+              title="Exportar relatório do que está filtrado"
+              className="gap-2 whitespace-nowrap"
+            >
+              <Download className="h-4 w-4" />
+              {exportando ? "Gerando..." : `Exportar (${total.toLocaleString("pt-BR")})`}
             </Button>
           </SearchBar>
 
@@ -1057,7 +1310,7 @@ export default function ColaboradoresPage() {
                       : `${trialInfo!.daysRemaining} ${trialInfo!.daysRemaining === 1 ? "dia" : "dias"}`}
                   </div>
                 </div>
-                <Button className="mt-3 w-full" size="sm" variant="outline" disabled={saving} onClick={() => void markTrialAsCompleted(e.id)}>
+                <Button className="mt-3 w-full" size="sm" variant="outline" disabled={saving} onClick={() => concluirExperiencia(e)}>
                   Marcar como realizado
                 </Button>
               </div>
@@ -1065,6 +1318,56 @@ export default function ColaboradoresPage() {
           </div>
         </div>
       )}
+
+      {/* Pedido do cadastro na farmácia, no fim da experiência.
+          Os 90 dias são quando o RH tem esse número em mãos — antes disso a farmácia
+          ainda não abriu o cadastro. Dá para concluir sem informar: travar a conclusão
+          por um dado que talvez ainda não exista só faria o RH desistir da tela. */}
+      <Dialog open={!!trialParaConcluir} onOpenChange={(aberto) => { if (!aberto) setTrialParaConcluir(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cadastro na farmácia</DialogTitle>
+            <DialogDescription>
+              {trialParaConcluir?.name} está concluindo o período de experiência e ainda não
+              tem o número do cadastro na farmácia conveniada. Informe agora, se já tiver.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="cartao-farmacia">Número do cadastro</Label>
+            <Input
+              id="cartao-farmacia"
+              value={cartaoDigitado}
+              onChange={(e) => setCartaoDigitado(e.target.value)}
+              placeholder="ex.: 19744"
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              variant="ghost"
+              disabled={saving}
+              onClick={() => {
+                const alvo = trialParaConcluir;
+                setTrialParaConcluir(null);
+                if (alvo) void markTrialAsCompleted(alvo.id);
+              }}
+            >
+              Concluir sem informar
+            </Button>
+            <Button
+              disabled={saving || !cartaoDigitado.trim()}
+              onClick={() => {
+                const alvo = trialParaConcluir;
+                const numero = cartaoDigitado.trim();
+                setTrialParaConcluir(null);
+                if (alvo) void markTrialAsCompleted(alvo.id, numero);
+              }}
+            >
+              Salvar e concluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
         <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden" showCloseButton={false}>
@@ -1091,13 +1394,37 @@ export default function ColaboradoresPage() {
                 <div className="space-y-1.5">
                   <Label>Situação</Label>
                   <select value={advancedFilters.status} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                    <option value="">Todos (Exceto Desligados)</option>
+                    {/* Só situações de quem está no quadro atual. Desligado, Inativo e
+                        Arquivo Morto saíram daqui: essa gente mora no schema `arquivo`
+                        desde a separação, então escolher essas opções devolvia SEMPRE
+                        zero — a tela dizia "nenhum resultado" para quem existe. Quem
+                        está inativo aparece na aba "Inativos"; quem saiu, na tela de
+                        Arquivo Morto. */}
+                    <option value="">Todos</option>
                     <option value="Ativo">Ativo</option>
                     <option value="Férias">Férias</option>
                     <option value="Afastado">Afastado</option>
-                    <option value="Inativo">Inativo</option>
-                    <option value="Desligado">Desligado</option>
-                    <option value="Arquivo Morto">Arquivo Morto</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Empresa</Label>
+                  <select value={advancedFilters.company_id} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, company_id: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Todas</option>
+                    {companies.map((c) => <option key={c.id} value={c.id}>{c.trading_name || c.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Centro de Custo</Label>
+                  <select value={advancedFilters.cost_center_id} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, cost_center_id: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Todos</option>
+                    {costCenters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Benefício</Label>
+                  <select value={advancedFilters.benefit} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, benefit: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Qualquer um</option>
+                    {benefitNames.map((b) => <option key={b} value={b}>{b}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -1147,7 +1474,7 @@ export default function ColaboradoresPage() {
             </div>
             <div className="p-4 border-t flex justify-between bg-muted/30">
               <Button variant="ghost" onClick={() => {
-                setAdvancedFilters({ gender: "", marital_status: "", sector_id: "", department_id: "", role: "", unit: "", status: "", admission_start: "", admission_end: "", dismissed_start: "", dismissed_end: "" });
+                setAdvancedFilters(FILTROS_VAZIOS);
                 setPage(0);
               }}>Limpar Filtros</Button>
               <div className="flex gap-2">
@@ -1201,3 +1528,11 @@ export default function ColaboradoresPage() {
   );
 }
 
+// Suspense e exigido pelo Next para `useSearchParams` em pagina exportada estaticamente.
+export default function ColaboradoresPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Carregando...</div>}>
+      <ColaboradoresPageInner />
+    </Suspense>
+  );
+}

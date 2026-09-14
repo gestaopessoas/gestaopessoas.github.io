@@ -9,7 +9,7 @@ test.describe('Turnover', () => {
     await page.getByLabel('E-mail').fill(process.env.LOGIN_BRUNO || '');
     await page.getByLabel('Senha').fill(process.env.PASS_BRUNO || '');
     await page.getByRole('button', { name: /entrar/i }).click();
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await page.waitForURL('**/dashboard**', { timeout: 30000 });
   });
 
   test('agrega no banco, sem baixar employees', async ({ page }) => {

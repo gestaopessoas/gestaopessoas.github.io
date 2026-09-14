@@ -35,21 +35,46 @@ export function GlobalHistoryTab() {
     setLoading(true)
     const supabase = createClient()
     
-    const query = supabase
-      .from('employee_history')
-      .select(`
-        *,
-        profiles!changed_by(name),
-        employees!employee_id(name),
-        employee_history_value_entries(value_side, path, value_text, value_number, value_boolean)
-      `)
+    // `employee_history` sozinha so tem quem esta no quadro atual: depois da separacao
+    // do arquivo morto, o log dos 4.543 ex-colaboradores mora no schema `arquivo`. A
+    // view `_todos` costura os dois lados — mas o PostgREST NAO atravessa view com
+    // UNION para fazer join embutido (devolve 400), entao os nomes e os valores vem em
+    // consultas separadas e sao costurados aqui.
+    const { data, error } = await supabase
+      .from('employee_history_todos')
+      .select('*')
       .order('change_date', { ascending: false })
       .limit(100)
 
-    const { data, error } = await query
-    
     if (!error && data) {
-      setHistory(data as unknown as HistoryEntry[])
+      const ids = data.map((h) => h.id)
+      const employeeIds = [...new Set(data.map((h) => h.employee_id).filter(Boolean))]
+      const authorIds = [...new Set(data.map((h) => h.changed_by).filter(Boolean))]
+
+      const [valores, pessoas, autores] = await Promise.all([
+        supabase
+          .from('employee_history_value_entries_todos')
+          .select('history_id, value_side, path, value_text, value_number, value_boolean')
+          .in('history_id', ids),
+        supabase.from('employees_todos').select('id, name').in('id', employeeIds),
+        supabase.from('profiles').select('id, name').in('id', authorIds),
+      ])
+
+      const porHistorico = new Map<string, HistoryEntry['employee_history_value_entries']>()
+      for (const v of valores.data ?? []) {
+        const lista = porHistorico.get(v.history_id) ?? []
+        lista.push(v)
+        porHistorico.set(v.history_id, lista)
+      }
+      const nomePessoa = new Map((pessoas.data ?? []).map((e) => [e.id, e.name]))
+      const nomeAutor = new Map((autores.data ?? []).map((p) => [p.id, p.name]))
+
+      setHistory(data.map((h) => ({
+        ...h,
+        employee_history_value_entries: porHistorico.get(h.id) ?? [],
+        employees: { name: nomePessoa.get(h.employee_id) ?? '' },
+        profiles: { name: nomeAutor.get(h.changed_by) ?? '' },
+      })) as unknown as HistoryEntry[])
     }
     setLoading(false)
   }
@@ -99,13 +124,16 @@ export function GlobalHistoryTab() {
       setReverting(false);
       return;
     }
-    const { error: updateError } = await supabase
-      .from('employees')
+    const { data: revertidos, error: updateError } = await supabase
+      .from('employees_todos')
       .update({ [revertItem.column_name]: value })
       .eq('id', revertItem.employee_id)
+      .select('id')
 
     if (updateError) {
       alert("Erro ao reverter: " + updateError.message)
+    } else if (!revertidos || revertidos.length === 0) {
+      alert("Nenhum registro foi alterado — o colaborador não foi encontrado. Nada foi revertido.")
     } else {
       alert("Reversão concluída com sucesso.")
       setRevertItem(null)

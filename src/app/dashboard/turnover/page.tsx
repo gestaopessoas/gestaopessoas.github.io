@@ -94,7 +94,7 @@ export default function TurnoverPage() {
                   {metrics.history.map((h) => (
                     <tr key={h.id} className="hover:bg-muted/50">
                       <td className="px-4 py-3 font-medium">{h.name}</td>
-                      <td className="px-4 py-3 tabular-nums">{h.dismissed_at ? format(new Date(h.dismissed_at), 'dd/MM/yyyy') : 'N/D'}</td>
+                      <td className="px-4 py-3 tabular-nums">{h.dismissed_at ? format(new Date(`${h.dismissed_at}T12:00:00`), 'dd/MM/yyyy') : 'N/D'}</td>
                       <td className="px-4 py-3 text-muted-foreground">{h.observation || 'Sem observação'}</td>
                     </tr>
                   ))}

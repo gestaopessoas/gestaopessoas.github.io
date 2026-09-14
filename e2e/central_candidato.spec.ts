@@ -10,7 +10,7 @@ test.describe('Central do Candidato (Issue #39)', () => {
     await page.fill('input[type="email"]', process.env.LOGIN_BRUNO as string);
     await page.fill('input[type="password"]', process.env.PASS_BRUNO as string);
     await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await page.waitForURL('**/dashboard**', { timeout: 30000 });
   });
 
   // A versão anterior esperava por `table tbody tr` e clicava na primeira linha. Só que

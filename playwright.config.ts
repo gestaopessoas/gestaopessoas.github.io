@@ -30,6 +30,9 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
+  // Compila /login e /dashboard antes de qualquer teste medir tempo: sem isto o
+  // primeiro spec da fila paga a compilacao do `next dev` e estoura sozinho.
+  globalSetup: './e2e/aquece-servidor.ts',
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000',

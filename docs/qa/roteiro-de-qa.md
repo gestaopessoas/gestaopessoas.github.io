@@ -128,6 +128,31 @@ falharam e o terceiro continuou verde, exatamente como devia.
 
 **Regra:** teste que nunca viu vermelho não é guarda, é decoração.
 
+### 9. Função que só quebra para quem não é administrador
+
+**Sintoma:** o sistema inteiro falha para uma parte dos usuários, e quem testa nunca vê.
+**Real:** `can_access()` tinha `AND module_key = $1` numa consulta a `profile_permissions`,
+que tem uma coluna com esse mesmo nome. O plpgsql não resolvia:
+
+```
+ERROR: column reference "module_key" is ambiguous   (SQLSTATE 42702)
+```
+
+Administrador (`level >= 50`) retorna `true` na linha anterior e nunca chega ali. Para
+todo perfil restrito, cada tela — inclusive o sino de notificações — respondia HTTP 400.
+Viveu desde 2026-08-14.
+
+Pesou mais depois da separação: as 70 policies do schema `arquivo` são
+`USING (can_access(...))`. Para não-admin elas não negavam nem permitiam — erravam.
+
+**Como caçar:** `e2e/_local-perfil-restrito.spec.ts` cria um usuário de nível 1 com uma
+única permissão, entra pela tela e confere que a permissão é **respondida** (`true` para
+o módulo dele, `false` para os outros), que as telas abrem, e que o arquivo morto não
+entrega o que a permissão dele não cobre.
+
+**Regra:** toda função que decide permissão precisa de um teste com usuário NÃO
+administrador. O caminho do admin quase sempre sai antes e esconde o resto.
+
 ---
 
 ## O que roda sozinho hoje
@@ -142,6 +167,8 @@ falharam e o terceiro continuou verde, exatamente como devia.
 | `e2e/view-colaboradores.spec.ts` | tela de operação não varre `employees` |
 | `e2e/_local-desligamento.spec.ts` | ciclo desligar/reativar preserva a data |
 | `e2e/_local-readmissao.spec.ts` | uma caixa por passagem; reativar não duplica |
+| `e2e/_local-navegacao.spec.ts` | 22 telas com dado real: ficha do arquivado, caixas, busca |
+| `e2e/_local-perfil-restrito.spec.ts` | o sistema visto por quem não é administrador |
 
 ```bash
 npm run test:e2e         # tudo que é leitura, contra produção
@@ -185,5 +212,9 @@ tela quebrada.
   consultas do código. Uma consulta nova sem paginação passa despercebida.
 - **Telas com parâmetro** (`historico?id=`, `termo-uniforme?id=`) ficam fora da varredura.
 - **Fuso em data:** nenhum teste pega. Depende de revisão.
-- **Permissões por perfil:** tudo roda como administrador. Um perfil restrito pode
-  encontrar tela quebrada que ninguém vê.
+- **Telas com parâmetro para o perfil restrito:** `e2e/_local-perfil-restrito.spec.ts`
+  cobre dashboard, colaboradores e analytics. As outras 41 telas só são varridas como
+  administrador.
+
+> Permissões por perfil **saiu** desta lista em 2026-09-09: virou a classe 9 e ganhou
+> guarda própria.

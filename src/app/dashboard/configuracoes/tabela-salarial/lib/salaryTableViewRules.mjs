@@ -28,7 +28,50 @@ export function summarizeSalaryRoles(rows) {
     ...role,
     structureLabel: role.usesLevel ? "Com nível" : "Sem nível",
     actionLabel: role.usesLevel ? "Gerenciar níveis" : "Gerenciar salários",
+    ...diagnosticarCargo(rows.filter((r) => r.role_name === role.name)),
   }));
+}
+
+// O que a tela precisa saber sobre um cargo ALEM da estrutura: quanto ele paga, e se a
+// faixa tem problema.
+//
+// Os dois problemas existem na base e ninguem via, porque a tela so mostrava "Por nível"
+// e escondia o resto atras de um modal:
+//
+//   - CONFLITO: a mesma combinacao (regime, nivel, senioridade) com DOIS salarios
+//     diferentes. O preenchimento automatico escolhe um dos dois sem criterio.
+//     Medido em 2026-09-10: 30 combinacoes, todas em "MESTRE DE OBRAS".
+//   - DUPLICADA: a mesma combinacao repetida com o MESMO valor. Nao muda salario, mas
+//     infla a tabela e esconde as que conflitam. Medido: 22 linhas.
+export function diagnosticarCargo(linhasDoCargo) {
+  const porCombinacao = new Map();
+  const valores = [];
+
+  for (const linha of linhasDoCargo) {
+    const chave = [linha.modality, linha.level ?? "", linha.seniority ?? ""].join("|");
+    if (!porCombinacao.has(chave)) porCombinacao.set(chave, []);
+    porCombinacao.get(chave).push(linha);
+
+    for (const v of [linha.salary, linha.salary_experience, linha.salary_after_probation]) {
+      if (typeof v === "number" && Number.isFinite(v)) valores.push(v);
+    }
+  }
+
+  let conflitos = 0;
+  let duplicadas = 0;
+  for (const grupo of porCombinacao.values()) {
+    if (grupo.length < 2) continue;
+    const distintos = new Set(grupo.map((l) => String(l.salary ?? "")));
+    if (distintos.size > 1) conflitos += 1;
+    else duplicadas += grupo.length - 1;
+  }
+
+  return {
+    linhas: linhasDoCargo.length,
+    faixa: valores.length ? { min: Math.min(...valores), max: Math.max(...valores) } : null,
+    conflitos,
+    duplicadas,
+  };
 }
 
 // Ordem canônica dos níveis salariais (não confundir com senioridade: Júnior/

@@ -7,6 +7,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Save, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useEffect } from "react";
+import { buscarTudo } from "@/lib/paginacao";
 
 export type JobProfile = {
   id: string;
@@ -148,11 +149,13 @@ export default function VagaForm({
     let active = true;
     const fetchOptions = async () => {
       const supabase = createClient();
+      try {
 
       const [profilesResult, departmentsResult, salaryResult, settingsResult, costCentersResult, benefitsResult, workplacesResult] = await Promise.all([
         supabase.from("job_profiles").select("id, profile_code, title, min_education, desired_education, min_experience, desired_experience, cnh, knowledge, competencies").order("title"),
         supabase.from("departments").select("id, name").order("name"),
-        supabase.from("salary_table").select("*").order("role_name"),
+        buscarTudo<Record<string, unknown>>((de, ate) =>
+          supabase.from("salary_table").select("*").order("role_name").range(de, ate)),
         supabase.from("system_setting_entries").select("path, value_text").eq("setting_key", "work_schedules").order("path"),
         supabase.from("cost_centers").select("id, name, code").order("name"),
         supabase.from("company_benefits").select("name").order("name"),
@@ -167,9 +170,10 @@ export default function VagaForm({
         return;
       }
 
+
       setProfiles((profilesResult.data ?? []) as JobProfile[]);
       setSectors((departmentsResult.data ?? []) as Department[]);
-      setSalaryTable((salaryResult.data ?? []) as SalaryRow[]);
+      setSalaryTable(salaryResult as SalaryRow[]);
       setCostCenters((costCentersResult.data ?? []) as CostCenter[]);
       setWorkplaces((workplacesResult.data ?? []) as Workplace[]);
       setCompanyBenefits((benefitsResult.data ?? []) as { name: string }[]);
@@ -207,7 +211,14 @@ export default function VagaForm({
         }
       }
 
-      setLoading(false);
+        setLoading(false);
+      } catch (e) {
+        // `buscarTudo` estoura quando o banco recusa; sem isto a promessa rejeitava em
+        // silencio e o formulario ficava carregando para sempre.
+        if (!active) return;
+        setLocalError(`Não foi possível carregar os dados do formulário: ${e instanceof Error ? e.message : String(e)}`);
+        setLoading(false);
+      }
     };
 
     fetchOptions();

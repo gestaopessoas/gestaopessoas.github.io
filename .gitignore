@@ -71,3 +71,10 @@ verify-permissions.mjs
 /test-results
 /test-results
 /playwright-report
+
+# Dashboards e extracoes com dado de folha: o repositorio e PUBLICO, e o que entra em
+# public/ vai para o ar. Nome e salario de colaborador nao podem sair daqui.
+/dashboard-custos.html
+/public/dashboard-custos.html
+/colunas-producao.json
+/scripts/custos_geral_clean.json

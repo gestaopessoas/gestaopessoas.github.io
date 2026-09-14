@@ -64,8 +64,23 @@ export default function BeneficiosHistoricoPage() {
     if (auditError || !audits) {
       setAuditLogs([]);
     } else {
+      // A auditoria guarda linha de gente que ja saiu, e `colaboradores` e so o quadro
+      // atual (296 de 4.839). Procurar o nome so ali fazia quase toda linha do historico
+      // sair como "Colaborador (a3f19c2e)". Busca separada, por `employees_todos`, e so
+      // dos ids que aparecem na auditoria — a lista da tela continua sendo o quadro atual.
+      const idsNaAuditoria = [...new Set(audits.map((a) => String(a.employee_id)).filter(Boolean))];
+      const { data: donos } = idsNaAuditoria.length
+        ? await supabase.from("employees_todos").select("id, name").in("id", idsNaAuditoria)
+        : { data: [] as { id: string; name: string }[] };
+      const nomePorId = new Map((donos ?? []).map((d) => [String(d.id), String(d.name)]));
+
       const enrichedAudits: AuditLog[] = audits.map((a: Record<string, unknown>) => {
-        const emp = empsList.find((e) => e.id === String(a.employee_id));
+        const nome = nomePorId.get(String(a.employee_id));
+        // Setor fica vazio para quem esta no arquivo: `employees_todos` e view com
+        // UNION, e o PostgREST nao atravessa isso para embutir `sectors(name)` (400).
+        const emp = nome
+          ? { id: String(a.employee_id), name: nome, department: undefined as string | undefined }
+          : empsList.find((e) => e.id === String(a.employee_id));
         return {
           id: String(a.id || ""),
           employee_id: String(a.employee_id || ""),
@@ -296,7 +311,7 @@ export default function BeneficiosHistoricoPage() {
                         <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">{emp.name}</td>
                         <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{emp.department || "-"}</td>
                         <td className="px-4 py-3 tabular-nums text-xs text-zinc-500">
-                          {format(new Date(emp.admission_date), "dd/MM/yyyy")}
+                          {format(new Date(`${emp.admission_date}T12:00:00`), "dd/MM/yyyy")}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <Button

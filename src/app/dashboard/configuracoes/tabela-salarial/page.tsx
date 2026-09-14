@@ -10,8 +10,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { formatCurrency } from "@/lib/utils";
 import { formatCurrencyInput, maskCurrencyInput, parseCurrencyInput } from "../../colaboradores/lib/employeeFormRules.mjs";
 import { summarizeSalaryRoles, groupByRegimeAndLevel, levelsInUse, STANDARD_LEVELS, NO_SENIORITY_KEY } from "./lib/salaryTableViewRules.mjs";
+import { buscarTudo } from "@/lib/paginacao";
 
 const SENIORITY_LEVELS = ["Júnior", "Pleno", "Sênior"];
+
+// A coluna `seniority` nem sempre guarda Júnior/Pleno/Sênior: no ESTAGIÁRIO ela guarda a
+// escolaridade (Ensino Médio / Técnico / Superior), que é a dimensão que cruza com os
+// níveis. Sem juntar o que o cargo já usa, editar uma linha dessas apagaria o valor —
+// o <select> não teria a opção e cairia em "Sem senioridade".
+function senioridadesDoCargo(variantes: SalaryRow[]) {
+  const usadas = variantes.map((v) => (v.seniority ?? "").trim()).filter(Boolean);
+  return [...new Set([...SENIORITY_LEVELS, ...usadas])];
+}
 
 type SalaryRow = {
   id: string;
@@ -36,20 +46,45 @@ type SalaryRoleSummary = {
     experience: number | null;
     afterProbation: number | null;
   }>>;
+  // Vem de `diagnosticarCargo`: quanto o cargo paga e o que ha de errado na faixa.
+  linhas: number;
+  faixa: { min: number; max: number } | null;
+  conflitos: number;
+  duplicadas: number;
 };
 
-const modalities = ["CLT", "PJ"] as const;
-
-function formatOptionalCurrency(value: number | null | undefined) {
-  return value == null ? "—" : formatCurrency(value);
-}
+// Uma linha da tela = um cargo, tenha faixa ou nao. `semFaixa` distingue os dois.
+type LinhaDaTela = Omit<SalaryRoleSummary, "structureLabel" | "actionLabel"> & {
+  semFaixa: boolean;
+  structureLabel: string;
+  actionLabel: string;
+};
 
 export default function SalaryTablePage() {
   const [data, setData] = useState<SalaryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [saveError, setSaveError] = useState("");
-  
+  // Quanta gente está em cada cargo e quais cargos existem no cadastro. Sem isso a tela
+  // mostrava só as faixas que existem — e um cargo SEM faixa simplesmente não aparecia,
+  // que é justamente o caso que precisa de atenção (118 cargos, 104 pessoas).
+  const [pessoasPorCargo, setPessoasPorCargo] = useState<Record<string, number>>({});
+  const [cargosDoCadastro, setCargosDoCadastro] = useState<string[]>([]);
+  // Cargo -> faixa de qual cargo ele usa. Pedreiro, encanador, carpinteiro, pintor e
+  // ferreiro armador pagam pela faixa de OFICIAL (o estágio depois dos 90 dias).
+  const [pagaComo, setPagaComo] = useState<Record<string, string>>({});
+  // Diretoria e conselho não se remuneram por tabela. Não é faixa faltando, é decisão —
+  // e cobrar isso na tela para sempre só ensina a ignorar o aviso.
+  const [foraDaTabela, setForaDaTabela] = useState<Set<string>>(new Set());
+
+  // Vínculo do cargo: por qual faixa ele paga, ou se fica fora da tabela. Era decisão
+  // que só entrava por migration — agora entra pela tela.
+  const [vinculoCargo, setVinculoCargo] = useState<string | null>(null);
+  const [vinculoFaixa, setVinculoFaixa] = useState("");
+  const [vinculoFora, setVinculoFora] = useState(false);
+  const [vinculoErro, setVinculoErro] = useState("");
+  const [salvandoVinculo, setSalvandoVinculo] = useState(false);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<string>("");
   const [roleVariants, setRoleVariants] = useState<SalaryRow[]>([]);
@@ -64,13 +99,14 @@ export default function SalaryTablePage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const { data: rows, error } = await createClient()
-      .from("salary_table")
-      .select("*")
-      .order("role_name", { ascending: true });
-    
-    if (!error && rows) {
-      setData(rows as SalaryRow[]);
+    // A propria tela da tabela salarial mostrava 1.000 de 2.464 linhas.
+    const supabase = createClient();
+    try {
+      const rows = await buscarTudo<SalaryRow>((de, ate) =>
+        supabase.from("salary_table").select("*").order("role_name", { ascending: true }).range(de, ate));
+      setData(rows);
+    } catch {
+      // mantem o comportamento anterior: erro nao derruba a tela
     }
     setLoading(false);
   }, []);
@@ -80,6 +116,45 @@ export default function SalaryTablePage() {
     return () => window.clearTimeout(timer);
   }, [fetchData]);
 
+  const carregarCargos = useCallback(async () => {
+    const supabase = createClient();
+    try {
+      const linhas = await buscarTudo<{ title: string | null; salary_role: string | null; off_salary_table: boolean | null }>((de, ate) =>
+        supabase.from("job_profiles").select("title, salary_role, off_salary_table").order("title").range(de, ate));
+      setCargosDoCadastro([...new Set(linhas.map((l) => (l.title ?? "").trim()).filter(Boolean))]);
+      const paga: Record<string, string> = {};
+      const fora = new Set<string>();
+      for (const l of linhas) {
+        const titulo = (l.title ?? "").trim();
+        const faixa = (l.salary_role ?? "").trim();
+        if (titulo && faixa) paga[titulo] = faixa;
+        if (titulo && l.off_salary_table) fora.add(titulo);
+      }
+      setPagaComo(paga);
+      setForaDaTabela(fora);
+    } catch {
+      setCargosDoCadastro([]); setPagaComo({}); setForaDaTabela(new Set());
+    }
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    void buscarTudo<{ role: string | null }>((de, ate) =>
+      supabase.from("employees").select("role").not("role", "is", null).range(de, ate))
+      .then((linhas) => {
+        const contagem: Record<string, number> = {};
+        for (const l of linhas) {
+          const cargo = (l.role ?? "").trim();
+          if (cargo) contagem[cargo] = (contagem[cargo] ?? 0) + 1;
+        }
+        setPessoasPorCargo(contagem);
+      })
+      .catch(() => setPessoasPorCargo({}));
+
+    void carregarCargos();
+  }, [carregarCargos]);
+
   const uniqueRoles = useMemo(() => {
     const roles = summarizeSalaryRoles(data) as SalaryRoleSummary[];
     return roles.filter(r =>
@@ -87,6 +162,105 @@ export default function SalaryTablePage() {
       (r.code && r.code.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [data, searchTerm]);
+
+  // A tela lista a UNIÃO: cargos que têm faixa + cargos do cadastro que não têm. Antes
+  // só apareciam os que tinham, então "este cargo não paga nada" era invisível — e é a
+  // informação mais acionável da tela.
+  const linhasDaTela: LinhaDaTela[] = useMemo(() => {
+    const comFaixa = new Set(uniqueRoles.map((r) => r.name));
+    const semFaixa = cargosDoCadastro
+      .filter((titulo) => !comFaixa.has(titulo))
+      .filter((titulo) =>
+        titulo.toLowerCase().includes(searchTerm.toLowerCase()))
+      .map((titulo) => ({
+        name: titulo,
+        semFaixa: true,
+        usesLevel: true,
+        structureLabel: "—",
+        actionLabel: "Cadastrar faixa",
+        faixa: null as { min: number; max: number } | null,
+        conflitos: 0,
+        duplicadas: 0,
+        linhas: 0,
+        salariesByModality: {},
+        code: "",
+      }));
+
+    return [...uniqueRoles.map((r) => ({ ...r, semFaixa: false })), ...semFaixa]
+      .sort((a, b) => {
+        // Problema primeiro: conflito de salário, depois cargo com gente e sem faixa.
+        const peso = (x: typeof a) =>
+          (x.conflitos > 0 ? 0
+            : foraDaTabela.has(x.name) ? 3
+            : x.semFaixa && (pessoasPorCargo[x.name] ?? 0) > 0 ? 1
+            : x.semFaixa ? 2 : 3);
+        const d = peso(a) - peso(b);
+        if (d !== 0) return d;
+        const gente = (pessoasPorCargo[b.name] ?? 0) - (pessoasPorCargo[a.name] ?? 0);
+        return gente !== 0 ? gente : a.name.localeCompare(b.name, "pt-BR");
+      });
+  }, [uniqueRoles, cargosDoCadastro, pessoasPorCargo, searchTerm, foraDaTabela]);
+
+  // Cargos que realmente têm valores cadastrados.
+  const temFaixa = useMemo(
+    () => new Set(uniqueRoles.filter((r) => (r.linhas ?? 0) > 0).map((r) => r.name)),
+    [uniqueRoles]
+  );
+
+  const resumo = useMemo(() => {
+    // Quem paga pela faixa de OUTRO cargo só está coberto se a faixa de lá existir.
+    // Pedreiro aponta para OFICIAL, mas enquanto OFICIAL estiver sem valores as 50
+    // pessoas continuam sem salário preenchido — contar como resolvido esconderia
+    // justamente a maior lacuna da tabela.
+    const semFaixa = linhasDaTela.filter(
+      (r) => r.semFaixa && !temFaixa.has(pagaComo[r.name] ?? "") && !foraDaTabela.has(r.name));
+    return {
+      cargos: linhasDaTela.length,
+      semFaixa: semFaixa.length,
+      pessoasSemFaixa: semFaixa.reduce((t, r) => t + (pessoasPorCargo[r.name] ?? 0), 0),
+      conflitos: linhasDaTela.reduce((t, r) => t + (r.conflitos ?? 0), 0),
+      duplicadas: linhasDaTela.reduce((t, r) => t + (r.duplicadas ?? 0), 0),
+    };
+  }, [linhasDaTela, pessoasPorCargo, pagaComo, temFaixa, foraDaTabela]);
+
+  const abrirVinculo = (cargo: string) => {
+    setVinculoCargo(cargo);
+    setVinculoFaixa(pagaComo[cargo] ?? "");
+    setVinculoFora(foraDaTabela.has(cargo));
+    setVinculoErro("");
+  };
+
+  const salvarVinculo = async () => {
+    if (!vinculoCargo) return;
+    if (vinculoFaixa && vinculoFaixa === vinculoCargo) {
+      setVinculoErro("Um cargo não pode pagar pela própria faixa. Deixe em branco para usar a dele.");
+      return;
+    }
+    setSalvandoVinculo(true);
+    setVinculoErro("");
+    const supabase = createClient();
+    const valores = { salary_role: vinculoFaixa || null, off_salary_table: vinculoFora };
+    // O cargo pode existir só na tabela salarial e não no catálogo — aí não há linha
+    // para atualizar, e sem o `select` isso passaria como sucesso silencioso.
+    const { data: alterados, error } = await supabase
+      .from("job_profiles").update(valores).eq("title", vinculoCargo).select("id");
+
+    let falha = error?.message ?? "";
+    if (!falha && (alterados?.length ?? 0) === 0) {
+      const { error: erroInsert } = await supabase.from("job_profiles").insert({
+        title: vinculoCargo,
+        profile_code: `AUTO-${vinculoCargo.slice(0, 20)}`,
+        ...valores,
+      });
+      falha = erroInsert?.message ?? "";
+    }
+    setSalvandoVinculo(false);
+    setVinculoErro(falha);
+    if (!falha) {
+      await carregarCargos();
+      setVinculoCargo(null);
+    }
+  };
 
   const loadRoleVariants = (roleName: string) => {
     const variants = data.filter(r => r.role_name === roleName);
@@ -155,7 +329,7 @@ export default function SalaryTablePage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tabela Salarial</h1>
           <p className="text-muted-foreground text-sm">
-            Consulte cargos com nível e salários de experiência ou pós-90 dias.
+            Todo cargo do cadastro aparece aqui — inclusive os que ainda não têm faixa.
           </p>
         </div>
         <Button onClick={() => {
@@ -167,6 +341,34 @@ export default function SalaryTablePage() {
           <Plus className="mr-2 h-4 w-4" /> Nova Faixa Salarial
         </Button>
       </div>
+
+      {/* O que precisa de atenção, em números, antes da lista. Antes era preciso abrir
+          cargo por cargo para descobrir que 118 não tinham faixa nenhuma. */}
+      {!loading && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-md border bg-card p-4">
+            <div className="text-2xl font-semibold tabular-nums">{resumo.cargos}</div>
+            <div className="text-xs text-muted-foreground">cargos no cadastro</div>
+          </div>
+          <div className={`rounded-md border p-4 ${resumo.pessoasSemFaixa > 0 ? "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30" : "bg-card"}`}>
+            <div className="text-2xl font-semibold tabular-nums">{resumo.pessoasSemFaixa}</div>
+            <div className="text-xs text-muted-foreground">
+              colaboradores sem faixa salarial
+              {resumo.semFaixa > 0 && <> · {resumo.semFaixa} cargos</>}
+            </div>
+          </div>
+          <div className={`rounded-md border p-4 ${resumo.conflitos > 0 ? "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30" : "bg-card"}`}>
+            <div className="text-2xl font-semibold tabular-nums">{resumo.conflitos}</div>
+            <div className="text-xs text-muted-foreground">
+              faixas com dois salários para a mesma combinação
+            </div>
+          </div>
+          <div className="rounded-md border bg-card p-4">
+            <div className="text-2xl font-semibold tabular-nums">{resumo.duplicadas}</div>
+            <div className="text-xs text-muted-foreground">linhas repetidas (mesmo valor)</div>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center w-full max-w-md space-x-2">
         <div className="relative flex-1">
@@ -185,69 +387,180 @@ export default function SalaryTablePage() {
           <table className="w-full caption-bottom text-sm">
             <thead className="[&_tr]:border-b">
               <tr className="border-b transition-colors hover:bg-muted/50">
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Código</th>
+                {/* "Código" saiu: era AUTO-xxxxxx gerado por importação, não dizia nada
+                    a ninguém. No lugar entra quanta GENTE depende da faixa — que é o
+                    que decide se o cargo merece atenção. */}
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Cargo</th>
+                <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Pessoas</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Estrutura</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Experiência</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Pós-90 dias</th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Faixa</th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Situação</th>
                 <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Ações</th>
               </tr>
             </thead>
             <tbody className="[&_tr:last-child]:border-0">
               {loading ? (
                 <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Carregando...</td></tr>
-              ) : uniqueRoles.length === 0 ? (
+              ) : linhasDaTela.length === 0 ? (
                 <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Nenhum cargo encontrado.</td></tr>
               ) : (
-                uniqueRoles.map((role) => (
-                  <tr key={role.name} className="border-b transition-colors hover:bg-muted/50">
-                    <td className="p-4 font-mono text-xs">{role.code}</td>
+                linhasDaTela.map((role) => {
+                  const pessoas = pessoasPorCargo[role.name] ?? 0;
+                  return (
+                  <tr key={role.name} className={`border-b transition-colors hover:bg-muted/50 ${role.conflitos > 0 ? "bg-red-50/40 dark:bg-red-950/10" : ""}`}>
                     <td className="p-4 font-medium">{role.name}</td>
+                    <td className="p-4 text-right tabular-nums">
+                      {pessoas > 0
+                        ? pessoas
+                        : <span className="text-muted-foreground">—</span>}
+                    </td>
                     <td className="p-4">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${role.usesLevel ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${role.semFaixa ? "bg-muted text-muted-foreground" : role.usesLevel ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
                         {role.structureLabel}
                       </span>
                     </td>
-                    <td className="p-4 text-xs">
-                      {role.usesLevel ? (
-                        <span className="text-muted-foreground">Por nível</span>
-                      ) : (
-                        <div className="space-y-1">
-                          {modalities.map(modality => (
-                            <div key={modality} className="flex min-w-32 justify-between gap-3">
-                              <span className="font-medium text-muted-foreground">{modality}</span>
-                              <span>{formatOptionalCurrency(role.salariesByModality[modality]?.experience)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    {/* A faixa fica VISÍVEL na lista. Antes era preciso abrir o modal de
+                        cada cargo para ver qualquer valor, e as duas colunas que existiam
+                        aqui mostravam "Por nível" — ou seja, nada. */}
+                    <td className="p-4 text-xs tabular-nums">
+                      {role.faixa
+                        ? (role.faixa.min === role.faixa.max
+                            ? formatCurrency(role.faixa.min)
+                            : <>{formatCurrency(role.faixa.min)} <span className="text-muted-foreground">até</span> {formatCurrency(role.faixa.max)}</>)
+                        : <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="p-4 text-xs">
-                      {role.usesLevel ? (
-                        <span className="text-muted-foreground">Por nível</span>
-                      ) : (
-                        <div className="space-y-1">
-                          {modalities.map(modality => (
-                            <div key={modality} className="flex min-w-32 justify-between gap-3">
-                              <span className="font-medium text-muted-foreground">{modality}</span>
-                              <span>{formatOptionalCurrency(role.salariesByModality[modality]?.afterProbation)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {role.conflitos > 0 && (
+                          <span
+                            title="A mesma combinação de regime, nível e senioridade tem mais de um salário. O preenchimento automático escolhe um deles sem critério."
+                            className="inline-flex rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-800 dark:bg-red-950/60 dark:text-red-200"
+                          >
+                            {role.conflitos} conflito{role.conflitos > 1 ? "s" : ""} de salário
+                          </span>
+                        )}
+                        {pagaComo[role.name] && (
+                          <span
+                            title={temFaixa.has(pagaComo[role.name])
+                              ? `Este cargo nao tem faixa propria: usa a de ${pagaComo[role.name]}.`
+                              : `Aponta para ${pagaComo[role.name]}, que ainda nao tem valores. Ate la, ${pessoas} colaborador(es) seguem sem salario preenchido.`}
+                            className={`inline-flex rounded-full px-2 py-0.5 font-medium ${temFaixa.has(pagaComo[role.name]) ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"}`}
+                          >
+                            paga como {pagaComo[role.name]}
+                            {!temFaixa.has(pagaComo[role.name]) && " — sem valores"}
+                          </span>
+                        )}
+                        {foraDaTabela.has(role.name) && (
+                          <span
+                            title="Cargo que nao se remunera por tabela salarial. Fora da tabela por decisao, nao por falta de cadastro."
+                            className="inline-flex rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground"
+                          >
+                            fora da tabela
+                          </span>
+                        )}
+                        {role.semFaixa && !pagaComo[role.name] && !foraDaTabela.has(role.name) && (
+                          <span
+                            title={pessoas > 0
+                              ? `${pessoas} colaborador(es) neste cargo não têm salário preenchido automaticamente.`
+                              : "Cargo cadastrado, mas ainda sem faixa salarial."}
+                            className={`inline-flex rounded-full px-2 py-0.5 font-medium ${pessoas > 0 ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200" : "bg-muted text-muted-foreground"}`}
+                          >
+                            sem faixa
+                          </span>
+                        )}
+                        {role.duplicadas > 0 && (
+                          <span
+                            title="Linhas repetidas com o mesmo valor. Não mudam salário, mas escondem as que conflitam."
+                            className="inline-flex rounded-full bg-muted px-2 py-0.5 text-muted-foreground"
+                          >
+                            {role.duplicadas} repetida{role.duplicadas > 1 ? "s" : ""}
+                          </span>
+                        )}
+                        {!role.semFaixa && !pagaComo[role.name] && !foraDaTabela.has(role.name) && role.conflitos === 0 && role.duplicadas === 0 && (
+                          <span className="text-muted-foreground">ok</span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-right">
-                      <Button variant="outline" size="sm" onClick={() => loadRoleVariants(role.name)}>
+                      <Button
+                        variant={role.semFaixa && pessoas > 0 && !foraDaTabela.has(role.name) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          if (!role.semFaixa) { loadRoleVariants(role.name); return; }
+                          // Cargo sem faixa abre o formulário já com o nome preenchido.
+                          setEditingRow({
+                            role_code: "", role_name: role.name, level: "Nível I", seniority: "",
+                            modality: "CLT", salary: 0, uses_level: true,
+                            salary_experience: null, salary_after_probation: null,
+                          });
+                          setSaveError("");
+                          setEditingRole("");
+                          setIsModalOpen(true);
+                        }}
+                      >
                         {role.actionLabel}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-1"
+                        title="Escolher por qual faixa este cargo paga, ou deixá-lo fora da tabela."
+                        onClick={() => abrirVinculo(role.name)}
+                      >
+                        Vínculo
                       </Button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      <Dialog open={vinculoCargo !== null} onOpenChange={(aberto) => { if (!aberto) setVinculoCargo(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Vínculo de faixa: {vinculoCargo}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Um cargo pode ter faixa própria, pagar pela faixa de outro cargo (é o caso dos
+              ofícios, que pagam como OFICIAL) ou ficar fora da tabela salarial, como a
+              diretoria. Nada aqui altera salário já gravado em ficha de colaborador.
+            </p>
+            <Field label="Paga pela faixa de" labelClassName="">
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={vinculoFaixa}
+                disabled={vinculoFora}
+                onChange={(e) => setVinculoFaixa(e.target.value)}
+              >
+                <option value="">— usa a faixa do próprio cargo —</option>
+                {[...temFaixa].sort((a, b) => a.localeCompare(b, "pt-BR"))
+                  .filter((nome) => nome !== vinculoCargo)
+                  .map((nome) => <option key={nome} value={nome}>{nome}</option>)}
+              </select>
+            </Field>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={vinculoFora}
+                onChange={(e) => { setVinculoFora(e.target.checked); if (e.target.checked) setVinculoFaixa(""); }}
+              />
+              Fora da tabela salarial (não é faixa faltando, é decisão)
+            </label>
+            {vinculoErro && <p className="text-sm text-destructive">{vinculoErro}</p>}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setVinculoCargo(null)}>Cancelar</Button>
+              <Button onClick={salvarVinculo} disabled={salvandoVinculo}>
+                {salvandoVinculo ? "Salvando..." : "Salvar vínculo"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
@@ -341,7 +654,7 @@ export default function SalaryTablePage() {
                 <Field label="Senioridade" labelClassName="">
                   <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={editingRow.seniority || ""} onChange={(e) => setEditingRow({ ...editingRow, seniority: e.target.value })}>
                     <option value="">Sem senioridade</option>
-                    {SENIORITY_LEVELS.map((s) => <option key={s} value={s}>{s}</option>)}
+                    {senioridadesDoCargo(roleVariants).map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </Field>
                 </>

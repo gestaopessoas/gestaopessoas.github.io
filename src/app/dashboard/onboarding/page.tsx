@@ -75,7 +75,7 @@ export default function OnboardingPage() {
     if (query) return true; // se tá buscando, mostra tudo
     if (!e.admission_date) return false;
     
-    const admission = new Date(e.admission_date);
+    const admission = new Date(`${e.admission_date}T12:00:00`);
     const diffDays = Math.floor((today.getTime() - admission.getTime()) / (1000 * 60 * 60 * 24));
     
     const status = Object.fromEntries((e.employee_onboarding_tasks ?? []).map((item) => [item.task_code, item.completed])) as Record<OnboardingTask, boolean>;

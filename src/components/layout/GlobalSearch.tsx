@@ -64,7 +64,7 @@ export function GlobalSearch() {
         .limit(5);
 
       const employeeResults = (employees || []).map(e => ({
-        href: `/dashboard/colaboradores?id=${e.id}`, // We could navigate or open modal
+        href: `/dashboard/colaboradores?edit=${e.id}`,
         label: e.name,
         description: e.role,
         icon: <Users className="mr-2 h-4 w-4 text-primary" />,
