@@ -3,39 +3,17 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Check, Search, Filter, Loader2, Key, Download, MapPin, Briefcase, Calendar, CalendarClock, CalendarPlus, Clock, Trash2, Phone, Mail, User, LogOut, Shield, ChevronDown, CheckCircle2, ChevronRight, X, FileText, ArrowRight, Printer, AlertTriangle, MessageSquare, Plus, FileUp } from "lucide-react";
-import * as pdfjsLib from "pdfjs-dist";
+import { Search, Download, Briefcase, Calendar, CalendarClock, CalendarPlus, Clock, Trash2, User, CheckCircle2, X, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { errorMessage } from "@/lib/utils";
 import { useToast } from "@/contexts/ToastContext";
-import { itemsToText, parseSolidesResume, type ParsedResume } from "@/lib/resumeParser";
-import { buildResumeExtractionPrompt, parseExtractionResponse } from "@/lib/resumeExtractionPrompt";
-import { DEFAULT_RESUME_MODEL, fetchResumeModel, geminiGenerateUrl } from "@/lib/resumeModelSettings";
+import { DEFAULT_RESUME_MODEL } from "@/lib/resumeModelSettings";
 import { formatInterviewSchedule, interviewHistoryStage, interviewProgressChanged, roleChangedOnSavedInterview } from "@/lib/interviewProgress.mjs";
+import { findExistingCandidateId, hasRealEmail, placeholderEmail } from "@/lib/candidateIdentity.mjs";
 import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
-
-// O parser local devolve ParsedResume; a IA devolve os mesmos campos mais alguns
-// que só ela consegue inferir do texto livre.
-type ParsedResumeFields = Partial<ParsedResume> & {
-  is_internal?: boolean;
-  emergency_contact_name?: string;
-  emergency_contact_phone?: string;
-  has_dependents?: boolean;
-  dependents_count?: number;
-  dependents_notes?: string;
-  uniform_size?: string;
-  languages?: string;
-  boot_size?: string;
-};
-
-// Define a versão para baixar o worker correto do CDN
-if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-}
 
 type PsychologicalTestInput = {
   test_name: string;
@@ -225,316 +203,9 @@ export const defaultProviders: AIProvider[] = [
 
 // Modelo padrão para as chamadas avulsas desta tela (parecer de teste). A importação de
 // currículo usa o modelo configurado pelo administrador — ver analyzeResume.
-const GEMINI_URL = geminiGenerateUrl(DEFAULT_RESUME_MODEL);
-
-async function generateTestText(testName: string, classification: string): Promise<string> {
-  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  const prompt = `Escreva um parágrafo curto e profissional de parecer psicológico para um candidato de emprego. O teste realizado foi '${testName}' e o resultado obtido foi '${classification}'. Não invente características adicionais, apenas explique o que esse resultado significa nesse teste específico em 2 a 3 linhas de forma objetiva.`;
-
-  if (apiKey) {
-    try {
-      const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      });
-      if (!res.ok) {
-        console.error("Gemini error:", res.status, await res.text());
-        return "";
-      }
-      const data = await res.json();
-      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-        return data.candidates[0].content.parts[0].text;
-      }
-    } catch (e) {
-      console.error("Erro na API do Gemini, usando fallback:", e);
-    }
-  }
-
-  const levels: Record<string, string> = {
-    "Superior": "acima da média, demonstrando excelente capacidade",
-    "Médio Superior": "ligeiramente acima da média, demonstrando boa capacidade",
-    "Médio": "dentro do esperado para a população geral, demonstrando capacidade adequada",
-    "Médio Inferior": "abaixo da média, sugerindo alguma dificuldade",
-    "Inferior": "significativamente abaixo da média, indicando dificuldade acentuada"
-  };
-
-  const levelText = levels[classification] || "com desempenho compatível com a classificação " + classification;
-
-  switch (testName) {
-    case "G36":
-      return `No teste G36 (Raciocínio Lógico e Inteligência Não-Verbal), o candidato obteve classificação ${classification}. O resultado indica que o mesmo apresenta uma capacidade de raciocínio abstrato e resolução de problemas ${levelText}.`;
-    case "TEALT":
-      return `Na avaliação pelo TEALT (Teste de Atenção Alternada), o candidato apresentou classificação ${classification}. Isto sugere que sua capacidade de alternar o foco entre diferentes tarefas ou estímulos está ${levelText}.`;
-    case "TEADI":
-      return `No TEADI (Teste de Atenção Dividida), o candidato alcançou a classificação ${classification}. O resultado aponta que sua habilidade para dividir a atenção em mais de um estímulo simultâneo está ${levelText}.`;
-    case "TEACO-FF":
-      return `Submetido ao TEACO-FF (Teste de Atenção Concentrada), o candidato demonstrou classificação ${classification}. Evidencia-se que sua aptidão para manter o foco em tarefas sob pressão ou rotineiras encontra-se ${levelText}.`;
-    case "NEO PI-R":
-    case "NEO FFI":
-      return `O inventário de personalidade ${testName} indicou que o candidato apresenta traços predominantemente em nível ${classification} nos fatores avaliados, sugerindo características comportamentais que requerem análise de adequação à vaga.`;
-    default:
-      return `No teste ${testName}, o candidato apresentou classificação ${classification}, indicando um desempenho compatível com este nível de aptidão.`;
-  }
-}
-
-
-const TEST_OPTIONS: Record<string, { table_name: string; demographic_type?: string; demographic_value?: string; label: string }[]> = {
-  "TEADI": [
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Geral",
-      "demographic_value": "Geral",
-      "label": "População Geral - Brasil"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "Até 25 anos",
-      "label": "População Geral - Brasil (Até 25 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "26 a 33 anos",
-      "label": "População Geral - Brasil (26 a 33 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "34 a 39 anos",
-      "label": "População Geral - Brasil (34 a 39 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "40 a 46 anos",
-      "label": "População Geral - Brasil (40 a 46 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "47 anos ou mais",
-      "label": "População Geral - Brasil (47 anos ou mais) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Escolaridade",
-      "demographic_value": "Ensino Fundamental",
-      "label": "População Geral - Brasil (Ensino Fundamental) - Escolaridade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Escolaridade",
-      "demographic_value": "Ensino Médio",
-      "label": "População Geral - Brasil (Ensino Médio) - Escolaridade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Escolaridade",
-      "demographic_value": "Superior",
-      "label": "População Geral - Brasil (Superior) - Escolaridade"
-    }
-  ],
-  "TEALT": [
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Geral",
-      "demographic_value": "Geral",
-      "label": "População Geral - Brasil"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "Até 22 anos",
-      "label": "População Geral - Brasil (Até 22 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "23 a 30 anos",
-      "label": "População Geral - Brasil (23 a 30 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "31 a 37 anos",
-      "label": "População Geral - Brasil (31 a 37 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "38 a 44 anos",
-      "label": "População Geral - Brasil (38 a 44 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "45 anos ou mais",
-      "label": "População Geral - Brasil (45 anos ou mais) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Escolaridade",
-      "demographic_value": "Ensino Fundamental",
-      "label": "População Geral - Brasil (Ensino Fundamental) - Escolaridade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Escolaridade",
-      "demographic_value": "Ensino Médio",
-      "label": "População Geral - Brasil (Ensino Médio) - Escolaridade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Escolaridade",
-      "demographic_value": "Superior",
-      "label": "População Geral - Brasil (Superior) - Escolaridade"
-    }
-  ],
-  "TEACO-FF": [
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Geral",
-      "demographic_value": "Geral",
-      "label": "População Geral - Brasil"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "18 a 19 anos",
-      "label": "População Geral - Brasil (18 a 19 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "20 a 29 anos",
-      "label": "População Geral - Brasil (20 a 29 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "30 a 39 anos",
-      "label": "População Geral - Brasil (30 a 39 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "40 a 49 anos",
-      "label": "População Geral - Brasil (40 a 49 anos) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Idade",
-      "demographic_value": "50 anos ou mais",
-      "label": "População Geral - Brasil (50 anos ou mais) - Idade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Escolaridade",
-      "demographic_value": "Ensino Fundamental",
-      "label": "População Geral - Brasil (Ensino Fundamental) - Escolaridade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Escolaridade",
-      "demographic_value": "Ensino Médio",
-      "label": "População Geral - Brasil (Ensino Médio) - Escolaridade"
-    },
-    {
-      "table_name": "População Geral - Brasil",
-      "demographic_type": "Escolaridade",
-      "demographic_value": "Superior",
-      "label": "População Geral - Brasil (Superior) - Escolaridade"
-    },
-    {
-      "table_name": "Tabela 43. População Geral - Brasil",
-      "label": "Tabela 43. População Geral - Brasil"
-    },
-    {
-      "table_name": "Tabela 44. População Geral - Brasil (Ensino Fundamental)",
-      "label": "Tabela 44. População Geral - Brasil (Ensino Fundamental)"
-    },
-    {
-      "table_name": "Tabela 44. População Geral - Brasil (Ensino Médio)",
-      "label": "Tabela 44. População Geral - Brasil (Ensino Médio)"
-    },
-    {
-      "table_name": "Tabela 44. População Geral - Brasil (Ensino Superior)",
-      "label": "Tabela 44. População Geral - Brasil (Ensino Superior)"
-    },
-    {
-      "table_name": "Tabela 55. População Geral - São Paulo",
-      "label": "Tabela 55. População Geral - São Paulo"
-    }
-  ],
-  "NEO PI-R": [
-    {
-      "table_name": "Geral",
-      "demographic_type": "Geral",
-      "demographic_value": "Geral",
-      "label": "Geral"
-    },
-    {
-      "table_name": "Masculino",
-      "demographic_type": "Sexo",
-      "demographic_value": "Masculino",
-      "label": "Masculino - Sexo"
-    },
-    {
-      "table_name": "Feminino",
-      "demographic_type": "Sexo",
-      "demographic_value": "Feminino",
-      "label": "Feminino - Sexo"
-    }
-  ],
-  "NEO FFI-R": [
-    {
-      "table_name": "Geral",
-      "demographic_type": "Geral",
-      "demographic_value": "Geral",
-      "label": "Geral"
-    },
-    {
-      "table_name": "Masculino",
-      "demographic_type": "Sexo",
-      "demographic_value": "Masculino",
-      "label": "Masculino - Sexo"
-    },
-    {
-      "table_name": "Feminino",
-      "demographic_type": "Sexo",
-      "demographic_value": "Feminino",
-      "label": "Feminino - Sexo"
-    }
-  ],
-  "G36": [
-    {
-      "table_name": "Tabela 20. Seleção de São Paulo",
-      "demographic_type": "Ensino Médio",
-      "demographic_value": "",
-      "label": "Tabela 20. Seleção de São Paulo - Ensino Médio"
-    },
-    {
-      "table_name": "Tabela 20. Seleção de São Paulo",
-      "demographic_type": "Superior",
-      "demographic_value": "",
-      "label": "Tabela 20. Seleção de São Paulo - Superior"
-    },
-    {
-      "table_name": "Tabela 20. Seleção de São Paulo",
-      "demographic_type": "Geral",
-      "demographic_value": "",
-      "label": "Tabela 20. Seleção de São Paulo"
-    }
-  ]
-};
-
 export default function EntrevistasPage() {
   const { toast } = useToast();
   const [interviews, setInterviews] = useState<Interview[]>([]);
-  const [roles, setRoles] = useState<string[]>([]);
-  const [worksites, setWorksites] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(""); // YYYY-MM
   const [loading, setLoading] = useState(true);
@@ -542,8 +213,6 @@ export default function EntrevistasPage() {
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dados" | "avaliacao" | "curriculo">("dados");
-  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [currentUpdatedAt, setCurrentUpdatedAt] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -553,7 +222,6 @@ export default function EntrevistasPage() {
   // Quem está logado assina a entrevista no histórico — antes ficava sempre "Desconhecido".
   const [currentUserName, setCurrentUserName] = useState("");
   const [stageByCandidate, setStageByCandidate] = useState<Record<string, string>>({});
-  const [movingToTalents, setMovingToTalents] = useState(false);
   
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   // Os provedores salvos já valem no primeiro render — evita renderizar uma vez
@@ -574,8 +242,6 @@ export default function EntrevistasPage() {
       return defaultProviders;
     }
   });
-  const [resumeText, setResumeText] = useState("");
-  const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
   const [viewingCandidateProfile, setViewingCandidateProfile] = useState<{ interviewId?: string | null; email?: string | null; name?: string | null } | null>(null);
 
   const updateProvider = (id: string, updates: Partial<AIProvider>) => {
@@ -640,155 +306,16 @@ export default function EntrevistasPage() {
   // administrador em Configurações › IA, que vale para todo mundo. A seleção de provedor
   // desta tela mora em localStorage, ou seja, é por navegador — serve para experimentar,
   // não para configurar o sistema.
-  const generateWithAI = async (prompt: string, modelOverride?: string): Promise<string> => {
-    const activeProvider = providers.find(p => p.isActive) || providers.find(p => p.id === "gemini");
-    if (!activeProvider) throw new Error("Nenhum provedor de IA ativo encontrado.");
-
-    if (activeProvider.id === "gemini") {
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      if (!apiKey) throw new Error("Chave do Gemini não configurada nas variáveis de ambiente.");
-
-      const modelToUse = modelOverride || activeProvider.selectedModel || DEFAULT_RESUME_MODEL;
-      const baseUrl = activeProvider.baseUrl.replace(/\/+$/, "");
-      const url = `${baseUrl}/models/${modelToUse}:generateContent?key=${apiKey}`;
-      
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      });
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Erro Gemini (${res.status}): ${errorText}`);
-      }
-      const data = await res.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    } else {
-      const baseUrl = activeProvider.baseUrl.replace(/\/+$/, "");
-      const res = await fetch(`${baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${activeProvider.apiKey}`,
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "Gestaopessoas"
-        },
-        body: JSON.stringify({
-          model: activeProvider.selectedModel || "gpt-3.5-turbo",
-          messages: [{ role: "user", content: prompt }]
-        })
-      });
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Erro AI (${res.status}): ${errorText}`);
-      }
-      const rawText = await res.text();
-      let data;
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        if (rawText.includes("data: ")) {
-          let fullText = "";
-          const lines = rawText.split('\n');
-          for (const line of lines) {
-            if (line.trim().startsWith('data: ')) {
-              const jsonStr = line.replace('data: ', '').trim();
-              if (jsonStr === '[DONE]') continue;
-              try {
-                const parsed = JSON.parse(jsonStr);
-                if (parsed.choices?.[0]?.delta?.content) fullText += parsed.choices[0].delta.content;
-                else if (parsed.choices?.[0]?.message?.content) fullText += parsed.choices[0].message.content;
-              } catch (err) {}
-            }
-          }
-          if (fullText) return fullText;
-        }
-        throw new Error("A resposta da IA não é um JSON válido (talvez seja um erro de conexão/proxy). " + String(e));
-      }
-      return data.choices?.[0]?.message?.content || "";
-    }
-  };
   
   // Test generation states
-  const [selectedTest, setSelectedTest] = useState("G36");
-  const [selectedClass, setSelectedClass] = useState("Médio");
-  const [isGeneratingTest, setIsGeneratingTest] = useState(false);
-
-  const handleGenerateTestText = async () => {
-    setIsGeneratingTest(true);
-    const supabase = createClient();
-    
-    let combinedResults = "";
-    const list = assessmentForm.tests_list || [];
-    
-    for (const test of list) {
-      if (test.test_name.includes("NEO")) {
-        const factors = test.factors || {};
-        let neoResults = `${test.test_name}:\n`;
-        for (const [f, score] of Object.entries(factors)) {
-          if (!score) continue;
-          const numScore = Number(score);
-          const { data } = await supabase
-            .from('psychological_norms')
-            .select('*')
-            .eq('test_name', test.test_name)
-            .eq('table_name', test.table_name || '')
-            .eq('demographic_type', test.demographic_type || '')
-            .eq('demographic_value', test.demographic_value || '')
-            .eq('factor', f)
-            .lte('min_score', numScore)
-            .gte('max_score', numScore)
-            .limit(1);
-          const classification = data?.[0]?.classification || "Não classificado (Tabela não encontrada)";
-          neoResults += `- Fator ${f}: Pontuação ${score} -> ${classification}\n`;
-        }
-        combinedResults += neoResults + "\n";
-      } else {
-        if (!test.score) continue;
-        const numScore = Number(test.score);
-        const { data } = await supabase
-          .from('psychological_norms')
-          .select('*')
-          .eq('test_name', test.test_name)
-          .eq('table_name', test.table_name || '')
-          .eq('demographic_type', test.demographic_type || '')
-          .eq('demographic_value', test.demographic_value || '')
-          .lte('min_score', numScore)
-          .gte('max_score', numScore)
-          .limit(1);
-        
-        const classification = data?.[0]?.classification || "Não classificado (Tabela não encontrada)";
-        combinedResults += `${test.test_name}: Pontuação ${test.score} -> ${classification}\n\n`;
-      }
-    }
-    
-    if (combinedResults.trim() !== "") {
-      const prompt = `O candidato de ${assessmentForm.age || 'idade não informada'} anos, escolaridade ${assessmentForm.education || 'não informada'}, realizou os seguintes testes psicológicos:\n${combinedResults}\nEscreva um parecer psicológico consolidado e profissional, em um parágrafo objetivo, explicando as características do candidato com base nessas classificações. O parecer deve focar estritamente nas classificações (inferior, médio, superior, etc) e no que elas significam.`;
-      
-      try {
-        const generatedText = await generateWithAI(prompt);
-        if (generatedText) {
-          setAssessmentForm({ ...assessmentForm, tests_details: "RESULTADOS DA AVALIAÇÃO:\n" + combinedResults + "\nPARECER INTEGRADO DA IA:\n" + generatedText });
-        } else {
-          setAssessmentForm({ ...assessmentForm, tests_details: "Erro ao comunicar com IA. Resultados brutos:\n" + combinedResults });
-        }
-      } catch (e) {
-        setAssessmentForm({ ...assessmentForm, tests_details: "Erro ao comunicar com IA. Resultados brutos:\n" + combinedResults });
-      }
-    } else {
-      setAssessmentForm({ ...assessmentForm, tests_details: "Resultados consultados (Sem testes válidos):\n" + combinedResults });
-    }
-    setIsGeneratingTest(false);
-  };
 
   const loadInterviews = async () => {
     setLoading(true);
     const supabase = createClient();
-    const [{ data, error }, { data: profilesData }, { data: workplacesData }] = await Promise.all([
-      supabase.from("interviews").select("*, interview_assessments(interview_assessment_values(field,item_index,value))").order("interview_date", { ascending: false, nullsFirst: false }),
-      supabase.from("job_profiles").select("title"),
-      supabase.from("workplaces").select("name").order("name")
-    ]);
+    const { data, error } = await supabase
+      .from("interviews")
+      .select("*, interview_assessments(interview_assessment_values(field,item_index,value))")
+      .order("interview_date", { ascending: false, nullsFirst: false });
 
     setLoading(false);
     if (error) {
@@ -816,14 +343,6 @@ export default function EntrevistasPage() {
       setStageByCandidate(mapa);
     } else {
       setStageByCandidate({});
-    }
-    if (profilesData) {
-      // Só títulos de job_profiles. Antes agregava interviews.role — texto livre vindo de
-      // importação de currículo — e cada erro da IA virava uma opção de cargo permanente.
-      setRoles(Array.from(new Set(profilesData.map(r => r.title).filter(Boolean))).sort());
-    }
-    if (workplacesData) {
-      setWorksites(workplacesData.map((w: { name: string }) => w.name));
     }
   };
 
@@ -926,199 +445,7 @@ export default function EntrevistasPage() {
     link.remove();
   };
   
-  const exportParecer = () => {
-    const text = `PARECER DE ENTREVISTA
-=============================
-Candidato: ${form.candidate_name || "N/I"}
-Cargo Alvo: ${form.role || "N/I"}
-Data: ${form.interview_date ? new Date(form.interview_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/I'}
-
-AVALIAÇÃO
-=============================
-Teste Psicológico Realizado? ${assessmentForm.psychological_test}
-Avaliação Técnica: ${assessmentForm.technical || '-'}
-Comunicação: ${assessmentForm.communication || '-'}
-Fit Cultural: ${assessmentForm.cultural_fit || '-'}
-
-PONTOS FORTES
------------------------------
-${assessmentForm.strengths || 'Nenhum registrado'}
-
-PONTOS A DESENVOLVER
------------------------------
-${assessmentForm.weaknesses || 'Nenhum registrado'}
-
-PARECER FINAL / OBSERVAÇÕES
------------------------------
-${assessmentForm.observations || 'Nenhum registrado'}
-
-Resultado Final: ${form.result || "N/C"}
-Destino: ${form.destination || "N/I"}
-`.trim();
-
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Parecer_${form.candidate_name?.replace(/\s+/g, '_') || 'candidato'}.txt`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const printParecer = () => {
-    const candidate = form.candidate_name || 'N/I';
-    const role = form.role || 'N/I';
-    const date = form.interview_date ? new Date(form.interview_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/I';
-    const result = form.result || 'N/C';
-    const destination = form.destination || '';
-    const resultColor = result === 'Aprovado' ? '#16a34a' : result === 'Reprovado' ? '#dc2626' : '#d97706';
-
-    const fortes = (assessmentForm.strengths || '').split(',').map(s => s.trim()).filter(Boolean);
-    const fracos = (assessmentForm.weaknesses || '').split(',').map(s => s.trim()).filter(Boolean);
-
-    const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <title>Parecer de Entrevista - ${candidate}</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', sans-serif; background: #f8fafc; color: #1e293b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page { max-width: 800px; margin: 0 auto; background: #fff; }
-    @media print { body { background: #fff; } .page { max-width: 100%; box-shadow: none; border: none; margin: 0; padding: 0; } .no-print { display: none !important; } }
-    @media screen { .page { margin: 32px auto; padding: 0; box-shadow: 0 4px 24px rgba(0,0,0,.10); border-radius: 16px; overflow: hidden; } }
-    .header { padding: 40px 48px 32px; display: flex; flex-direction: column; align-items: center; text-align: center; border-bottom: 2px solid #e2e8f0; }
-    .header img { max-width: 140px; margin-bottom: 20px; }
-    .header h1 { font-size: 26px; font-weight: 700; margin-bottom: 4px; color: #0f172a; }
-    .header-sub { font-size: 14px; color: #64748b; font-weight: 500; }
-    .result-badge { display: inline-block; margin-top: 20px; padding: 6px 18px; border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: .5px; background: ${resultColor}15; color: ${resultColor}; border: 1.5px solid ${resultColor}40; }
-    .body { padding: 40px 48px; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
-    .info-item label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 4px; }
-    .info-item span { font-size: 15px; font-weight: 500; color: #1e293b; }
-    .section { margin-bottom: 28px; }
-    .section-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #6366f1; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; }
-    .eval-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-    .eval-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
-    .eval-card label { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 6px; }
-    .eval-card span { font-size: 14px; font-weight: 600; color: #1e293b; }
-    .tags { display: flex; flex-wrap: wrap; gap: 8px; }
-    .tag { padding: 5px 14px; border-radius: 999px; font-size: 13px; font-weight: 500; }
-    .tag-green { background: #dcfce7; color: #15803d; }
-    .tag-orange { background: #ffedd5; color: #c2410c; }
-    .observations { background: #f8fafc; border-left: 4px solid #6366f1; border-radius: 0 8px 8px 0; padding: 18px 20px; font-size: 14px; line-height: 1.8; color: #334155; white-space: pre-wrap; }
-    .footer { background: #f1f5f9; padding: 20px 48px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #94a3b8; }
-    .print-btn { position: fixed; bottom: 32px; right: 32px; background: #6366f1; color: #fff; border: none; border-radius: 12px; padding: 14px 28px; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 16px rgba(99,102,241,.4); display: flex; align-items: center; gap: 8px; }
-    .print-btn:hover { background: #4f46e5; }
-    .psy { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; background: ${assessmentForm.psychological_test === 'Sim' ? '#dcfce7' : '#fee2e2'}; color: ${assessmentForm.psychological_test === 'Sim' ? '#15803d' : '#dc2626'}; }
-  </style>
-</head>
-<body>
-<div class="page">
-  <div class="header">
-    <img src="/logos/SEDE.png" alt="ACPO" />
-    <h1>${candidate}</h1>
-    <div class="header-sub">Parecer de Entrevista · ${role}</div>
-    <div class="result-badge">Resultado: ${result}</div>
-    ${destination ? `<div class="result-badge" style="margin-top:8px;background:#6366f115;color:#6366f1;border-color:#6366f140">Destino: ${destination}</div>` : ''}
-  </div>
-  <div class="body">
-    <div class="info-grid">
-      <div class="info-item"><label>Data da Entrevista</label><span>${date}</span></div>
-      <div class="info-item"><label>Cargo</label><span>${role}</span></div>
-      <div class="info-item"><label>Telefone</label><span>${form.phone || '—'}</span></div>
-      <div class="info-item"><label>E-mail</label><span>${form.email || '—'}</span></div>
-    </div>
-
-    ${(assessmentForm.professional_summary || assessmentForm.experience_summary || (assessmentForm.academic_list && assessmentForm.academic_list.length > 0) || (assessmentForm.experience_list && assessmentForm.experience_list.length > 0)) ? `
-    <div class="section">
-      <div class="section-title">Resumo Curricular / Formação & Experiências</div>
-      ${assessmentForm.professional_summary ? `<div style="margin-bottom:12px"><b>Resumo Profissional:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.professional_summary}</p></div>` : ''}
-      ${assessmentForm.address ? `<div style="margin-bottom:12px"><b>Endereço:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.address}</p></div>` : ''}
-      ${assessmentForm.academic_list && assessmentForm.academic_list.length > 0 ? `
-      <div style="margin-bottom:14px">
-        <b style="font-size:13px;color:#334155">Formação Acadêmica & Cursos:</b>
-        <div style="margin-top:6px;display:flex;flex-direction:column;gap:8px">
-          ${assessmentForm.academic_list.map(ac => `
-            <div style="padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">
-              <div style="font-weight:600;font-size:13px;color:#1e293b">${ac.course || 'Curso não informado'} — <span style="color:#64748b;font-weight:500">${ac.institution || 'Instituição não informada'}</span></div>
-              <div style="font-size:12px;color:#64748b;margin-top:2px">Período: ${ac.start_date || 'N/I'} até ${ac.in_progress ? 'Em andamento' : (ac.end_date || 'N/I')}</div>
-            </div>
-          `).join('')}
-        </div>
-      </div>` : ''}
-      ${assessmentForm.experience_list && assessmentForm.experience_list.length > 0 ? `
-      <div style="margin-bottom:12px">
-        <b style="font-size:13px;color:#334155">Histórico Profissional & Experiências:</b>
-        <div style="margin-top:6px;display:flex;flex-direction:column;gap:10px">
-          ${assessmentForm.experience_list.map(ex => `
-            <div style="padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">
-              <div style="display:flex;justify-content:space-between;align-items:baseline">
-                <span style="font-weight:600;font-size:13px;color:#1e293b">${ex.role || 'Cargo não informado'} <span style="color:#64748b;font-weight:500">em ${ex.company || 'Empresa não informada'}</span></span>
-                <span style="font-size:11px;color:#475569;background:#e2e8f0;padding:2px 8px;border-radius:4px">${ex.start_date || 'N/I'} - ${ex.is_current ? 'Atual / Até o momento' : (ex.end_date || 'N/I')}</span>
-              </div>
-              ${ex.description ? `<p style="font-size:12px;margin:6px 0 0 0;white-space:pre-wrap;color:#475569;line-height:1.4">${ex.description}</p>` : ''}
-            </div>
-          `).join('')}
-        </div>
-      </div>` : (assessmentForm.experience_summary ? `<div><b>Experiência:</b><p style="font-size:13px;margin:4px 0;white-space:pre-wrap;color:#475569">${assessmentForm.experience_summary}</p></div>` : '')}
-    </div>` : ''}
-
-    <div class="section">
-      <div class="section-title">Avaliação</div>
-      <div class="eval-grid">
-        <div class="eval-card"><label>Avaliação Técnica</label><span>${assessmentForm.technical || '—'}</span></div>
-        <div class="eval-card"><label>Comunicação</label><span>${assessmentForm.communication || '—'}</span></div>
-        <div class="eval-card"><label>Fit Cultural</label><span>${assessmentForm.cultural_fit || '—'}</span></div>
-      </div>
-      <div style="margin-top:12px"><label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:6px">Teste Psicológico Realizado</label><span class="psy">${assessmentForm.psychological_test || 'Não Informado'}</span></div>
-      ${assessmentForm.psychological_test === 'Sim' && assessmentForm.tests_details ? `
-      <div style="margin-top:16px">
-        <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#94a3b8;display:block;margin-bottom:6px">Testes Aplicados e Resultados</label>
-        <div style="font-size: 14px; line-height: 1.6; color: #334155; white-space: pre-wrap; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">${assessmentForm.tests_details}</div>
-      </div>` : ''}
-    </div>
-
-    ${fortes.length > 0 ? `
-    <div class="section">
-      <div class="section-title">Pontos Fortes</div>
-      <div class="tags">${fortes.map(f => `<span class="tag tag-green">${f}</span>`).join('')}</div>
-    </div>` : ''}
-
-    ${fracos.length > 0 ? `
-    <div class="section">
-      <div class="section-title">Pontos a Desenvolver</div>
-      <div class="tags">${fracos.map(f => `<span class="tag tag-orange">${f}</span>`).join('')}</div>
-    </div>` : ''}
-
-    ${assessmentForm.observations ? `
-    <div class="section">
-      <div class="section-title">Parecer Final</div>
-      <div class="observations">${assessmentForm.observations}</div>
-    </div>` : ''}
-  </div>
-  <div class="footer">
-    <span>Gerado em ${new Date().toLocaleString('pt-BR')}</span>
-    <span>RH · Gestão de Pessoas</span>
-  </div>
-</div>
-<button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
-</body>
-</html>`;
-
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      win.onload = () => win.print();
-    }
-  };
-
   const handleModalSave = async (formData: any, assessmentData: any, interviewProgress?: { status: string; result: string; destination?: string; interview_date?: string; interview_time?: string }) => {
-    setSaving(true);
     setError("");
     const supabase = createClient();
 
@@ -1161,7 +488,6 @@ Destino: ${form.destination || "N/I"}
     const fail: (message: string, variant?: "error" | "warning") => never = (message, variant = "error") => {
       setError(message);
       toast(message, variant);
-      setSaving(false);
       throw Object.assign(new Error(message), { handled: true });
     };
 
@@ -1177,11 +503,16 @@ Destino: ${form.destination || "N/I"}
       const parts = payloadAny.candidate_name.split(" ");
       const tag = payloadAny.destination || (payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : payloadAny.result === "Reprovado" ? "Reprovado na Entrevista" : "Entrevistado");
 
-      const { data: upsertData, error: upsertError } = await supabase.from("candidates").upsert({
+      // Quem é esta pessoa: e-mail de verdade, depois CPF, depois telefone. Antes era
+      // `upsert onConflict: email` com um e-mail derivado do primeiro nome — dois homônimos
+      // sem e-mail viravam o mesmo cadastro (issue #76).
+      const identidade = { email: payloadAny.email, cpf: formData.cpf, phone: payloadAny.phone };
+      const existente = await findExistingCandidateId(supabase, identidade);
+      const dadosDoCandidato = {
         full_name: payloadAny.candidate_name,
         first_name: parts[0] || "",
         last_name: parts.slice(1).join(" ") || "",
-        email: payloadAny.email || `${parts[0]?.toLowerCase() || 'candidato'}@sememail.com`,
+        email: hasRealEmail(payloadAny.email) ? payloadAny.email : undefined,
         phone: payloadAny.phone,
         role_interest: payloadAny.role,
         city: assessmentData.worksite || "",
@@ -1205,9 +536,30 @@ Destino: ${form.destination || "N/I"}
         dependents_count: formData.dependents_count ?? null,
         uniform_size: formData.uniform_size || null,
         boot_size: formData.boot_size || null
-      }, { onConflict: "email" }).select("id").single();
-      if (upsertError) console.error("Erro ao enviar para candidatos:", upsertError);
-      else if (upsertData) candidateId = upsertData.id;
+      };
+      // `email` é NOT NULL UNIQUE: quem não informou ganha uma chave própria, nunca
+      // uma derivada do nome. Num cadastro que já existe, o e-mail atual é preservado.
+      const semEmail = dadosDoCandidato.email === undefined;
+
+      if (existente) {
+        const { error: updateError } = await supabase
+          .from("candidates")
+          .update(semEmail ? { ...dadosDoCandidato, email: undefined } : dadosDoCandidato)
+          .eq("id", existente);
+        if (updateError) console.error("Erro ao atualizar candidato:", updateError);
+        else candidateId = existente;
+      } else {
+        const { data: inserido, error: insertError } = await supabase
+          .from("candidates")
+          .insert({
+            ...dadosDoCandidato,
+            email: semEmail ? placeholderEmail(payloadAny.candidate_name) : dadosDoCandidato.email,
+          })
+          .select("id")
+          .single();
+        if (insertError) console.error("Erro ao enviar para candidatos:", insertError);
+        else if (inserido) candidateId = inserido.id;
+      }
     }
 
     // 2. Trocar a vaga de uma entrevista salva apagaria o registro (e o parecer) da vaga
@@ -1283,217 +635,15 @@ Destino: ${form.destination || "N/I"}
 
     setIsModalOpen(false);
     loadInterviews();
-    setSaving(false);
     return candidateId ?? undefined;
   };
   
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type === "application/pdf") {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const typedarray = new Uint8Array(reader.result as ArrayBuffer);
-          const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
-          let text = "";
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const content = await page.getTextContent();
-            // itemsToText separa as colunas do PDF com TAB (a Sólides usa duas
-            // colunas nos dados pessoais) e descarta os rodapés "1 / 3".
-            text += itemsToText(content.items) + "\n";
-          }
-          setResumeText(text);
-        } catch (err) {
-          console.error(err);
-          alert("Erro ao extrair texto do PDF. O arquivo pode estar protegido.");
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    } else if (file.type === "text/plain") {
-      const reader = new FileReader();
-      reader.onload = () => setResumeText(reader.result as string);
-      reader.readAsText(file);
-    } else {
-      alert("Formato não suportado. Por favor, envie um arquivo PDF ou TXT.");
-    }
-  };
-
   // Aplica no formulário o currículo lido — pelo parser local ou pela IA.
-  const applyParsedResume = (parsed: ParsedResumeFields) => {
-    openNewModal();
-    setForm(prev => ({
-      ...prev,
-      candidate_name: parsed.name || "",
-      email: parsed.email || "",
-      phone: parsed.phone || "",
-      // Vaga fica SEMPRE em branco: é escolhida no dropdown de job_profiles.
-      // Deixar a IA preencher enchia o campo com o cargo do último emprego.
-      role: ""
-    }));
-    setAssessmentForm(prev => ({
-      ...prev,
-      age: parsed.age || prev.age,
-      location: parsed.location || prev.location,
-      is_internal: typeof parsed.is_internal === "boolean" ? parsed.is_internal : prev.is_internal,
-      education: parsed.education || prev.education,
-      professional_summary: parsed.professional_summary || prev.professional_summary,
-      experience_summary: parsed.experience_summary || prev.experience_summary,
-      cnh: parsed.cnh || prev.cnh,
-      cnh_category: parsed.cnh_category || prev.cnh_category,
-      birth_date: parsed.birth_date || prev.birth_date,
-      cpf: parsed.cpf || prev.cpf,
-      gender: parsed.gender || prev.gender,
-      address: parsed.address || prev.address,
-      marital_status: parsed.marital_status || prev.marital_status,
-      birthplace: parsed.birthplace || prev.birthplace,
-      secondary_phone: parsed.secondary_phone || prev.secondary_phone,
-      secondary_email: parsed.secondary_email || prev.secondary_email,
-      emergency_contact_phone: parsed.emergency_contact_phone || prev.emergency_contact_phone,
-      emergency_contact_name: parsed.emergency_contact_name || prev.emergency_contact_name,
-      salary_expectation: parsed.salary_expectation || prev.salary_expectation,
-      has_cnh: typeof parsed.has_cnh === "boolean" ? parsed.has_cnh : prev.has_cnh,
-      cnh_categories: Array.isArray(parsed.cnh_categories) ? parsed.cnh_categories : prev.cnh_categories,
-      has_dependents: typeof parsed.has_dependents === "boolean" ? parsed.has_dependents : prev.has_dependents,
-      dependents_count: typeof parsed.dependents_count === "number" ? parsed.dependents_count : prev.dependents_count,
-      dependents_notes: parsed.dependents_notes || prev.dependents_notes,
-      uniform_size: parsed.uniform_size || prev.uniform_size,
-      boot_size: parsed.boot_size || prev.boot_size,
-      gender_identity: parsed.gender_identity || prev.gender_identity,
-      sexual_orientation: parsed.sexual_orientation || prev.sexual_orientation,
-      race_declaration: parsed.race_declaration || prev.race_declaration,
-      languages: parsed.languages || prev.languages,
-      academic_list: Array.isArray(parsed.academic_list) ? parsed.academic_list.map((item, idx) => ({
-        id: String(Date.now() + idx),
-        course: item.course || "",
-        institution: item.institution || "",
-        start_date: item.start_date || "",
-        end_date: item.end_date || "",
-        in_progress: Boolean(item.in_progress)
-      })) : prev.academic_list || [],
-      experience_list: Array.isArray(parsed.experience_list) ? parsed.experience_list.map((item, idx) => ({
-        id: String(Date.now() + 100 + idx),
-        role: item.role || "",
-        company: item.company || "",
-        start_date: item.start_date || "",
-        end_date: item.end_date || "",
-        is_current: Boolean(item.is_current),
-        description: item.description || ""
-      })) : prev.experience_list || []
-    }));
-  };
-
-  const parseWithoutAI = () => {
-    if (!resumeText.trim()) return;
-    applyParsedResume(parseSolidesResume(resumeText));
-  };
-
-  const analyzeResume = async () => {
-    if (!resumeText.trim()) return;
-    setIsAnalyzingResume(true);
-    
-    // Prompt calibrado nos currículos reais do acervo — ver src/lib/resumeExtractionPrompt.ts.
-    // A seção "Habilidades" não é mais recortada do texto: ela vinha sendo apagada por regex
-    // porque candidatos colam requisitos de anúncio de vaga ali, mas o recorte também comia
-    // conteúdo legítimo até a próxima seção. A regra R14 do prompt trata isso sem perder texto.
-    const prompt = buildResumeExtractionPrompt(resumeText);
-
-    try {
-      const model = await fetchResumeModel(createClient());
-      const generatedText = await generateWithAI(prompt, model);
-      const parsed = parseExtractionResponse(generatedText);
-
-      applyParsedResume(parsed as Parameters<typeof applyParsedResume>[0]);
-    } catch (e) {
-      console.error(e);
-      alert("Falha na Inteligência Artificial: " + errorMessage(e, "A resposta não estava no formato JSON correto."));
-    }
-    setIsAnalyzingResume(false);
-  };
-
-  const moveToTalents = async () => {
-    if (!assessmentForm.worksite || !assessmentForm.selection_stage) {
-      setError("Para mover, preencha 'Obra / Plantão / Sede' e 'Fase do Processo Seletivo'.");
-      return;
-    }
-    if (!form.candidate_name || !form.email) {
-      setError("Candidato precisa de nome e email para ir ao Banco de Talentos.");
-      return;
-    }
-    setMovingToTalents(true);
-    setError("");
-    const supabase = createClient();
-    const parts = form.candidate_name.split(" ");
-
-    const candidateData = {
-      full_name: form.candidate_name,
-      first_name: parts[0] || "",
-      last_name: parts.slice(1).join(" ") || "",
-      email: form.email,
-      phone: form.phone,
-      role_interest: form.role,
-      // Usa a cidade/localização real do candidato; worksite é a obra de destino
-      city: assessmentForm.location || assessmentForm.worksite,
-      available_worksites: assessmentForm.worksite ? [assessmentForm.worksite] : [],
-      search_tags: [assessmentForm.selection_stage, "Importado de Entrevistas"].filter(Boolean)
-    };
-
-    const { data: inserted, error: insertError } = await supabase
-      .from("candidates")
-      .insert(candidateData)
-      .select("id")
-      .single();
-
-    if (insertError) {
-      setError("Erro ao enviar para o Banco de Talentos: " + insertError.message);
-      setMovingToTalents(false);
-      return;
-    }
-
-    const candidateId = inserted?.id;
-
-    // Persiste formação acadêmica extraída pela IA / parser
-    const academicList = assessmentForm.academic_list ?? [];
-    if (candidateId && academicList.length > 0) {
-      const educations = academicList.map(item => ({
-        candidate_id: candidateId,
-        institution_name: item.institution || "Não informada",
-        degree: item.course || "Não informado",
-        start_date: item.start_date || null,
-        end_date: item.in_progress ? null : (item.end_date || null),
-      }));
-      const { error: eduError } = await supabase.from("candidate_educations").insert(educations);
-      if (eduError) console.warn("Erro ao salvar formações:", eduError.message);
-    }
-
-    // Persiste experiências profissionais extraídas pela IA / parser
-    const experienceList = assessmentForm.experience_list ?? [];
-    if (candidateId && experienceList.length > 0) {
-      const experiences = experienceList.map(item => ({
-        candidate_id: candidateId,
-        company_name: item.company || "Não informada",
-        position_title: item.role || "Não informado",
-        start_date: item.start_date || null,
-        end_date: item.is_current ? null : (item.end_date || null),
-        is_current: item.is_current ?? false,
-        description: item.description || "",
-      }));
-      const { error: expError } = await supabase.from("candidate_experiences").insert(experiences);
-      if (expError) console.warn("Erro ao salvar experiências:", expError.message);
-    }
-
-    alert("Candidato movido para o Banco de Talentos com sucesso!");
-    setMovingToTalents(false);
-  };
-
   const openNewModal = () => {
     setEditingId(null);
     setCurrentUpdatedAt(null);
     setForm({ candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C", destination: "" });
     setAssessmentForm(defaultAssessment);
-    setActiveTab("dados");
     setIsModalOpen(true);
   };
   
@@ -1513,7 +663,6 @@ Destino: ${form.destination || "N/I"}
       destination: "",
     });
     setAssessmentForm(defaultAssessment);
-    setActiveTab("dados");
     setIsModalOpen(true);
   };
 
@@ -1551,7 +700,6 @@ Destino: ${form.destination || "N/I"}
       uniform_size: interview.uniform_size ?? assessment.uniform_size,
       boot_size: interview.boot_size ?? assessment.boot_size,
     });
-    setActiveTab("dados");
     setIsModalOpen(true);
   };
 
@@ -1566,46 +714,6 @@ Destino: ${form.destination || "N/I"}
     }
     setInterviews((prev) => prev.filter((i) => i.id !== id));
     if (editingId === id) setIsModalOpen(false);
-  };
-
-  const PREDEFINED_STRENGTHS = ["Proatividade", "Boa Comunicação", "Experiência", "Trabalho em Equipe", "Organização", "Liderança", "Foco em Resultados", "Empatia", "Resiliência"];
-  const PREDEFINED_WEAKNESSES = ["Timidez", "Falta de Experiência Técnica", "Insegurança", "Dificuldade com Ferramentas", "Postura", "Conhecimento Básico", "Nervosismo", "Falta de Clareza"];
-
-  const toggleListItem = (list: string, item: string) => {
-    const arr = list ? list.split(',').map(s => s.trim()).filter(Boolean) : [];
-    if (arr.includes(item)) {
-      return arr.filter(i => i !== item).join(', ');
-    } else {
-      return [...arr, item].join(', ');
-    }
-  };
-
-  const generateParecerText = () => {
-    const parts: string[] = [];
-    if (assessmentForm.technical) parts.push(`Apresentou uma avaliação técnica ${assessmentForm.technical.toLowerCase()}.`);
-    if (assessmentForm.communication) parts.push(`Sua comunicação foi avaliada como ${assessmentForm.communication.toLowerCase()}.`);
-    if (assessmentForm.cultural_fit) parts.push(`Demonstrou aderência cultural ${assessmentForm.cultural_fit.toLowerCase()} com os valores da empresa.`);
-    
-    const fortes = assessmentForm.strengths ? assessmentForm.strengths.split(',').map(s => s.trim().toLowerCase()) : [];
-    if (fortes.length > 0) {
-      parts.push(`Como pontos fortes, destacou-se por apresentar ${fortes.join(', ')}.`);
-    }
-
-    const fracos = assessmentForm.weaknesses ? assessmentForm.weaknesses.split(',').map(s => s.trim().toLowerCase()) : [];
-    if (fracos.length > 0) {
-      parts.push(`Como pontos de atenção e desenvolvimento, notou-se: ${fracos.join(', ')}.`);
-    }
-
-    if (parts.length === 0) {
-      parts.push("Nenhuma avaliação técnica ou comportamental preenchida.");
-    } else {
-      parts.push("Candidato(a) " + (form.result === "Aprovado" ? "recomendado(a) para a vaga." : form.result === "Reprovado" ? "não recomendado(a) para a vaga neste momento." : "aguardando definição final."));
-    }
-
-    setAssessmentForm(prev => ({
-      ...prev,
-      observations: parts.join(' ')
-    }));
   };
 
   return (
