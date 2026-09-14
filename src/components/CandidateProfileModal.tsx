@@ -21,9 +21,9 @@ import { normalizeResumeDate } from "@/lib/resumeDate";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/contexts/ToastContext";
 import { errorMessage } from "@/lib/utils";
-import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId, syncInterviewDestination } from "@/lib/candidateHistory.mjs";
+import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
 import { deriveCandidateStatus, LIMITED_STAGE_OPTIONS, STAGE_OPTIONS } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
-import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
+import { INTERVIEW_STATUSES, normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -211,10 +211,12 @@ type CandidateProfileModalProps = {
   defaultEditMode?: boolean;
   initialData?: Partial<ProfilePerson>;
   initialAssessmentData?: any;
-  interviewProgress?: { status: string; result: string; destination?: string };
+  interviewProgress?: { status: string; result: string; destination?: string; interview_date?: string; interview_time?: string };
+  /** Ficha em branco abre travada: só depois de confirmar é que os campos liberam. */
+  startLocked?: boolean;
   /** Só a tela que sabe gravar o parecer (entrevistas) libera a edição da aba Parecer. */
   canSaveAssessment?: boolean;
-  onSave?: (data: ProfilePerson, assessmentData: any, interviewProgress?: { status: string; result: string; destination?: string }) => Promise<string | void>;
+  onSave?: (data: ProfilePerson, assessmentData: any, interviewProgress?: { status: string; result: string; destination?: string; interview_date?: string; interview_time?: string }) => Promise<string | void>;
 };
 
 export function CandidateProfileModal({
@@ -230,6 +232,7 @@ export function CandidateProfileModal({
   initialData,
   initialAssessmentData,
   interviewProgress,
+  startLocked = false,
   canSaveAssessment = false,
   onSave
 }: CandidateProfileModalProps) {
@@ -242,7 +245,10 @@ export function CandidateProfileModal({
   const [formData, setFormData] = useState<ProfilePerson>(initialData || {});
   const [assessmentData, setAssessmentData] = useState<any>(initialAssessmentData || {});
   const [progress, setProgress] = useState(() => normalizeInterviewProgress(interviewProgress || { status: "Aguardando", result: "N/C", destination: "" }));
-  const [isEditing, setIsEditing] = useState(defaultEditMode && !!onSave);
+  const [isEditing, setIsEditing] = useState(defaultEditMode && !!onSave && !startLocked);
+  // Ficha nova abrindo em branco e já editável fazia o usuário digitar por cima de um
+  // registro que ele achava que era o antigo. Agora precisa destravar de propósito.
+  const [locked, setLocked] = useState(startLocked);
   const [isSaving, setIsSaving] = useState(false);
   const [assessmentLoadError, setAssessmentLoadError] = useState("");
   const [isParsingCv, setIsParsingCv] = useState(false);
@@ -296,14 +302,6 @@ export function CandidateProfileModal({
       ]);
 
       if (error) throw error;
-
-      // Etapa terminal também manda no Destino da entrevista (issue #41, opção b).
-      const sync = await syncInterviewDestination(supabase, {
-        email: person?.email || email || "",
-        fullName: person?.full_name || person?.name || candidateName || "",
-        stage: historyForm.stage,
-      });
-      if (sync?.error) toast(`Etapa salva, mas o destino da entrevista não: ${errorMessage(sync.error)}`, "warning");
 
       // Reload history
       const { data } = await supabase.from("candidate_interviews").select("*").eq("candidate_id", targetCandId).order("created_at", { ascending: false });
@@ -680,6 +678,12 @@ export function CandidateProfileModal({
       toast("Esta tela não permite salvar alterações da ficha.", "error");
       return;
     }
+    // Entrevista sem data não vira registro: é o dado que sustenta agenda e histórico,
+    // inclusive de quem não compareceu.
+    if (interviewProgress && !progress.interview_date) {
+      toast("Informe a data da entrevista antes de salvar.", "error");
+      return;
+    }
     setIsSaving(true);
     try {
       const returnedId = await onSave(formData, assessmentData, progress);
@@ -735,9 +739,16 @@ export function CandidateProfileModal({
     }
   };
 
+  // A prop chega como objeto novo a cada render do pai. Depender dela crua fazia este
+  // efeito rodar no meio da edição e jogar fora o que o usuário tinha acabado de escolher.
+  // A dependência é o conteúdo, não a identidade do objeto.
+  const interviewProgressKey = interviewProgress
+    ? [interviewProgress.status, interviewProgress.result, interviewProgress.destination, interviewProgress.interview_date, interviewProgress.interview_time].join("|")
+    : "";
   useEffect(() => {
     if (interviewProgress) setProgress(normalizeInterviewProgress(interviewProgress));
-  }, [interviewProgress]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interviewProgressKey]);
 
   // Fecha com ESC
   useEffect(() => {
@@ -973,7 +984,7 @@ export function CandidateProfileModal({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-background shadow-2xl border outline-none animate-in fade-in zoom-in-95 duration-200"
+        className="relative flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-background shadow-2xl border outline-none animate-in fade-in zoom-in-95 duration-200"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b px-6 py-4 bg-muted/30">
@@ -1011,8 +1022,24 @@ export function CandidateProfileModal({
           </div>
         </div>
 
+        {locked && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/40">
+            <div className="flex flex-col items-center gap-3 rounded-xl border bg-background/95 px-8 py-6 text-center shadow-lg">
+              <p className="max-w-xs text-sm text-muted-foreground">
+                Ficha em branco. Os campos estão bloqueados para não registrar nada sem querer.
+              </p>
+              <Button
+                onClick={() => { setLocked(false); setIsEditing(true); }}
+                className="gap-2 bg-amber-500 text-amber-950 hover:bg-amber-500/90"
+              >
+                <Plus className="h-4 w-4" /> Registrar nova entrevista
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Content (Sidebar Layout) */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className={`flex flex-1 overflow-hidden ${locked ? "pointer-events-none select-none blur-[3px]" : ""}`}>
           {loading ? (
             <div className="flex h-full w-full items-center justify-center text-muted-foreground">
               <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
@@ -1217,18 +1244,39 @@ export function CandidateProfileModal({
                           <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
                         </summary>
                         <div className="p-5 grid gap-4 sm:grid-cols-2 text-sm">
+                          {/* Data e hora ficam no registro mesmo quando o candidato não
+                              compareceu: é o que aconteceu com a entrevista marcada. */}
+                          <label className="space-y-1.5">
+                            <span className="text-xs text-muted-foreground block font-medium">Data da entrevista</span>
+                            <input
+                              type="date"
+                              disabled={!isEditing}
+                              value={progress.interview_date || ""}
+                              onChange={(e) => setProgress(normalizeInterviewProgress({ ...progress, interview_date: e.target.value }))}
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
+                            />
+                          </label>
+                          <label className="space-y-1.5">
+                            <span className="text-xs text-muted-foreground block font-medium">Hora</span>
+                            <input
+                              type="time"
+                              disabled={!isEditing}
+                              value={progress.interview_time || ""}
+                              onChange={(e) => setProgress(normalizeInterviewProgress({ ...progress, interview_time: e.target.value }))}
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
+                            />
+                          </label>
                           <label className="space-y-1.5">
                             <span className="text-xs text-muted-foreground block font-medium">Status</span>
                             <select
                               disabled={!isEditing}
                               value={progress.status}
-                              onChange={(e) => setProgress(normalizeInterviewProgress({ status: e.target.value, result: progress.result, destination: progress.destination }))}
+                              onChange={(e) => setProgress(normalizeInterviewProgress({ ...progress, status: e.target.value }))}
                               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
                             >
-                              <option value="Aguardando">Aguardando</option>
-                              <option value="Confirmado">Confirmado</option>
-                              <option value="Compareceu">Compareceu</option>
-                              <option value="Desistente">Desistente</option>
+                              {INTERVIEW_STATUSES.map((s: string) => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
                             </select>
                           </label>
                           <label className="space-y-1.5">
@@ -1236,7 +1284,7 @@ export function CandidateProfileModal({
                             <select
                               disabled={!isEditing}
                               value={progress.result}
-                              onChange={(e) => setProgress(normalizeInterviewProgress({ status: progress.status, result: e.target.value, destination: progress.destination }))}
+                              onChange={(e) => setProgress(normalizeInterviewProgress({ ...progress, result: e.target.value }))}
                               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
                             >
                               <option value="N/C">N/C</option>
@@ -1249,7 +1297,7 @@ export function CandidateProfileModal({
                             <select
                               disabled={!isEditing}
                               value={progress.destination}
-                              onChange={(e) => setProgress(normalizeInterviewProgress({ status: progress.status, result: progress.result, destination: e.target.value }))}
+                              onChange={(e) => setProgress(normalizeInterviewProgress({ ...progress, destination: e.target.value }))}
                               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
                             >
                               <option value="">-</option>

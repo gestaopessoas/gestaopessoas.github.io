@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -22,9 +22,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createClient } from "@/utils/supabase/client";
-import { STAGE_BUCKETS, BUCKET_ORDER, BUCKET_LABELS, TERMINAL_STAGES } from "../lib/candidateLogic.mjs";
+import { useRouter } from "next/navigation";
+import { STAGE_BUCKETS, BUCKET_ORDER, TERMINAL_STAGES, isInterviewStage } from "../lib/candidateLogic.mjs";
+import { formatInterviewSchedule } from "@/lib/interviewProgress.mjs";
 import { errorMessage } from "@/lib/utils";
-import { syncInterviewDestination } from "@/lib/candidateHistory.mjs";
 
 export default function AdvanceStageModal({
   isOpen,
@@ -46,15 +47,29 @@ export default function AdvanceStageModal({
   workplaceName?: string | null;
 }) {
   const [selectedStage, setSelectedStage] = useState("");
+  // Avançar para uma etapa de entrevista marca a entrevista: data e hora entram aqui e
+  // viram registro em `interviews`, que é o que alimenta a agenda e o histórico.
+  const [stageDate, setStageDate] = useState("");
+  const [stageTime, setStageTime] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [currentUserName, setCurrentUserName] = useState("");
+  const router = useRouter();
 
-  const [technical, setTechnical] = useState("");
-  const [communication, setCommunication] = useState("");
-  const [culturalFit, setCulturalFit] = useState("");
-  const [strengths, setStrengths] = useState("");
-  const [weaknesses, setWeaknesses] = useState("");
+  // Quem avançou a etapa assina o histórico — antes ficava "Desconhecido".
+  useEffect(() => {
+    if (!isOpen) return;
+    const carregar = async () => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return;
+      const { data: perfil } = await supabase.from("profiles").select("name").eq("id", data.user.id).maybeSingle();
+      setCurrentUserName(perfil?.name || data.user.email?.split("@")[0] || "");
+    };
+    carregar();
+  }, [isOpen]);
+
   const [candidateFuture, setCandidateFuture] = useState<string[]>([]);
 
   const futureOptions = [
@@ -93,7 +108,9 @@ export default function AdvanceStageModal({
     return stages;
   }, [currentBucket]);
 
-  const handleSave = async () => {
+  // Quem quiser o parecer vai para a ficha da entrevista recém-criada; quem não quiser
+  // termina o avanço em dois cliques.
+  const handleSave = async (abrirParecer = false) => {
     if (!selectedStage) {
       setError("Selecione a próxima etapa.");
       return;
@@ -104,34 +121,65 @@ export default function AdvanceStageModal({
     const supabase = createClient();
 
     try {
+      // O parecer da entrevista mora na ficha da entrevista, não aqui: esta tela registra
+      // a etapa. Só o que é do avanço fica nas notas.
       let finalNotes = "";
-      if (technical) finalNotes += `[Avaliação Técnica]\n${technical}\n\n`;
-      if (communication) finalNotes += `[Comunicação]\n${communication}\n\n`;
-      if (culturalFit) finalNotes += `[Fit Cultural]\n${culturalFit}\n\n`;
-      if (strengths) finalNotes += `[Pontos Fortes]\n${strengths}\n\n`;
-      if (weaknesses) finalNotes += `[Pontos a Desenvolver]\n${weaknesses}\n\n`;
       if (candidateFuture.length > 0) finalNotes += `[Futuro do Candidato]\n${candidateFuture.join(", ")}\n\n`;
       if (notes) finalNotes += `[Observações Gerais]\n${notes}\n\n`;
 
+      const marcaEntrevista = isInterviewStage(selectedStage);
+      if (marcaEntrevista && !stageDate) {
+        setError("Informe a data da entrevista.");
+        setSaving(false);
+        return;
+      }
+
+      const quando = marcaEntrevista ? formatInterviewSchedule(stageDate, stageTime) : "";
       const { error: insertError } = await supabase.from("candidate_interviews").insert({
         candidate_id: candidateId,
         stage: selectedStage,
-        notes: finalNotes.trim() || null,
+        notes: [quando ? `[Entrevista marcada]\n${quando}` : "", finalNotes.trim()].filter(Boolean).join("\n\n") || null,
         workplace_name: workplaceName || null,
+        interviewer_name: currentUserName || null,
         candidate_future: candidateFuture.join(", ") || null,
       });
 
       if (insertError) throw insertError;
-      // Etapa terminal reflete no Destino da entrevista (issue #41, opção b).
-      await syncInterviewDestination(supabase, { fullName: candidateName, stage: selectedStage });
+
+      // A entrevista agendada aqui precisa existir em `interviews`: é de lá que saem a
+      // agenda, a situação do candidato e o parecer.
+      if (marcaEntrevista) {
+        const { data: candidato } = await supabase
+          .from("candidates")
+          .select("full_name, email, phone, role_interest")
+          .eq("id", candidateId)
+          .maybeSingle();
+        const { data: entrevista, error: interviewError } = await supabase.from("interviews").insert({
+          candidate_id: candidateId,
+          candidate_name: candidato?.full_name || candidateName,
+          email: candidato?.email || null,
+          phone: candidato?.phone || null,
+          role: candidato?.role_interest || null,
+          interview_date: stageDate,
+          interview_time: stageTime || null,
+          status: "Aguardando",
+          result: "N/C",
+        }).select("id").single();
+        if (interviewError) {
+          setError(`Etapa salva, mas a entrevista não foi agendada: ${interviewError.message}`);
+          setSaving(false);
+          return;
+        }
+        if (abrirParecer && entrevista) {
+          router.push(`/dashboard/entrevistas?entrevista=${entrevista.id}`);
+        }
+      }
+
       onSuccess();
       setSelectedStage("");
+      setStageDate("");
+      setStageTime("");
       setNotes("");
-      setTechnical("");
-      setCommunication("");
-      setCulturalFit("");
-      setStrengths("");
-      setWeaknesses("");
       setCandidateFuture([]);
     } catch (err) {
       console.error(err);
@@ -177,62 +225,30 @@ export default function AdvanceStageModal({
             </Select>
           </div>
 
-          <div className="space-y-4 pt-2 border-t mt-4">
-            <h4 className="text-sm font-semibold text-muted-foreground">Avaliação (Opcional)</h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="technical">Avaliação Técnica</Label>
-                <Textarea
-                  id="technical"
-                  placeholder="Conhecimentos técnicos, experiência..."
-                  value={technical}
-                  onChange={(e) => setTechnical(e.target.value)}
-                  className="min-h-[80px]"
+          {isInterviewStage(selectedStage) && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Data da entrevista *</label>
+                <input
+                  type="date"
+                  value={stageDate}
+                  onChange={(e) => setStageDate(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="communication">Comunicação</Label>
-                <Textarea
-                  id="communication"
-                  placeholder="Clareza, articulação, postura..."
-                  value={communication}
-                  onChange={(e) => setCommunication(e.target.value)}
-                  className="min-h-[80px]"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="culturalFit">Fit Cultural</Label>
-                <Textarea
-                  id="culturalFit"
-                  placeholder="Alinhamento com os valores da empresa..."
-                  value={culturalFit}
-                  onChange={(e) => setCulturalFit(e.target.value)}
-                  className="min-h-[80px]"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="strengths">Pontos Fortes</Label>
-                <Textarea
-                  id="strengths"
-                  placeholder="Principais qualidades do candidato..."
-                  value={strengths}
-                  onChange={(e) => setStrengths(e.target.value)}
-                  className="min-h-[80px]"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="weaknesses">Pontos a Desenvolver</Label>
-                <Textarea
-                  id="weaknesses"
-                  placeholder="Pontos de melhoria, atenção..."
-                  value={weaknesses}
-                  onChange={(e) => setWeaknesses(e.target.value)}
-                  className="min-h-[80px]"
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Hora</label>
+                <input
+                  type="time"
+                  value={stageTime}
+                  onChange={(e) => setStageTime(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 />
               </div>
             </div>
+          )}
 
+          <div className="space-y-4 pt-2 border-t mt-4">
             <div className="space-y-3 pt-2">
               <Label>Futuro do Candidato</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border p-3 rounded-md bg-muted/20">
@@ -276,7 +292,13 @@ export default function AdvanceStageModal({
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          {isInterviewStage(selectedStage) && (
+            <Button variant="secondary" onClick={() => handleSave(true)} disabled={saving} className="gap-2">
+              <FileText className="h-4 w-4" />
+              Avançar e preencher parecer
+            </Button>
+          )}
+          <Button onClick={() => handleSave()} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirmar Avanço
           </Button>

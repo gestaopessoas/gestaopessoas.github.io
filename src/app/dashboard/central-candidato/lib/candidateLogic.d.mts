@@ -7,6 +7,7 @@ export function normalizeStage(value: unknown): string;
 export function sameStage(a: unknown, b: unknown): boolean;
 export function isUnlockStage(stage: unknown): boolean;
 export function isTerminalStage(stage: unknown): boolean;
+export function isInterviewStage(stage: unknown): boolean;
 
 export interface InterviewLike {
   created_at: string;
@@ -35,8 +36,21 @@ export interface CandidateStatus {
 
 export function deriveCandidateStatus(interviews?: InterviewLike[] | null): CandidateStatus;
 
+export interface InterviewProgressLike {
+  status?: string | null;
+  result?: string | null;
+  destination?: string | null;
+}
+
+export const PENDING_INTERVIEW_STATUSES: string[];
+
+export function statusFromInterviewProgress(
+  progress?: InterviewProgressLike | null
+): { status: string; etapa_atual: string | null } | null;
+
 export interface CandidateLike {
   candidate_interviews?: InterviewLike[] | null;
+  interview_progress?: InterviewProgressLike | null;
   search_tags?: string[] | null;
   available_worksites?: string[] | null;
   city?: string | null;

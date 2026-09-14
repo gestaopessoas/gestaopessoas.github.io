@@ -84,7 +84,7 @@ export default function CentralCandidatoPage() {
     if (!selectedCandidateId) return;
     const row = candidates.find((c) => c.id === selectedCandidateId);
     let active = true;
-    fetchInterviewProgress(supabase, { email: row?.email, fullName: row?.full_name }).then((progress) => {
+    fetchInterviewProgress(supabase, { candidateId: selectedCandidateId, email: row?.email, fullName: row?.full_name }).then((progress) => {
       if (active && progress) setLoadedProgress({ id: selectedCandidateId, progress });
     });
     return () => { active = false; };
@@ -122,18 +122,40 @@ export default function CentralCandidatoPage() {
         const emails = data.map(c => c.email).filter(Boolean);
         let interviewsData: any[] = [];
         if (emails.length > 0) {
-          const { data: ints } = await supabase.from("interviews").select("email, interview_assessments(interview_assessment_values(field,item_index,value))").in("email", emails);
+          const { data: ints } = await supabase
+            .from("interviews")
+            .select("candidate_id, email, status, result, destination, created_at, interview_assessments(interview_assessment_values(field,item_index,value))")
+            .or(`candidate_id.in.(${data.map((c) => c.id).join(",")}),email.in.(${emails.map((e) => `"${e}"`).join(",")})`)
+            .order("created_at", { ascending: false });
           if (ints) interviewsData = ints;
         }
 
+        // Situação da entrevista mais recente: contratado/entrevista agendada não podem
+        // cair no balde "Livres". Chaveia por candidate_id e, para as linhas antigas que
+        // ainda não têm o vínculo, por e-mail. A ordem do select já traz a mais nova primeiro.
+        const progressByKey = new Map<string, { status: string; result: string; destination: string }>();
+        for (const i of interviewsData) {
+          const progresso = {
+            status: i.status || "Aguardando",
+            result: i.result || "N/C",
+            destination: i.destination || "",
+          };
+          for (const chave of [i.candidate_id, i.email]) {
+            if (chave && !progressByKey.has(chave)) progressByKey.set(chave, progresso);
+          }
+        }
+
         const rows: CandidateRow[] = data.map((c) => {
-          const derived = resolveCandidateStatus(c);
+          const derived = resolveCandidateStatus({
+            ...c,
+            interview_progress: progressByKey.get(c.id) ?? (c.email ? progressByKey.get(c.email) ?? null : null),
+          });
           const finalStatus = derived.status;
           const finalChamado = derived.ultimo_chamado;
 
           let extraDegree = null;
           if (c.email) {
-            const intMatches = interviewsData.filter(i => i.email === c.email);
+            const intMatches = interviewsData.filter(i => i.candidate_id === c.id || i.email === c.email);
             for (const m of intMatches) {
               const assessment: any = rowsToAssessment(m.interview_assessments?.interview_assessment_values ?? []);
               if (Array.isArray(assessment.academic_list) && assessment.academic_list.length > 0) {

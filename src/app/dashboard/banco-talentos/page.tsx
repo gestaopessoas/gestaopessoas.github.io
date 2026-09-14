@@ -65,7 +65,7 @@ export default function BancoTalentosPage() {
     if (!selectedCandidateId) return;
     const row = candidates.find((c) => c.id === selectedCandidateId);
     let active = true;
-    fetchInterviewProgress(supabase, { email: row?.email, fullName: row?.full_name }).then((progress) => {
+    fetchInterviewProgress(supabase, { candidateId: selectedCandidateId, email: row?.email, fullName: row?.full_name }).then((progress) => {
       if (active && progress) setLoadedProgress({ id: selectedCandidateId, progress });
     });
     return () => { active = false; };

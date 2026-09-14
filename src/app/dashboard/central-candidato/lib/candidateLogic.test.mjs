@@ -6,6 +6,7 @@ import {
   isLockedByInterview,
   deriveCandidateStatus,
   latestEducationDegree,
+  isInterviewStage,
   candidateBucket,
   BUCKET_ORDER,
   STAGE_BUCKETS,
@@ -165,4 +166,37 @@ test("candidato sem entrevistas cai no Banco de Talentos", () => {
     assert.equal(derived.ultimo_chamado, "Nenhum contato");
   }
   assert.equal(resolveCandidateStatus({}).status, "Banco de Talentos");
+});
+
+test("contratado e entrevista agendada nunca caem no balde Livres", () => {
+  const livre = { search_tags: ["Banco de Talentos"], candidate_interviews: [] };
+
+  const contratado = resolveCandidateStatus({
+    ...livre,
+    interview_progress: { status: "Compareceu", result: "Aprovado", destination: "Contratado" },
+  });
+  assert.equal(contratado.status, "Contratado");
+  assert.notEqual(candidateBucket(contratado.status, contratado.etapa_atual), "livre");
+
+  for (const status of ["Aguardando", "Confirmado"]) {
+    const agendado = resolveCandidateStatus({ ...livre, interview_progress: { status, result: "N/C" } });
+    assert.equal(agendado.status, "Em Processo");
+    assert.equal(candidateBucket(agendado.status, agendado.etapa_atual), "entrevista");
+  }
+
+  // Entrevista já concluída sem destino não mexe no status derivado.
+  const concluida = resolveCandidateStatus({
+    ...livre,
+    interview_progress: { status: "Compareceu", result: "Aprovado", destination: "" },
+  });
+  assert.equal(concluida.status, "Banco de Talentos");
+});
+
+test("etapa de entrevista é reconhecida para marcar data e hora", () => {
+  for (const etapa of ["Entrevista RH", "entrevista gestor", "Triagem", "Testagem Psicológica"]) {
+    assert.equal(isInterviewStage(etapa), true, etapa);
+  }
+  for (const etapa of ["Contratado", "Em Obra", "Banco de Talentos", ""]) {
+    assert.equal(isInterviewStage(etapa), false, etapa);
+  }
 });

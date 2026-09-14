@@ -1,5 +1,5 @@
 // Caminho relativo (e não o alias "@/"): estes .mjs também rodam sob `node --test`.
-import { normalizeStage, sameStage, TERMINAL_STAGES } from "../app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { normalizeStage } from "../app/dashboard/central-candidato/lib/candidateLogic.mjs";
 
 export function buildCandidateHistoryRecord({
   candidateId,
@@ -56,10 +56,12 @@ export function canDisplayCandidateContacts(interviews = []) {
 }
 
 /**
- * `interviews` não tem candidate_id: o vínculo com o candidato é por e-mail (com o
- * nome como fallback), o mesmo critério do upsert em entrevistas/page.tsx.
+ * `interviews.candidate_id` é o vínculo de verdade (migração 20260914210000). E-mail e nome
+ * continuam como fallback enquanto houver linha antiga sem o vínculo preenchido.
  */
-function matchInterviewByPerson(query, { email, fullName }) {
+function matchInterviewByPerson(query, { candidateId, email, fullName }) {
+  const id = String(candidateId || "").trim();
+  if (id) return query.eq("candidate_id", id);
   const mail = String(email || "").trim();
   if (mail) return query.ilike("email", mail);
   const name = String(fullName || "").trim();
@@ -68,37 +70,19 @@ function matchInterviewByPerson(query, { email, fullName }) {
 }
 
 /** Situação da entrevista mais recente do candidato, no formato da prop interviewProgress. */
-export async function fetchInterviewProgress(supabase, { email, fullName }) {
+export async function fetchInterviewProgress(supabase, { candidateId, email, fullName }) {
   const query = matchInterviewByPerson(
-    supabase.from("interviews").select("status, result, destination"),
-    { email, fullName }
+    supabase.from("interviews").select("status, result, destination, interview_date, interview_time"),
+    { candidateId, email, fullName }
   );
   if (!query) return null;
   const { data } = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!data) return null;
-  return { status: data.status || "Aguardando", result: data.result || "N/C", destination: data.destination || "" };
-}
-
-/**
- * Etapa terminal gravada no histórico manda no destino da entrevista — é o campo que a
- * tela de Entrevistas exibe, e ele não é derivado do histórico (ADR: opção (b) da issue #41).
- */
-export async function syncInterviewDestination(supabase, { email = "", fullName = "", stage }) {
-  const canonical = TERMINAL_STAGES.find((s) => sameStage(s, stage));
-  if (!canonical) return { skipped: true };
-  // Só a entrevista mais recente recebe o destino: atualizar por e-mail atingiria
-  // também as entrevistas antigas do mesmo candidato.
-  const lookup = matchInterviewByPerson(supabase.from("interviews").select("id"), { email, fullName });
-  if (!lookup) return { skipped: true };
-  const { data: latest, error: lookupError } = await lookup
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (lookupError) return { error: lookupError };
-  if (!latest) return { skipped: true };
-  const { error } = await supabase
-    .from("interviews")
-    .update({ destination: canonical })
-    .eq("id", latest.id);
-  return { error };
+  return {
+    status: data.status || "Aguardando",
+    result: data.result || "N/C",
+    destination: data.destination || "",
+    interview_date: data.interview_date || "",
+    interview_time: data.interview_time || "",
+  };
 }

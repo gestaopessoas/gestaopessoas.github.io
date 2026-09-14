@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Check, Search, Filter, Loader2, Key, Download, MapPin, Briefcase, Calendar, Clock, Trash2, Phone, Mail, User, LogOut, Shield, ChevronDown, CheckCircle2, ChevronRight, X, FileText, ArrowRight, Printer, AlertTriangle, MessageSquare, Plus, FileUp } from "lucide-react";
+import { Check, Search, Filter, Loader2, Key, Download, MapPin, Briefcase, Calendar, CalendarClock, CalendarPlus, Clock, Trash2, Phone, Mail, User, LogOut, Shield, ChevronDown, CheckCircle2, ChevronRight, X, FileText, ArrowRight, Printer, AlertTriangle, MessageSquare, Plus, FileUp } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { itemsToText, parseSolidesResume, type ParsedResume } from "@/lib/resumeParser";
 import { buildResumeExtractionPrompt, parseExtractionResponse } from "@/lib/resumeExtractionPrompt";
 import { DEFAULT_RESUME_MODEL, fetchResumeModel, geminiGenerateUrl } from "@/lib/resumeModelSettings";
+import { formatInterviewSchedule, interviewHistoryStage, interviewProgressChanged, roleChangedOnSavedInterview } from "@/lib/interviewProgress.mjs";
 import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 
 // O parser local devolve ParsedResume; a IA devolve os mesmos campos mais alguns
@@ -129,6 +130,7 @@ type Interview = {
   interview_time: string | null;
   result: string | null;
   destination: string | null;
+  candidate_id?: string | null;
   assessment: Assessment | null;
   created_at: string;
   updated_at?: string;
@@ -547,6 +549,9 @@ export default function EntrevistasPage() {
     candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C", destination: ""
   });
   const [assessmentForm, setAssessmentForm] = useState<Assessment>(defaultAssessment);
+  // Quem está logado assina a entrevista no histórico — antes ficava sempre "Desconhecido".
+  const [currentUserName, setCurrentUserName] = useState("");
+  const [stageByCandidate, setStageByCandidate] = useState<Record<string, string>>({});
   const [movingToTalents, setMovingToTalents] = useState(false);
   
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -793,6 +798,24 @@ export default function EntrevistasPage() {
       ...interview,
       assessment: rowsToAssessment(interview.interview_assessments?.interview_assessment_values ?? []),
     })) as Interview[]);
+
+    // Etapa atual do candidato é lida do histórico, não copiada para dentro da entrevista:
+    // o Destino continua sendo a decisão daquele dia.
+    const candidateIds = Array.from(new Set((data ?? []).map((i: any) => i.candidate_id).filter(Boolean)));
+    if (candidateIds.length > 0) {
+      const { data: etapas } = await supabase
+        .from("candidate_interviews")
+        .select("candidate_id, stage, created_at")
+        .in("candidate_id", candidateIds)
+        .order("created_at", { ascending: false });
+      const mapa: Record<string, string> = {};
+      for (const etapa of etapas ?? []) {
+        if (etapa.candidate_id && etapa.stage && !mapa[etapa.candidate_id]) mapa[etapa.candidate_id] = etapa.stage;
+      }
+      setStageByCandidate(mapa);
+    } else {
+      setStageByCandidate({});
+    }
     if (profilesData) {
       // Só títulos de job_profiles. Antes agregava interviews.role — texto livre vindo de
       // importação de currículo — e cada erro da IA virava uma opção de cargo permanente.
@@ -806,6 +829,29 @@ export default function EntrevistasPage() {
   useEffect(() => {
     const run = async () => { await loadInterviews(); };
     run();
+  }, []);
+
+  // Vindo do "Avançar e preencher parecer" da Central: abre direto a entrevista criada lá.
+  useEffect(() => {
+    const alvo = new URLSearchParams(window.location.search).get("entrevista");
+    if (!alvo || isModalOpen) return;
+    const entrevista = interviews.find((i) => i.id === alvo);
+    if (!entrevista) return;
+    openEditModal(entrevista);
+    window.history.replaceState({}, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interviews]);
+
+  // Nome de quem está logado, para assinar o histórico da entrevista.
+  useEffect(() => {
+    const carregarUsuario = async () => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return;
+      const { data: perfil } = await supabase.from("profiles").select("name").eq("id", data.user.id).maybeSingle();
+      setCurrentUserName(perfil?.name || data.user.email?.split("@")[0] || "");
+    };
+    carregarUsuario();
   }, []);
 
   // B1: fecha modais com ESC (modais handrolled sem handler)
@@ -836,6 +882,20 @@ export default function EntrevistasPage() {
     }
     return result;
   }, [query, selectedMonth, interviews]);
+
+  // Agenda: o que ainda vai acontecer, sem depender do filtro de mês/busca. É a lista que
+  // o RH abre de manhã — por isso ignora `filtered` e olha a base inteira.
+  const hojeISO = new Date().toLocaleDateString("en-CA");
+  const agenda = useMemo(() => {
+    const limite = new Date();
+    limite.setDate(limite.getDate() + 7);
+    const limiteISO = limite.toLocaleDateString("en-CA");
+    return interviews
+      .filter((i) => i.interview_date && i.interview_date >= hojeISO && i.interview_date <= limiteISO)
+      .filter((i) => i.status === "Aguardando" || i.status === "Confirmado")
+      .sort((a, b) => `${a.interview_date}${a.interview_time || ""}`.localeCompare(`${b.interview_date}${b.interview_time || ""}`));
+  }, [interviews, hojeISO]);
+  const agendaHoje = agenda.filter((i) => i.interview_date === hojeISO);
 
   const confirmados = filtered.filter((i) => i.status === "Confirmado").length;
   const compareceram = filtered.filter((i) => i.status === "Compareceu" || i.result === "Aprovado" || i.result === "Reprovado").length;
@@ -1056,7 +1116,7 @@ Destino: ${form.destination || "N/I"}
     }
   };
 
-  const handleModalSave = async (formData: any, assessmentData: any, interviewProgress?: { status: string; result: string; destination?: string }) => {
+  const handleModalSave = async (formData: any, assessmentData: any, interviewProgress?: { status: string; result: string; destination?: string; interview_date?: string; interview_time?: string }) => {
     setSaving(true);
     setError("");
     const supabase = createClient();
@@ -1068,6 +1128,9 @@ Destino: ${form.destination || "N/I"}
       status: interviewProgress?.status || form.status,
       result: interviewProgress?.result || form.result,
       destination: interviewProgress?.destination || form.destination || null,
+      // Data/hora vêm da ficha: a entrevista marcada fica registrada mesmo sem comparecimento.
+      interview_date: interviewProgress?.interview_date || form.interview_date || null,
+      interview_time: interviewProgress?.interview_time || form.interview_time || null,
       candidate_name: formData.full_name || formData.name || form.candidate_name,
       email: formData.email,
       phone: formData.phone,
@@ -1101,45 +1164,11 @@ Destino: ${form.destination || "N/I"}
       throw Object.assign(new Error(message), { handled: true });
     };
 
-    let savedInterviewId = editingId;
-
-    if (editingId) {
-      let query = supabase.from("interviews").update(payload).eq("id", editingId);
-      if (currentUpdatedAt) {
-        query = query.eq("updated_at", currentUpdatedAt);
-      }
-      const { data, error: saveError } = await query.select("id");
-
-      if (saveError) fail("Erro ao atualizar entrevista: " + saveError.message);
-      else if (!data || data.length === 0) fail("Conflito: A entrevista foi modificada por outro usuário. Por favor, cancele e abra novamente.");
-    } else {
-      const { data, error: saveError } = await supabase.from("interviews").insert(payload).select("id").single();
-      if (saveError) fail("Erro ao salvar entrevista: " + saveError.message);
-      else savedInterviewId = data.id;
-    }
-
-    if (savedInterviewId) {
-      const { data: assessment, error: assessmentError } = await supabase
-        .from("interview_assessments")
-        .upsert({ interview_id: savedInterviewId }, { onConflict: "interview_id" })
-        .select("id")
-        .single();
-      // A entrevista já gravou aqui: falha do parecer é salvamento parcial (amarelo).
-      if (assessmentError || !assessment) fail("Entrevista salva, mas o parecer não: " + (assessmentError?.message || "avaliação não encontrada."), "warning");
-      const values = assessmentToRows({ ...assessmentForm, ...assessmentData, dependents_notes: formData.dependents_notes || null }).map((value) => ({ ...value, assessment_id: assessment.id }));
-      // Só apaga quando há linhas novas para gravar — parecer vazio zerava o que existia.
-      if (values.length) {
-        const { error: clearError } = await supabase.from("interview_assessment_values").delete().eq("assessment_id", assessment.id);
-        const { error: valuesError } = clearError ? { error: clearError } : await supabase.from("interview_assessment_values").insert(values);
-        if (clearError || valuesError) fail("Entrevista salva, mas o parecer não: " + (clearError || valuesError)!.message, "warning");
-      }
-    }
-
-    toast("Parecer e entrevista salvos com sucesso.", "success");
-
     const payloadAny = payload as unknown as Record<string, any>;
-    // Toda entrevista salva reflete um registro na Central do Candidato,
-    // independente do Destino escolhido — não só Aprovado/Banco de Talentos.
+
+    // 1. O candidato vem primeiro: `interviews.candidate_id` é o vínculo de verdade desde a
+    //    migração 20260914210000, então o candidato precisa existir antes da entrevista.
+    let candidateId: string | null = null;
     if (payloadAny.candidate_name) {
       const parts = payloadAny.candidate_name.split(" ");
       const tag = payloadAny.destination || (payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : payloadAny.result === "Reprovado" ? "Reprovado na Entrevista" : "Entrevistado");
@@ -1171,16 +1200,84 @@ Destino: ${form.destination || "N/I"}
         boot_size: formData.boot_size || null
       }, { onConflict: "email" }).select("id").single();
       if (upsertError) console.error("Erro ao enviar para candidatos:", upsertError);
-      else if (upsertData) {
-        setIsModalOpen(false);
-        loadInterviews();
-        setSaving(false);
-        return upsertData.id;
+      else if (upsertData) candidateId = upsertData.id;
+    }
+
+    // 2. Trocar a vaga de uma entrevista salva apagaria o registro (e o parecer) da vaga
+    //    anterior. Outra vaga é outra entrevista — o usuário decide na hora.
+    let alvoId = editingId;
+    if (roleChangedOnSavedInterview(editingId, form.role, payloadAny.role)) {
+      const criarNova = window.confirm(
+        `A vaga mudou de "${form.role}" para "${payloadAny.role}".` +
+        "\n\nOK = registrar como entrevista NOVA (a anterior fica no histórico)." +
+        "\nCancelar = alterar a entrevista atual."
+      );
+      if (criarNova) alvoId = null;
+    }
+
+    // 3. A entrevista em si.
+    const interviewPayload = { ...payload, candidate_id: candidateId };
+    let savedInterviewId = alvoId;
+
+    if (alvoId) {
+      let query = supabase.from("interviews").update(interviewPayload).eq("id", alvoId);
+      if (currentUpdatedAt) {
+        query = query.eq("updated_at", currentUpdatedAt);
+      }
+      const { data, error: saveError } = await query.select("id");
+
+      if (saveError) fail("Erro ao atualizar entrevista: " + saveError.message);
+      else if (!data || data.length === 0) fail("Conflito: A entrevista foi modificada por outro usuário. Por favor, cancele e abra novamente.");
+    } else {
+      const { data, error: saveError } = await supabase.from("interviews").insert(interviewPayload).select("id").single();
+      if (saveError) fail("Erro ao salvar entrevista: " + saveError.message);
+      else savedInterviewId = data.id;
+    }
+
+    if (savedInterviewId) {
+      const { data: assessment, error: assessmentError } = await supabase
+        .from("interview_assessments")
+        .upsert({ interview_id: savedInterviewId }, { onConflict: "interview_id" })
+        .select("id")
+        .single();
+      // A entrevista já gravou aqui: falha do parecer é salvamento parcial (amarelo).
+      if (assessmentError || !assessment) fail("Entrevista salva, mas o parecer não: " + (assessmentError?.message || "avaliação não encontrada."), "warning");
+      const values = assessmentToRows({ ...assessmentForm, ...assessmentData, dependents_notes: formData.dependents_notes || null }).map((value) => ({ ...value, assessment_id: assessment.id }));
+      // Só apaga quando há linhas novas para gravar — parecer vazio zerava o que existia.
+      if (values.length) {
+        const { error: clearError } = await supabase.from("interview_assessment_values").delete().eq("assessment_id", assessment.id);
+        const { error: valuesError } = clearError ? { error: clearError } : await supabase.from("interview_assessment_values").insert(values);
+        if (clearError || valuesError) fail("Entrevista salva, mas o parecer não: " + (clearError || valuesError)!.message, "warning");
       }
     }
+
+    toast("Parecer e entrevista salvos com sucesso.", "success");
+
+    // 4. Histórico do candidato: entrevista nova ou mudança de situação vira linha própria,
+    //    para que a situação anterior não se perca ao sobrescrever `interviews`.
+    if (candidateId) {
+      const novaSituacao = {
+        status: payloadAny.status,
+        result: payloadAny.result,
+        destination: payloadAny.destination || "",
+      };
+      const situacaoAnterior = { status: form.status, result: form.result, destination: form.destination };
+      if (!alvoId || interviewProgressChanged(situacaoAnterior, novaSituacao)) {
+        const { error: historyError } = await supabase.from("candidate_interviews").insert({
+          candidate_id: candidateId,
+          stage: interviewHistoryStage(novaSituacao),
+          workplace_name: assessmentData.worksite || null,
+          interviewer_name: currentUserName || null,
+          notes: `[Entrevista] ${payloadAny.role || "Vaga não informada"} — ${formatInterviewSchedule(payloadAny.interview_date, payloadAny.interview_time)} · Situação: ${novaSituacao.status} · Resultado: ${novaSituacao.result}${novaSituacao.destination ? ` · Destino: ${novaSituacao.destination}` : ""}`,
+        });
+        if (historyError) console.error("Erro ao gravar histórico da entrevista:", historyError.message);
+      }
+    }
+
     setIsModalOpen(false);
     loadInterviews();
     setSaving(false);
+    return candidateId ?? undefined;
   };
   
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1393,6 +1490,26 @@ Destino: ${form.destination || "N/I"}
     setIsModalOpen(true);
   };
   
+  // Mesma pessoa, outra vaga: registro novo (com parecer próprio), nunca por cima do antigo.
+  const openNewInterviewFor = (interview: Interview) => {
+    setEditingId(null);
+    setCurrentUpdatedAt(null);
+    setForm({
+      candidate_name: interview.candidate_name || "",
+      role: "",
+      phone: interview.phone || "",
+      email: interview.email || "",
+      interview_date: "",
+      interview_time: "",
+      status: "Aguardando",
+      result: "N/C",
+      destination: "",
+    });
+    setAssessmentForm(defaultAssessment);
+    setActiveTab("dados");
+    setIsModalOpen(true);
+  };
+
   const openEditModal = (interview: Interview) => {
     setEditingId(interview.id);
     setCurrentUpdatedAt(interview.updated_at || null);
@@ -1509,11 +1626,41 @@ Destino: ${form.destination || "N/I"}
         {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Metric icon={CalendarClock} label="Hoje" value={agendaHoje.length} />
           <Metric icon={User} label="Total Registros" value={filtered.length} />
           <Metric icon={Calendar} label="Confirmados" value={confirmados} />
           <Metric icon={CheckCircle2} label="Compareceram" value={compareceram} />
           <Metric icon={CheckCircle2} label="Aprovados" value={aprovados} />
         </div>
+
+        {agenda.length > 0 && (
+          <div className="rounded-xl border bg-card">
+            <div className="flex items-center gap-2 border-b p-4 font-semibold">
+              <CalendarClock className="h-4 w-4 text-primary" />
+              Próximas entrevistas
+              <span className="text-xs font-normal text-muted-foreground">(hoje e próximos 7 dias)</span>
+            </div>
+            <ul className="divide-y">
+              {agenda.slice(0, 8).map((i) => (
+                <li
+                  key={i.id}
+                  onClick={() => openEditModal(i)}
+                  className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-sm hover:bg-muted/30"
+                >
+                  <span className={`font-medium ${i.interview_date === hojeISO ? "text-primary" : "text-foreground"}`}>
+                    {i.interview_date === hojeISO ? "Hoje" : new Date(i.interview_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                    {i.interview_time ? ` ${i.interview_time}` : ""}
+                  </span>
+                  <span className="font-medium">{i.candidate_name || "Sem nome"}</span>
+                  <span className="text-muted-foreground">{i.role || "Vaga não informada"}</span>
+                  <span className={`ml-auto inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${statusStyle[i.status || ""] || "bg-muted text-muted-foreground"}`}>
+                    {i.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-full max-w-sm">
@@ -1605,8 +1752,22 @@ Destino: ${form.destination || "N/I"}
                        ) : (
                          <span className="text-muted-foreground">-</span>
                        )}
+                       {interview.candidate_id && stageByCandidate[interview.candidate_id] && (
+                         <div className="mt-1 text-xs text-muted-foreground">
+                           Etapa: {stageByCandidate[interview.candidate_id]}
+                         </div>
+                       )}
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openNewInterviewFor(interview)}
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Nova entrevista para outra vaga"
+                      >
+                        <CalendarPlus className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1638,7 +1799,8 @@ Destino: ${form.destination || "N/I"}
             ...assessmentForm
           } : undefined}
           initialAssessmentData={!editingId ? assessmentForm : undefined}
-          interviewProgress={{ status: form.status, result: form.result, destination: form.destination }}
+          interviewProgress={{ status: form.status, result: form.result, destination: form.destination, interview_date: form.interview_date, interview_time: form.interview_time }}
+          startLocked={!editingId}
           isEditable={true}
           defaultEditMode={true}
           canSaveAssessment={true}

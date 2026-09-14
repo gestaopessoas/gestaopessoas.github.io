@@ -61,6 +61,14 @@ export const STAGE_OPTIONS = [
   ]),
 ];
 
+/**
+ * Etapas que são uma entrevista de verdade: avançar para uma delas marca data e hora e
+ * gera registro em `interviews`, senão a entrevista não aparece na agenda nem no relatório.
+ */
+export function isInterviewStage(stage) {
+  return STAGE_BUCKETS.entrevista.some((s) => sameStage(s, stage));
+}
+
 /** Etapas que quem não é do RH pode registrar no histórico. */
 export const LIMITED_STAGE_OPTIONS = ["Banco de Talentos", "Em proposta"];
 
@@ -132,6 +140,25 @@ export function deriveCandidateStatus(interviews = []) {
   return { status: "Em Processo", etapa_atual: latest.stage, ...base };
 }
 
+/** Situação de entrevista que ainda vai acontecer: o candidato não está livre. */
+export const PENDING_INTERVIEW_STATUSES = ["Aguardando", "Confirmado"];
+
+/**
+ * Situação da entrevista mais recente (tabela `interviews`) sobrepõe a derivação do
+ * histórico: contratado nunca é livre, e entrevista agendada também não.
+ * Retorna null quando a situação não decide nada.
+ */
+export function statusFromInterviewProgress(progress) {
+  if (!progress) return null;
+  if (sameStage(progress.destination, "Contratado")) {
+    return { status: "Contratado", etapa_atual: null };
+  }
+  if (PENDING_INTERVIEW_STATUSES.some((s) => sameStage(s, progress.status))) {
+    return { status: "Em Processo", etapa_atual: "Entrevista RH" };
+  }
+  return null;
+}
+
 /**
  * Status final do candidato, considerando também as tags gravadas pela tela de Entrevistas.
  * Central do Candidato e Banco de Talentos precisam concordar sobre o mesmo candidato —
@@ -158,6 +185,18 @@ export function resolveCandidateStatus(candidate = {}) {
 
   // Marcação explícita de Banco de Talentos vence a derivação.
   if (tags.some((t) => sameStage(t, "Banco de Talentos"))) status = "Banco de Talentos";
+
+  // ...mas não vence a situação da entrevista mais recente: contratado ou com entrevista
+  // agendada não pode cair no balde "Livres".
+  const fromProgress = statusFromInterviewProgress(candidate.interview_progress);
+  // Contratado manda sempre; entrevista agendada só tira o candidato de "livre" — se ele
+  // já está numa etapa adiantada do histórico, a etapa continua valendo.
+  if (fromProgress?.status === "Contratado") {
+    return { ...derived, ...fromProgress, ultimo_chamado };
+  }
+  if (fromProgress && sameStage(status, "Banco de Talentos")) {
+    return { ...derived, ...fromProgress, ultimo_chamado };
+  }
 
   return { ...derived, status, ultimo_chamado };
 }
