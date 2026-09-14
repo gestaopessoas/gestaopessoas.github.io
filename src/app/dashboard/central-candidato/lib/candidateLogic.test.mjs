@@ -7,6 +7,7 @@ import {
   deriveCandidateStatus,
   latestEducationDegree,
   isInterviewStage,
+  stageNeedsWorkplace,
   candidateBucket,
   BUCKET_ORDER,
   STAGE_BUCKETS,
@@ -198,5 +199,26 @@ test("etapa de entrevista é reconhecida para marcar data e hora", () => {
   }
   for (const etapa of ["Contratado", "Em Obra", "Banco de Talentos", ""]) {
     assert.equal(isInterviewStage(etapa), false, etapa);
+  }
+});
+
+test("contratado não volta para o Banco de Talentos por causa da tag", () => {
+  const contratado = resolveCandidateStatus({
+    search_tags: ["Banco de Talentos"],
+    candidate_interviews: [
+      { stage: "Banco de Talentos", created_at: "2026-08-01" },
+      { stage: "Contratado", created_at: "2026-09-01" },
+    ],
+  });
+  assert.equal(contratado.status, "Contratado");
+  assert.equal(candidateBucket(contratado.status, contratado.etapa_atual), "encerrado");
+});
+
+test("etapas de obra exigem a obra", () => {
+  for (const etapa of ["Encaminhado - Obra Específica", "Em Obra", "Aguardando Obra", "Recusado pela Obra"]) {
+    assert.equal(stageNeedsWorkplace(etapa), true, etapa);
+  }
+  for (const etapa of ["Entrevista RH", "Banco de Talentos", "Contratado", ""]) {
+    assert.equal(stageNeedsWorkplace(etapa), false, etapa);
   }
 });

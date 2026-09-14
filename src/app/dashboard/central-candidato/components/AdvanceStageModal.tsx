@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { STAGE_BUCKETS, BUCKET_ORDER, TERMINAL_STAGES, isInterviewStage } from "../lib/candidateLogic.mjs";
+import { STAGE_BUCKETS, BUCKET_ORDER, TERMINAL_STAGES, isInterviewStage, stageNeedsWorkplace } from "../lib/candidateLogic.mjs";
 import { formatInterviewSchedule } from "@/lib/interviewProgress.mjs";
 import { errorMessage } from "@/lib/utils";
 
@@ -55,6 +55,9 @@ export default function AdvanceStageModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [currentUserName, setCurrentUserName] = useState("");
+  // Obra do avanço: a etapa "Obra Específica" não tinha onde dizer qual obra (QA B2).
+  const [selectedWorkplace, setSelectedWorkplace] = useState(workplaceName || "");
+  const [workplaces, setWorkplaces] = useState<string[]>([]);
   const router = useRouter();
 
   // Quem avançou a etapa assina o histórico — antes ficava "Desconhecido".
@@ -68,6 +71,15 @@ export default function AdvanceStageModal({
       setCurrentUserName(perfil?.name || data.user.email?.split("@")[0] || "");
     };
     carregar();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const carregarObras = async () => {
+      const { data } = await createClient().from("workplaces").select("name").order("name");
+      setWorkplaces((data ?? []).map((w: { name: string }) => w.name).filter(Boolean));
+    };
+    carregarObras();
   }, [isOpen]);
 
   const [candidateFuture, setCandidateFuture] = useState<string[]>([]);
@@ -133,13 +145,19 @@ export default function AdvanceStageModal({
         setSaving(false);
         return;
       }
+      const obra = selectedWorkplace || workplaceName || "";
+      if (stageNeedsWorkplace(selectedStage) && !obra) {
+        setError("Informe a obra desta etapa.");
+        setSaving(false);
+        return;
+      }
 
       const quando = marcaEntrevista ? formatInterviewSchedule(stageDate, stageTime) : "";
       const { error: insertError } = await supabase.from("candidate_interviews").insert({
         candidate_id: candidateId,
         stage: selectedStage,
         notes: [quando ? `[Entrevista marcada]\n${quando}` : "", finalNotes.trim()].filter(Boolean).join("\n\n") || null,
-        workplace_name: workplaceName || null,
+        workplace_name: obra || null,
         interviewer_name: currentUserName || null,
         candidate_future: candidateFuture.join(", ") || null,
       });
@@ -177,6 +195,7 @@ export default function AdvanceStageModal({
 
       onSuccess();
       setSelectedStage("");
+      setSelectedWorkplace("");
       setStageDate("");
       setStageTime("");
       setNotes("");
@@ -224,6 +243,25 @@ export default function AdvanceStageModal({
               </SelectContent>
             </Select>
           </div>
+
+          {(stageNeedsWorkplace(selectedStage) || isInterviewStage(selectedStage)) && (
+            <div className="grid gap-2">
+              <label className="text-sm font-medium" htmlFor="avanco-obra">
+                Obra {stageNeedsWorkplace(selectedStage) ? "*" : "(opcional)"}
+              </label>
+              <select
+                id="avanco-obra"
+                value={selectedWorkplace}
+                onChange={(e) => setSelectedWorkplace(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Selecione a obra...</option>
+                {workplaces.map((obra) => (
+                  <option key={obra} value={obra}>{obra}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {isInterviewStage(selectedStage) && (
             <div className="grid grid-cols-2 gap-3">

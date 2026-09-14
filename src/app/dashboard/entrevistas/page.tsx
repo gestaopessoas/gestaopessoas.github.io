@@ -187,7 +187,8 @@ const defaultAssessment: Assessment = {
   weaknesses: "",
   observations: "",
   worksite: "",
-  worksite_type: "all",
+  // Sem padrão: disponibilidade de obra é informação do candidato, não do formulário (QA B3).
+  worksite_type: "specific",
   available_worksites: [],
   selection_stage: "",
   is_internal: false,
@@ -1169,6 +1170,9 @@ Destino: ${form.destination || "N/I"}
     // 1. O candidato vem primeiro: `interviews.candidate_id` é o vínculo de verdade desde a
     //    migração 20260914210000, então o candidato precisa existir antes da entrevista.
     let candidateId: string | null = null;
+    const disponibilidadeInformada: string[] = Array.isArray(assessmentData.available_worksites) && assessmentData.available_worksites.length > 0
+      ? assessmentData.available_worksites
+      : (assessmentData.worksite_type === "all" ? ["Todas as Obras"] : []);
     if (payloadAny.candidate_name) {
       const parts = payloadAny.candidate_name.split(" ");
       const tag = payloadAny.destination || (payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : payloadAny.result === "Reprovado" ? "Reprovado na Entrevista" : "Entrevistado");
@@ -1181,7 +1185,10 @@ Destino: ${form.destination || "N/I"}
         phone: payloadAny.phone,
         role_interest: payloadAny.role,
         city: assessmentData.worksite || "",
-        available_worksites: assessmentData.worksite_type === "all" ? ["Todas as Obras"] : (assessmentData.available_worksites || []),
+        // Só grava disponibilidade que alguém informou. O padrão do parecer marcava
+        // "Todas as Obras" em todo candidato (QA B3) e, sem a chave condicional abaixo,
+        // o salvamento passaria a apagar a disponibilidade real de quem já tinha uma.
+        ...(disponibilidadeInformada.length > 0 ? { available_worksites: disponibilidadeInformada } : {}),
         search_tags: [tag, assessmentData.selection_stage || "Importado de Entrevistas"].filter(Boolean),
         birth_date: formData.birth_date || null,
         cpf: formData.cpf || null,

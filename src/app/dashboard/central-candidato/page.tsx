@@ -405,7 +405,9 @@ export default function CentralCandidatoPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 items-center">
-                        {candidate.bucket !== "livre" && candidate.bucket !== "contratacao" && (
+                        {/* Quem está livre também precisa de porta de entrada: sem isto o
+                            Banco de Talentos virava lista de leitura (QA B5). */}
+                        {candidate.bucket !== "contratacao" && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -420,7 +422,7 @@ export default function CentralCandidatoPage() {
                               });
                             }}
                           >
-                            Avançar
+                            {candidate.bucket === "livre" ? "Chamar" : "Avançar"}
                           </Button>
                         )}
                         {candidate.bucket === "obras" && (

@@ -69,6 +69,15 @@ export function isInterviewStage(stage) {
   return STAGE_BUCKETS.entrevista.some((s) => sameStage(s, stage));
 }
 
+/**
+ * Etapas que só fazem sentido com uma obra: encaminhar "para obra específica" sem dizer
+ * qual obra gravava um registro vazio (QA B2).
+ */
+export function stageNeedsWorkplace(stage) {
+  return [...STAGE_BUCKETS.obras, "Encaminhado - Obra Específica", "Recusado pela Obra"]
+    .some((s) => sameStage(s, stage));
+}
+
 /** Etapas que quem não é do RH pode registrar no histórico. */
 export const LIMITED_STAGE_OPTIONS = ["Banco de Talentos", "Em proposta"];
 
@@ -183,8 +192,11 @@ export function resolveCandidateStatus(candidate = {}) {
     ultimo_chamado = `Encaminhado para: ${obras}`;
   }
 
-  // Marcação explícita de Banco de Talentos vence a derivação.
-  if (tags.some((t) => sameStage(t, "Banco de Talentos"))) status = "Banco de Talentos";
+  // Marcação explícita de Banco de Talentos vence a derivação — menos para quem já foi
+  // contratado depois disso, que aparecia no Banco de Talentos como se estivesse livre.
+  if (derived.status !== "Contratado" && tags.some((t) => sameStage(t, "Banco de Talentos"))) {
+    status = "Banco de Talentos";
+  }
 
   // ...mas não vence a situação da entrevista mais recente: contratado ou com entrevista
   // agendada não pode cair no balde "Livres".

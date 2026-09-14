@@ -8,6 +8,7 @@ export function sameStage(a: unknown, b: unknown): boolean;
 export function isUnlockStage(stage: unknown): boolean;
 export function isTerminalStage(stage: unknown): boolean;
 export function isInterviewStage(stage: unknown): boolean;
+export function stageNeedsWorkplace(stage: unknown): boolean;
 
 export interface InterviewLike {
   created_at: string;

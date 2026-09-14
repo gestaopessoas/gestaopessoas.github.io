@@ -99,8 +99,29 @@ export default function BancoTalentosPage() {
       if (error) throw error;
 
       if (data) {
+        // Situação da entrevista mais recente: sem ela, quem foi contratado continuava
+        // listado como talento disponível por causa da tag antiga (QA B6).
+        const { data: ints } = await supabase
+          .from("interviews")
+          .select("candidate_id, email, status, result, destination, created_at")
+          .order("created_at", { ascending: false });
+        const progressoPor = new Map<string, { status: string; result: string; destination: string }>();
+        for (const i of ints ?? []) {
+          const progresso = {
+            status: i.status || "Aguardando",
+            result: i.result || "N/C",
+            destination: i.destination || "",
+          };
+          for (const chave of [i.candidate_id, i.email]) {
+            if (chave && !progressoPor.has(chave)) progressoPor.set(chave, progresso);
+          }
+        }
+
         const rows: CandidateRow[] = data.map((c) => {
-          const finalStatus = resolveCandidateStatus(c).status;
+          const finalStatus = resolveCandidateStatus({
+            ...c,
+            interview_progress: progressoPor.get(c.id) ?? (c.email ? progressoPor.get(c.email) ?? null : null),
+          }).status;
 
           // Obras Disponíveis reflete só o campo "obras de interesse" do candidato —
           // nunca a cidade/endereço, que é outro dado e não deve aparecer aqui.

@@ -5,7 +5,6 @@ import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, 
   Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, 
@@ -515,7 +514,12 @@ export function CandidateProfileModal({
   const [results, setResults] = useState<BigFiveResult[]>([]);
   const [interviews, setInterviews] = useState<ProfileInterview[]>([]);
   const [candidateInterviews, setCandidateInterviews] = useState<CandidateInterview[]>([]);
-  const contactsAreVisible = useMemo(() => canDisplayCandidateContacts(candidateInterviews), [candidateInterviews]);
+  // A restrição de contato protege quem está em processo de ser abordado por fora — mas
+  // não pode cegar quem está conduzindo a entrevista e precisa ligar para confirmar (QA B7).
+  const contactsAreVisible = useMemo(
+    () => !!interviewProgress || canDisplayCandidateContacts(candidateInterviews),
+    [candidateInterviews, interviewProgress]
+  );
   const [educations, setEducations] = useState<ProfileEducation[]>([]);
   const [experiences, setExperiences] = useState<ProfileExperience[]>([]);
   const [loading, setLoading] = useState(!initialData);
@@ -987,17 +991,18 @@ export function CandidateProfileModal({
         className="relative flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-background shadow-2xl border outline-none animate-in fade-in zoom-in-95 duration-200"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b px-6 py-4 bg-muted/30">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-primary/10 rounded-xl text-primary">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-6 sm:py-4 bg-muted/30">
+          <div className="flex min-w-0 items-center space-x-3">
+            <div className="hidden p-2 bg-primary/10 rounded-xl text-primary sm:block">
               <User className="h-6 w-6" />
             </div>
-            <div>
-              <h2 className="text-lg font-bold">Perfil do Colaborador / Candidato</h2>
-              <p className="text-xs text-muted-foreground">Visão unificada de informações e histórico</p>
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-bold sm:text-lg">Perfil do Colaborador / Candidato</h2>
+              <p className="hidden text-xs text-muted-foreground sm:block">Visão unificada de informações e histórico</p>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
+          {/* flex-wrap + shrink: a 375px os botões Salvar e fechar saíam da tela (QA B1). */}
+          <div className="flex shrink-0 items-center gap-2">
             {isEditable && !isEditing && (
               <Button onClick={() => setIsEditing(true)} variant="outline" size="sm" className="gap-2">
                 <Edit2 className="h-4 w-4" /> Editar Perfil
@@ -1039,7 +1044,7 @@ export function CandidateProfileModal({
         )}
 
         {/* Content (Sidebar Layout) */}
-        <div className={`flex flex-1 overflow-hidden ${locked ? "pointer-events-none select-none blur-[3px]" : ""}`}>
+        <div className={`flex flex-1 flex-col overflow-y-auto sm:flex-row sm:overflow-hidden ${locked ? "pointer-events-none select-none blur-[3px]" : ""}`}>
           {loading ? (
             <div className="flex h-full w-full items-center justify-center text-muted-foreground">
               <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
@@ -1053,7 +1058,7 @@ export function CandidateProfileModal({
           ) : (
             <>
               {/* Left Sidebar */}
-              <div className="w-80 border-r bg-muted/10 flex flex-col h-full overflow-y-auto">
+              <div className="w-full shrink-0 border-b bg-muted/10 flex flex-col sm:h-full sm:w-80 sm:border-b-0 sm:border-r sm:overflow-y-auto">
                 {/* Profile Card */}
                 <div className="p-6 border-b bg-card">
                   <div className="space-y-4">
@@ -1073,28 +1078,20 @@ export function CandidateProfileModal({
                       <div className="flex items-center gap-2.5">
                         <Briefcase className="h-4 w-4 text-primary shrink-0" />
                         {isEditing ? (
-                          <Select
+                          /* Select nativo: a lista tem ~200 cargos e o combobox estilizado não
+                             tinha busca — teclar para procurar escrevia no campo anterior e
+                             corrompia o telefone (QA B4/F1). O nativo faz typeahead sozinho. */
+                          <select
+                            aria-label="Cargo"
                             value={formData.role_interest || formData.role || ""}
-                            onValueChange={(value) => handleChange(formData.role_interest !== undefined ? 'role_interest' : 'role', value)}
+                            onChange={(e) => handleChange(formData.role_interest !== undefined ? 'role_interest' : 'role', e.target.value)}
+                            className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                           >
-                            <SelectTrigger size="sm" className="w-full">
-                              <SelectValue placeholder="Cargo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {/* A lista selecionável é só job_profiles. O valor atual entra
-                                  junto porque o Select precisa dele entre os itens para
-                                  conseguir exibi-lo — sem isso, um cargo já gravado aparecia
-                                  em branco e a lista vazia parecia um campo desabilitado.
-                                  Isso não reabre a poluição antiga: nada mais escreve texto
-                                  livre nesse campo, então o valor atual ou está vazio ou é um
-                                  cargo que alguém escolheu aqui. */}
-                              {cargoOptions.map((title) => (
-                                <SelectItem key={title} value={title}>
-                                  {title}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <option value="">Cargo...</option>
+                            {cargoOptions.map((title) => (
+                              <option key={title} value={title}>{title}</option>
+                            ))}
+                          </select>
                         ) : (
                           <span className="font-medium text-foreground">{formData.role_interest || formData.role || "Cargo não informado"}</span>
                         )}
@@ -1199,7 +1196,7 @@ export function CandidateProfileModal({
               </div>
 
               {/* Right Content Area */}
-              <div className="flex-1 overflow-y-auto p-8 bg-muted/5">
+              <div className="min-w-0 flex-1 p-4 bg-muted/5 sm:overflow-y-auto sm:p-8">
                 {activeTab === "curriculum" && (
                   <div className="space-y-6 animate-in fade-in duration-200">
                     <h2 className="text-2xl font-bold mb-6">Currículo & Dados Pessoais</h2>
