@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Search, Download, Briefcase, Calendar, CalendarClock, CalendarPlus, Clock, Trash2, User, CheckCircle2, X, Plus } from "lucide-react";
+import { Search, Download, Briefcase, Calendar, CalendarClock, Clock, Trash2, User, CheckCircle2, X, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -103,6 +103,9 @@ const resultStyle: Record<string, string> = {
 const destinationStyle: Record<string, string> = {
   Contratado: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   "Banco de Talentos": "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  // "Descartado" é o nome antigo de "Reprovado" (issue #88): as duas chaves existem porque
+  // as linhas já gravadas continuam com o valor legado.
+  Reprovado: "bg-red-500/10 text-red-700 dark:text-red-300",
   Descartado: "bg-red-500/10 text-red-700 dark:text-red-300",
   Desistente: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-300",
 };
@@ -585,25 +588,6 @@ export default function EntrevistasPage() {
     setIsModalOpen(true);
   };
   
-  // Mesma pessoa, outra vaga: registro novo (com parecer próprio), nunca por cima do antigo.
-  const openNewInterviewFor = (interview: Interview) => {
-    setEditingId(null);
-    setCurrentUpdatedAt(null);
-    setForm({
-      candidate_name: interview.candidate_name || "",
-      role: "",
-      phone: interview.phone || "",
-      email: interview.email || "",
-      interview_date: "",
-      interview_time: "",
-      status: "Aguardando",
-      result: "N/C",
-      destination: "",
-    });
-    setAssessmentForm(defaultAssessment);
-    setIsModalOpen(true);
-  };
-
   const openEditModal = (interview: Interview) => {
     setEditingId(interview.id);
     setCurrentUpdatedAt(interview.updated_at || null);
@@ -793,15 +777,6 @@ export default function EntrevistasPage() {
                        )}
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openNewInterviewFor(interview)}
-                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Nova entrevista para outra vaga"
-                      >
-                        <CalendarPlus className="h-4 w-4" />
-                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
