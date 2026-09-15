@@ -165,16 +165,20 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
             <div className="space-y-3">
               {HARD_SKILLS.map(skill => (
                 <div key={skill.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                  <span className="text-sm font-medium">{skill.label}</span>
+                  <label htmlFor={`skill-${skill.id}`} className="text-sm font-medium">{skill.label}</label>
                   {/* O slider precisa de largura própria: em tela estreita ele quebra para a
                       linha de baixo inteiro, em vez de encolher para 14px (issue #67). */}
                   <div className="flex w-full min-w-[9rem] flex-1 items-center gap-2 sm:w-32 sm:flex-none">
-                    <Input 
-                      type="range" 
+                    {/* Em tela estreita o preenchimento é por teclado: sem anel de foco não
+                        dá para ver onde se está (issue #71). */}
+                    <Input
+                      type="range"
+                      id={`skill-${skill.id}`}
                       min="0" max="5" step="1"
-                      className="w-full h-2 cursor-pointer p-0 border-0"
-                      value={assessmentData[skill.id] || "0"} 
-                      onChange={(e) => onChange(skill.id, e.target.value)} 
+                      className="w-full h-2 cursor-pointer p-0 border-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      value={assessmentData[skill.id] || "0"}
+                      aria-valuetext={`${assessmentData[skill.id] || "0"} de 5`}
+                      onChange={(e) => onChange(skill.id, e.target.value)}
                     />
                     <span className="text-xs font-bold w-4 text-center">{assessmentData[skill.id] || "0"}</span>
                   </div>
@@ -202,16 +206,20 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
             <div className="space-y-3">
               {SOFT_SKILLS.map(skill => (
                 <div key={skill.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                  <span className="text-sm font-medium">{skill.label}</span>
+                  <label htmlFor={`skill-${skill.id}`} className="text-sm font-medium">{skill.label}</label>
                   {/* O slider precisa de largura própria: em tela estreita ele quebra para a
                       linha de baixo inteiro, em vez de encolher para 14px (issue #67). */}
                   <div className="flex w-full min-w-[9rem] flex-1 items-center gap-2 sm:w-32 sm:flex-none">
-                    <Input 
-                      type="range" 
+                    {/* Em tela estreita o preenchimento é por teclado: sem anel de foco não
+                        dá para ver onde se está (issue #71). */}
+                    <Input
+                      type="range"
+                      id={`skill-${skill.id}`}
                       min="0" max="5" step="1"
-                      className="w-full h-2 cursor-pointer p-0 border-0"
-                      value={assessmentData[skill.id] || "0"} 
-                      onChange={(e) => onChange(skill.id, e.target.value)} 
+                      className="w-full h-2 cursor-pointer p-0 border-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      value={assessmentData[skill.id] || "0"}
+                      aria-valuetext={`${assessmentData[skill.id] || "0"} de 5`}
+                      onChange={(e) => onChange(skill.id, e.target.value)}
                     />
                     <span className="text-xs font-bold w-4 text-center">{assessmentData[skill.id] || "0"}</span>
                   </div>

@@ -211,7 +211,7 @@ type CandidateProfileModalProps = {
   initialData?: Partial<ProfilePerson>;
   initialAssessmentData?: any;
   interviewProgress?: { status: string; result: string; destination?: string; interview_date?: string; interview_time?: string };
-  /** Ficha em branco abre travada: só depois de confirmar é que os campos liberam. */
+  /** Entrevista nova abre travada: só depois de confirmar é que os campos liberam. */
   startLocked?: boolean;
   /** Só a tela que sabe gravar o parecer (entrevistas) libera a edição da aba Parecer. */
   canSaveAssessment?: boolean;
@@ -1010,7 +1010,8 @@ export function CandidateProfileModal({
           </div>
           {/* flex-wrap + shrink: a 375px os botões Salvar e fechar saíam da tela (QA B1). */}
           <div className="flex shrink-0 items-center gap-2">
-            {isEditable && !isEditing && (
+            {/* Travado, "Editar Perfil" não destrava nada: só o botão do overlay libera. */}
+            {isEditable && !isEditing && !locked && (
               <Button onClick={() => setIsEditing(true)} variant="outline" size="sm" className="gap-2">
                 <Edit2 className="h-4 w-4" /> Editar Perfil
               </Button>
@@ -1038,7 +1039,8 @@ export function CandidateProfileModal({
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/40">
             <div className="flex flex-col items-center gap-3 rounded-xl border bg-background/95 px-8 py-6 text-center shadow-lg">
               <p className="max-w-xs text-sm text-muted-foreground">
-                Ficha em branco. Os campos estão bloqueados para não registrar nada sem querer.
+                Nada foi registrado ainda. Confirme abaixo para abrir os campos e registrar uma
+                entrevista nova — os dados já preenchidos são só o ponto de partida.
               </p>
               <Button
                 onClick={() => { setLocked(false); setIsEditing(true); }}

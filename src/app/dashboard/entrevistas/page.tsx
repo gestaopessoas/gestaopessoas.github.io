@@ -505,6 +505,10 @@ export default function EntrevistasPage() {
       if (criarNova) alvoId = null;
     }
 
+    // Primeira gravação costuma ter só data, hora e situação: sem linhas de parecer o
+    // toast não pode dizer que salvou parecer (issue #69).
+    const assessmentRows = assessmentToRows({ ...assessmentForm, ...assessmentData });
+
     // 3. A entrevista em si.
     const interviewPayload = { ...payload, candidate_id: candidateId };
     let savedInterviewId = alvoId;
@@ -532,7 +536,7 @@ export default function EntrevistasPage() {
         .single();
       // A entrevista já gravou aqui: falha do parecer é salvamento parcial (amarelo).
       if (assessmentError || !assessment) fail("Entrevista salva, mas o parecer não: " + (assessmentError?.message || "avaliação não encontrada."), "warning");
-      const values = assessmentToRows({ ...assessmentForm, ...assessmentData }).map((value) => ({ ...value, assessment_id: assessment.id }));
+      const values = assessmentRows.map((value) => ({ ...value, assessment_id: assessment.id }));
       // Só apaga quando há linhas novas para gravar — parecer vazio zerava o que existia.
       if (values.length) {
         const { error: clearError } = await supabase.from("interview_assessment_values").delete().eq("assessment_id", assessment.id);
@@ -541,7 +545,7 @@ export default function EntrevistasPage() {
       }
     }
 
-    toast("Parecer e entrevista salvos com sucesso.", "success");
+    toast(assessmentRows.length ? "Parecer e entrevista salvos com sucesso." : "Entrevista salva.", "success");
 
     // 4. Histórico do candidato: entrevista nova ou mudança de situação vira linha própria,
     //    para que a situação anterior não se perca ao sobrescrever `interviews`.
