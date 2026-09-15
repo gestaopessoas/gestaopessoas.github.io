@@ -1317,6 +1317,20 @@ export function CandidateProfileModal({
                             </select>
                           </label>
                         </div>
+                        {/* Quem gravou a última versão desta entrevista (issue #81). Vem do
+                            gatilho set_interview_editor, e por isso só existe para quem foi
+                            salvo depois dele — linha antiga fica sem o rastro. Só aparece na
+                            ficha de uma entrevista: aberta pelo candidato, a lista traz
+                            várias e o rodapé mentiria sobre qual delas mudou. */}
+                        {interviewId && interviews[0]?.updated_by_name && (
+                          <p className="px-5 pb-5 -mt-1 text-xs text-muted-foreground">
+                            Última alteração por {interviews[0].updated_by_name}
+                            {interviews[0].updated_at
+                              ? ` em ${new Date(interviews[0].updated_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`
+                              : ""}
+                            .
+                          </p>
+                        )}
                       </details>
                     )}
                     
