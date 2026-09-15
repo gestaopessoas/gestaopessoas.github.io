@@ -38,7 +38,6 @@ export const MODULES = [
   "clima",
   "metas",
   "pdi",
-  "competencias",
   "turnover",
   "analytics",
   "salarios",

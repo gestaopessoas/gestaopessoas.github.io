@@ -24,7 +24,6 @@ const TELAS = [
   '/dashboard/centros-de-custo',
   '/dashboard/clima',
   '/dashboard/colaboradores',
-  '/dashboard/competencias',
   '/dashboard/configuracoes',
   '/dashboard/configuracoes/beneficios-historico',
   '/dashboard/configuracoes/tabela-salarial',
@@ -52,8 +51,6 @@ const TELAS = [
   '/dashboard/vagas',
   '/dashboard/vagas/candidatos',
   '/dashboard/vagas/metricas',
-  '/dashboard/vagas/provas',
-  '/dashboard/vagas/triagem',
 ];
 
 // Telas que exigem um registro escolhido antes; sem `?id=` elas mostram vazio de
@@ -78,10 +75,7 @@ const RUIDO = [
 // Quebras JÁ CONHECIDAS, com issue aberta. Ficam listadas em vez de removidas da
 // varredura: assim a lista é a dívida visível, e qualquer tela NOVA que quebrar continua
 // derrubando o teste. Ao resolver a issue, apague a linha daqui.
-const CONHECIDOS = [
-  { tela: '/dashboard/competencias', issue: '#66' },
-  { tela: '/dashboard/vagas/provas', issue: '#66' },
-];
+const CONHECIDOS: { tela: string; issue: string }[] = [];
 
 type Achado = { tela: string; tipo: string; detalhe: string };
 

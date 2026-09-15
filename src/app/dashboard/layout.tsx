@@ -32,7 +32,6 @@ const breadcrumbMap: Record<string, string> = {
   "/dashboard/avaliacoes": "Avaliações",
   "/dashboard/metas": "Metas",
   "/dashboard/pdi": "PDI",
-  "/dashboard/competencias": "Competências",
   "/dashboard/turnover": "Turnover",
   "/dashboard/clima": "Clima",
   "/dashboard/beneficios": "Benefícios",

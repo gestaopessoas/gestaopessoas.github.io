@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
-import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Award, Package, CheckSquare, CircleDollarSign, FileOutput, Contact, BadgePercent, Database } from "lucide-react"
+import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, CalendarDays, Gift, Clock, Receipt, Star, Smile, Target, TrendingUp, RefreshCcw, Package, CheckSquare, CircleDollarSign, FileOutput, Contact, BadgePercent, Database } from "lucide-react"
 import { usePermissions } from "@/hooks/usePermissions"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { createClient } from "@/utils/supabase/client"
@@ -52,7 +52,6 @@ const sidebarGroups: NavGroup[] = [
       { name: "Avaliações", href: "/dashboard/avaliacoes", icon: Star, module: "avaliacoes" },
       { name: "Metas", href: "/dashboard/metas", icon: Target, module: "metas" },
       { name: "PDI", href: "/dashboard/pdi", icon: TrendingUp, module: "pdi" },
-      { name: "Competências", href: "/dashboard/competencias", icon: Award, module: "competencias" },
       { name: "Turnover", href: "/dashboard/turnover", icon: RefreshCcw, module: "turnover" },
       { name: "Clima", href: "/dashboard/clima", icon: Smile, module: "clima" },
     ]
