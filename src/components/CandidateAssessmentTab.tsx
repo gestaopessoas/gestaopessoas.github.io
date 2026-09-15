@@ -28,7 +28,7 @@ const HARD_SKILLS = [
 const ASSESSMENT_SENIORITY_OPTIONS = ["Estagiário", ...SENIORITY_OPTIONS.filter(Boolean), "Especialista"];
 
 const SOFT_SKILLS = [
-  { id: "communication", label: "Comunicação" },
+  { id: "communication_score", label: "Comunicação" },
   { id: "leadership", label: "Liderança" },
   { id: "emotional_intelligence", label: "Int. Emocional" },
   { id: "problem_solving", label: "Res. de Problemas" },
