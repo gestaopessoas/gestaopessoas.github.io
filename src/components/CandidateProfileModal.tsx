@@ -13,6 +13,7 @@ import {
   Plus, Pencil, Trash2, ExternalLink
 } from "lucide-react";
 import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
+import GuiaAvaliadorButton from "@/components/GuiaAvaliadorButton";
 import * as pdfjsLib from "pdfjs-dist";
 import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
 import { buildResumeExtractionPrompt, parseExtractionResponse } from "@/lib/resumeExtractionPrompt";
@@ -1014,6 +1015,8 @@ export function CandidateProfileModal({
           </div>
           {/* flex-wrap + shrink: a 375px os botões Salvar e fechar saíam da tela (QA B1). */}
           <div className="flex shrink-0 items-center gap-2">
+            {/* Sempre visível, em qualquer modo: serve para consultar durante a entrevista. */}
+            <GuiaAvaliadorButton triggerClassName="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3" />
             {/* Travado, "Editar Perfil" não destrava nada: só o botão do overlay libera. */}
             {isEditable && !isEditing && !locked && (
               <Button onClick={() => setIsEditing(true)} variant="outline" size="sm" className="gap-2">
@@ -1329,7 +1332,7 @@ export function CandidateProfileModal({
                               <option value="">-</option>
                               <option value="Contratado">Contratado</option>
                               <option value="Banco de Talentos">Banco de Talentos</option>
-                              <option value="Descartado">Descartado</option>
+                              <option value="Reprovado">Reprovado</option>
                               <option value="Desistente">Desistente</option>
                             </select>
                           </label>

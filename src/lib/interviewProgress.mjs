@@ -73,7 +73,9 @@ export function interviewHistoryStage({ status, result, destination } = {}) {
   const dest = String(destination || "").trim();
   if (dest === "Contratado") return "Contratado";
   if (dest === "Banco de Talentos") return "Banco de Talentos";
-  if (dest === "Descartado") return "Reprovado";
+  // "Descartado" é o valor legado do destino (issue #88 renomeou para "Reprovado" no select);
+  // linhas antigas gravadas com ele continuam mapeando para a mesma etapa.
+  if (dest === "Reprovado" || dest === "Descartado") return "Reprovado";
   if (dest === "Desistente" || status === "Desistente") return "Desistente";
   if (result === "Reprovado") return "Reprovado";
   return "Entrevista RH";
