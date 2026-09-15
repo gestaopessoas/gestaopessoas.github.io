@@ -78,3 +78,7 @@ verify-permissions.mjs
 /public/dashboard-custos.html
 /colunas-producao.json
 /scripts/custos_geral_clean.json
+
+# Dumps e seeds com dado pessoal: este repositorio e publico.
+# A copia local fica fora do versionamento (ver docs/manutencao.md).
+supabase/seed_arquivo_morto.sql
