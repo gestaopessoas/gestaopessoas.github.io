@@ -95,6 +95,8 @@ export const BUCKET_ORDER: readonly [
 ];
 export const BUCKET_LABELS: Record<string, string>;
 
+export function nextStageOptions(currentBucket: string): string[];
+
 export function candidateBucket(
   status: string | null | undefined,
   etapaAtual: string | null | undefined

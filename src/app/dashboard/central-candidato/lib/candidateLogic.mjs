@@ -114,6 +114,34 @@ export function candidateBucket(status, etapaAtual) {
   return "entrevista";
 }
 
+/**
+ * Etapas oferecidas no avanço da Central: as do balde atual (movimento lateral) e as do
+ * balde seguinte. Balde desconhecido — ou `livre`, que não tem etapa própria — começa o
+ * funil pela entrevista.
+ *
+ * Desfecho não mora aqui. Contratado, Banco de Talentos, Reprovado e Desistente são decisão
+ * da entrevista, registrada na ficha em /dashboard/entrevistas: é lá que se contrata ou se
+ * manda para o banco. A Central só acompanha o funil, e contratar quem terminou a
+ * documentação tem botão próprio no balde `documentacao`.
+ *
+ * ponytail: quem desiste no meio (obra, proposta) encerra pela ficha da entrevista. Se isso
+ * virar atrito no dia a dia, o caminho é um botão "Encerrar processo" na linha — não
+ * devolver os desfechos a este select, que foi de onde eles saíram.
+ */
+export function nextStageOptions(currentBucket) {
+  const idx = BUCKET_ORDER.indexOf(currentBucket);
+  if (idx === -1) return [...STAGE_BUCKETS.entrevista];
+
+  const stages = [...(STAGE_BUCKETS[currentBucket] ?? [])];
+  const proximo = BUCKET_ORDER[idx + 1];
+  if (proximo) stages.push(...(STAGE_BUCKETS[proximo] ?? []));
+
+  // O filtro é a regra, não a montagem acima: "Contratado" é a etapa do balde `contratacao`
+  // e voltaria pela porta dos fundos.
+  const desfechos = ["Contratado", ...TERMINAL_STAGES];
+  return [...new Set(stages)].filter((s) => !desfechos.some((d) => sameStage(d, s)));
+}
+
 export function latestInterview(interviews = []) {
   if (!Array.isArray(interviews) || interviews.length === 0) return null;
   return [...interviews].sort(

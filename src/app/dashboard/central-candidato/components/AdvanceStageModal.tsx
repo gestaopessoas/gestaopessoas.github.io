@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { STAGE_BUCKETS, BUCKET_ORDER, TERMINAL_STAGES, isInterviewStage, stageNeedsWorkplace } from "../lib/candidateLogic.mjs";
+import { nextStageOptions, isInterviewStage, stageNeedsWorkplace } from "../lib/candidateLogic.mjs";
 import {
   INTERVIEW_OUTCOME_OPTIONS,
   formatInterviewSchedule,
@@ -56,6 +56,7 @@ export default function AdvanceStageModal({
   currentBucket,
   currentStage,
   workplaceName,
+  forcedStage,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -65,8 +66,10 @@ export default function AdvanceStageModal({
   currentBucket: string;
   currentStage?: string | null;
   workplaceName?: string | null;
+  /** Etapa fixa (ex.: "Contratado") — some com o select e vira uma caixa de leitura. */
+  forcedStage?: string;
 }) {
-  const [selectedStage, setSelectedStage] = useState("");
+  const [selectedStage, setSelectedStage] = useState(forcedStage || "");
   // Avançar para uma etapa de entrevista marca a entrevista: data e hora entram aqui e
   // viram registro em `interviews`, que é o que alimenta a agenda e o histórico.
   const [stageDate, setStageDate] = useState("");
@@ -141,31 +144,9 @@ export default function AdvanceStageModal({
     "Transferência entre Obras"
   ];
 
-  const validNextStages = useMemo(() => {
-    // Retorna todos os estágios do balde atual e do balde seguinte
-    const currentIdx = (BUCKET_ORDER as readonly string[]).indexOf(currentBucket);
-    const stages: string[] = [];
-    
-    // Add current bucket stages (so they can move sideways)
-    const currentBucketType = currentBucket as keyof typeof STAGE_BUCKETS;
-    if (currentBucketType && STAGE_BUCKETS[currentBucketType]) {
-      stages.push(...STAGE_BUCKETS[currentBucketType]);
-    }
-    
-    // Add next bucket stages
-    const nextBucket = BUCKET_ORDER[currentIdx + 1];
-    if (nextBucket && STAGE_BUCKETS[nextBucket as keyof typeof STAGE_BUCKETS]) {
-      stages.push(...STAGE_BUCKETS[nextBucket as keyof typeof STAGE_BUCKETS]);
-    }
-
-    // Etapas terminais encerram o processo a partir de qualquer balde — sem elas
-    // "Banco de Talentos" era inalcançável por aqui (issue #41).
-    for (const stage of ["Contratado", ...TERMINAL_STAGES]) {
-      if (!stages.includes(stage)) stages.push(stage);
-    }
-
-    return stages;
-  }, [currentBucket]);
+  // O balde atual e o seguinte, sem desfecho: contratar, mandar para o banco, reprovar e
+  // registrar desistência são decisão da entrevista, não do funil (issue #84).
+  const validNextStages = useMemo(() => nextStageOptions(currentBucket), [currentBucket]);
 
   // Quem quiser o parecer vai para a ficha da entrevista recém-criada; quem não quiser
   // termina o avanço em dois cliques.
@@ -296,9 +277,11 @@ export default function AdvanceStageModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Avançar Etapa</DialogTitle>
+          <DialogTitle>{forcedStage ? "Contratar" : "Avançar Etapa"}</DialogTitle>
           <DialogDescription>
-            Registrar o avanço de <strong>{candidateName}</strong> no processo seletivo.
+            {forcedStage
+              ? <>Registrar a contratação de <strong>{candidateName}</strong>.</>
+              : <>Registrar o avanço de <strong>{candidateName}</strong> no processo seletivo.</>}
           </DialogDescription>
         </DialogHeader>
 
@@ -367,21 +350,30 @@ export default function AdvanceStageModal({
             </div>
           </div>
 
-          <div className="grid gap-2">
-            <label className="text-sm font-medium">Próxima Etapa *</label>
-            <Select value={selectedStage} onValueChange={(val) => setSelectedStage(val || "")}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a etapa..." />
-              </SelectTrigger>
-              <SelectContent>
-                {validNextStages.map((stage) => (
-                  <SelectItem key={stage} value={stage}>
-                    {stage}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {forcedStage ? (
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Próxima Etapa</label>
+              <div className="rounded-md border bg-muted p-2 text-sm text-muted-foreground">
+                {forcedStage}
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Próxima Etapa *</label>
+              <Select value={selectedStage} onValueChange={(val) => setSelectedStage(val || "")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a etapa..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {validNextStages.map((stage) => (
+                    <SelectItem key={stage} value={stage}>
+                      {stage}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {(stageNeedsWorkplace(selectedStage) || isInterviewStage(selectedStage)) && (
             <div className="grid gap-2">

@@ -68,7 +68,7 @@ export default function CentralCandidatoPage() {
   const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
-  const [advanceModalData, setAdvanceModalData] = useState<{ id: string; name: string; bucket: string; stage: string | null; workplace: string | null } | null>(null);
+  const [advanceModalData, setAdvanceModalData] = useState<{ id: string; name: string; bucket: string; stage: string | null; workplace: string | null; forcedStage?: string } | null>(null);
   const [recusaModalData, setRecusaModalData] = useState<{ id: string; name: string; workplace: string | null } | null>(null);
   const { can } = usePermissions();
   const canDelete = can("central_candidato", "delete");
@@ -455,6 +455,26 @@ export default function CentralCandidatoPage() {
                             Ver Checklist
                           </Button>
                         )}
+                        {candidate.bucket === "documentacao" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAdvanceModalData({
+                                id: candidate.id,
+                                name: candidate.full_name,
+                                bucket: candidate.bucket,
+                                stage: candidate.etapa_atual,
+                                workplace: candidate.obra_atual,
+                                forcedStage: "Contratado",
+                              });
+                            }}
+                          >
+                            <UserCheck className="h-4 w-4 mr-1" />
+                            Contratar
+                          </Button>
+                        )}
                         {canDelete && (
                           <Button
                             variant="ghost"
@@ -574,6 +594,7 @@ export default function CentralCandidatoPage() {
           currentBucket={advanceModalData.bucket}
           currentStage={advanceModalData.stage}
           workplaceName={advanceModalData.workplace}
+          forcedStage={advanceModalData.forcedStage}
         />
       )}
 
