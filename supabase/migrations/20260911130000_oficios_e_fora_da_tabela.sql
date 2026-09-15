@@ -5,6 +5,9 @@
 --
 -- Fecha os cargos que sobraram sem faixa. Decisoes do Bruno em 2026-09-11.
 --
+-- A conferencia vira aviso (RAISE NOTICE) em banco sem cadastro, e continua reprovando
+-- (RAISE EXCEPTION) onde ha colaborador cadastrado (issue #83).
+--
 -- 1. OS OFICIOS VAO PARA O OFICIAL
 --
 -- Mesmo criterio de pedreiro, encanador, carpinteiro, pintor, ferreiro armador e
@@ -52,11 +55,17 @@ UPDATE public.job_profiles
  WHERE title IN ('DIRETOR', 'DIRETOR (OBRAS)', 'PRESIDENTE', 'PRESIDENTE (CONSELHO)');
 
 DO $$
-DECLARE com_faixa integer; sem_faixa integer; fora integer;
+DECLARE
+  com_faixa integer; sem_faixa integer; fora integer;
+  sem_cadastro boolean := NOT EXISTS (SELECT 1 FROM public.employees LIMIT 1);
 BEGIN
   SELECT count(*) INTO fora FROM public.job_profiles WHERE off_salary_table;
   IF fora <> 4 THEN
-    RAISE EXCEPTION 'Esperava 4 cargos fora da tabela, achei %', fora;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'Esperava 4 cargos fora da tabela, achei %; banco sem cadastro, conferencia pulada.', fora;
+    ELSE
+      RAISE EXCEPTION 'Esperava 4 cargos fora da tabela, achei %', fora;
+    END IF;
   END IF;
 
   SELECT count(*) FILTER (WHERE tem OR f.fora),

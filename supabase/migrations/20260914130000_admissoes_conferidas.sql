@@ -4,6 +4,9 @@
 --
 -- Datas de admissao conferidas com a folha de custos. Decisoes do Bruno em 2026-09-14.
 --
+-- A conferencia vira aviso (RAISE NOTICE) em banco sem cadastro, e continua reprovando
+-- (RAISE EXCEPTION) onde ha colaborador cadastrado (issue #83).
+--
 -- A comparacao achou 8 divergencias. O Bruno olhou uma a uma e manteve o sistema em SEIS
 -- delas — seis colaboradores,
 -- So estas duas mudam.
@@ -36,22 +39,36 @@ UPDATE public.employees
    AND admission_date = DATE '2021-02-18';
 
 DO $$
-DECLARE um date; dois date; quantos integer;
+DECLARE
+  um date; dois date; quantos integer;
+  sem_cadastro boolean := NOT EXISTS (SELECT 1 FROM public.employees LIMIT 1);
 BEGIN
   SELECT count(*) INTO quantos FROM public.employees
    WHERE registration_number IN ('19700', '1834');
   IF quantos <> 2 THEN
-    RAISE EXCEPTION 'Esperava 2 fichas, achei %', quantos;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'Esperava 2 fichas, achei %; banco sem cadastro, conferencia pulada.', quantos;
+    ELSE
+      RAISE EXCEPTION 'Esperava 2 fichas, achei %', quantos;
+    END IF;
   END IF;
 
   SELECT admission_date INTO um FROM public.employees WHERE registration_number = '19700';
   SELECT admission_date INTO dois     FROM public.employees WHERE registration_number = '1834';
 
   IF um <> DATE '2026-02-03' THEN
-    RAISE EXCEPTION 'A primeira ficha ficou com admissao %, esperava 2026-02-03', um;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'A primeira ficha ficou com admissao %, esperava 2026-02-03; banco sem cadastro, conferencia pulada.', um;
+    ELSE
+      RAISE EXCEPTION 'A primeira ficha ficou com admissao %, esperava 2026-02-03', um;
+    END IF;
   END IF;
   IF dois <> DATE '2021-01-18' THEN
-    RAISE EXCEPTION 'A segunda ficha ficou com admissao %, esperava 2021-01-18', dois;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'A segunda ficha ficou com admissao %, esperava 2021-01-18; banco sem cadastro, conferencia pulada.', dois;
+    ELSE
+      RAISE EXCEPTION 'A segunda ficha ficou com admissao %, esperava 2021-01-18', dois;
+    END IF;
   END IF;
 
   -- ninguem pode ter admissao no futuro
@@ -59,7 +76,11 @@ BEGIN
    WHERE admission_date > current_date
      AND (status IS NULL OR status NOT IN ('Desligado', 'Inativo', 'Arquivo Morto'));
   IF quantos > 0 THEN
-    RAISE EXCEPTION '% colaborador(es) ativo(s) com admissao no futuro', quantos;
+    IF sem_cadastro THEN
+      RAISE NOTICE '% colaborador(es) ativo(s) com admissao no futuro; banco sem cadastro, conferencia pulada.', quantos;
+    ELSE
+      RAISE EXCEPTION '% colaborador(es) ativo(s) com admissao no futuro', quantos;
+    END IF;
   END IF;
 
   RAISE NOTICE 'Admissoes conferidas: 03/02/2026 e 18/01/2021.';

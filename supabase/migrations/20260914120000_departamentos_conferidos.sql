@@ -4,6 +4,9 @@
 --
 -- Departamentos conferidos com a folha de custos. Decisoes do Bruno em 2026-09-14.
 --
+-- A conferencia vira aviso (RAISE NOTICE) em banco sem cadastro, e continua reprovando
+-- (RAISE EXCEPTION) onde ha colaborador cadastrado (issue #83).
+--
 -- 1. O SISTEMA SE CONTRADIZIA EM 12 PESSOAS
 --
 -- A ficha guarda a classificacao em DOIS lugares: a coluna de texto `department` e o
@@ -71,7 +74,9 @@ UPDATE public.employees e
    AND coalesce(e.department, '') = 'RH';
 
 DO $$
-DECLARE contradiz integer; quatro integer; tem_rh integer;
+DECLARE
+  contradiz integer; quatro integer; tem_rh integer;
+  sem_cadastro boolean := NOT EXISTS (SELECT 1 FROM public.employees LIMIT 1);
 BEGIN
   SELECT count(*) INTO contradiz
     FROM public.employees e
@@ -81,7 +86,11 @@ BEGIN
      AND upper(e.department) <> upper(d.name);
 
   IF contradiz > 0 THEN
-    RAISE EXCEPTION 'Ainda ha % ficha(s) com texto e vinculo se contradizendo', contradiz;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'Ainda ha % ficha(s) com texto e vinculo se contradizendo; banco sem cadastro, conferencia pulada.', contradiz;
+    ELSE
+      RAISE EXCEPTION 'Ainda ha % ficha(s) com texto e vinculo se contradizendo', contradiz;
+    END IF;
   END IF;
 
   SELECT count(*) INTO quatro
@@ -92,12 +101,20 @@ BEGIN
      AND upper(d.name) IN ('DIRETO', 'INDIRETO');
 
   IF quatro <> 4 THEN
-    RAISE EXCEPTION 'Esperava as 4 pessoas na classificacao, achei %', quatro;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'Esperava as 4 pessoas na classificacao, achei %; banco sem cadastro, conferencia pulada.', quatro;
+    ELSE
+      RAISE EXCEPTION 'Esperava as 4 pessoas na classificacao, achei %', quatro;
+    END IF;
   END IF;
 
   SELECT count(*) INTO tem_rh FROM public.departments WHERE name = 'RH';
   IF tem_rh > 0 THEN
-    RAISE EXCEPTION 'O departamento RH continua existindo';
+    IF sem_cadastro THEN
+      RAISE NOTICE 'O departamento RH continua existindo; banco sem cadastro, conferencia pulada.';
+    ELSE
+      RAISE EXCEPTION 'O departamento RH continua existindo';
+    END IF;
   END IF;
 
   RAISE NOTICE 'Departamentos conferidos: 0 contradicao, 4 pessoas na classificacao, RH por extenso.';

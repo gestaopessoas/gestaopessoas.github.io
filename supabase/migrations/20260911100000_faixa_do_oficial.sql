@@ -2,6 +2,9 @@
 --   DELETE FROM public.salary_table WHERE role_name = 'OFICIAL';
 --   ALTER TABLE public.job_profiles DROP COLUMN salary_role;
 --
+-- A conferencia vira aviso (RAISE NOTICE) em banco sem cadastro, e continua reprovando
+-- (RAISE EXCEPTION) onde ha colaborador cadastrado (issue #83).
+--
 -- A faixa do OFICIAL, e os oficios apontando para ela. Decisao do Bruno em 2026-09-11.
 --
 -- O QUE ELE EXPLICOU
@@ -78,7 +81,9 @@ UPDATE public.job_profiles
  WHERE title IN ('PEDREIRO', 'ENCANADOR', 'CARPINTEIRO', 'PINTOR', 'FERREIRO ARMADOR');
 
 DO $$
-DECLARE apontam integer; pessoas integer;
+DECLARE
+  apontam integer; pessoas integer;
+  sem_cadastro boolean := NOT EXISTS (SELECT 1 FROM public.employees LIMIT 1);
 BEGIN
   SELECT count(*) INTO apontam FROM public.job_profiles WHERE salary_role = 'OFICIAL';
 
@@ -88,7 +93,11 @@ BEGIN
    WHERE j.salary_role = 'OFICIAL';
 
   IF apontam = 0 THEN
-    RAISE EXCEPTION 'Nenhum oficio apontou para OFICIAL; os titulos do cadastro mudaram?';
+    IF sem_cadastro THEN
+      RAISE NOTICE 'Nenhum oficio apontou para OFICIAL; os titulos do cadastro mudaram?; banco sem cadastro, conferencia pulada.';
+    ELSE
+      RAISE EXCEPTION 'Nenhum oficio apontou para OFICIAL; os titulos do cadastro mudaram?';
+    END IF;
   END IF;
 
   RAISE NOTICE 'Faixa OFICIAL criada (piso e pos-90 a preencher). % oficio(s) apontam para ela, cobrindo % colaborador(es).',

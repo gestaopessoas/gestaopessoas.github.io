@@ -1,7 +1,10 @@
-﻿-- ROLLBACK: nao ha volta automatica â€” apaga 30 linhas de faixa. Para restaurar, reimportar
+-- ROLLBACK: nao ha volta automatica â€” apaga 30 linhas de faixa. Para restaurar, reimportar
 --   da planilha "2. Tabela Salarial  05.2026.xlsx", aba Operacional, banda da linha 40.
 --
 -- MESTRE DE OBRAS passa a ter UMA faixa. Decisao do Bruno em 2026-09-11.
+--
+-- A conferencia vira aviso (RAISE NOTICE) em banco sem cadastro, e continua reprovando
+-- (RAISE EXCEPTION) onde ha colaborador cadastrado (issue #83).
 --
 -- O CONFLITO
 --
@@ -43,7 +46,9 @@ DELETE FROM public.salary_table s
         AND maior.salary > s.salary);
 
 DO $$
-DECLARE conflitos integer; linhas integer; abaixo integer;
+DECLARE
+  conflitos integer; linhas integer; abaixo integer;
+  sem_cadastro boolean := NOT EXISTS (SELECT 1 FROM public.employees LIMIT 1);
 BEGIN
   SELECT count(*) INTO conflitos FROM (
     SELECT 1 FROM public.salary_table WHERE role_name = 'MESTRE DE OBRAS'
@@ -51,12 +56,20 @@ BEGIN
     HAVING count(*) > 1) x;
 
   IF conflitos > 0 THEN
-    RAISE EXCEPTION 'MESTRE DE OBRAS ainda tem % combinacao(oes) com dois valores', conflitos;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'MESTRE DE OBRAS ainda tem % combinacao(oes) com dois valores; banco sem cadastro, conferencia pulada.', conflitos;
+    ELSE
+      RAISE EXCEPTION 'MESTRE DE OBRAS ainda tem % combinacao(oes) com dois valores', conflitos;
+    END IF;
   END IF;
 
   SELECT count(*) INTO linhas FROM public.salary_table WHERE role_name = 'MESTRE DE OBRAS';
   IF linhas <> 30 THEN
-    RAISE EXCEPTION 'Esperava 30 linhas em MESTRE DE OBRAS, ficaram %', linhas;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'Esperava 30 linhas em MESTRE DE OBRAS, ficaram %; banco sem cadastro, conferencia pulada.', linhas;
+    ELSE
+      RAISE EXCEPTION 'Esperava 30 linhas em MESTRE DE OBRAS, ficaram %', linhas;
+    END IF;
   END IF;
 
   -- ninguem pode ter ficado abaixo do piso da faixa que sobrou
@@ -68,7 +81,11 @@ BEGIN
                            WHERE role_name = 'MESTRE DE OBRAS');
 
   IF abaixo > 0 THEN
-    RAISE EXCEPTION '% mestre(s) ficaram abaixo do piso da faixa', abaixo;
+    IF sem_cadastro THEN
+      RAISE NOTICE '% mestre(s) ficaram abaixo do piso da faixa; banco sem cadastro, conferencia pulada.', abaixo;
+    ELSE
+      RAISE EXCEPTION '% mestre(s) ficaram abaixo do piso da faixa', abaixo;
+    END IF;
   END IF;
 
   RAISE NOTICE 'MESTRE DE OBRAS: % linhas, 0 conflito, ninguem abaixo do piso.', linhas;

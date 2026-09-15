@@ -2,6 +2,9 @@
 --
 -- Centro de custo conferido com a folha de custos. Decisoes do Bruno em 2026-09-14.
 --
+-- A conferencia vira aviso (RAISE NOTICE) em banco sem cadastro, e continua reprovando
+-- (RAISE EXCEPTION) onde ha colaborador cadastrado (issue #83).
+--
 -- O PROBLEMA
 --
 -- A ficha guarda o centro de custo DUAS vezes: a sigla digitada (`cost_center`) e a
@@ -64,7 +67,9 @@ UPDATE public.employees
  WHERE registration_number = '3847';
 
 DO $$
-DECLARE sobrou integer; luis text;
+DECLARE
+  sobrou integer; luis text;
+  sem_cadastro boolean := NOT EXISTS (SELECT 1 FROM public.employees LIMIT 1);
 BEGIN
   SELECT count(*) INTO sobrou
     FROM public.employees e
@@ -82,12 +87,20 @@ BEGIN
 
   -- devem sobrar exatamente os 4 que o Bruno ainda vai decidir
   IF sobrou <> 4 THEN
-    RAISE EXCEPTION 'Esperava sobrar 4 fichas para decidir, sobraram %', sobrou;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'Esperava sobrar 4 fichas para decidir, sobraram %; banco sem cadastro, conferencia pulada.', sobrou;
+    ELSE
+      RAISE EXCEPTION 'Esperava sobrar 4 fichas para decidir, sobraram %', sobrou;
+    END IF;
   END IF;
 
   SELECT cost_center INTO luis FROM public.employees WHERE registration_number = '3847';
   IF luis <> 'DIRECT' THEN
-    RAISE EXCEPTION 'O mestre de obras ficou com centro de custo %, esperava DIRECT', luis;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'O mestre de obras ficou com centro de custo %, esperava DIRECT; banco sem cadastro, conferencia pulada.', luis;
+    ELSE
+      RAISE EXCEPTION 'O mestre de obras ficou com centro de custo %, esperava DIRECT', luis;
+    END IF;
   END IF;
 
   RAISE NOTICE 'Centro de custo: 20 siglas alinhadas + 1 mudanca de empresa. 4 ficam para decidir.';

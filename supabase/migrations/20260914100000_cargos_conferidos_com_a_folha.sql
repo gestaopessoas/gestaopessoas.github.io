@@ -16,6 +16,9 @@
 -- Corrige o cargo de 9 colaboradores, conferido com a planilha de custos do RH.
 -- Decisoes do Bruno em 2026-09-14, uma a uma.
 --
+-- A conferencia vira aviso (RAISE NOTICE) em banco sem cadastro, e continua reprovando
+-- (RAISE EXCEPTION) onde ha colaborador cadastrado (issue #83).
+--
 -- DE ONDE VEM
 --
 -- A comparacao entre "Custos Geral 01092026.xlsx" (folha de 09/09/2026) e o sistema
@@ -127,6 +130,7 @@ DECLARE
   faltou text;
   sem_faixa integer;
   quantos integer;
+  sem_cadastro boolean := NOT EXISTS (SELECT 1 FROM public.employees LIMIT 1);
 BEGIN
   -- Cada pessoa tem que ter saido do cargo antigo. Se alguma nao mudou, e porque o nome
   -- no banco nao e o esperado — e melhor a migration parar do que mentir que arrumou.
@@ -140,13 +144,21 @@ BEGIN
                         'DIRETOR DE OPERAÇÕES', 'PSICÓLOGO ORGANIZACIONAL')) x;
 
   IF faltou IS NOT NULL THEN
-    RAISE EXCEPTION 'Nao consegui corrigir o cargo de: %', faltou;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'Nao consegui corrigir o cargo de: %; banco sem cadastro, conferencia pulada.', faltou;
+    ELSE
+      RAISE EXCEPTION 'Nao consegui corrigir o cargo de: %', faltou;
+    END IF;
   END IF;
 
   SELECT count(*) INTO quantos FROM public.employees
    WHERE role IN ('ATENDENTE DE OBRAS', 'MOTORISTA DE LOGÍSTICA');
   IF quantos <> 2 THEN
-    RAISE EXCEPTION 'Esperava 2 pessoas nos cargos renomeados, achei %', quantos;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'Esperava 2 pessoas nos cargos renomeados, achei %; banco sem cadastro, conferencia pulada.', quantos;
+    ELSE
+      RAISE EXCEPTION 'Esperava 2 pessoas nos cargos renomeados, achei %', quantos;
+    END IF;
   END IF;
 
   -- Ninguem pode ter ficado sem faixa por causa desta migration.
@@ -164,7 +176,11 @@ BEGIN
    WHERE NOT tem AND NOT fora;
 
   IF sem_faixa > 0 THEN
-    RAISE EXCEPTION '% colaborador(es) ficaram sem faixa salarial', sem_faixa;
+    IF sem_cadastro THEN
+      RAISE NOTICE '% colaborador(es) ficaram sem faixa salarial; banco sem cadastro, conferencia pulada.', sem_faixa;
+    ELSE
+      RAISE EXCEPTION '% colaborador(es) ficaram sem faixa salarial', sem_faixa;
+    END IF;
   END IF;
 
   RAISE NOTICE 'Cargos conferidos com a folha: 9 pessoas corrigidas, 0 sem faixa.';

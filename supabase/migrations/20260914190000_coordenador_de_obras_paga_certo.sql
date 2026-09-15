@@ -5,6 +5,9 @@
 -- COORDENADOR TÉCNICO DE OBRAS (OBRAS) passa a pagar pela faixa de COORDENADOR DE OBRAS.
 -- Decisao do Bruno em 2026-09-14, revendo a de mais cedo.
 --
+-- A conferencia vira aviso (RAISE NOTICE) em banco sem cadastro, e continua reprovando
+-- (RAISE EXCEPTION) onde ha colaborador cadastrado (issue #83).
+--
 -- POR QUE MUDOU
 --
 -- Na primeira rodada a escolha foi pelo NOME: a folha chamava "COORD. DE OBRAS", o
@@ -27,13 +30,19 @@ UPDATE public.job_profiles
  WHERE title = 'COORDENADOR TÉCNICO DE OBRAS (OBRAS)';
 
 DO $$
-DECLARE fora integer; faixa text; piso numeric; teto numeric;
+DECLARE
+  fora integer; faixa text; piso numeric; teto numeric;
+  sem_cadastro boolean := NOT EXISTS (SELECT 1 FROM public.employees LIMIT 1);
 BEGIN
   SELECT j.salary_role INTO faixa FROM public.job_profiles j
    WHERE j.title = 'COORDENADOR TÉCNICO DE OBRAS (OBRAS)';
 
   IF faixa IS DISTINCT FROM 'COORDENADOR DE OBRAS' THEN
-    RAISE EXCEPTION 'O cargo ficou apontando para %, esperava COORDENADOR DE OBRAS', faixa;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'O cargo ficou apontando para %, esperava COORDENADOR DE OBRAS; banco sem cadastro, conferencia pulada.', faixa;
+    ELSE
+      RAISE EXCEPTION 'O cargo ficou apontando para %, esperava COORDENADOR DE OBRAS', faixa;
+    END IF;
   END IF;
 
   SELECT min(salary), max(salary) INTO piso, teto
@@ -47,7 +56,11 @@ BEGIN
      AND (e.base_salary < piso OR e.base_salary > teto);
 
   IF fora > 0 THEN
-    RAISE EXCEPTION '% coordenador(es) continuam fora da faixa (% a %)', fora, piso, teto;
+    IF sem_cadastro THEN
+      RAISE NOTICE '% coordenador(es) continuam fora da faixa (% a %); banco sem cadastro, conferencia pulada.', fora, piso, teto;
+    ELSE
+      RAISE EXCEPTION '% coordenador(es) continuam fora da faixa (% a %)', fora, piso, teto;
+    END IF;
   END IF;
 
   RAISE NOTICE 'Coordenadores tecnicos de obras agora pagam por COORDENADOR DE OBRAS (% a %), 0 fora da faixa.',

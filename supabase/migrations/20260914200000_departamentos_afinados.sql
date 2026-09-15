@@ -7,6 +7,9 @@
 --
 -- Afina o cadastro de departamentos. Decisoes do Bruno em 2026-09-14.
 --
+-- A conferencia vira aviso (RAISE NOTICE) em banco sem cadastro, e continua reprovando
+-- (RAISE EXCEPTION) onde ha colaborador cadastrado (issue #83).
+--
 -- O QUE NAO E PROBLEMA (e eu achei que fosse)
 --
 -- 209 dos 293 ativos tem DIRETO ou INDIRETO como departamento. Levantei isso como
@@ -50,12 +53,18 @@ DELETE FROM public.departments d
    AND NOT EXISTS (SELECT 1 FROM arquivo.employees a WHERE a.department_id = d.id);
 
 DO $$
-DECLARE sobrou integer; rh integer; orfaos integer;
+DECLARE
+  sobrou integer; rh integer; orfaos integer;
+  sem_cadastro boolean := NOT EXISTS (SELECT 1 FROM public.employees LIMIT 1);
 BEGIN
   SELECT count(*) INTO sobrou FROM public.departments
    WHERE name IN ('GESTÃO', 'COMERCIAL - PLANTÃO SOLANAS', 'JURIDICO', 'ANALISE DE CRÉDITO');
   IF sobrou > 0 THEN
-    RAISE EXCEPTION 'Sobraram % cadastro(s) que deviam ter sumido ou sido renomeados', sobrou;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'Sobraram % cadastro(s) que deviam ter sumido ou sido renomeados; banco sem cadastro, conferencia pulada.', sobrou;
+    ELSE
+      RAISE EXCEPTION 'Sobraram % cadastro(s) que deviam ter sumido ou sido renomeados', sobrou;
+    END IF;
   END IF;
 
   SELECT count(*) INTO rh
@@ -65,7 +74,11 @@ BEGIN
      AND (e.status IS NULL OR e.status NOT IN ('Desligado', 'Inativo', 'Arquivo Morto'));
 
   IF rh < 3 THEN
-    RAISE EXCEPTION 'RECURSOS HUMANOS ficou com % pessoa(s), esperava ao menos 3', rh;
+    IF sem_cadastro THEN
+      RAISE NOTICE 'RECURSOS HUMANOS ficou com % pessoa(s), esperava ao menos 3; banco sem cadastro, conferencia pulada.', rh;
+    ELSE
+      RAISE EXCEPTION 'RECURSOS HUMANOS ficou com % pessoa(s), esperava ao menos 3', rh;
+    END IF;
   END IF;
 
   -- ninguem pode ter ficado apontando para departamento que nao existe mais
@@ -73,7 +86,11 @@ BEGIN
    WHERE e.department_id IS NOT NULL
      AND NOT EXISTS (SELECT 1 FROM public.departments d WHERE d.id = e.department_id);
   IF orfaos > 0 THEN
-    RAISE EXCEPTION '% ficha(s) apontando para departamento inexistente', orfaos;
+    IF sem_cadastro THEN
+      RAISE NOTICE '% ficha(s) apontando para departamento inexistente; banco sem cadastro, conferencia pulada.', orfaos;
+    ELSE
+      RAISE EXCEPTION '% ficha(s) apontando para departamento inexistente', orfaos;
+    END IF;
   END IF;
 
   RAISE NOTICE 'Departamentos afinados: 2 acentos, GESTÃO unificada em RECURSOS HUMANOS (agora %), 1 vazio removido.', rh;
