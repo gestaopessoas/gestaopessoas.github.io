@@ -1239,7 +1239,9 @@ export default function MPGeneratorPage() {
                 </div>
               </div>
 
-              {reason === "Outros" && (
+              {/* O select oferece "Outra" (availableReasonsContratacao); com "Outros" aqui o
+                  campo nunca aparecia e o MP saía com "Outra:" em branco. */}
+              {reason === "Outra" && (
                 <div className="space-y-2">
                   <Label>Especificar Razão</Label>
                   <Input value={customReason} onChange={e => setCustomReason(e.target.value)} />

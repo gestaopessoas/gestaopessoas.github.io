@@ -61,8 +61,21 @@ for (const value of [
   data.effectiveDate,
   MP_REVISION,
 ]) {
-  assert.ok(plain.includes(value), `valor ausente no docx: ${value}`)
+  // Sem caixa: o que esta asserção prova é que o valor chegou no documento. O DOCX é
+  // padronizado em maiúsculo (mpDocx.ts:130, `caps: true`), então comparar como foi digitado
+  // reprovava um documento correto.
+  assert.ok(
+    plain.toUpperCase().includes(String(value).toUpperCase()),
+    `valor ausente no docx: ${value}`
+  )
 }
+
+// O maiúsculo do formulário é decisão de layout, não acidente: se alguém tirar o `caps`,
+// a asserção acima continuaria passando e ninguém perceberia.
+assert.ok(
+  plain.includes(data.candidateName.toUpperCase()),
+  "o nome do candidato precisa sair em maiúsculo no formulário"
+)
 
 // Estrutura do formulario impresso.
 for (const section of [
@@ -86,10 +99,15 @@ assert.strictEqual((plain.match(/☒/g) || []).length, 1, "mais de um checkbox m
 
 // Razao livre cai no "Outra:".
 const outra = await Packer.toBuffer(
-  buildMpContratacaoDocument({ ...data, reason: "Outros", customReason: "Projeto novo" }),
+  // "Outra" é o valor que o select realmente produz (availableReasonsContratacao).
+  buildMpContratacaoDocument({ ...data, reason: "Outra", customReason: "Projeto novo" }),
 )
 const outraXml = (await (await JSZip.loadAsync(outra)).file("word/document.xml").async("string")).replace(/<[^>]+>/g, "")
-assert.ok(outraXml.includes("☒ Outra: Projeto novo"), "razão livre não foi para o campo Outra")
+// O rótulo mantém a caixa; só o valor digitado sobe para maiúsculo.
+assert.ok(
+  outraXml.toUpperCase().includes("☒ OUTRA: PROJETO NOVO"),
+  "razão livre não foi para o campo Outra",
+)
 
 // Paleta amostrada do formulario impresso: dourado das reguas e navy dos titulos.
 assert.ok(xml.includes("C98A1F"), "dourado das réguas ausente")
@@ -127,7 +145,11 @@ const mov = await Packer.toBuffer(
 )
 const movPlain = (await (await JSZip.loadAsync(mov)).file("word/document.xml").async("string")).replace(/<[^>]+>/g, "")
 for (const value of ["Ficha", "678", "DADOS ATUAIS", "DADOS ALTERADOS", "Carla Rockenbach", "João Revisor", "20/08/2026", MP_REVISION]) {
-  assert.ok(movPlain.includes(value), `valor ausente na MP de movimentação: ${value}`)
+  // Sem caixa, pelo mesmo motivo do bloco da contratação: o valor é que é maiúsculo.
+  assert.ok(
+    movPlain.toUpperCase().includes(String(value).toUpperCase()),
+    `valor ausente na MP de movimentação: ${value}`,
+  )
 }
 
 console.log("mpDocx.test.mjs passed")
