@@ -153,16 +153,17 @@ export default function CentralCandidatoPage() {
           const finalStatus = derived.status;
           const finalChamado = derived.ultimo_chamado;
 
-          let extraDegree = null;
-          if (c.email) {
-            const intMatches = interviewsData.filter(i => i.candidate_id === c.id || i.email === c.email);
-            for (const m of intMatches) {
-              const assessment: any = rowsToAssessment(m.interview_assessments?.interview_assessment_values ?? []);
-              if (Array.isArray(assessment.academic_list) && assessment.academic_list.length > 0) {
-                extraDegree = assessment.academic_list[0].course || "Curso Superior / Técnico";
-                break;
-              }
-            }
+          // Reserva de escolaridade: o parecer mais recente que disser alguma coisa.
+          // A ficha grava `education`, e não só `academic_list` — ler só a lista deixava
+          // "Não informado" em quem declarou a escolaridade na entrevista (issue #72).
+          let assessmentDegree = null;
+          const intMatches = interviewsData.filter(
+            (i) => i.candidate_id === c.id || (c.email && i.email === c.email)
+          );
+          for (const m of intMatches) {
+            const assessment: any = rowsToAssessment(m.interview_assessments?.interview_assessment_values ?? []);
+            assessmentDegree = latestEducationDegree([], assessment);
+            if (assessmentDegree) break;
           }
 
           const hasNewApplication = Array.isArray(c.job_applications) && c.job_applications.some((app: any) => app.status === "Nova Aplicação");
@@ -172,7 +173,7 @@ export default function CentralCandidatoPage() {
             full_name: c.full_name,
             phone: c.phone || "Não informado",
             email: c.email,
-            escolaridade: latestEducationDegree(c.candidate_educations) || extraDegree || "Não informado",
+            escolaridade: latestEducationDegree(c.candidate_educations) || assessmentDegree || "Não informado",
             status: finalStatus,
             ultimo_chamado: finalChamado,
             obra_atual: derived.obra_atual || c.city || null,

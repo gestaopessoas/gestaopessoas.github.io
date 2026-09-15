@@ -10,6 +10,7 @@ import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { resolveCandidateStatus, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { errorMessage } from "@/lib/utils";
 import { fetchInterviewProgress } from "@/lib/candidateHistory.mjs";
+import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 import {
   Dialog,
   DialogContent,
@@ -102,17 +103,26 @@ export default function BancoTalentosPage() {
         // listado como talento disponível por causa da tag antiga (QA B6).
         const { data: ints } = await supabase
           .from("interviews")
-          .select("candidate_id, email, status, result, destination, created_at")
+          .select("candidate_id, email, status, result, destination, created_at, interview_assessments(interview_assessment_values(field,item_index,value))")
           .order("created_at", { ascending: false });
         const progressoPor = new Map<string, { status: string; result: string; destination: string }>();
+        // Escolaridade do parecer como reserva do cadastro (issue #72): a ficha grava
+        // `education`, que nenhuma das duas telas lia. A ordem do select já traz a mais nova.
+        const escolaridadePor = new Map<string, string>();
         for (const i of ints ?? []) {
           const progresso = {
             status: i.status || "Aguardando",
             result: i.result || "N/C",
             destination: i.destination || "",
           };
+          const assessment: any = rowsToAssessment(
+            (i as any).interview_assessments?.interview_assessment_values ?? []
+          );
+          const escolaridade = latestEducationDegree([], assessment);
           for (const chave of [i.candidate_id, i.email]) {
-            if (chave && !progressoPor.has(chave)) progressoPor.set(chave, progresso);
+            if (!chave) continue;
+            if (!progressoPor.has(chave)) progressoPor.set(chave, progresso);
+            if (escolaridade && !escolaridadePor.has(chave)) escolaridadePor.set(chave, escolaridade);
           }
         }
 
@@ -133,7 +143,11 @@ export default function BancoTalentosPage() {
             full_name: c.full_name,
             phone: c.phone || "Não informado",
             email: c.email,
-            escolaridade: latestEducationDegree(c.candidate_educations) || "Não informado",
+            escolaridade:
+              latestEducationDegree(c.candidate_educations) ||
+              escolaridadePor.get(c.id) ||
+              (c.email ? escolaridadePor.get(c.email) : null) ||
+              "Não informado",
             role_interest: c.role_interest || "Não informado",
             status: finalStatus,
             obras: worksitesStr,

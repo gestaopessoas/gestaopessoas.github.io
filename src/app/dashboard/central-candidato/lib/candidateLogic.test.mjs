@@ -137,6 +137,20 @@ test("latestEducationDegree: último por data; fallback sem datas", () => {
   assert.equal(latestEducationDegree([]), null);
 });
 
+// Issue #72
+test("latestEducationDegree: parecer é reserva, e o cadastro continua mandando", () => {
+  assert.equal(latestEducationDegree([], { education: "Ensino Médio" }), "Ensino Médio");
+  assert.equal(
+    latestEducationDegree([], { education: "Ensino Médio", academic_list: [{ course: "Engenharia Civil" }] }),
+    "Engenharia Civil"
+  );
+  assert.equal(
+    latestEducationDegree([{ degree: "Superior" }], { education: "Ensino Médio" }),
+    "Superior"
+  );
+  assert.equal(latestEducationDegree([], { education: "" }), null);
+});
+
 // Issue #41
 test("etapa gravada em minúsculo conta como Banco de Talentos", () => {
   const derived = deriveCandidateStatus([int("banco de talentos", "2026-08-14")]);

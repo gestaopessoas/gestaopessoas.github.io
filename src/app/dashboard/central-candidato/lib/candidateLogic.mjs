@@ -217,7 +217,24 @@ export function resolveCandidateStatus(candidate = {}) {
   return { ...derived, status, ultimo_chamado };
 }
 
-export function latestEducationDegree(educations = []) {
+/**
+ * Escolaridade da linha: o cadastro (`candidate_educations`) manda, como diz o ADR 0010.
+ * Só quando ele está vazio é que o parecer entra como reserva — primeiro a formação
+ * detalhada (`academic_list`), depois o campo `education` da ficha, que era o único
+ * preenchido em quem só passou por entrevista e ainda assim aparecia "Não informado".
+ */
+export function latestEducationDegree(educations = [], assessment = null) {
+  const fromRegistry = degreeFromEducations(educations);
+  if (fromRegistry) return fromRegistry;
+  if (!assessment) return null;
+  const academic = Array.isArray(assessment.academic_list) ? assessment.academic_list[0] : null;
+  const course = academic && (academic.course || academic.degree);
+  if (course) return course;
+  if (academic) return "Curso Superior / Técnico";
+  return assessment.education || null;
+}
+
+function degreeFromEducations(educations) {
   if (!Array.isArray(educations) || educations.length === 0) return null;
   const byDate = educations
     .filter((e) => e && (e.end_date || e.start_date))

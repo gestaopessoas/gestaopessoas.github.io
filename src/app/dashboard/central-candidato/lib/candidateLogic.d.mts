@@ -63,7 +63,15 @@ export interface CandidateLike {
 
 export function resolveCandidateStatus(candidate?: CandidateLike | null): CandidateStatus;
 
-export function latestEducationDegree(educations?: EducationLike[] | null): string | null;
+export interface AssessmentEducationLike {
+  education?: string | null;
+  academic_list?: { course?: string | null; degree?: string | null }[] | null;
+}
+
+export function latestEducationDegree(
+  educations?: EducationLike[] | null,
+  assessment?: AssessmentEducationLike | null
+): string | null;
 
 export type CandidateBucket =
   | "livre"
