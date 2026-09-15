@@ -3,10 +3,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { createClient } from "@/utils/supabase/client";
-import { Search, Loader2, Database, RefreshCw, Trash2, AlertCircle, Edit2, FileText, Plus } from "lucide-react";
+import { Search, Loader2, Database, RefreshCw, Trash2, AlertCircle, Edit2, FileText, Plus, CalendarPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import AdvanceStageModal from "@/app/dashboard/central-candidato/components/AdvanceStageModal";
 import { resolveCandidateStatus, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { errorMessage } from "@/lib/utils";
 import { fetchInterviewProgress } from "@/lib/candidateHistory.mjs";
@@ -52,6 +53,7 @@ export default function BancoTalentosPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [candidateToInterview, setCandidateToInterview] = useState<{ id: string; name: string } | null>(null);
   
   const { can } = usePermissions();
   const canDelete = can("central_candidato", "delete");
@@ -312,6 +314,9 @@ export default function BancoTalentosPage() {
                     </td>
                     <td className="sticky right-0 z-10 bg-card px-6 py-4 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]">
                       <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => setCandidateToInterview({ id: candidate.id, name: candidate.full_name })} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Chamar para entrevista">
+                              <CalendarPlus className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => setSelectedCandidateId(candidate.id)} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Editar / Ver Dossiê">
                               <Edit2 className="h-4 w-4" />
                           </Button>
@@ -395,6 +400,18 @@ export default function BancoTalentosPage() {
             }
             fetchCandidates();
           }}
+        />
+      )}
+
+      {candidateToInterview && (
+        <AdvanceStageModal
+          isOpen={true}
+          onClose={() => setCandidateToInterview(null)}
+          onSuccess={fetchCandidates}
+          candidateId={candidateToInterview.id}
+          candidateName={candidateToInterview.name}
+          currentBucket="livre"
+          currentStage="Banco de Talentos"
         />
       )}
 
