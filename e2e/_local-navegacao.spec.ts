@@ -127,6 +127,24 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
     companyId = (await rest('POST', 'companies', { name: 'ZZ EMPRESA NAVEGACAO', cnpj: '00000000000353' }))[0].id;
     costCenterId = (await rest('POST', 'cost_centers', { code: 'ZZ03', name: 'ZZ CC NAVEGACAO' }))[0].id;
     jobProfileId = (await rest('POST', 'job_profiles', { title: CARGO, profile_code: 'ZZ-003' }))[0].id;
+
+    // Piso de colaboradores: o banco local persiste entre sessões e o `supabase db
+    // reset` está quebrado (issue #83), então o quadro atual pode vir vazio ou raso
+    // demais para paginação/busca. Só completa até 30 se faltar — com dump de produção
+    // restaurado o banco já tem gente e nada é criado aqui.
+    const ativos = await contar('employees?select=id&status=not.in.("Desligado","Arquivo Morto","Inativo")');
+    const faltam = 30 - ativos;
+    if (faltam > 0) {
+      const novos = Array.from({ length: faltam }, (_, i) => ({
+        name: `${PREFIXO} COLABORADOR ${String(i + 1).padStart(3, '0')}`,
+        status: 'Ativo',
+        admission_date: '2024-05-02',
+        role: CARGO,
+        company_id: companyId,
+        cost_center_id: costCenterId,
+      }));
+      await rest('POST', 'employees', novos);
+    }
   });
 
   test.afterAll(async () => {
@@ -135,6 +153,10 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
       for (const fonte of ['employees_todos', 'employees']) {
         await fetch(`${API}/rest/v1/${fonte}?name=eq.${encodeURIComponent(nome)}`, { method: 'DELETE', headers: H });
       }
+    }
+    // Piso de colaboradores criado no beforeAll (name=ZZ NAVEGACAO COLABORADOR NNN).
+    for (const fonte of ['employees_todos', 'employees']) {
+      await fetch(`${API}/rest/v1/${fonte}?name=like.${encodeURIComponent(`${PREFIXO} COLABORADOR`)}*`, { method: 'DELETE', headers: H });
     }
     await fetch(`${API}/rest/v1/rgs_processes?employee_name=like.ZZ*`, { method: 'DELETE', headers: H });
     await fetch(`${API}/rest/v1/physical_boxes?code=eq.${CAIXA}`, { method: 'DELETE', headers: H });
