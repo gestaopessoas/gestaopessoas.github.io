@@ -21,6 +21,10 @@ const NOME_REATIVAR = `${PREFIXO} REATIVAR`;
 const NOME_CADASTRO = `${PREFIXO} CADASTRO`;
 const CARGO = 'ZZ CARGO NAVEGACAO';
 const CAIXA = 'ZZ-NAV';
+// Fora do PREFIXO de propósito: a busca global corta o termo em 12 caracteres e traz 5
+// resultados — com `ZZ NAVEGACAO ...` o piso de 30 colaboradores ocupava a lista inteira.
+const NOME_ARQUIVADO = 'ZZ ARQUIVADO NAVEGACAO';
+const CAIXA_SEED = 'ZZ-NAV-SEED';
 
 let companyId: string, costCenterId: string, jobProfileId: string;
 
@@ -120,6 +124,39 @@ function vigia(page: Page) {
   return achados;
 }
 
+/**
+ * Semeia UM arquivado completo (caixa + histórico com valores) quando o banco não tem
+ * nenhum. Com `db reset` limpo o schema `arquivo` nasce vazio e metade deste spec ficava
+ * sem alvo (issue #93); com o dump de produção restaurado nada aqui roda.
+ */
+async function semearArquivado() {
+  if ((await contar('arquivo_morto?select=id&archive_id=not.is.null')) > 0) return;
+
+  const id: string = (await rest('POST', 'employees', {
+    name: NOME_ARQUIVADO, status: 'Desligado',
+    // Dentro do último ano: o histórico do turnover (teste 17) só enxerga esta janela.
+    dismissed_at: '2026-03-10', admission_date: '2019-04-01',
+    cpf: '00000000191', rg: 'ZZ0000001',
+    role: CARGO, company_id: companyId, cost_center_id: costCenterId,
+  }))[0].id;
+
+  // Histórico com valor de verdade: a tela do teste 14 confere o par Anterior/Novo.
+  const historicoId: string = (await rest('POST', 'employee_history', {
+    employee_id: id, change_type: 'Alteração de Cargo', column_name: 'role',
+    description: 'ZZ mudança semeada pelo teste',
+  }))[0].id;
+  await rest('POST', 'employee_history_value_entries', [
+    { history_id: historicoId, value_side: 'old', path: ['role'], value_type: 'string', value_text: 'ZZ CARGO ANTERIOR' },
+    { history_id: historicoId, value_side: 'new', path: ['role'], value_type: 'string', value_text: CARGO },
+  ]);
+
+  const caixaId: string = (await rest('POST', 'physical_boxes', { code: CAIXA_SEED, description: 'ZZ caixa semeada' }))[0].id;
+  await rest('POST', 'employee_archives', { employee_id: id, box_id: caixaId, label: 'ZZ dossiê semeado' });
+
+  // Mesmo caminho da rotina das 03:00: leva a pessoa e as filhas para o schema `arquivo`.
+  await rpcComoUsuario('arquivar_colaboradores', {});
+}
+
 test.describe('Navegação pós-separação do arquivo morto (banco local)', () => {
   test.describe.configure({ timeout: 120_000 });
 
@@ -145,11 +182,13 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
       }));
       await rest('POST', 'employees', novos);
     }
+
+    await semearArquivado();
   });
 
   test.afterAll(async () => {
     // employees_todos apaga em public e no arquivo — a pessoa pode ter sido movida.
-    for (const nome of [NOME_REATIVAR, NOME_CADASTRO, `${PREFIXO} FICHA`]) {
+    for (const nome of [NOME_REATIVAR, NOME_CADASTRO, NOME_ARQUIVADO, `${PREFIXO} FICHA`]) {
       for (const fonte of ['employees_todos', 'employees']) {
         await fetch(`${API}/rest/v1/${fonte}?name=eq.${encodeURIComponent(nome)}`, { method: 'DELETE', headers: H });
       }
@@ -159,7 +198,7 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
       await fetch(`${API}/rest/v1/${fonte}?name=like.${encodeURIComponent(`${PREFIXO} COLABORADOR`)}*`, { method: 'DELETE', headers: H });
     }
     await fetch(`${API}/rest/v1/rgs_processes?employee_name=like.ZZ*`, { method: 'DELETE', headers: H });
-    await fetch(`${API}/rest/v1/physical_boxes?code=eq.${CAIXA}`, { method: 'DELETE', headers: H });
+    await fetch(`${API}/rest/v1/physical_boxes?code=in.(${CAIXA},${CAIXA_SEED})`, { method: 'DELETE', headers: H });
     for (const [t, v] of [['job_profiles', jobProfileId], ['cost_centers', costCenterId], ['companies', companyId]] as const) {
       if (v) await fetch(`${API}/rest/v1/${t}?id=eq.${v}`, { method: 'DELETE', headers: H });
     }
@@ -466,8 +505,11 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
       ).toBeVisible({ timeout: 20000 });
     }
 
-    // 629 caixas / 100 por página.
-    await expect(page.getByRole('button', { name: String(Math.ceil(totalCaixas / 100)), exact: true })).toBeVisible();
+    // 629 caixas / 100 por página. Com uma página só a tela não desenha o controle.
+    const paginas = Math.ceil(totalCaixas / 100);
+    if (paginas > 1) {
+      await expect(page.getByRole('button', { name: String(paginas), exact: true })).toBeVisible();
+    }
     expect(erros, erros.join(' | ')).toHaveLength(0);
   });
 
