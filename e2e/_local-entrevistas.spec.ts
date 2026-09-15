@@ -276,6 +276,37 @@ test.describe('Registro de entrevistas (banco local)', () => {
     expect(avanco.notes).toContain(VAGA);
   });
 
+  // Na Central os campos da entrevista são só leitura — aquela tela não grava entrevista.
+  // Sem um caminho dali, o usuário fechava a ficha e caçava o candidato na tela de
+  // Entrevistas na mão (issue #74).
+  test('a ficha da Central leva para a entrevista', async ({ page }) => {
+    await abrirNovaEntrevista(page);
+    await preencherPessoa(page, VAGA);
+    await campoData(page).fill(AMANHA);
+    await campoHora(page).fill('09:00');
+    await salvar(page).click();
+    await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
+    const [entrevista] = await entrevistasDoTeste();
+
+    await page.goto('/dashboard/central-candidato');
+    await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+    const linha = page.getByRole('row').filter({ hasText: NOME });
+    await expect(linha).toBeVisible({ timeout: 30000 });
+    await linha.click();
+
+    const abrir = page.getByRole('link', { name: 'Abrir entrevista' });
+    await expect(abrir).toBeVisible({ timeout: 30000 });
+    // O `trailingSlash` do Next reescreve para /dashboard/entrevistas/?entrevista=...
+    const href = await abrir.getAttribute('href');
+    expect(href).toBe(`/dashboard/entrevistas/?entrevista=${entrevista.id}`);
+
+    // O link precisa abrir a ficha DAQUELA entrevista, com os campos liberados — é o que
+    // faltava. A data marcada é a prova de que veio a entrevista certa.
+    await abrir.click();
+    await page.waitForURL(`**/dashboard/entrevistas/?entrevista=${entrevista.id}`, { timeout: 30000 });
+    await expect(campoData(page)).toHaveValue(AMANHA, { timeout: 30000 });
+  });
+
   // Entrevista vencida é o caso pior, não o mais leve: a pessoa pode ter comparecido e
   // ninguém registrou. Trava igual, e o aviso fala no passado.
   test('entrevista vencida sem registro também trava o avanço', async ({ page }) => {
