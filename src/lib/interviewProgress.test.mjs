@@ -77,9 +77,13 @@ const pendingCases = [
   [marcada, true, "entrevista confirmada para hoje é pendente"],
   [{ ...marcada, interview_date: "2026-09-20" }, true, "entrevista futura é pendente"],
   [{ ...marcada, status: "Aguardando" }, true, "aguardando também é pendente"],
-  [{ ...marcada, interview_date: "2026-09-14" }, false, "entrevista de ontem não trava o avanço"],
+  // Entrevista de ontem que ninguém registrou é o caso pior: a pessoa pode ter
+  // comparecido e o encontro sumiu do sistema.
+  [{ ...marcada, interview_date: "2026-09-14" }, true, "entrevista vencida também trava"],
   [{ ...marcada, status: "Compareceu" }, false, "entrevista já registrada não trava"],
   [{ ...marcada, status: "Não compareceu" }, false, "ausência já registrada não trava"],
+  // As linhas antigas de `interviews` nasceram sem data (ADR 0010): travar por causa
+  // delas seria prender processo por dado que nunca existiu.
   [{ ...marcada, interview_date: "" }, false, "sem data não há entrevista marcada"],
   [null, false, "candidato sem entrevista não trava"],
 ];
@@ -88,6 +92,14 @@ for (const [input, esperado, motivo] of pendingCases) {
   if (Boolean(pendingScheduledInterview(input, HOJE)) !== esperado) {
     throw new Error(`${motivo}: ${JSON.stringify(input)}`);
   }
+}
+
+// `overdue` é só para a tela escolher o tempo do verbo ("tem" x "teve").
+if (pendingScheduledInterview(marcada, HOJE).overdue !== false) {
+  throw new Error("Entrevista de hoje não está vencida");
+}
+if (pendingScheduledInterview({ ...marcada, interview_date: "2026-09-14" }, HOJE).overdue !== true) {
+  throw new Error("Entrevista de ontem está vencida");
 }
 
 const outcomeCases = [

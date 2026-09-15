@@ -24,6 +24,7 @@ const VAGA = 'ZZ CARGO ENTREVISTA';
 const OUTRA_VAGA = 'ZZ CARGO ENTREVISTA II';
 const HOJE = new Date().toLocaleDateString('en-CA');
 const AMANHA = new Date(Date.now() + 86400000).toLocaleDateString('en-CA');
+const ONTEM = new Date(Date.now() - 86400000).toLocaleDateString('en-CA');
 
 let jobProfileIds: string[] = [];
 
@@ -270,5 +271,42 @@ test.describe('Registro de entrevistas (banco local)', () => {
     expect(avanco.notes).toContain('[Entrevista]');
     expect(avanco.notes).toContain('Não compareceu');
     expect(avanco.notes).toContain(VAGA);
+  });
+
+  // Entrevista vencida é o caso pior, não o mais leve: a pessoa pode ter comparecido e
+  // ninguém registrou. Trava igual, e o aviso fala no passado.
+  test('entrevista vencida sem registro também trava o avanço', async ({ page }) => {
+    await abrirNovaEntrevista(page);
+    await preencherPessoa(page, VAGA);
+    await campoData(page).fill(ONTEM);
+    await campoHora(page).fill('14:00');
+    await salvar(page).click();
+    await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
+
+    await page.goto('/dashboard/central-candidato');
+    await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+    const linha = page.getByRole('row').filter({ hasText: NOME });
+    await expect(linha).toBeVisible({ timeout: 30000 });
+    await linha.getByRole('button', { name: /^(Avançar|Chamar)$/ }).click();
+
+    await expect(page.getByText(/teve entrevista marcada para/)).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(/ninguém registrou o que ocorreu/)).toBeVisible();
+
+    const confirmar = page.getByRole('button', { name: 'Confirmar Avanço' });
+    await page.getByRole('combobox').filter({ hasText: 'Selecione a etapa' }).click();
+    await page.getByRole('option', { name: 'Encaminhado - Pool Geral' }).click();
+    await expect(confirmar).toBeDisabled();
+
+    // "Compareceu" sem resultado não diz o que ocorreu: continua travado.
+    await page.locator('#avanco-situacao-entrevista').selectOption('Compareceu');
+    await expect(confirmar).toBeDisabled();
+    await page.locator('#avanco-resultado-entrevista').selectOption('Aprovado');
+    await expect(confirmar).toBeEnabled();
+    await confirmar.click();
+
+    await expect
+      .poll(async () => (await entrevistasDoTeste())[0]?.status, { timeout: 30000 })
+      .toBe('Compareceu');
+    expect((await entrevistasDoTeste())[0].result).toBe('Aprovado');
   });
 });

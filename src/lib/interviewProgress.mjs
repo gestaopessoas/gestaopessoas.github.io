@@ -16,15 +16,22 @@ export const PENDING_INTERVIEW_STATUSES = ["Aguardando", "Confirmado"];
 export const INTERVIEW_OUTCOME_OPTIONS = ["Compareceu", "Não compareceu", "Desistente"];
 
 /**
- * Entrevista marcada e ainda não resolvida, com data de hoje em diante. É a que continua
- * na Agenda depois de um avanço de etapa, e por isso precisa ser registrada antes dele.
+ * Entrevista marcada e ainda não resolvida, futura ou vencida. É a que continua na Agenda
+ * depois de um avanço de etapa, e por isso precisa ser registrada antes dele.
+ *
+ * A vencida entra junto de propósito: entrevista de ontem que ninguém registrou é o caso
+ * pior, não o mais leve — a pessoa pode ter comparecido e o encontro sumiu do sistema.
+ * `overdue` existe só para a tela falar no tempo certo ("tem" x "teve").
+ *
+ * Sem data não é entrevista marcada: as linhas antigas de `interviews` nasceram todas sem
+ * data (ADR 0010) e travar por causa delas seria prender processo por dado que nunca houve.
  * `today` no formato en-CA (AAAA-MM-DD), que é como `interview_date` é gravado.
  */
 export function pendingScheduledInterview(progress, today) {
   const data = String(progress?.interview_date || "").trim();
   if (!data) return null;
   if (!PENDING_INTERVIEW_STATUSES.includes(progress.status)) return null;
-  return data >= today ? progress : null;
+  return { ...progress, overdue: data < today };
 }
 
 /**
