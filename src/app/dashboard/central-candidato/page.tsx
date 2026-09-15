@@ -79,7 +79,7 @@ export default function CentralCandidatoPage() {
 
   // Situação/Destino vivem em `interviews`, ligados ao candidato por e-mail — o modal
   // só mostra o bloco quando recebe a prop.
-  const [loadedProgress, setLoadedProgress] = useState<{ id: string; progress: { status: string; result: string; destination?: string } } | null>(null);
+  const [loadedProgress, setLoadedProgress] = useState<{ id: string; progress: { id?: string; status: string; result: string; destination?: string } } | null>(null);
   useEffect(() => {
     if (!selectedCandidateId) return;
     const row = candidates.find((c) => c.id === selectedCandidateId);

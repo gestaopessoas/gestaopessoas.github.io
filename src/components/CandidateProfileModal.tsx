@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,7 @@ import {
   X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, 
   Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, 
   Info, Heart, DollarSign, Users, ChevronRight, Edit2, Save, History, FileCheck, FileUp,
-  Plus, Pencil, Trash2
+  Plus, Pencil, Trash2, ExternalLink
 } from "lucide-react";
 import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
 import * as pdfjsLib from "pdfjs-dist";
@@ -212,7 +213,8 @@ type CandidateProfileModalProps = {
   defaultEditMode?: boolean;
   initialData?: Partial<ProfilePerson>;
   initialAssessmentData?: any;
-  interviewProgress?: { status: string; result: string; destination?: string; interview_date?: string; interview_time?: string };
+  /** `id` é o da entrevista: é o que permite abrir a ficha dela (issue #74). */
+  interviewProgress?: { id?: string; status: string; result: string; destination?: string; interview_date?: string; interview_time?: string };
   /** Entrevista nova abre travada: só depois de confirmar é que os campos liberam. */
   startLocked?: boolean;
   /** Só a tela que sabe gravar o parecer (entrevistas) libera a edição da aba Parecer. */
@@ -1249,7 +1251,22 @@ export function CandidateProfileModal({
                             <Calendar className="h-5 w-5 text-primary" />
                             Situação da Entrevista
                           </div>
-                          <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
+                          <div className="flex items-center gap-3">
+                            {/* Aqui os campos são só leitura: esta tela não grava entrevista.
+                                Sem este link o usuário fechava a ficha e caçava o candidato na
+                                tela de Entrevistas na mão (issue #74). */}
+                            {interviewProgress.id && (
+                              <Link
+                                href={`/dashboard/entrevistas?entrevista=${interviewProgress.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                Abrir entrevista
+                              </Link>
+                            )}
+                            <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
+                          </div>
                         </summary>
                         <div className="p-5 grid gap-4 sm:grid-cols-2 text-sm">
                           {/* Data e hora ficam no registro mesmo quando o candidato não
