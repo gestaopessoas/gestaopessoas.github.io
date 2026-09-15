@@ -1,0 +1,214 @@
+import { test, expect, type Page } from '@playwright/test';
+
+// Caminho principal do Registro de Entrevistas, contra o Supabase LOCAL.
+//
+// Não pode rodar contra produção: cada teste cria entrevista, parecer e candidato de
+// verdade. Por isso só o playwright.local.config.ts executa este spec.
+//
+// Cobre o que o QA de 14/09/2026 quebrou na mão e o ADR 0010 decidiu (issue #80):
+//   1. data obrigatória — salvar sem data é recusado, e a Situação da Entrevista abre
+//      sozinha mostrando o campo, mesmo se o usuário tiver recolhido o bloco (issue #70);
+//   2. situação gravada é a que o usuário escolheu, e cada mudança vira Registro de Etapa;
+//   3. segunda vaga cria entrevista nova, sem apagar a anterior nem o parecer dela;
+//   4. o cadastro pessoal não volta a ser copiado para dentro da entrevista.
+
+const API = process.env.LOCAL_API_URL as string;
+const SERVICE = process.env.LOCAL_SERVICE_ROLE_KEY as string;
+const H = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' };
+
+const NOME = 'ZZ TESTE AUTOMATIZADO ENTREVISTA';
+const EMAIL = 'zz.teste.entrevista@local.dev';
+const VAGA = 'ZZ CARGO ENTREVISTA';
+const OUTRA_VAGA = 'ZZ CARGO ENTREVISTA II';
+const HOJE = new Date().toLocaleDateString('en-CA');
+
+let jobProfileIds: string[] = [];
+
+async function rest(metodo: string, caminho: string, corpo?: unknown) {
+  const r = await fetch(`${API}/rest/v1/${caminho}`, {
+    method: metodo,
+    headers: { ...H, Prefer: 'return=representation' },
+    body: corpo === undefined ? undefined : JSON.stringify(corpo),
+  });
+  if (!r.ok) throw new Error(`${metodo} ${caminho} -> ${r.status} ${await r.text()}`);
+  return r.status === 204 ? null : r.json();
+}
+
+const entrevistasDoTeste = () =>
+  rest('GET', `interviews?candidate_name=eq.${encodeURIComponent(NOME)}&select=*&order=created_at.asc`);
+
+const candidatoDoTeste = () =>
+  rest('GET', `candidates?email=eq.${encodeURIComponent(EMAIL)}&select=*`);
+
+const historicoDoTeste = async () => {
+  const [candidato] = await candidatoDoTeste();
+  if (!candidato) return [];
+  return rest('GET', `candidate_interviews?candidate_id=eq.${candidato.id}&select=*&order=created_at.asc`);
+};
+
+async function limpar() {
+  const entrevistas = await entrevistasDoTeste();
+  for (const entrevista of entrevistas) {
+    // interview_assessments cai por cascade; os valores dependem do assessment.
+    const avaliacoes = await rest('GET', `interview_assessments?interview_id=eq.${entrevista.id}&select=id`);
+    for (const avaliacao of avaliacoes) {
+      await fetch(`${API}/rest/v1/interview_assessment_values?assessment_id=eq.${avaliacao.id}`, { method: 'DELETE', headers: H });
+    }
+    await fetch(`${API}/rest/v1/interviews?id=eq.${entrevista.id}`, { method: 'DELETE', headers: H });
+  }
+  const [candidato] = await candidatoDoTeste();
+  if (candidato) {
+    await fetch(`${API}/rest/v1/candidate_interviews?candidate_id=eq.${candidato.id}`, { method: 'DELETE', headers: H });
+    await fetch(`${API}/rest/v1/candidates?id=eq.${candidato.id}`, { method: 'DELETE', headers: H });
+  }
+}
+
+// O select de cargo da ficha só oferece títulos de job_profiles: sem cadastro, não há vaga
+// para escolher.
+const campoData = (page: Page) => page.locator('input[type="date"]').first();
+const campoHora = (page: Page) => page.locator('input[type="time"]').first();
+const campoStatus = (page: Page) => page.locator('select').filter({ hasText: 'Compareceu' }).first();
+const campoResultado = (page: Page) => page.locator('select').filter({ hasText: 'Aprovado' }).first();
+const salvar = (page: Page) => page.getByRole('button', { name: 'Salvar' }).first();
+
+async function abrirNovaEntrevista(page: Page) {
+  await page.getByRole('button', { name: 'Nova Entrevista' }).click();
+  // Ficha em branco abre bloqueada de propósito (QA B: evita digitar por cima sem querer).
+  await page.getByRole('button', { name: /Registrar nova entrevista/ }).click();
+  await expect(campoData(page)).toBeVisible({ timeout: 30000 });
+}
+
+async function preencherPessoa(page: Page, vaga: string) {
+  await page.getByPlaceholder('Nome completo').fill(NOME);
+  await page.getByPlaceholder('E-mail').fill(EMAIL);
+  await page.getByLabel('Cargo').selectOption(vaga);
+}
+
+test.describe('Registro de entrevistas (banco local)', () => {
+  test.beforeAll(async () => {
+    const perfis = await rest('POST', 'job_profiles', [
+      { title: VAGA, profile_code: 'ZZ-E01' },
+      { title: OUTRA_VAGA, profile_code: 'ZZ-E02' },
+    ]);
+    jobProfileIds = perfis.map((p: { id: string }) => p.id);
+  });
+
+  test.afterAll(async () => {
+    await limpar();
+    for (const id of jobProfileIds) {
+      await fetch(`${API}/rest/v1/job_profiles?id=eq.${id}`, { method: 'DELETE', headers: H });
+    }
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await limpar();
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('admin@local.dev');
+    await page.getByLabel('Senha').fill('admin123');
+    await page.getByRole('button', { name: /entrar/i }).click();
+    await page.waitForURL('**/dashboard**', { timeout: 30000 });
+    await page.goto('/dashboard/entrevistas');
+  });
+
+  test('entrevista sem data é recusada e o campo aparece na tela', async ({ page }) => {
+    await abrirNovaEntrevista(page);
+    await preencherPessoa(page, VAGA);
+
+    // O usuário recolhe o bloco e tenta salvar: antes o erro apontava um campo invisível.
+    await page.locator('details', { hasText: 'Situação da Entrevista' }).first().evaluate((el: HTMLDetailsElement) => { el.open = false; });
+    await salvar(page).click();
+
+    await expect(page.getByText('Informe a data da entrevista antes de salvar.')).toBeVisible();
+    await expect(campoData(page)).toBeVisible();
+    expect(await entrevistasDoTeste()).toHaveLength(0);
+  });
+
+  test('situação escolhida é a que fica gravada, com data, hora e histórico', async ({ page }) => {
+    await abrirNovaEntrevista(page);
+    await preencherPessoa(page, VAGA);
+    await campoData(page).fill(HOJE);
+    await campoHora(page).fill('09:30');
+    await campoStatus(page).selectOption('Confirmado');
+    await salvar(page).click();
+
+    await expect(page.getByRole('cell', { name: NOME })).toBeVisible({ timeout: 30000 });
+
+    const [entrevista] = await entrevistasDoTeste();
+    expect(entrevista.status).toBe('Confirmado');
+    expect(entrevista.result).toBe('N/C');
+    expect(entrevista.interview_date).toBe(HOJE);
+    expect(entrevista.interview_time).toBe('09:30');
+    expect(entrevista.role).toBe(VAGA);
+    // O vínculo é o candidate_id, não o e-mail (ADR 0010).
+    const [candidato] = await candidatoDoTeste();
+    expect(entrevista.candidate_id).toBe(candidato.id);
+
+    // O cadastro pessoal não é copiado para dentro da entrevista (issue #77).
+    expect(entrevista).not.toHaveProperty('cpf');
+    expect(entrevista).not.toHaveProperty('uniform_size');
+
+    const historico = await historicoDoTeste();
+    expect(historico).toHaveLength(1);
+    expect(historico[0].notes).toContain('Situação: Confirmado');
+    expect(historico[0].interviewer_name).toBeTruthy();
+  });
+
+  test('mudar a situação não apaga a anterior: vira linha no histórico', async ({ page }) => {
+    await abrirNovaEntrevista(page);
+    await preencherPessoa(page, VAGA);
+    await campoData(page).fill(HOJE);
+    await salvar(page).click();
+    await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
+    await expect(page.getByRole('cell', { name: NOME })).toBeVisible({ timeout: 30000 });
+
+    await page.getByRole('cell', { name: NOME }).click();
+    await expect(campoResultado(page)).toBeVisible({ timeout: 30000 });
+    await campoResultado(page).selectOption('Aprovado');
+    // Marcar Aprovado normaliza a situação para Compareceu (ADR 0010): esperar o efeito
+    // antes de salvar, senão o clique corre com o onChange.
+    await expect(campoStatus(page)).toHaveValue('Compareceu');
+    await salvar(page).click();
+
+    // O aviso de sucesso do salvamento anterior ainda pode estar na tela; o sinal confiável
+    // é o próprio registro.
+    await expect
+      .poll(async () => (await entrevistasDoTeste())[0]?.status, { timeout: 30000 })
+      .toBe('Compareceu');
+
+    const entrevistas = await entrevistasDoTeste();
+    expect(entrevistas).toHaveLength(1);
+    expect(entrevistas[0].result).toBe('Aprovado');
+
+    // O histórico é gravado depois da entrevista: esperar a linha nova, não supor que já veio.
+    await expect.poll(async () => (await historicoDoTeste()).length, { timeout: 30000 }).toBe(2);
+    const historico = await historicoDoTeste();
+    expect(historico[0].notes).toContain('Situação: Aguardando');
+    expect(historico[1].notes).toContain('Resultado: Aprovado');
+  });
+
+  test('segunda vaga cria entrevista nova sem apagar a primeira', async ({ page }) => {
+    await abrirNovaEntrevista(page);
+    await preencherPessoa(page, VAGA);
+    await campoData(page).fill(HOJE);
+    await salvar(page).click();
+    await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
+    await expect(page.getByRole('cell', { name: NOME })).toBeVisible({ timeout: 30000 });
+
+    await page.getByRole('row').filter({ hasText: NOME }).getByTitle('Nova entrevista para outra vaga').click();
+    await page.getByRole('button', { name: /Registrar nova entrevista/ }).click();
+    await expect(campoData(page)).toBeVisible({ timeout: 30000 });
+    await page.getByLabel('Cargo').selectOption(OUTRA_VAGA);
+    await campoData(page).fill(HOJE);
+    await campoHora(page).fill('15:00');
+    await salvar(page).click();
+
+    await expect
+      .poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 })
+      .toBe(2);
+
+    const entrevistas = await entrevistasDoTeste();
+    expect(entrevistas.map((e: { role: string }) => e.role).sort()).toEqual([VAGA, OUTRA_VAGA].sort());
+    // Uma pessoa, dois registros: o candidato não é duplicado.
+    expect(await candidatoDoTeste()).toHaveLength(1);
+  });
+});

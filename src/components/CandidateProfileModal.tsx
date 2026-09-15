@@ -248,6 +248,10 @@ export function CandidateProfileModal({
   // Ficha nova abrindo em branco e já editável fazia o usuário digitar por cima de um
   // registro que ele achava que era o antigo. Agora precisa destravar de propósito.
   const [locked, setLocked] = useState(startLocked);
+  // Recolher "Situação da Entrevista" escondia o campo obrigatório: o salvamento era
+  // recusado e não havia para onde olhar (issue #70).
+  const situacaoRef = useRef<HTMLDetailsElement>(null);
+  const dataEntrevistaRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [assessmentLoadError, setAssessmentLoadError] = useState("");
   const [isParsingCv, setIsParsingCv] = useState(false);
@@ -685,6 +689,9 @@ export function CandidateProfileModal({
     // Entrevista sem data não vira registro: é o dado que sustenta agenda e histórico,
     // inclusive de quem não compareceu.
     if (interviewProgress && !progress.interview_date) {
+      if (situacaoRef.current) situacaoRef.current.open = true;
+      dataEntrevistaRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+      dataEntrevistaRef.current?.focus({ preventScroll: true });
       toast("Informe a data da entrevista antes de salvar.", "error");
       return;
     }
@@ -1232,7 +1239,7 @@ export function CandidateProfileModal({
                     </div>
 
                     {interviewProgress && (
-                      <details open className="group rounded-xl border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden">
+                      <details ref={situacaoRef} open className="group rounded-xl border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden">
                         <summary className="flex cursor-pointer items-center justify-between font-bold text-foreground p-5 border-b">
                           <div className="flex items-center gap-2">
                             <Calendar className="h-5 w-5 text-primary" />
@@ -1246,6 +1253,7 @@ export function CandidateProfileModal({
                           <label className="space-y-1.5">
                             <span className="text-xs text-muted-foreground block font-medium">Data da entrevista</span>
                             <input
+                              ref={dataEntrevistaRef}
                               type="date"
                               disabled={!isEditing}
                               value={progress.interview_date || ""}

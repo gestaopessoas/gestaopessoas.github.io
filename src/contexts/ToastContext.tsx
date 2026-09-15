@@ -47,14 +47,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div
         role="status"
         aria-live="polite"
-        className="print:hidden pointer-events-none fixed bottom-4 right-4 z-[100] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2"
+        className="print:hidden pointer-events-none fixed inset-x-0 top-4 z-[100] mx-auto flex w-[min(28rem,calc(100vw-2rem))] flex-col items-center gap-2"
       >
         {toasts.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => dismiss(t.id)}
-            className={`pointer-events-auto motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 rounded-md border px-4 py-3 text-left text-sm shadow-lg ${VARIANT_CLASS[t.variant]}`}
+            className={`pointer-events-auto w-full motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 rounded-md border px-4 py-3 text-left text-sm shadow-lg ${VARIANT_CLASS[t.variant]}`}
           >
             {t.message}
           </button>
