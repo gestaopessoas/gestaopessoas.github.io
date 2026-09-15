@@ -205,10 +205,11 @@ test.describe('Registro de entrevistas (banco local)', () => {
     await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
     await expect(page.getByRole('cell', { name: NOME })).toBeVisible({ timeout: 30000 });
 
-    await page.getByRole('row').filter({ hasText: NOME }).getByTitle('Nova entrevista para outra vaga').click();
-    await page.getByRole('button', { name: /Registrar nova entrevista/ }).click();
-    await expect(campoData(page)).toBeVisible({ timeout: 30000 });
-    await page.getByLabel('Cargo').selectOption(OUTRA_VAGA);
+    // O atalho por linha saiu da tela (issue #86): a aba Entrevistas virou visualizador do
+    // registro. A segunda entrevista da mesma pessoa nasce pelo "Nova Entrevista" do topo, e
+    // o candidato é reaproveitado pelo nome — que é justamente o que este teste garante.
+    await abrirNovaEntrevista(page);
+    await preencherPessoa(page, OUTRA_VAGA);
     await campoData(page).fill(HOJE);
     await campoHora(page).fill('15:00');
     await salvar(page).click();

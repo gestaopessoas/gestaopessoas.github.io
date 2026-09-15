@@ -1,0 +1,333 @@
+import { test, expect, type Page } from '@playwright/test';
+
+// Fluxo completo Central do Candidato x Entrevistas x Banco de Talentos (issue #90).
+//
+// Cobre o que mudou nas issues #84/#87/#88/#89: a Central não decide mais desfecho
+// (Contratado / Banco de Talentos / Reprovado / Desistente) — quem decide é a ficha
+// da entrevista; o balde Documentação ganhou o botão "Contratar"; o Banco de Talentos
+// ganhou "Chamar para entrevista"; a aba Entrevistas perdeu o ícone por linha; e o
+// "Guia do Avaliador" é sempre visível no header da ficha.
+//
+// Cada teste prepara o estado "antes" por REST — a UI não é o que está sendo testado
+// naquele passo — e usa a interface só para o clique/efeito do item da issue.
+
+const API = process.env.LOCAL_API_URL as string;
+const SERVICE = process.env.LOCAL_SERVICE_ROLE_KEY as string;
+const H = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' };
+
+const PREFIXO = `QA-FLUXO-${Date.now()}`;
+// O select de Cargo da ficha só oferece títulos de job_profiles: precisa existir no banco
+// antes do teste, não basta inventar um nome (ver e2e/_local-entrevistas.spec.ts).
+const VAGA = 'ZZ CARGO FLUXO';
+const HOJE = new Date().toLocaleDateString('en-CA');
+
+let jobProfileId: string | null = null;
+
+async function rest(metodo: string, caminho: string, corpo?: unknown) {
+  const r = await fetch(`${API}/rest/v1/${caminho}`, {
+    method: metodo,
+    headers: { ...H, Prefer: 'return=representation' },
+    body: corpo === undefined ? undefined : JSON.stringify(corpo),
+  });
+  if (!r.ok) throw new Error(`${metodo} ${caminho} -> ${r.status} ${await r.text()}`);
+  return r.status === 204 ? null : r.json();
+}
+
+const candidatoPorNome = async (nome: string) => {
+  const linhas = await rest('GET', `candidates?full_name=eq.${encodeURIComponent(nome)}&select=*`);
+  return linhas[0] ?? null;
+};
+
+const interviewsPorNome = (nome: string) =>
+  rest('GET', `interviews?candidate_name=eq.${encodeURIComponent(nome)}&select=*&order=created_at.asc`);
+
+const historicoPorCandidato = (candidateId: string) =>
+  rest('GET', `candidate_interviews?candidate_id=eq.${candidateId}&select=*&order=created_at.asc`);
+
+// Monta o estado "antes" de cada cenário: candidato, e opcionalmente uma entrevista
+// (`interviews`) e/ou uma etapa de histórico (`candidate_interviews`) já existentes.
+async function seedCandidato(
+  nome: string,
+  email: string,
+  opts: { interview?: { status: string; result?: string; destination?: string | null }; stage?: string } = {}
+) {
+  const partes = nome.split(' ');
+  const [candidato] = await rest('POST', 'candidates', [{
+    full_name: nome,
+    // NOT NULL em candidates: first_name, last_name, email.
+    first_name: partes[0],
+    last_name: partes.slice(1).join(' ') || partes[0],
+    email,
+    role_interest: VAGA,
+  }]);
+  if (opts.interview) {
+    await rest('POST', 'interviews', [{
+      candidate_id: candidato.id,
+      candidate_name: nome,
+      email,
+      role: VAGA,
+      interview_date: HOJE,
+      status: opts.interview.status,
+      result: opts.interview.result || 'N/C',
+      destination: opts.interview.destination || null,
+    }]);
+  }
+  if (opts.stage) {
+    await rest('POST', 'candidate_interviews', [{
+      candidate_id: candidato.id,
+      stage: opts.stage,
+      interviewer_name: 'QA',
+    }]);
+  }
+  return candidato;
+}
+
+async function limparCandidato(nome: string) {
+  const entrevistas = await interviewsPorNome(nome);
+  for (const entrevista of entrevistas) {
+    // interview_assessment_values não cai em cascata de `interviews`: apaga primeiro.
+    const avaliacoes = await rest('GET', `interview_assessments?interview_id=eq.${entrevista.id}&select=id`);
+    for (const avaliacao of avaliacoes) {
+      await fetch(`${API}/rest/v1/interview_assessment_values?assessment_id=eq.${avaliacao.id}`, { method: 'DELETE', headers: H });
+    }
+    await fetch(`${API}/rest/v1/interviews?id=eq.${entrevista.id}`, { method: 'DELETE', headers: H });
+  }
+  const candidato = await candidatoPorNome(nome);
+  if (candidato) {
+    await fetch(`${API}/rest/v1/candidate_interviews?candidate_id=eq.${candidato.id}`, { method: 'DELETE', headers: H });
+    await fetch(`${API}/rest/v1/candidates?id=eq.${candidato.id}`, { method: 'DELETE', headers: H });
+  }
+}
+
+const campoData = (page: Page) => page.locator('input[type="date"]').first();
+const campoStatus = (page: Page) => page.locator('select').filter({ hasText: 'Compareceu' }).first();
+const campoDestino = (page: Page) => page.locator('select').filter({ hasText: 'Banco de Talentos' }).first();
+const salvar = (page: Page) => page.getByRole('button', { name: 'Salvar' }).first();
+
+async function login(page: Page) {
+  await page.goto('/login');
+  await page.getByLabel('E-mail').fill('admin@local.dev');
+  await page.getByLabel('Senha').fill('admin123');
+  await page.getByRole('button', { name: /entrar/i }).click();
+  await page.waitForURL('**/dashboard**', { timeout: 30000 });
+}
+
+async function abrirFichaNaEntrevistas(page: Page, nome: string) {
+  await page.goto('/dashboard/entrevistas');
+  await page.getByPlaceholder('Buscar candidato, cargo, status...').fill(nome);
+  const linha = page.getByRole('row').filter({ hasText: nome });
+  await expect(linha).toBeVisible({ timeout: 30000 });
+  await linha.click();
+  await expect(campoDestino(page)).toBeVisible({ timeout: 30000 });
+}
+
+test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', () => {
+  test.beforeAll(async () => {
+    const [perfil] = await rest('POST', 'job_profiles', [{ title: VAGA, profile_code: 'ZZ-FLX01' }]);
+    jobProfileId = perfil.id;
+  });
+
+  test.afterAll(async () => {
+    if (jobProfileId) await fetch(`${API}/rest/v1/job_profiles?id=eq.${jobProfileId}`, { method: 'DELETE', headers: H });
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
+  test('1. criar entrevista pelo botão "Nova Entrevista" leva o candidato para "Em entrevista" na Central', async ({ page }) => {
+    const NOME = `${PREFIXO} T1`;
+    const EMAIL = `${PREFIXO.toLowerCase()}.t1@local.dev`;
+    await limparCandidato(NOME);
+    try {
+      await page.goto('/dashboard/entrevistas');
+      await page.getByRole('button', { name: 'Nova Entrevista' }).click();
+      await page.getByRole('button', { name: /Registrar nova entrevista/ }).click();
+      await expect(campoData(page)).toBeVisible({ timeout: 30000 });
+      await page.getByPlaceholder('Nome completo').fill(NOME);
+      await page.getByPlaceholder('E-mail').fill(EMAIL);
+      await page.getByLabel('Cargo').selectOption(VAGA);
+      await campoData(page).fill(HOJE);
+      await salvar(page).click();
+      await expect(page.getByText('Entrevista salva.', { exact: true })).toBeVisible({ timeout: 30000 });
+
+      await page.goto('/dashboard/central-candidato');
+      await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+      const linha = page.getByRole('row').filter({ hasText: NOME });
+      await expect(linha).toBeVisible({ timeout: 30000 });
+      await expect(linha).toContainText('Em entrevista');
+    } finally {
+      await limparCandidato(NOME);
+    }
+  });
+
+  test('2. destino "Banco de Talentos" na ficha da entrevista tira o candidato de "Em entrevista" e o leva ao Banco de Talentos', async ({ page }) => {
+    const NOME = `${PREFIXO} T2`;
+    const EMAIL = `${PREFIXO.toLowerCase()}.t2@local.dev`;
+    await limparCandidato(NOME);
+    try {
+      await seedCandidato(NOME, EMAIL, { interview: { status: 'Aguardando' } });
+
+      await abrirFichaNaEntrevistas(page, NOME);
+      // Entrevista ainda "Aguardando"/"Confirmado" prende o candidato em "Em entrevista"
+      // de propósito (issue #75) — resolver a situação é o que libera o destino.
+      await campoStatus(page).selectOption('Compareceu');
+      await campoDestino(page).selectOption('Banco de Talentos');
+      await salvar(page).click();
+      await expect(page.getByText(/Entrevista salva|Parecer e entrevista salvos/)).toBeVisible({ timeout: 30000 });
+
+      await page.goto('/dashboard/central-candidato');
+      await page.getByRole('button', { name: /Em entrevista/ }).click();
+      await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+      await expect(page.getByRole('row').filter({ hasText: NOME })).toHaveCount(0, { timeout: 30000 });
+
+      await page.goto('/dashboard/banco-talentos');
+      await page.getByPlaceholder('Buscar por nome, cargo, obra ou tag...').fill(NOME);
+      await expect(page.getByRole('row').filter({ hasText: NOME })).toBeVisible({ timeout: 30000 });
+    } finally {
+      await limparCandidato(NOME);
+    }
+  });
+
+  test('3. "Chamar para entrevista" no Banco de Talentos volta o candidato para "Em entrevista" e cria a entrevista no Registro', async ({ page }) => {
+    const NOME = `${PREFIXO} T3`;
+    const EMAIL = `${PREFIXO.toLowerCase()}.t3@local.dev`;
+    await limparCandidato(NOME);
+    try {
+      await seedCandidato(NOME, EMAIL, { interview: { status: 'Compareceu', destination: 'Banco de Talentos' } });
+
+      await page.goto('/dashboard/banco-talentos');
+      await page.getByPlaceholder('Buscar por nome, cargo, obra ou tag...').fill(NOME);
+      const linha = page.getByRole('row').filter({ hasText: NOME });
+      await expect(linha).toBeVisible({ timeout: 30000 });
+      await linha.getByTitle('Chamar para entrevista').click();
+
+      await page.getByRole('combobox').filter({ hasText: 'Selecione a etapa' }).click();
+      await page.getByRole('option', { name: 'Entrevista RH' }).click();
+      await expect(campoData(page)).toBeVisible({ timeout: 30000 });
+      await campoData(page).fill(HOJE);
+      await page.getByRole('button', { name: 'Confirmar Avanço' }).click();
+
+      await expect.poll(async () => (await interviewsPorNome(NOME)).length, { timeout: 30000 }).toBe(2);
+
+      await page.goto('/dashboard/central-candidato');
+      await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+      const linhaCentral = page.getByRole('row').filter({ hasText: NOME });
+      await expect(linhaCentral).toBeVisible({ timeout: 30000 });
+      await expect(linhaCentral).toContainText('Em entrevista');
+
+      await page.goto('/dashboard/entrevistas');
+      await page.getByPlaceholder('Buscar candidato, cargo, status...').fill(NOME);
+      // O candidato agora tem duas entrevistas no Registro (a original e a criada aqui):
+      // a original volta com "Compareceu"/"Banco de Talentos" (issue #90), então checar
+      // a primeira já basta — ver que a lista não ficou vazia é o que importa aqui.
+      await expect(page.getByRole('row').filter({ hasText: NOME }).first()).toBeVisible({ timeout: 30000 });
+    } finally {
+      await limparCandidato(NOME);
+    }
+  });
+
+  test('4. botão "Contratar" no balde Documentação tira o candidato da Central', async ({ page }) => {
+    const NOME = `${PREFIXO} T4`;
+    const EMAIL = `${PREFIXO.toLowerCase()}.t4@local.dev`;
+    await limparCandidato(NOME);
+    try {
+      await seedCandidato(NOME, EMAIL, { stage: 'Coleta de Documentos & Exames' });
+
+      await page.goto('/dashboard/central-candidato');
+      await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+      const linha = page.getByRole('row').filter({ hasText: NOME });
+      await expect(linha).toBeVisible({ timeout: 30000 });
+      await expect(linha).toContainText('Documentação');
+      await linha.getByRole('button', { name: 'Contratar' }).click();
+      await expect(page.getByRole('dialog').getByText('Contratado', { exact: true })).toBeVisible({ timeout: 30000 });
+      await page.getByRole('button', { name: 'Confirmar Avanço' }).click();
+
+      await expect.poll(async () => {
+        const candidato = await candidatoPorNome(NOME);
+        const historico = candidato ? await historicoPorCandidato(candidato.id) : [];
+        return historico[historico.length - 1]?.stage;
+      }, { timeout: 30000 }).toBe('Contratado');
+
+      await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+      await expect(page.getByRole('row').filter({ hasText: NOME })).toHaveCount(0, { timeout: 30000 });
+    } finally {
+      await limparCandidato(NOME);
+    }
+  });
+
+  test('5. destino "Contratado" na ficha da entrevista também tira o candidato da Central', async ({ page }) => {
+    const NOME = `${PREFIXO} T5`;
+    const EMAIL = `${PREFIXO.toLowerCase()}.t5@local.dev`;
+    await limparCandidato(NOME);
+    try {
+      await seedCandidato(NOME, EMAIL, { interview: { status: 'Aguardando' } });
+
+      await abrirFichaNaEntrevistas(page, NOME);
+      await campoDestino(page).selectOption('Contratado');
+      await salvar(page).click();
+      await expect(page.getByText(/Entrevista salva|Parecer e entrevista salvos/)).toBeVisible({ timeout: 30000 });
+
+      await page.goto('/dashboard/central-candidato');
+      await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+      await expect(page.getByRole('row').filter({ hasText: NOME })).toHaveCount(0, { timeout: 30000 });
+    } finally {
+      await limparCandidato(NOME);
+    }
+  });
+
+  test('regressão: ícone antigo de Entrevistas sumiu, o select de etapa da Central não lista desfecho, a ficha mostra o Guia do Avaliador e o Banco de Talentos mostra os dois botões', async ({ page }) => {
+    const NOME = `${PREFIXO} T6`;
+    const EMAIL = `${PREFIXO.toLowerCase()}.t6@local.dev`;
+    const NOME_BT = `${PREFIXO} T6 BT`;
+    const EMAIL_BT = `${PREFIXO.toLowerCase()}.t6bt@local.dev`;
+    await limparCandidato(NOME);
+    await limparCandidato(NOME_BT);
+    try {
+      await seedCandidato(NOME, EMAIL, { interview: { status: 'Aguardando' } });
+
+      // Entrevistas: sem "Nova entrevista para outra vaga" por linha, com "Nova Entrevista" no topo.
+      await page.goto('/dashboard/entrevistas');
+      await expect(page.getByTitle('Nova entrevista para outra vaga')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Nova Entrevista' })).toBeVisible();
+
+      // Ficha: Guia do Avaliador sempre visível.
+      await page.getByPlaceholder('Buscar candidato, cargo, status...').fill(NOME);
+      await page.getByRole('row').filter({ hasText: NOME }).click();
+      await expect(page.getByRole('button', { name: 'Guia do Avaliador' })).toBeVisible({ timeout: 30000 });
+      await page.keyboard.press('Escape');
+
+      // Central: o select de etapa do "Avançar Etapa" não lista nenhum dos 4 desfechos.
+      await page.goto('/dashboard/central-candidato');
+      await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+      const linha = page.getByRole('row').filter({ hasText: NOME });
+      await expect(linha).toBeVisible({ timeout: 30000 });
+      await linha.getByRole('button', { name: /^(Avançar|Chamar)$/ }).click();
+      await page.getByRole('combobox').filter({ hasText: 'Selecione a etapa' }).click();
+      // Escopado no listbox aberto: a entrevista pendente também mostra um <select> nativo
+      // de situação (Compareceu/Não compareceu/Desistente), e "Desistente" bateria por
+      // engano se a checagem não travasse na lista de etapas.
+      const listaEtapas = page.getByRole('listbox');
+      // Controle positivo: sem ele, um listbox que não abriu faria os quatro toHaveCount(0)
+      // passarem sem provar nada — teste verde que não testa.
+      await expect(listaEtapas.getByRole('option').first()).toBeVisible({ timeout: 30000 });
+      for (const desfecho of ['Contratado', 'Banco de Talentos', 'Reprovado', 'Desistente']) {
+        await expect(listaEtapas.getByRole('option', { name: desfecho, exact: true })).toHaveCount(0);
+      }
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Cancelar' }).click();
+
+      // Banco de Talentos: os dois botões por linha.
+      await seedCandidato(NOME_BT, EMAIL_BT, { interview: { status: 'Compareceu', destination: 'Banco de Talentos' } });
+      await page.goto('/dashboard/banco-talentos');
+      await page.getByPlaceholder('Buscar por nome, cargo, obra ou tag...').fill(NOME_BT);
+      const linhaBanco = page.getByRole('row').filter({ hasText: NOME_BT });
+      await expect(linhaBanco).toBeVisible({ timeout: 30000 });
+      await expect(linhaBanco.getByTitle('Chamar para entrevista')).toBeVisible();
+      await expect(linhaBanco.getByTitle('Editar / Ver Dossiê')).toBeVisible();
+    } finally {
+      await limparCandidato(NOME);
+      await limparCandidato(NOME_BT);
+    }
+  });
+});

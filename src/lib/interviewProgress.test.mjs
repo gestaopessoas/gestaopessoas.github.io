@@ -21,6 +21,8 @@ import { formatInterviewSchedule, interviewHistoryStage, interviewProgressChange
 const stageCases = [
   [{ status: "Compareceu", result: "Aprovado", destination: "Contratado" }, "Contratado"],
   [{ status: "Compareceu", result: "Aprovado", destination: "Banco de Talentos" }, "Banco de Talentos"],
+  [{ status: "Compareceu", result: "Reprovado", destination: "Reprovado" }, "Reprovado"],
+  // "Descartado" é o destino legado: linhas antigas não podem mudar de etapa (issue #88).
   [{ status: "Compareceu", result: "Reprovado", destination: "Descartado" }, "Reprovado"],
   [{ status: "Desistente", result: "N/C", destination: "Desistente" }, "Desistente"],
   [{ status: "Compareceu", result: "Reprovado", destination: "" }, "Reprovado"],

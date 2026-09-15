@@ -9,6 +9,7 @@ import {
   isInterviewStage,
   stageNeedsWorkplace,
   candidateBucket,
+  nextStageOptions,
   BUCKET_ORDER,
   STAGE_BUCKETS,
   resolveCandidateStatus,
@@ -235,4 +236,39 @@ test("etapas de obra exigem a obra", () => {
   for (const etapa of ["Entrevista RH", "Banco de Talentos", "Contratado", ""]) {
     assert.equal(stageNeedsWorkplace(etapa), false, etapa);
   }
+});
+
+// A Central acompanha o funil; quem contrata, manda para o banco, reprova ou registra
+// desistência é a entrevista (issue #84). O select de avanço não pode oferecer desfecho.
+const DESFECHOS = ["Contratado", "Banco de Talentos", "Reprovado", "Desistente"];
+
+test("nenhum balde oferece desfecho no avanço", () => {
+  for (const balde of [...BUCKET_ORDER, "encerrado", "balde-que-nao-existe"]) {
+    const opcoes = nextStageOptions(balde);
+    for (const desfecho of DESFECHOS) {
+      assert.equal(opcoes.includes(desfecho), false, `${balde} ofereceu ${desfecho}`);
+    }
+  }
+});
+
+test("o avanço oferece o balde atual e o seguinte", () => {
+  const opcoes = nextStageOptions("entrevista");
+  for (const etapa of STAGE_BUCKETS.entrevista) assert.ok(opcoes.includes(etapa), etapa);
+  for (const etapa of STAGE_BUCKETS.encaminhado) assert.ok(opcoes.includes(etapa), etapa);
+  // Dois baldes adiante não: avanço é um passo por vez.
+  assert.equal(opcoes.includes("Em Obra"), false);
+});
+
+test("quem está no banco de talentos é chamado para entrevista", () => {
+  // O balde de quem está livre não tem etapa própria — a única saída é marcar entrevista,
+  // que é o que o botão "Chamar para entrevista" do Banco de Talentos usa.
+  const opcoes = nextStageOptions("livre");
+  assert.deepEqual(opcoes, STAGE_BUCKETS.entrevista);
+});
+
+test("o fim do funil não vira beco sem saída silencioso", () => {
+  // "Contratado" é a única etapa do balde `contratacao` e foi filtrada: a lista vazia é o
+  // sinal de que contratar tem botão próprio, não que o balde foi esquecido.
+  assert.deepEqual(nextStageOptions("contratacao"), []);
+  assert.ok(nextStageOptions("documentacao").length > 0);
 });
