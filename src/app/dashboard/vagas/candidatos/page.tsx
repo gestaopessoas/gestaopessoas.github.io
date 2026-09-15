@@ -9,7 +9,8 @@ import { createClient } from "@/utils/supabase/client";
 import { calculateMatchScore, MatchResult } from "@/utils/matchScore";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { useToast } from "@/contexts/ToastContext";
-import { PIPELINE_STAGES, normalizeStage } from "../lib/stages";
+import { normalizeStage } from "../lib/stages";
+import AdvanceStageModal from "@/app/dashboard/central-candidato/components/AdvanceStageModal";
 
 type Applicant = {
   id: string;
@@ -103,6 +104,7 @@ function CandidatosContent() {
   const [loading, setLoading] = useState(Boolean(id));
   const [error, setError] = useState(id ? "" : "ID da vaga não fornecido");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [applicantParaEntrevista, setApplicantParaEntrevista] = useState<Applicant | null>(null);
 
   const load = useCallback(() => {
     if (!id) return;
@@ -118,21 +120,22 @@ function CandidatosContent() {
 
   useEffect(() => { load(); }, [load]);
 
-  const changeStage = async (applicant: Applicant, stage: string) => {
-    const previous = applicant.stage;
-    setApplicants((prev) => prev.map((a) => (a.application_id === applicant.application_id ? { ...a, stage } : a)));
-
+  // O modal já grava a etapa na Central (candidate_interviews) e, se for entrevista, agenda
+  // em `interviews`. Aqui só falta refletir o status na candidatura desta vaga.
+  const handleAdvanceSuccess = async (applicant: Applicant) => {
+    setApplicantParaEntrevista(null);
     const { error: updateError } = await createClient()
       .from("job_applications")
-      .update({ status: stage })
+      .update({ status: "Entrevista" })
       .eq("id", applicant.application_id);
 
     if (updateError) {
-      setApplicants((prev) => prev.map((a) => (a.application_id === applicant.application_id ? { ...a, stage: previous } : a)));
-      toast("Não foi possível atualizar a etapa do candidato.", "error");
-      return;
+      toast("Candidato movido para a Central, mas o status da candidatura não pôde ser atualizado.", "error");
+    } else {
+      toast(`${applicant.name} movido para Entrevista — agora aparece na Central do Candidato.`, "success");
     }
-    toast(`${applicant.name} movido para ${stage}.`, "success");
+    setApplicants((prev) => prev.map((a) => (a.application_id === applicant.application_id ? { ...a, stage: "Entrevista" } : a)));
+    load();
   };
 
   return (
@@ -201,16 +204,13 @@ function CandidatosContent() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <select
-                        value={applicant.stage}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => changeStage(applicant, e.target.value)}
-                        className="flex h-9 rounded-md border border-input bg-background px-2 text-sm"
+                      <Button
+                        variant={applicant.stage === "Nova" || applicant.stage === "Triagem" ? "default" : "outline"}
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); setApplicantParaEntrevista(applicant); }}
                       >
-                        {PIPELINE_STAGES.map((stage) => (
-                          <option key={stage} value={stage}>{stage}</option>
-                        ))}
-                      </select>
+                        Mover para Entrevista
+                      </Button>
                     </td>
                     <td className="px-6 py-4 max-w-sm">
                       {applicant.summary ? (
@@ -256,6 +256,19 @@ function CandidatosContent() {
         <CandidateProfileModal
           candidateId={selectedCandidateId}
           onClose={() => { setSelectedCandidateId(null); load(); }}
+        />
+      )}
+
+      {applicantParaEntrevista && (
+        <AdvanceStageModal
+          isOpen={Boolean(applicantParaEntrevista)}
+          onClose={() => setApplicantParaEntrevista(null)}
+          onSuccess={() => handleAdvanceSuccess(applicantParaEntrevista)}
+          candidateId={applicantParaEntrevista.id}
+          candidateName={applicantParaEntrevista.name}
+          currentBucket="livre"
+          currentStage={applicantParaEntrevista.stage}
+          forcedStage="Entrevista RH"
         />
       )}
     </div>

@@ -135,7 +135,7 @@ export default function VagasAdminPage() {
   };
   
   const deleteRequest = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta vaga definitivamente?")) return;
+    if (!confirm("Excluir esta vaga definitivamente?\n\nAs candidaturas não são apagadas: elas ficam sem vaga e as pessoas continuam no Banco de Talentos.")) return;
     const supabase = createClient();
     const { error } = await supabase.from("job_requests").delete().eq("id", id);
     if (error) {

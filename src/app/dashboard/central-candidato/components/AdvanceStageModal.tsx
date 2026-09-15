@@ -277,11 +277,16 @@ export default function AdvanceStageModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{forcedStage ? "Contratar" : "Avançar Etapa"}</DialogTitle>
+          {/* `forcedStage` nasceu como "Contratar"; hoje a tela da vaga também o usa para
+              mandar direto para a entrevista, então o título sai da etapa, não do fato de
+              ela estar fixada. */}
+          <DialogTitle>{forcedStage ? (forcedStage === "Contratado" ? "Contratar" : `Mover para ${forcedStage}`) : "Avançar Etapa"}</DialogTitle>
           <DialogDescription>
-            {forcedStage
+            {forcedStage === "Contratado"
               ? <>Registrar a contratação de <strong>{candidateName}</strong>.</>
-              : <>Registrar o avanço de <strong>{candidateName}</strong> no processo seletivo.</>}
+              : forcedStage
+                ? <>Registrar <strong>{candidateName}</strong> na etapa {forcedStage} — a pessoa passa a aparecer na Central do Candidato.</>
+                : <>Registrar o avanço de <strong>{candidateName}</strong> no processo seletivo.</>}
           </DialogDescription>
         </DialogHeader>
 

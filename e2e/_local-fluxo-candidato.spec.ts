@@ -330,4 +330,45 @@ test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', (
       await limparCandidato(NOME_BT);
     }
   });
+  test('5. quem se candidata entra no Banco de Talentos e continua la depois da vaga ser excluida (#61)', async ({ page }) => {
+    const NOME = `${PREFIXO} CANDIDATURA`;
+    const EMAIL = `${PREFIXO.toLowerCase()}-candidatura@local.dev`;
+    let vagaId = '';
+    try {
+      const candidato = await seedCandidato(NOME, EMAIL);
+      const [vaga] = await rest('POST', 'job_requests', [{ position_title: 'ZZ VAGA FLUXO', requested_role: VAGA }]);
+      vagaId = vaga.id;
+      await rest('POST', 'job_applications', [{ candidate_id: candidato.id, job_request_id: vagaId }]);
+
+      // A marca e do gatilho no banco, nao da tela: vale para portal, dashboard e importacao.
+      const marcado = await candidatoPorNome(NOME);
+      expect(marcado.search_tags, 'candidatar-se nao colocou a pessoa no Banco de Talentos').toContain('Banco de Talentos');
+
+      await login(page);
+      await page.goto('/dashboard/banco-talentos');
+      await page.getByPlaceholder('Buscar por nome, cargo, obra ou tag...').fill(NOME);
+      await expect(page.getByRole('row').filter({ hasText: NOME })).toBeVisible({ timeout: 30000 });
+
+      // Excluir a vaga: antes do #61 a FK era CASCADE e levava a candidatura junto.
+      await fetch(`${API}/rest/v1/job_requests?id=eq.${vagaId}`, { method: 'DELETE', headers: H });
+      vagaId = '';
+
+      const candidaturas = await rest('GET', `job_applications?candidate_id=eq.${candidato.id}&select=id,job_request_id`);
+      expect(candidaturas, 'excluir a vaga apagou a candidatura').toHaveLength(1);
+      expect(candidaturas[0].job_request_id, 'a candidatura devia ficar sem vaga, nao sumir').toBeNull();
+
+      await page.goto('/dashboard/banco-talentos');
+      await page.getByPlaceholder('Buscar por nome, cargo, obra ou tag...').fill(NOME);
+      await expect(
+        page.getByRole('row').filter({ hasText: NOME }),
+        'a pessoa sumiu do Banco de Talentos depois da vaga ser excluida'
+      ).toBeVisible({ timeout: 30000 });
+    } finally {
+      const candidato = await candidatoPorNome(NOME);
+      if (candidato) await fetch(`${API}/rest/v1/job_applications?candidate_id=eq.${candidato.id}`, { method: 'DELETE', headers: H });
+      if (vagaId) await fetch(`${API}/rest/v1/job_requests?id=eq.${vagaId}`, { method: 'DELETE', headers: H });
+      await fetch(`${API}/rest/v1/job_requests?position_title=eq.ZZ%20VAGA%20FLUXO`, { method: 'DELETE', headers: H });
+      await limparCandidato(NOME);
+    }
+  });
 });
