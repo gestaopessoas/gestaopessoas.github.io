@@ -73,7 +73,9 @@ const salvar = (page: Page) => page.getByRole('button', { name: 'Salvar' }).firs
 
 async function abrirNovaEntrevista(page: Page) {
   await page.getByRole('button', { name: 'Nova Entrevista' }).click();
-  // Ficha em branco abre bloqueada de propósito (QA B: evita digitar por cima sem querer).
+  // Ficha abre bloqueada de propósito (QA B: evita digitar por cima sem querer).
+  // Travada, "Editar Perfil" não destrava nada e por isso nem aparece (issue #69).
+  await expect(page.getByRole('button', { name: 'Editar Perfil' })).toHaveCount(0);
   await page.getByRole('button', { name: /Registrar nova entrevista/ }).click();
   await expect(campoData(page)).toBeVisible({ timeout: 30000 });
 }
@@ -129,8 +131,13 @@ test.describe('Registro de entrevistas (banco local)', () => {
     await campoData(page).fill(HOJE);
     await campoHora(page).fill('09:30');
     await campoStatus(page).selectOption('Confirmado');
+    // As notas do parecer têm rótulo ligado ao controle: dá para achar pelo nome (issue #71).
+    await page.getByRole('button', { name: /Parecer \/ Avaliação/ }).click();
+    await expect(page.getByRole('slider', { name: 'Comunicação', exact: true })).toHaveAttribute('aria-valuetext', '0 de 5');
     await salvar(page).click();
 
+    // Primeira gravação não tem parecer nenhum: o aviso não pode dizer que salvou um.
+    await expect(page.getByText('Entrevista salva.', { exact: true })).toBeVisible({ timeout: 30000 });
     await expect(page.getByRole('cell', { name: NOME })).toBeVisible({ timeout: 30000 });
 
     const [entrevista] = await entrevistasDoTeste();

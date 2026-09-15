@@ -505,9 +505,12 @@ export default function EntrevistasPage() {
       if (criarNova) alvoId = null;
     }
 
-    // Primeira gravação costuma ter só data, hora e situação: sem linhas de parecer o
-    // toast não pode dizer que salvou parecer (issue #69).
+    // Primeira gravação costuma ter só data, hora e situação. O parecer nunca sai vazio
+    // (o formulário tem padrões: "Não", "Ensino Médio"...), então o que vale é ter mudado
+    // alguma coisa em relação ao padrão — senão o toast anuncia um parecer que não existe
+    // (issue #69).
     const assessmentRows = assessmentToRows({ ...assessmentForm, ...assessmentData });
+    const temParecer = JSON.stringify(assessmentRows) !== JSON.stringify(assessmentToRows(defaultAssessment));
 
     // 3. A entrevista em si.
     const interviewPayload = { ...payload, candidate_id: candidateId };
@@ -545,7 +548,7 @@ export default function EntrevistasPage() {
       }
     }
 
-    toast(assessmentRows.length ? "Parecer e entrevista salvos com sucesso." : "Entrevista salva.", "success");
+    toast(temParecer ? "Parecer e entrevista salvos com sucesso." : "Entrevista salva.", "success");
 
     // 4. Histórico do candidato: entrevista nova ou mudança de situação vira linha própria,
     //    para que a situação anterior não se perca ao sobrescrever `interviews`.
