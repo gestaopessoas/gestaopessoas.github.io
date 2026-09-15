@@ -179,6 +179,8 @@ type CandidateInterview = {
 type ProfileInterview = {
   id: string;
   role?: string | null;
+  updated_at?: string | null;
+  updated_by_name?: string | null;
   status?: string | null;
   result?: string | null;
   destination?: string | null;

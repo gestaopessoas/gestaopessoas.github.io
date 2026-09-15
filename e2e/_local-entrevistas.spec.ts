@@ -234,6 +234,9 @@ test.describe('Registro de entrevistas (banco local)', () => {
     await campoStatus(page).selectOption('Confirmado');
     await salvar(page).click();
     await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
+    // O histórico é gravado depois da entrevista: sair da tela antes disso deixa o insert
+    // correndo e ele pode aterrissar no meio do avanço.
+    await expect.poll(async () => (await historicoDoTeste()).length, { timeout: 30000 }).toBe(1);
 
     await page.goto('/dashboard/central-candidato');
     await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
@@ -266,8 +269,8 @@ test.describe('Registro de entrevistas (banco local)', () => {
 
     // E o que houve fica no histórico, junto da etapa nova — não numa linha que a contradiga.
     const historico = await historicoDoTeste();
-    const avanco = historico[historico.length - 1];
-    expect(avanco.stage).toBe('Encaminhado - Pool Geral');
+    const avanco = historico.find((h: { stage: string }) => h.stage === 'Encaminhado - Pool Geral');
+    expect(avanco, 'o avanço precisa virar Registro de Etapa').toBeTruthy();
     expect(avanco.notes).toContain('[Entrevista]');
     expect(avanco.notes).toContain('Não compareceu');
     expect(avanco.notes).toContain(VAGA);
@@ -282,6 +285,9 @@ test.describe('Registro de entrevistas (banco local)', () => {
     await campoHora(page).fill('14:00');
     await salvar(page).click();
     await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
+    // O histórico é gravado depois da entrevista: sair da tela antes disso deixa o insert
+    // correndo e ele pode aterrissar no meio do avanço.
+    await expect.poll(async () => (await historicoDoTeste()).length, { timeout: 30000 }).toBe(1);
 
     await page.goto('/dashboard/central-candidato');
     await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
@@ -308,5 +314,45 @@ test.describe('Registro de entrevistas (banco local)', () => {
       .poll(async () => (await entrevistasDoTeste())[0]?.status, { timeout: 30000 })
       .toBe('Compareceu');
     expect((await entrevistasDoTeste())[0].result).toBe('Aprovado');
+  });
+
+  // Linha antiga de `interviews`, do tempo em que nenhuma tela expunha data (ADR 0010).
+  // A tela não deixa mais criar uma assim, então a data é removida por fora.
+  test('entrevista sem data também trava o avanço', async ({ page }) => {
+    await abrirNovaEntrevista(page);
+    await preencherPessoa(page, VAGA);
+    await campoData(page).fill(HOJE);
+    await salvar(page).click();
+    await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
+
+    await expect.poll(async () => (await historicoDoTeste()).length, { timeout: 30000 }).toBe(1);
+
+    const [entrevista] = await entrevistasDoTeste();
+    await rest('PATCH', `interviews?id=eq.${entrevista.id}`, { interview_date: null, interview_time: null });
+    expect((await entrevistasDoTeste())[0].interview_date).toBeNull();
+
+    await page.goto('/dashboard/central-candidato');
+    await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+    const linha = page.getByRole('row').filter({ hasText: NOME });
+    await expect(linha).toBeVisible({ timeout: 30000 });
+    await linha.getByRole('button', { name: /^(Avançar|Chamar)$/ }).click();
+
+    // Sem data o aviso não pode escrever "marcada para Data não informada".
+    const aviso = page.getByText(/entrevista marcada sem data informada/);
+    await expect(aviso).toBeVisible({ timeout: 30000 });
+    await expect(aviso).toContainText('ninguém registrou o que ocorreu');
+
+    const confirmar = page.getByRole('button', { name: 'Confirmar Avanço' });
+    await page.getByRole('combobox').filter({ hasText: 'Selecione a etapa' }).click();
+    await page.getByRole('option', { name: 'Encaminhado - Pool Geral' }).click();
+    await expect(confirmar).toBeDisabled();
+
+    await page.locator('#avanco-situacao-entrevista').selectOption('Desistente');
+    await expect(confirmar).toBeEnabled();
+    await confirmar.click();
+
+    await expect
+      .poll(async () => (await entrevistasDoTeste())[0]?.status, { timeout: 30000 })
+      .toBe('Desistente');
   });
 });

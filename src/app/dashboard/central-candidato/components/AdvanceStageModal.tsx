@@ -37,8 +37,9 @@ import { errorMessage } from "@/lib/utils";
 type EntrevistaMarcada = {
   id: string;
   role: string;
-  /** Data já passou e ninguém registrou o que houve — muda só o texto do aviso. */
+  /** Data já passou, ou nunca houve data. Muda só o texto do aviso. */
   overdue: boolean;
+  undated: boolean;
   status: string;
   result: string;
   destination: string;
@@ -309,10 +310,14 @@ export default function AdvanceStageModal({
               <p className="flex items-start gap-2 font-medium">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>
-                  {candidateName} {entrevistaMarcada.overdue ? "teve" : "tem"} entrevista marcada para{" "}
-                  {formatInterviewSchedule(entrevistaMarcada.interview_date, entrevistaMarcada.interview_time)}
+                  {candidateName} {entrevistaMarcada.overdue ? "teve" : "tem"} entrevista marcada{" "}
+                  {entrevistaMarcada.undated
+                    ? "sem data informada"
+                    : `para ${formatInterviewSchedule(entrevistaMarcada.interview_date, entrevistaMarcada.interview_time)}`}
                   {entrevistaMarcada.role ? ` — ${entrevistaMarcada.role}` : ""}
-                  {entrevistaMarcada.overdue ? ", e ninguém registrou o que ocorreu." : "."}
+                  {entrevistaMarcada.overdue || entrevistaMarcada.undated
+                    ? ", e ninguém registrou o que ocorreu."
+                    : "."}
                 </span>
               </p>
               <p>Registre o que ocorreu nela para poder avançar a etapa.</p>

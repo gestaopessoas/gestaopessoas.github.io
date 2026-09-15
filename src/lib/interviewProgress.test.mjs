@@ -82,10 +82,11 @@ const pendingCases = [
   [{ ...marcada, interview_date: "2026-09-14" }, true, "entrevista vencida também trava"],
   [{ ...marcada, status: "Compareceu" }, false, "entrevista já registrada não trava"],
   [{ ...marcada, status: "Não compareceu" }, false, "ausência já registrada não trava"],
-  // As linhas antigas de `interviews` nasceram sem data (ADR 0010): travar por causa
-  // delas seria prender processo por dado que nunca existiu.
-  [{ ...marcada, interview_date: "" }, false, "sem data não há entrevista marcada"],
+  // Linha antiga sem data (ADR 0010) trava igual: é o registro que ninguém fechou.
+  [{ ...marcada, interview_date: "" }, true, "entrevista sem data também trava"],
+  [{ ...marcada, interview_date: null }, true, "data nula também trava"],
   [null, false, "candidato sem entrevista não trava"],
+  [{ status: "" }, false, "situação vazia não trava"],
 ];
 
 for (const [input, esperado, motivo] of pendingCases) {
@@ -100,6 +101,14 @@ if (pendingScheduledInterview(marcada, HOJE).overdue !== false) {
 }
 if (pendingScheduledInterview({ ...marcada, interview_date: "2026-09-14" }, HOJE).overdue !== true) {
   throw new Error("Entrevista de ontem está vencida");
+}
+// Sem data não é "vencida": não dá para dizer que passou o que nunca foi marcado.
+const semData = pendingScheduledInterview({ ...marcada, interview_date: "" }, HOJE);
+if (semData.undated !== true || semData.overdue !== false) {
+  throw new Error(`Entrevista sem data mal classificada: ${JSON.stringify(semData)}`);
+}
+if (pendingScheduledInterview(marcada, HOJE).undated !== false) {
+  throw new Error("Entrevista com data não é sem data");
 }
 
 const outcomeCases = [

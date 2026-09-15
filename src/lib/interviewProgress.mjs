@@ -16,22 +16,25 @@ export const PENDING_INTERVIEW_STATUSES = ["Aguardando", "Confirmado"];
 export const INTERVIEW_OUTCOME_OPTIONS = ["Compareceu", "Não compareceu", "Desistente"];
 
 /**
- * Entrevista marcada e ainda não resolvida, futura ou vencida. É a que continua na Agenda
+ * Entrevista ainda não resolvida — futura, vencida ou sem data. É a que continua na Agenda
  * depois de um avanço de etapa, e por isso precisa ser registrada antes dele.
  *
- * A vencida entra junto de propósito: entrevista de ontem que ninguém registrou é o caso
- * pior, não o mais leve — a pessoa pode ter comparecido e o encontro sumiu do sistema.
- * `overdue` existe só para a tela falar no tempo certo ("tem" x "teve").
+ * Quem decide é a situação, não o calendário: `Aguardando`/`Confirmado` quer dizer que
+ * ninguém disse o que houve naquele encontro. A vencida é o caso pior, não o mais leve — a
+ * pessoa pode ter comparecido e o encontro sumiu do sistema.
  *
- * Sem data não é entrevista marcada: as linhas antigas de `interviews` nasceram todas sem
- * data (ADR 0010) e travar por causa delas seria prender processo por dado que nunca houve.
- * `today` no formato en-CA (AAAA-MM-DD), que é como `interview_date` é gravado.
+ * As linhas antigas de `interviews` nasceram sem data (ADR 0010) e travam também: entrevista
+ * sem data e sem situação é exatamente o registro que ninguém fechou. O custo é conhecido —
+ * o legado prende o avanço até alguém registrar o que ocorreu, que é o ponto.
+ *
+ * `overdue` e `undated` existem só para a tela falar no tempo certo ("tem" x "teve") e não
+ * escrever "marcada para Data não informada". `today` no formato en-CA (AAAA-MM-DD), que é
+ * como `interview_date` é gravado.
  */
 export function pendingScheduledInterview(progress, today) {
-  const data = String(progress?.interview_date || "").trim();
-  if (!data) return null;
-  if (!PENDING_INTERVIEW_STATUSES.includes(progress.status)) return null;
-  return { ...progress, overdue: data < today };
+  if (!PENDING_INTERVIEW_STATUSES.includes(progress?.status)) return null;
+  const data = String(progress.interview_date || "").trim();
+  return { ...progress, undated: !data, overdue: Boolean(data) && data < today };
 }
 
 /**
