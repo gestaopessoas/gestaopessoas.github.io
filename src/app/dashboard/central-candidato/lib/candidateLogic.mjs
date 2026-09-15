@@ -3,6 +3,12 @@
 // Importado por page.tsx/CandidateDetailsSheet.tsx/AddInterviewModal.tsx e testado em candidateLogic.test.mjs.
 // ponytail: se tipos ficarem onerosos, migrar para TS com .ts/.tsx — hoje as .d.mts cobrem a fronteira.
 
+// A situação da entrevista é do evento, e por isso mora em interviewProgress.mjs (ADR 0010).
+// Caminho relativo (e não o alias "@/"): estes .mjs também rodam sob `node --test`.
+import { PENDING_INTERVIEW_STATUSES } from "../../../../lib/interviewProgress.mjs";
+
+export { PENDING_INTERVIEW_STATUSES };
+
 export const UNLOCK_STAGES = ["Reprovado", "Desistente", "Banco de Talentos", "Contratado"];
 
 /**
@@ -149,8 +155,6 @@ export function deriveCandidateStatus(interviews = []) {
   return { status: "Em Processo", etapa_atual: latest.stage, ...base };
 }
 
-/** Situação de entrevista que ainda vai acontecer: o candidato não está livre. */
-export const PENDING_INTERVIEW_STATUSES = ["Aguardando", "Confirmado"];
 
 /**
  * Situação da entrevista mais recente (tabela `interviews`) sobrepõe a derivação do

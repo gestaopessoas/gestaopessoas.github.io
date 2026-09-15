@@ -38,9 +38,13 @@ export interface CandidateStatus {
 export function deriveCandidateStatus(interviews?: InterviewLike[] | null): CandidateStatus;
 
 export interface InterviewProgressLike {
+  id?: string;
+  role?: string | null;
   status?: string | null;
   result?: string | null;
   destination?: string | null;
+  interview_date?: string | null;
+  interview_time?: string | null;
 }
 
 export const PENDING_INTERVIEW_STATUSES: string[];

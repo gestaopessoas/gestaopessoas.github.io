@@ -5,6 +5,38 @@ export const INTERVIEW_STATUSES = ["Aguardando", "Confirmado", "Compareceu", "N�
 /** Não compareceu = faltou sem avisar; Desistente = avisou que saiu do processo. */
 export const NO_SHOW_STATUSES = ["Não compareceu", "Desistente"];
 
+/** Situação de entrevista que ainda vai acontecer: o encontro está marcado, não resolvido. */
+export const PENDING_INTERVIEW_STATUSES = ["Aguardando", "Confirmado"];
+
+/**
+ * O que a pessoa pode registrar sobre uma entrevista marcada na hora de avançar a etapa.
+ * "Aguardando"/"Confirmado" não entram: seguir o processo sem dizer o que houve no
+ * encontro é o que deixava a entrevista marcada e invisível (issue #75).
+ */
+export const INTERVIEW_OUTCOME_OPTIONS = ["Compareceu", "Não compareceu", "Desistente"];
+
+/**
+ * Entrevista marcada e ainda não resolvida, com data de hoje em diante. É a que continua
+ * na Agenda depois de um avanço de etapa, e por isso precisa ser registrada antes dele.
+ * `today` no formato en-CA (AAAA-MM-DD), que é como `interview_date` é gravado.
+ */
+export function pendingScheduledInterview(progress, today) {
+  const data = String(progress?.interview_date || "").trim();
+  if (!data) return null;
+  if (!PENDING_INTERVIEW_STATUSES.includes(progress.status)) return null;
+  return data >= today ? progress : null;
+}
+
+/**
+ * O registro da entrevista está completo? "Compareceu" sem resultado não diz o que
+ * ocorreu, e é justamente o que a issue #75 exige antes de avançar.
+ */
+export function interviewOutcomeComplete({ status, result } = {}) {
+  if (!INTERVIEW_OUTCOME_OPTIONS.includes(status)) return false;
+  if (status === "Compareceu") return result === "Aprovado" || result === "Reprovado";
+  return true;
+}
+
 export function normalizeInterviewProgress({ status, result, destination = "", interview_date = "", interview_time = "" }) {
   const quando = { interview_date: interview_date || "", interview_time: interview_time || "" };
   // Quem não apareceu não tem resultado de entrevista, mesmo que alguém tenha marcado antes.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Loader2 } from "lucide-react";
+import { AlertTriangle, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -24,8 +24,25 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { STAGE_BUCKETS, BUCKET_ORDER, TERMINAL_STAGES, isInterviewStage, stageNeedsWorkplace } from "../lib/candidateLogic.mjs";
-import { formatInterviewSchedule } from "@/lib/interviewProgress.mjs";
+import {
+  INTERVIEW_OUTCOME_OPTIONS,
+  formatInterviewSchedule,
+  interviewOutcomeComplete,
+  normalizeInterviewProgress,
+  pendingScheduledInterview,
+} from "@/lib/interviewProgress.mjs";
+import { fetchInterviewProgress } from "@/lib/candidateHistory.mjs";
 import { errorMessage } from "@/lib/utils";
+
+type EntrevistaMarcada = {
+  id: string;
+  role: string;
+  status: string;
+  result: string;
+  destination: string;
+  interview_date: string;
+  interview_time: string;
+};
 
 export default function AdvanceStageModal({
   isOpen,
@@ -58,7 +75,16 @@ export default function AdvanceStageModal({
   // Obra do avanço: a etapa "Obra Específica" não tinha onde dizer qual obra (QA B2).
   const [selectedWorkplace, setSelectedWorkplace] = useState(workplaceName || "");
   const [workplaces, setWorkplaces] = useState<string[]>([]);
+  // Entrevista marcada para hoje ou depois: avançar por cima dela sem dizer o que houve a
+  // deixava marcada na Agenda e invisível na Central (issue #75).
+  const [entrevistaMarcada, setEntrevistaMarcada] = useState<EntrevistaMarcada | null>(null);
+  const [situacaoEntrevista, setSituacaoEntrevista] = useState("");
+  const [resultadoEntrevista, setResultadoEntrevista] = useState("");
   const router = useRouter();
+
+  const registroEntrevistaCompleto =
+    !entrevistaMarcada ||
+    interviewOutcomeComplete({ status: situacaoEntrevista, result: resultadoEntrevista });
 
   // Quem avançou a etapa assina o histórico — antes ficava "Desconhecido".
   useEffect(() => {
@@ -81,6 +107,24 @@ export default function AdvanceStageModal({
     };
     carregarObras();
   }, [isOpen]);
+
+  // A consulta é feita aqui, e não recebida por prop, para valer o que está no banco no
+  // instante do avanço — a Central carrega a situação uma vez, no começo da listagem.
+  useEffect(() => {
+    if (!isOpen) return;
+    let ativo = true;
+    const carregarEntrevista = async () => {
+      const progresso = await fetchInterviewProgress(createClient(), { candidateId, fullName: candidateName });
+      const hoje = new Date().toLocaleDateString("en-CA");
+      const marcada = pendingScheduledInterview(progresso, hoje) as EntrevistaMarcada | null;
+      if (!ativo) return;
+      setEntrevistaMarcada(marcada);
+      setSituacaoEntrevista("");
+      setResultadoEntrevista("");
+    };
+    carregarEntrevista();
+    return () => { ativo = false; };
+  }, [isOpen, candidateId, candidateName]);
 
   const [candidateFuture, setCandidateFuture] = useState<string[]>([]);
 
@@ -151,12 +195,46 @@ export default function AdvanceStageModal({
         setSaving(false);
         return;
       }
+      if (!registroEntrevistaCompleto) {
+        setError(
+          situacaoEntrevista === "Compareceu"
+            ? "Informe se o candidato foi aprovado ou reprovado na entrevista."
+            : "Registre o que ocorreu na entrevista marcada antes de avançar a etapa."
+        );
+        setSaving(false);
+        return;
+      }
+
+      // A entrevista é gravada antes do avanço: se o registro do encontro falhar, a etapa
+      // não anda — é isso que impede a entrevista de continuar marcada sem ninguém saber.
+      let notaEntrevista = "";
+      if (entrevistaMarcada) {
+        const situacao = normalizeInterviewProgress({
+          status: situacaoEntrevista,
+          result: resultadoEntrevista,
+          destination: entrevistaMarcada.destination,
+          interview_date: entrevistaMarcada.interview_date,
+          interview_time: entrevistaMarcada.interview_time,
+        });
+        const { error: entrevistaError } = await supabase
+          .from("interviews")
+          .update({ status: situacao.status, result: situacao.result, destination: situacao.destination })
+          .eq("id", entrevistaMarcada.id);
+        if (entrevistaError) {
+          setError(`A etapa não avançou: a entrevista marcada não pôde ser atualizada (${entrevistaError.message}).`);
+          setSaving(false);
+          return;
+        }
+        // Uma linha de histórico só: a situação da entrevista vai na nota do avanço, para o
+        // registro não contradizer a etapa nova (um "Desistente" seguido de "Em Obra").
+        notaEntrevista = `[Entrevista] ${entrevistaMarcada.role || "Vaga não informada"} — ${formatInterviewSchedule(entrevistaMarcada.interview_date, entrevistaMarcada.interview_time)} · Situação: ${situacao.status} · Resultado: ${situacao.result}`;
+      }
 
       const quando = marcaEntrevista ? formatInterviewSchedule(stageDate, stageTime) : "";
       const { error: insertError } = await supabase.from("candidate_interviews").insert({
         candidate_id: candidateId,
         stage: selectedStage,
-        notes: [quando ? `[Entrevista marcada]\n${quando}` : "", finalNotes.trim()].filter(Boolean).join("\n\n") || null,
+        notes: [notaEntrevista, quando ? `[Entrevista marcada]\n${quando}` : "", finalNotes.trim()].filter(Boolean).join("\n\n") || null,
         workplace_name: obra || null,
         interviewer_name: currentUserName || null,
         candidate_future: candidateFuture.join(", ") || null,
@@ -200,6 +278,9 @@ export default function AdvanceStageModal({
       setStageTime("");
       setNotes("");
       setCandidateFuture([]);
+      setEntrevistaMarcada(null);
+      setSituacaoEntrevista("");
+      setResultadoEntrevista("");
     } catch (err) {
       console.error(err);
       setError(errorMessage(err, "Ocorreu um erro ao avançar o candidato."));
@@ -221,6 +302,56 @@ export default function AdvanceStageModal({
         <div className="space-y-4 py-2">
           {error && <p className="text-sm font-medium text-destructive">{error}</p>}
           
+          {entrevistaMarcada && (
+            <div className="rounded-lg border border-amber-300/40 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200 space-y-3">
+              <p className="flex items-start gap-2 font-medium">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>
+                  {candidateName} tem entrevista marcada para{" "}
+                  {formatInterviewSchedule(entrevistaMarcada.interview_date, entrevistaMarcada.interview_time)}
+                  {entrevistaMarcada.role ? ` — ${entrevistaMarcada.role}` : ""}.
+                </span>
+              </p>
+              <p>Registre o que ocorreu nela para poder avançar a etapa.</p>
+              <div className="grid gap-2">
+                <label className="font-medium" htmlFor="avanco-situacao-entrevista">
+                  O que ocorreu na entrevista *
+                </label>
+                <select
+                  id="avanco-situacao-entrevista"
+                  value={situacaoEntrevista}
+                  onChange={(e) => {
+                    setSituacaoEntrevista(e.target.value);
+                    setResultadoEntrevista("");
+                  }}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  <option value="">Selecione...</option>
+                  {(INTERVIEW_OUTCOME_OPTIONS as string[]).map((situacao) => (
+                    <option key={situacao} value={situacao}>{situacao}</option>
+                  ))}
+                </select>
+              </div>
+              {situacaoEntrevista === "Compareceu" && (
+                <div className="grid gap-2">
+                  <label className="font-medium" htmlFor="avanco-resultado-entrevista">
+                    Resultado *
+                  </label>
+                  <select
+                    id="avanco-resultado-entrevista"
+                    value={resultadoEntrevista}
+                    onChange={(e) => setResultadoEntrevista(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="Aprovado">Aprovado</option>
+                    <option value="Reprovado">Reprovado</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid gap-2">
             <label className="text-sm font-medium">Etapa Atual</label>
             <div className="rounded-md border bg-muted p-2 text-sm text-muted-foreground">
@@ -331,12 +462,12 @@ export default function AdvanceStageModal({
             Cancelar
           </Button>
           {isInterviewStage(selectedStage) && (
-            <Button variant="secondary" onClick={() => handleSave(true)} disabled={saving} className="gap-2">
+            <Button variant="secondary" onClick={() => handleSave(true)} disabled={saving || !registroEntrevistaCompleto} className="gap-2">
               <FileText className="h-4 w-4" />
               Avançar e preencher parecer
             </Button>
           )}
-          <Button onClick={() => handleSave()} disabled={saving}>
+          <Button onClick={() => handleSave()} disabled={saving || !registroEntrevistaCompleto}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirmar Avanço
           </Button>

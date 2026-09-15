@@ -70,15 +70,19 @@ function matchInterviewByPerson(query, { candidateId, email, fullName }) {
 }
 
 /** Situação da entrevista mais recente do candidato, no formato da prop interviewProgress. */
-export async function fetchInterviewProgress(supabase, { candidateId, email, fullName }) {
+export async function fetchInterviewProgress(supabase, { candidateId, email = "", fullName = "" }) {
   const query = matchInterviewByPerson(
-    supabase.from("interviews").select("status, result, destination, interview_date, interview_time"),
+    // `id` e `role` entram porque quem avança a etapa precisa nomear a entrevista marcada
+    // ("15/09 às 09:00 — Pedreiro") e gravar nela o que ocorreu (issue #75).
+    supabase.from("interviews").select("id, role, status, result, destination, interview_date, interview_time"),
     { candidateId, email, fullName }
   );
   if (!query) return null;
   const { data } = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!data) return null;
   return {
+    id: data.id,
+    role: data.role || "",
     status: data.status || "Aguardando",
     result: data.result || "N/C",
     destination: data.destination || "",

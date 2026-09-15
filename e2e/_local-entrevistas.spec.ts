@@ -10,7 +10,9 @@ import { test, expect, type Page } from '@playwright/test';
 //      sozinha mostrando o campo, mesmo se o usuário tiver recolhido o bloco (issue #70);
 //   2. situação gravada é a que o usuário escolheu, e cada mudança vira Registro de Etapa;
 //   3. segunda vaga cria entrevista nova, sem apagar a anterior nem o parecer dela;
-//   4. o cadastro pessoal não volta a ser copiado para dentro da entrevista.
+//   4. o cadastro pessoal não volta a ser copiado para dentro da entrevista;
+//   5. avançar a etapa por cima de uma entrevista marcada exige registrar o que ocorreu
+//      nela, senão a entrevista fica na agenda e some da Central (issue #75).
 
 const API = process.env.LOCAL_API_URL as string;
 const SERVICE = process.env.LOCAL_SERVICE_ROLE_KEY as string;
@@ -21,6 +23,7 @@ const EMAIL = 'zz.teste.entrevista@local.dev';
 const VAGA = 'ZZ CARGO ENTREVISTA';
 const OUTRA_VAGA = 'ZZ CARGO ENTREVISTA II';
 const HOJE = new Date().toLocaleDateString('en-CA');
+const AMANHA = new Date(Date.now() + 86400000).toLocaleDateString('en-CA');
 
 let jobProfileIds: string[] = [];
 
@@ -217,5 +220,55 @@ test.describe('Registro de entrevistas (banco local)', () => {
     expect(entrevistas.map((e: { role: string }) => e.role).sort()).toEqual([VAGA, OUTRA_VAGA].sort());
     // Uma pessoa, dois registros: o candidato não é duplicado.
     expect(await candidatoDoTeste()).toHaveLength(1);
+  });
+
+  // Issue #75: no QA de 14/09 a candidata tinha entrevista confirmada para o dia seguinte e
+  // foi encaminhada para obra sem aviso nenhum. A entrevista continuava na agenda e sumia
+  // do radar de quem olha a Central.
+  test('avançar etapa exige registrar a entrevista marcada', async ({ page }) => {
+    await abrirNovaEntrevista(page);
+    await preencherPessoa(page, VAGA);
+    await campoData(page).fill(AMANHA);
+    await campoHora(page).fill('09:00');
+    await campoStatus(page).selectOption('Confirmado');
+    await salvar(page).click();
+    await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
+
+    await page.goto('/dashboard/central-candidato');
+    await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+    const linha = page.getByRole('row').filter({ hasText: NOME });
+    await expect(linha).toBeVisible({ timeout: 30000 });
+    await linha.getByRole('button', { name: /^(Avançar|Chamar)$/ }).click();
+
+    // O aviso nomeia a entrevista: data e vaga, para a pessoa saber o que está atropelando.
+    const aviso = page.getByText(/tem entrevista marcada para/);
+    await expect(aviso).toBeVisible({ timeout: 30000 });
+    await expect(aviso).toContainText(VAGA);
+
+    const confirmar = page.getByRole('button', { name: 'Confirmar Avanço' });
+    // O bloco da entrevista também tem um select: o da etapa é o que traz o placeholder.
+    await page.getByRole('combobox').filter({ hasText: 'Selecione a etapa' }).click();
+    await page.getByRole('option', { name: 'Encaminhado - Pool Geral' }).click();
+
+    // Sem registro da entrevista, o avanço não sai do lugar.
+    await expect(confirmar).toBeDisabled();
+
+    await page.locator('#avanco-situacao-entrevista').selectOption('Não compareceu');
+    await expect(confirmar).toBeEnabled();
+    await confirmar.click();
+
+    // A entrevista deixa de estar marcada: sai da agenda porque alguém disse o que houve.
+    await expect
+      .poll(async () => (await entrevistasDoTeste())[0]?.status, { timeout: 30000 })
+      .toBe('Não compareceu');
+    expect((await entrevistasDoTeste())[0].result).toBe('N/C');
+
+    // E o que houve fica no histórico, junto da etapa nova — não numa linha que a contradiga.
+    const historico = await historicoDoTeste();
+    const avanco = historico[historico.length - 1];
+    expect(avanco.stage).toBe('Encaminhado - Pool Geral');
+    expect(avanco.notes).toContain('[Entrevista]');
+    expect(avanco.notes).toContain('Não compareceu');
+    expect(avanco.notes).toContain(VAGA);
   });
 });

@@ -65,3 +65,49 @@ if (!roleChangedOnSavedInterview("id-1", "Pedreiro", "Servente")) throw new Erro
 if (roleChangedOnSavedInterview("id-1", "Pedreiro", "Pedreiro")) throw new Error("Mesma vaga não pergunta");
 if (roleChangedOnSavedInterview(null, "Pedreiro", "Servente")) throw new Error("Entrevista nova não pergunta");
 if (roleChangedOnSavedInterview("id-1", "", "Servente")) throw new Error("Sem vaga anterior não pergunta");
+
+// Issue #75: entrevista marcada para hoje ou depois precisa ser registrada antes de a
+// etapa avançar, senão ela continua na Agenda e some da Central.
+import { interviewOutcomeComplete, pendingScheduledInterview } from "./interviewProgress.mjs";
+
+const HOJE = "2026-09-15";
+const marcada = { status: "Confirmado", interview_date: "2026-09-15", interview_time: "09:00" };
+
+const pendingCases = [
+  [marcada, true, "entrevista confirmada para hoje é pendente"],
+  [{ ...marcada, interview_date: "2026-09-20" }, true, "entrevista futura é pendente"],
+  [{ ...marcada, status: "Aguardando" }, true, "aguardando também é pendente"],
+  [{ ...marcada, interview_date: "2026-09-14" }, false, "entrevista de ontem não trava o avanço"],
+  [{ ...marcada, status: "Compareceu" }, false, "entrevista já registrada não trava"],
+  [{ ...marcada, status: "Não compareceu" }, false, "ausência já registrada não trava"],
+  [{ ...marcada, interview_date: "" }, false, "sem data não há entrevista marcada"],
+  [null, false, "candidato sem entrevista não trava"],
+];
+
+for (const [input, esperado, motivo] of pendingCases) {
+  if (Boolean(pendingScheduledInterview(input, HOJE)) !== esperado) {
+    throw new Error(`${motivo}: ${JSON.stringify(input)}`);
+  }
+}
+
+const outcomeCases = [
+  [{ status: "Compareceu", result: "Aprovado" }, true],
+  [{ status: "Compareceu", result: "Reprovado" }, true],
+  [{ status: "Compareceu", result: "N/C" }, false],
+  [{ status: "Compareceu", result: "" }, false],
+  [{ status: "Não compareceu", result: "" }, true],
+  [{ status: "Desistente", result: "" }, true],
+  // Manter a entrevista marcada não é registro: é o buraco que a issue #75 fechou.
+  [{ status: "Confirmado", result: "N/C" }, false],
+  [{ status: "Aguardando", result: "N/C" }, false],
+  [{ status: "", result: "" }, false],
+  [undefined, false],
+];
+
+for (const [input, esperado] of outcomeCases) {
+  if (interviewOutcomeComplete(input) !== esperado) {
+    throw new Error(`Registro mal validado: ${JSON.stringify(input)}`);
+  }
+}
+
+console.log("interviewProgress.test.mjs (issue #75) passed");
