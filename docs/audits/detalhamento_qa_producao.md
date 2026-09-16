@@ -1,5 +1,10 @@
 # Detalhamento QA — Produção
 
+> **Documento histórico — não descreve o código atual.**
+> `CandidateDetailsSheet.tsx` deixou de existir em 2026-08-13 (commit `c1038f3`), substituído por
+> `src/components/CandidateProfileModal.tsx`. As Etapas citadas aqui também mudaram com o eixo único
+> de Etapa (ADR 0006). Leia como registro do que foi encontrado na data acima, não como mapa do `src/`.
+
 **Última verificação:** 2026-08-03, sessão em `gestaopessoas.github.io`, logado.
 **Propósito:** consolidar o status real de todos os achados das 3 auditorias anteriores (`2026-07-31-central-candidato-audit.md`, `2026-08-01-design-audit.md`, `2026-07-31-qa-premium-logado.md`), verificado contra o código e o site publicado após as correções aplicadas em paralelo (commits `0ed5ce6`…`41031ee`).
 

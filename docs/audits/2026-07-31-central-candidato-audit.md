@@ -1,5 +1,10 @@
 # Auditoria — Módulo Central do Candidato
 
+> **Documento histórico — não descreve o código atual.**
+> `CandidateDetailsSheet.tsx` deixou de existir em 2026-08-13 (commit `c1038f3`), substituído por
+> `src/components/CandidateProfileModal.tsx`. As Etapas citadas aqui também mudaram com o eixo único
+> de Etapa (ADR 0006). Leia como registro do que foi encontrado na data acima, não como mapa do `src/`.
+
 **Escopo:** `src/app/dashboard/central-candidato/` (4 arquivos: `page.tsx`, `AddCandidateModal.tsx`, `AddInterviewModal.tsx`, `CandidateDetailsSheet.tsx`) + migrations relacionadas às tabelas `candidates`, `candidate_interviews`, `candidate_educations`, `candidate_experiences`.
 
 **Metodologia:** 3 agentes especializados em paralelo (`ecc:react-reviewer`, `ecc:database-reviewer`, `ecc:silent-failure-hunter`), read-only, cruzados com evidência visual de produção fornecida pelo usuário (screenshots de `gestaopessoas.github.io/dashboard/central-candidato/`). Sem aplicação de fix — só diagnóstico, por decisão do usuário.

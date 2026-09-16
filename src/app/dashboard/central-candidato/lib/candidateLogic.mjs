@@ -1,6 +1,6 @@
 // Lógica pura compartilhada da Central do Candidato (ESM).
 // Fonte única de verdade para estágios do lock e derivação de status/escolaridade.
-// Importado por page.tsx/CandidateDetailsSheet.tsx/AddInterviewModal.tsx e testado em candidateLogic.test.mjs.
+// Testado em candidateLogic.test.mjs.
 // ponytail: se tipos ficarem onerosos, migrar para TS com .ts/.tsx — hoje as .d.mts cobrem a fronteira.
 
 // A situação da entrevista é do evento, e por isso mora em interviewProgress.mjs (ADR 0010).
