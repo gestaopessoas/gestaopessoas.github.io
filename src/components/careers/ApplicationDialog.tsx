@@ -122,6 +122,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
   const [cpfError, setCpfError] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
   const [cepError, setCepError] = useState("");
+  const [cepFound, setCepFound] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState("");
@@ -163,6 +164,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     setResumeFile(null);
     setResumeError("");
     setSavedCandidateId("");
+    setCepFound(false);
     lastCepLookup.current = "";
   };
 
@@ -196,6 +198,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     lastCepLookup.current = digits;
     setCepLoading(true);
     setCepError("");
+    setCepFound(false);
     try {
       const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
       const data = await response.json();
@@ -210,6 +213,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         city: data.localidade || prev.city,
         state: data.uf || prev.state,
       }));
+      setCepFound(true);
     } catch {
       setCepError("Não foi possível consultar o CEP agora. Preencha o endereço manualmente.");
     } finally {
@@ -625,17 +629,23 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                 <Field label="LinkedIn"><Input disabled={!job} value={candidate.linkedin_url} onChange={(event) => update("linkedin_url", event.target.value)} /></Field>
               </FormSection>
 
-              <FormSection title="Endereço" description="Informe o CEP para preencher automaticamente.">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Field label="CEP">
+              <FormSection title="Endereço">
+                <div className="rounded-md border border-dashed border-input bg-muted/30 p-3">
+                  <Field label="CEP — preenche o endereço sozinho">
                     <div className="relative">
-                      <Input inputMode="numeric" placeholder="00000-000" value={candidate.cep} onChange={(event) => { setCepError(""); const masked = maskCep(event.target.value); update("cep", masked); lookupCep(masked); }} />
+                      <Input inputMode="numeric" placeholder="00000-000" value={candidate.cep} onChange={(event) => { setCepError(""); setCepFound(false); const masked = maskCep(event.target.value); update("cep", masked); lookupCep(masked); }} />
                       {cepLoading && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
                     </div>
-                    {cepError && <p className="text-xs text-destructive">{cepError}</p>}
+                    {cepError ? (
+                      <p className="text-xs text-destructive">{cepError}</p>
+                    ) : cepFound ? (
+                      <p role="status" className="text-xs font-medium text-emerald-600">Endereço encontrado — confira e complete o número.</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Digite os 8 dígitos e os campos abaixo se completam. Não sabe o CEP? Preencha à mão.</p>
+                    )}
                   </Field>
-                  <Field label="Bairro"><Input value={candidate.neighborhood} onChange={(event) => update("neighborhood", event.target.value)} /></Field>
                 </div>
+                <Field label="Bairro"><Input value={candidate.neighborhood} onChange={(event) => update("neighborhood", event.target.value)} /></Field>
                 <Field label="Logradouro"><Input value={candidate.address} onChange={(event) => update("address", event.target.value)} /></Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Número"><Input inputMode="numeric" value={candidate.address_number} onChange={(event) => update("address_number", maskAddressNumber(event.target.value))} /></Field>
