@@ -286,9 +286,23 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
 
     // Sem .select() após o insert: anon não tem policy de SELECT em candidates
     // (protege PII), e PostgREST precisa reler a linha pra devolver representation.
-    // Sem essa leitura o insert inteiro estoura RLS e dá rollback. Gerando o id no
-    // client evita depender de ler a linha de volta.
-    let candidateId = crypto.randomUUID();
+    // Sem essa leitura o insert inteiro estoura RLS e dá rollback. Conhecer o id antes
+    // do insert evita depender de ler a linha de volta.
+    //
+    // O id não é sorteado no client: `new_application_ticket` emite um ticket contando por IP
+    // (migration 20260916210000). O mesmo ticket vira o id do candidato e a pasta do
+    // currículo no Storage — as duas policies exigem um ticket válido.
+    const { data: ticketId, error: ticketError } = await supabase.rpc("new_application_ticket");
+    if (ticketError || !ticketId) {
+      setSaving(false);
+      setError(
+        ticketError?.message?.includes("rate_limit")
+          ? "Muitas candidaturas enviadas deste acesso. Tente de novo em uma hora."
+          : "Não foi possível iniciar o envio. Tente de novo em instantes."
+      );
+      return;
+    }
+    let candidateId = ticketId as string;
     let isExistingCandidate = false;
 
     // Upload antes do insert porque `resume_url` vai na mesma linha. Se falhar,
@@ -366,8 +380,11 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         // Sem e-mail, o par de reconhecimento é o telefone — que é obrigatório e
         // validado. Ordem de casamento do ADR 0010: e-mail, depois telefone.
         const { data: existingId } = candidate.email
-          ? await supabase.rpc("find_candidate_id_by_email", { p_email: sanitizeText(candidate.email, 255) })
-          : await supabase.rpc("find_candidate_id_by_phone", { p_phone: sanitizeText(candidate.phone, 20) });
+          // `p_ticket` marca no ticket qual candidato antigo foi reaproveitado: sem essa
+          // marca a policy de `job_applications` recusa o vínculo, porque o id do candidato
+          // aqui é o de um cadastro velho, não o do ticket (migration 20260916220000).
+          ? await supabase.rpc("find_candidate_id_by_email", { p_email: sanitizeText(candidate.email, 255), p_ticket: ticketId })
+          : await supabase.rpc("find_candidate_id_by_phone", { p_phone: sanitizeText(candidate.phone, 20), p_ticket: ticketId });
         if (!existingId) {
           setSaving(false);
           setError(
