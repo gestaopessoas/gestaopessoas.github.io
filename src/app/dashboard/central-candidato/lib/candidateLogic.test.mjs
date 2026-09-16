@@ -1,10 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  UNLOCK_STAGES,
   latestInterview,
   isLockedByInterview,
-  deriveCandidateStatus,
   latestEducationDegree,
   isInterviewStage,
   stageNeedsWorkplace,
@@ -12,28 +10,54 @@ import {
   nextStageOptions,
   BUCKET_ORDER,
   STAGE_BUCKETS,
-  resolveCandidateStatus,
+  candidaturaAtual,
+  candidaturasAtivas,
+  candidateStatusFromApplications,
 } from "./candidateLogic.mjs";
 
-test("resolveCandidateStatus dá o mesmo veredito para Central e Banco de Talentos", () => {
-  // Encaminhado pela tela de Entrevistas, ainda sem registro de entrevista.
-  const encaminhado = {
-    candidate_interviews: [],
-    search_tags: ["Aprovado na Entrevista"],
-    available_worksites: ["SEDE"],
-  };
-  assert.equal(resolveCandidateStatus(encaminhado).status, "Em Processo");
-  assert.equal(resolveCandidateStatus(encaminhado).ultimo_chamado, "Encaminhado para: SEDE");
+const app = (status, created_at, extra = {}) => ({ status, created_at, ...extra });
 
-  // Marcação explícita vence a derivação.
-  assert.equal(
-    resolveCandidateStatus({ candidate_interviews: [], search_tags: ["Banco de Talentos"] }).status,
-    "Banco de Talentos"
+test("candidaturaAtual: a mais recente por created_at, vazio dá null", () => {
+  assert.equal(candidaturaAtual([]), null);
+  const lista = [app("Triagem", "2026-07-01"), app("Entrevista RH", "2026-07-10")];
+  assert.equal(candidaturaAtual(lista).status, "Entrevista RH");
+});
+
+test("candidaturasAtivas: filtra fora as terminais", () => {
+  const lista = [app("Contratado", "2026-07-01"), app("Triagem", "2026-07-05"), app("Reprovado", "2026-07-02")];
+  const ativas = candidaturasAtivas(lista);
+  assert.deepEqual(ativas.map((a) => a.status), ["Triagem"]);
+});
+
+test("candidateStatusFromApplications: sem candidatura -> Banco de Talentos", () => {
+  const s = candidateStatusFromApplications([], {});
+  assert.equal(s.status, "Banco de Talentos");
+  assert.equal(s.etapa_atual, null);
+  assert.equal(s.total_candidaturas, 0);
+});
+
+test("candidateStatusFromApplications: só terminais -> Banco de Talentos com a última etapa", () => {
+  const s = candidateStatusFromApplications(
+    [app("Reprovado", "2026-07-01"), app("Desistente", "2026-08-01")],
+    {}
   );
+  assert.equal(s.status, "Banco de Talentos");
+  assert.equal(s.etapa_atual, "Desistente");
+});
 
-  // Sem tags, cai na derivação normal.
-  assert.equal(resolveCandidateStatus({ candidate_interviews: [] }).status, "Banco de Talentos");
-  assert.equal(resolveCandidateStatus({}).status, "Banco de Talentos");
+test("candidateStatusFromApplications: uma ativa + uma terminal -> Em Processo com a ativa", () => {
+  const s = candidateStatusFromApplications(
+    [app("Reprovado", "2026-06-01"), app("Entrevista RH", "2026-08-01")],
+    {}
+  );
+  assert.equal(s.status, "Em Processo");
+  assert.equal(s.etapa_atual, "Entrevista RH");
+});
+
+test("candidateStatusFromApplications: Contratado", () => {
+  const s = candidateStatusFromApplications([app("Contratado", "2026-07-01")], {});
+  assert.equal(s.status, "Contratado");
+  assert.equal(s.etapa_atual, "Contratado");
 });
 
 test("candidateBucket separa os baldes que o adm de obra precisa ver", () => {
@@ -41,7 +65,7 @@ test("candidateBucket separa os baldes que o adm de obra precisa ver", () => {
   assert.equal(candidateBucket("Em Processo", "Triagem"), "entrevista");
   assert.equal(candidateBucket("Em Processo", "Entrevista Gestor"), "entrevista");
   assert.equal(candidateBucket("Em Processo", "Testagem Psicológica"), "entrevista");
-  assert.equal(candidateBucket("Em Processo", "Coleta de Documentos & Exames"), "documentacao");
+  assert.equal(candidateBucket("Em Processo", "Documentação"), "documentacao");
   assert.equal(candidateBucket("Em Processo", "Proposta"), "proposta");
   assert.equal(candidateBucket("Em Processo", "Contratado"), "contratacao");
 });
@@ -66,10 +90,6 @@ test("todo balde declarado em BUCKET_ORDER é alcançável", () => {
 
 const int = (stage, created_at, extra = {}) => ({ stage, created_at, ...extra });
 
-test("UNLOCK_STAGES contém os 4 estágios terminais", () => {
-  assert.deepEqual(UNLOCK_STAGES, ["Reprovado", "Desistente", "Banco de Talentos", "Contratado"]);
-});
-
 test("latestInterview ordena por created_at desc", () => {
   const list = [int("Triagem", "2026-07-01"), int("Entrevista RH", "2026-07-10")];
   assert.equal(latestInterview(list).stage, "Entrevista RH");
@@ -82,48 +102,6 @@ test("isLockedByInterview: ativo trava, terminais liberam", () => {
   assert.equal(isLockedByInterview(int("Contratado", "2026-07-01")), false);
   assert.equal(isLockedByInterview(int("Reprovado", "2026-07-01")), false);
   assert.equal(isLockedByInterview(null), false);
-});
-
-test("deriveCandidateStatus: sem histórico -> Banco de Talentos", () => {
-  assert.deepEqual(deriveCandidateStatus([]), {
-    status: "Banco de Talentos",
-    etapa_atual: null,
-    obra_atual: null,
-    ultimo_chamado: "Nenhum contato",
-  });
-});
-
-test("deriveCandidateStatus: Contratado", () => {
-  const s = deriveCandidateStatus([int("Contratado", "2026-07-01", { workplace_name: "Obra X" })]);
-  assert.equal(s.status, "Contratado");
-  assert.equal(s.obra_atual, "Obra X");
-});
-
-test("deriveCandidateStatus: Reprovado -> Banco de Talentos, sem etapa", () => {
-  const s = deriveCandidateStatus([int("Reprovado", "2026-07-01", { workplace_name: "Obra X" })]);
-  assert.equal(s.status, "Banco de Talentos");
-  assert.equal(s.etapa_atual, null);
-  assert.equal(s.obra_atual, "Obra X");
-});
-
-test("deriveCandidateStatus: ativo -> Em Processo com etapa", () => {
-  const s = deriveCandidateStatus([
-    int("Entrevista Gestor", "2026-07-05", { workplace_name: "Obra Y", interviewer_name: "Maria" }),
-  ]);
-  assert.equal(s.status, "Em Processo");
-  assert.equal(s.etapa_atual, "Entrevista Gestor");
-  assert.equal(s.obra_atual, "Obra Y");
-  assert.equal(s.ultimo_chamado, "Maria - Obra Y");
-});
-
-test("candidate_future reflete os filtros da Central", () => {
-  const livre = deriveCandidateStatus([int("Em entrevista", "2026-08-14", { candidate_future: "Livre" })]);
-  assert.equal(livre.status, "Banco de Talentos");
-  assert.equal(candidateBucket(livre.status, livre.etapa_atual), "livre");
-
-  const documentacao = deriveCandidateStatus([int("Coleta de documentos", "2026-08-14", { candidate_future: "Avançar no processo" })]);
-  assert.equal(documentacao.status, "Em Processo");
-  assert.equal(candidateBucket(documentacao.status, documentacao.etapa_atual), "documentacao");
 });
 
 test("latestEducationDegree: último por data; fallback sem datas", () => {
@@ -152,62 +130,6 @@ test("latestEducationDegree: parecer é reserva, e o cadastro continua mandando"
   assert.equal(latestEducationDegree([], { education: "" }), null);
 });
 
-// Issue #41
-test("etapa gravada em minúsculo conta como Banco de Talentos", () => {
-  const derived = deriveCandidateStatus([int("banco de talentos", "2026-08-14")]);
-  assert.equal(derived.status, "Banco de Talentos");
-  assert.equal(derived.etapa_atual, null);
-  assert.equal(candidateBucket(derived.status, derived.etapa_atual), "livre");
-  assert.equal(isLockedByInterview({ stage: "Banco de talentos" }), false);
-});
-
-test("tag prefixada em candidate_future não vira destino Banco de Talentos", () => {
-  const derived = deriveCandidateStatus([
-    int("Entrevista RH", "2026-08-14", { candidate_future: "Aprovado para Banco de Talentos" }),
-  ]);
-  assert.equal(derived.status, "Em Processo");
-  assert.equal(derived.etapa_atual, "Entrevista RH");
-  // Já o valor exato (com outra caixa) é destino de verdade.
-  assert.equal(
-    deriveCandidateStatus([int("Entrevista RH", "2026-08-14", { candidate_future: "BANCO DE TALENTOS" })]).status,
-    "Banco de Talentos"
-  );
-});
-
-test("candidato sem entrevistas cai no Banco de Talentos", () => {
-  for (const entrevistas of [[], null, undefined]) {
-    const derived = deriveCandidateStatus(entrevistas);
-    assert.equal(derived.status, "Banco de Talentos");
-    assert.equal(derived.etapa_atual, null);
-    assert.equal(derived.ultimo_chamado, "Nenhum contato");
-  }
-  assert.equal(resolveCandidateStatus({}).status, "Banco de Talentos");
-});
-
-test("contratado e entrevista agendada nunca caem no balde Livres", () => {
-  const livre = { search_tags: ["Banco de Talentos"], candidate_interviews: [] };
-
-  const contratado = resolveCandidateStatus({
-    ...livre,
-    interview_progress: { status: "Compareceu", result: "Aprovado", destination: "Contratado" },
-  });
-  assert.equal(contratado.status, "Contratado");
-  assert.notEqual(candidateBucket(contratado.status, contratado.etapa_atual), "livre");
-
-  for (const status of ["Aguardando", "Confirmado"]) {
-    const agendado = resolveCandidateStatus({ ...livre, interview_progress: { status, result: "N/C" } });
-    assert.equal(agendado.status, "Em Processo");
-    assert.equal(candidateBucket(agendado.status, agendado.etapa_atual), "entrevista");
-  }
-
-  // Entrevista já concluída sem destino não mexe no status derivado.
-  const concluida = resolveCandidateStatus({
-    ...livre,
-    interview_progress: { status: "Compareceu", result: "Aprovado", destination: "" },
-  });
-  assert.equal(concluida.status, "Banco de Talentos");
-});
-
 test("etapa de entrevista é reconhecida para marcar data e hora", () => {
   for (const etapa of ["Entrevista RH", "entrevista gestor", "Triagem", "Testagem Psicológica"]) {
     assert.equal(isInterviewStage(etapa), true, etapa);
@@ -217,20 +139,8 @@ test("etapa de entrevista é reconhecida para marcar data e hora", () => {
   }
 });
 
-test("contratado não volta para o Banco de Talentos por causa da tag", () => {
-  const contratado = resolveCandidateStatus({
-    search_tags: ["Banco de Talentos"],
-    candidate_interviews: [
-      { stage: "Banco de Talentos", created_at: "2026-08-01" },
-      { stage: "Contratado", created_at: "2026-09-01" },
-    ],
-  });
-  assert.equal(contratado.status, "Contratado");
-  assert.equal(candidateBucket(contratado.status, contratado.etapa_atual), "encerrado");
-});
-
 test("etapas de obra exigem a obra", () => {
-  for (const etapa of ["Encaminhado - Obra Específica", "Em Obra", "Aguardando Obra", "Recusado pela Obra"]) {
+  for (const etapa of ["Em Obra", "Aguardando Obra", "Em Avaliação na Obra"]) {
     assert.equal(stageNeedsWorkplace(etapa), true, etapa);
   }
   for (const etapa of ["Entrevista RH", "Banco de Talentos", "Contratado", ""]) {
@@ -239,7 +149,7 @@ test("etapas de obra exigem a obra", () => {
 });
 
 // A Central acompanha o funil; quem contrata, manda para o banco, reprova ou registra
-// desistência é a entrevista (issue #84). O select de avanço não pode oferecer desfecho.
+// desistência é decisão de desfecho, do RH. O select de avanço não pode oferecer desfecho.
 const DESFECHOS = ["Contratado", "Banco de Talentos", "Reprovado", "Desistente"];
 
 test("nenhum balde oferece desfecho no avanço", () => {
@@ -254,9 +164,9 @@ test("nenhum balde oferece desfecho no avanço", () => {
 test("o avanço oferece o balde atual e o seguinte", () => {
   const opcoes = nextStageOptions("entrevista");
   for (const etapa of STAGE_BUCKETS.entrevista) assert.ok(opcoes.includes(etapa), etapa);
-  for (const etapa of STAGE_BUCKETS.encaminhado) assert.ok(opcoes.includes(etapa), etapa);
+  for (const etapa of STAGE_BUCKETS.obras) assert.ok(opcoes.includes(etapa), etapa);
   // Dois baldes adiante não: avanço é um passo por vez.
-  assert.equal(opcoes.includes("Em Obra"), false);
+  assert.equal(opcoes.includes("Proposta"), false);
 });
 
 test("quem está no banco de talentos é chamado para entrevista", () => {

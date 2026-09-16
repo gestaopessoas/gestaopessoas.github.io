@@ -9,7 +9,14 @@ import { PENDING_INTERVIEW_STATUSES } from "../../../../lib/interviewProgress.mj
 
 export { PENDING_INTERVIEW_STATUSES };
 
-export const UNLOCK_STAGES = ["Reprovado", "Desistente", "Banco de Talentos", "Contratado"];
+// A lista canônica das 13 Etapas e o conjunto terminal moram em `src/lib/stages.ts` — aqui
+// ficou só o que é da Central: os baldes de visualização (ADR 0006, issue #57).
+const TERMINAIS = ["Contratado", "Reprovado", "Desistente"];
+
+/** Etapa que encerra a Candidatura. Sair dela é rejeitado pelo banco. */
+export function isTerminalStage(stage) {
+  return TERMINAIS.some((s) => sameStage(s, stage));
+}
 
 /**
  * Caixa e acento não são informação aqui: "Banco de talentos" gravado pelo modal e
@@ -29,43 +36,17 @@ export function sameStage(a, b) {
   return normalizeStage(a) === normalizeStage(b);
 }
 
-export function isUnlockStage(stage) {
-  const normalized = normalizeStage(stage);
-  return UNLOCK_STAGES.some((s) => normalizeStage(s) === normalized);
-}
-
-/** Etapas que encerram o processo e devem refletir no destino da entrevista. */
-export const TERMINAL_STAGES = ["Banco de Talentos", "Reprovado", "Desistente"];
-
-export function isTerminalStage(stage) {
-  const normalized = normalizeStage(stage);
-  return TERMINAL_STAGES.some((s) => normalizeStage(s) === normalized);
-}
-
 // Agrupa as etapas granulares gravadas em candidate_interviews.stage nos baldes que o
 // administrativo de obra precisa enxergar. A etapa exata continua visível na linha —
 // o balde existe só para filtrar e contar.
 export const STAGE_BUCKETS = {
-  entrevista: ["Triagem", "Entrevista RH", "Entrevista Gestor", "Testagem Psicológica", "Em entrevista"],
-  encaminhado: ["Encaminhado - Pool Geral", "Encaminhado - Obra Específica", "Processo de MPs"],
+  entrevista: ["Triagem", "Entrevista RH", "Entrevista Gestor", "Testagem Psicológica"],
   obras: ["Aguardando Obra", "Em Avaliação na Obra", "Em Obra"],
-  proposta: ["Proposta Pendente", "Proposta em Aprovação RH", "Proposta Aprovada", "Proposta", "Em proposta"],
-  documentacao: ["Coleta de Documentos & Exames", "Coleta de documentos", "Aguardando ASO"],
+  proposta: ["Proposta"],
+  documentacao: ["Documentação"],
+  mp: ["Processo de MP"],
   contratacao: ["Contratado"],
 };
-
-/**
- * Fonte única das etapas oferecidas nos selects (modal do candidato, nova entrevista,
- * avanço de etapa). Ordem = ordem dos baldes, terminais no fim.
- */
-export const STAGE_OPTIONS = [
-  ...new Set([
-    ...Object.values(STAGE_BUCKETS).flat(),
-    ...UNLOCK_STAGES,
-    "Recusado pela Obra",
-    "Outros",
-  ]),
-];
 
 /**
  * Etapas que são uma entrevista de verdade: avançar para uma delas marca data e hora e
@@ -80,22 +61,24 @@ export function isInterviewStage(stage) {
  * qual obra gravava um registro vazio (QA B2).
  */
 export function stageNeedsWorkplace(stage) {
-  return [...STAGE_BUCKETS.obras, "Encaminhado - Obra Específica", "Recusado pela Obra"]
-    .some((s) => sameStage(s, stage));
+  return STAGE_BUCKETS.obras.some((s) => sameStage(s, stage));
 }
 
-/** Etapas que quem não é do RH pode registrar no histórico. */
-export const LIMITED_STAGE_OPTIONS = ["Banco de Talentos", "Em proposta"];
+/**
+ * Etapas que quem não é do RH pode registrar. "Banco de Talentos" saiu: deixou de ser Etapa
+ * e virou consulta derivada — encerrar uma Candidatura é decisão de desfecho, do RH.
+ */
+export const LIMITED_STAGE_OPTIONS = ["Proposta"];
 
-export const BUCKET_ORDER = ["livre", "entrevista", "encaminhado", "obras", "proposta", "documentacao", "contratacao"];
+export const BUCKET_ORDER = ["livre", "entrevista", "obras", "proposta", "documentacao", "mp", "contratacao"];
 
 export const BUCKET_LABELS = {
   livre: "Livres",
   entrevista: "Em entrevista",
-  encaminhado: "Encaminhados",
   obras: "Em Obra",
   proposta: "Proposta",
   documentacao: "Documentação",
+  mp: "Processo de MP",
   contratacao: "Contratação",
 };
 
@@ -138,7 +121,7 @@ export function nextStageOptions(currentBucket) {
 
   // O filtro é a regra, não a montagem acima: "Contratado" é a etapa do balde `contratacao`
   // e voltaria pela porta dos fundos.
-  const desfechos = ["Contratado", ...TERMINAL_STAGES];
+  const desfechos = ["Contratado", "Reprovado", "Desistente"];
   return [...new Set(stages)].filter((s) => !desfechos.some((d) => sameStage(d, s)));
 }
 
@@ -150,99 +133,74 @@ export function latestInterview(interviews = []) {
 }
 
 export function isLockedByInterview(latest) {
-  return !!latest && !isUnlockStage(latest.stage);
+  return !!latest && !isTerminalStage(latest.stage);
 }
 
-export function deriveCandidateStatus(interviews = []) {
-  const latest = latestInterview(interviews);
-  if (!latest) {
-    return { status: "Banco de Talentos", etapa_atual: null, obra_atual: null, ultimo_chamado: "Nenhum contato" };
-  }
-  const isTerminal = isUnlockStage(latest.stage);
+/**
+ * A Candidatura mais recente do candidato. "Mais recente" e não "mais avançada": a Central
+ * mostra em que pé está o processo de agora, e o histórico completo fica a um clique.
+ */
+export function candidaturaAtual(applications = []) {
+  if (!Array.isArray(applications) || applications.length === 0) return null;
+  return [...applications].sort(
+    (a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+  )[0];
+}
+
+export function candidaturasAtivas(applications = []) {
+  if (!Array.isArray(applications)) return [];
+  return applications.filter((a) => !isTerminalStage(a?.status));
+}
+
+/**
+ * Status do candidato a partir das Candidaturas — não mais derivado do histórico.
+ *
+ * `job_applications.status` **é** a Etapa (ADR 0006); esta função só decide qual das
+ * Candidaturas a linha mostra. Banco de Talentos virou consulta: sem Candidatura ativa e
+ * não Contratado. É isso que mata o bug do reprovado — ele tem uma Candidatura em Etapa
+ * Terminal `Reprovado`, e Etapa Terminal não é ausência de histórico, então a linha diz
+ * "Banco de Talentos — Reprovado" em vez de fingir que o candidato está livre e novo.
+ */
+export function candidateStatusFromApplications(applications = [], candidate = {}) {
+  const ativas = candidaturasAtivas(applications);
+  const atualAtiva = candidaturaAtual(ativas);
+  const atualQualquer = candidaturaAtual(applications);
+  const contratada = (Array.isArray(applications) ? applications : []).find((a) =>
+    sameStage(a?.status, "Contratado")
+  );
+
   const base = {
-    obra_atual: latest.workplace_name || null,
-    ultimo_chamado: `${latest.interviewer_name || "Desconhecido"} - ${latest.workplace_name || "Obra não informada"}`,
+    obra_atual: obraDaCandidatura(atualAtiva ?? contratada ?? atualQualquer) || candidate.city || null,
+    ultimo_chamado: chamadoDaCandidatura(atualAtiva ?? contratada ?? atualQualquer),
+    candidatura_id: (atualAtiva ?? contratada ?? atualQualquer)?.id ?? null,
+    total_candidaturas: Array.isArray(applications) ? applications.length : 0,
   };
-  // Igualdade exata do valor normalizado: a tag "Aprovado para Banco de Talentos"
-  // não é o destino "Banco de Talentos" e não pode casar aqui.
-  const future = normalizeStage(latest.candidate_future);
-  if (future === "livre" || future === "banco de talentos") {
-    return { status: "Banco de Talentos", etapa_atual: null, ...base };
+
+  if (atualAtiva) {
+    return { status: "Em Processo", etapa_atual: atualAtiva.status ?? null, ...base };
   }
-  if (future === "encerrar processo") {
-    return { status: "Encerrado", etapa_atual: null, ...base };
+  if (contratada) {
+    return { status: "Contratado", etapa_atual: "Contratado", ...base };
   }
-  if (sameStage(latest.stage, "Contratado")) {
-    return { status: "Contratado", etapa_atual: null, ...base };
-  }
-  if (isTerminal) {
-    return { status: "Banco de Talentos", etapa_atual: null, ...base };
-  }
-  // Toda etapa não terminal é "Em Processo" — é o único status que candidateBucket()
-  // reconhece como ativo. A etapa granular vai em etapa_atual e define o balde.
-  return { status: "Em Processo", etapa_atual: latest.stage, ...base };
+  // Sem Candidatura ativa e não Contratado: Banco de Talentos. A última Etapa continua
+  // visível, porque "por que ele está livre" é a informação que faltava.
+  return {
+    status: "Banco de Talentos",
+    etapa_atual: atualQualquer?.status ?? null,
+    ...base,
+  };
 }
 
-
-/**
- * Situação da entrevista mais recente (tabela `interviews`) sobrepõe a derivação do
- * histórico: contratado nunca é livre, e entrevista agendada também não.
- * Retorna null quando a situação não decide nada.
- */
-export function statusFromInterviewProgress(progress) {
-  if (!progress) return null;
-  if (sameStage(progress.destination, "Contratado")) {
-    return { status: "Contratado", etapa_atual: null };
-  }
-  if (PENDING_INTERVIEW_STATUSES.some((s) => sameStage(s, progress.status))) {
-    return { status: "Em Processo", etapa_atual: "Entrevista RH" };
-  }
-  return null;
+function obraDaCandidatura(app) {
+  return app?.job_openings?.workplaces?.name ?? app?.job_openings?.workplace_name ?? null;
 }
 
-/**
- * Status final do candidato, considerando também as tags gravadas pela tela de Entrevistas.
- * Central do Candidato e Banco de Talentos precisam concordar sobre o mesmo candidato —
- * por isso a regra mora aqui, e não duplicada em cada página.
- */
-export function resolveCandidateStatus(candidate = {}) {
-  const entrevistas = candidate.candidate_interviews;
-  const derived = deriveCandidateStatus(entrevistas);
-  const tags = Array.isArray(candidate.search_tags) ? candidate.search_tags : [];
-  const semEntrevista = !Array.isArray(entrevistas) || entrevistas.length === 0;
-
-  let status = derived.status;
-  let ultimo_chamado = derived.ultimo_chamado;
-
-  // Encaminhado pela tela de Entrevistas, ainda sem registro de entrevista na Central.
-  if (semEntrevista && tags.includes("Aprovado na Entrevista")) {
-    status = "Em Processo";
-    const obras =
-      Array.isArray(candidate.available_worksites) && candidate.available_worksites.length > 0
-        ? candidate.available_worksites.join(", ")
-        : candidate.city || "Obra não informada";
-    ultimo_chamado = `Encaminhado para: ${obras}`;
-  }
-
-  // Marcação explícita de Banco de Talentos vence a derivação — menos para quem já foi
-  // contratado depois disso, que aparecia no Banco de Talentos como se estivesse livre.
-  if (derived.status !== "Contratado" && tags.some((t) => sameStage(t, "Banco de Talentos"))) {
-    status = "Banco de Talentos";
-  }
-
-  // ...mas não vence a situação da entrevista mais recente: contratado ou com entrevista
-  // agendada não pode cair no balde "Livres".
-  const fromProgress = statusFromInterviewProgress(candidate.interview_progress);
-  // Contratado manda sempre; entrevista agendada só tira o candidato de "livre" — se ele
-  // já está numa etapa adiantada do histórico, a etapa continua valendo.
-  if (fromProgress?.status === "Contratado") {
-    return { ...derived, ...fromProgress, ultimo_chamado };
-  }
-  if (fromProgress && sameStage(status, "Banco de Talentos")) {
-    return { ...derived, ...fromProgress, ultimo_chamado };
-  }
-
-  return { ...derived, status, ultimo_chamado };
+function chamadoDaCandidatura(app) {
+  if (!app) return "Nenhum contato";
+  const vaga = app.job_requests?.position_title || app.job_requests?.requested_role || null;
+  const obra = obraDaCandidatura(app);
+  if (vaga && obra) return `${vaga} - ${obra}`;
+  return vaga || obra || "Candidatura sem vaga informada";
 }
 
 /**

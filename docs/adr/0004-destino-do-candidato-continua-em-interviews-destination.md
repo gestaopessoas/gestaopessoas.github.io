@@ -15,6 +15,14 @@ Encerrado na prática pelo [ADR 0010](./0010-entrevista-e-evento-com-situacao-pr
 fase 3 do ADR 0006, mas como decisão daquele dia — nada mais o reescreve a partir do
 histórico.
 
+Concluído na Fase 2 do ADR 0006 em 2026-09-16 (issue #57): a tela de Entrevistas parou de
+gravar `interviews.destination`, e o desfecho virou Etapa Terminal da Candidatura. **A coluna
+não foi dropada na Fase 3** (issue #58): `destination` continua sendo a forma como a situação
+da entrevista trafega no código, e essa forma é decisão do ADR 0010 —
+`normalizeInterviewProgress`, `interviewHistoryStage` e o select "Destino" da ficha leem e
+escrevem esse campo. Dropar a coluna hoje quebraria o ADR 0010 sem decisão registrada; fica
+para uma issue própria, com os dois ADRs na mesa.
+
 ## Contexto
 
 O status do candidato é derivado em tempo de leitura a partir de `candidate_interviews`

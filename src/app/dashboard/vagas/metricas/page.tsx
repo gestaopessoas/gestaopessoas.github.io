@@ -5,7 +5,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Clock, Users, Target, Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { PIPELINE_STAGES, normalizeStage } from "../lib/stages";
+import { STAGES } from "@/lib/stages";
 
 export default function MetricasVagasPage() {
   const supabase = createClient();
@@ -41,12 +41,14 @@ export default function MetricasVagasPage() {
 
       // Funil (contagem por etapa do funil da vaga)
       const stageCounts = (apps || []).reduce<Record<string, number>>((acc, a) => {
-        const stage = normalizeStage(a.status);
-        acc[stage] = (acc[stage] || 0) + 1;
+        if (!a.status) return acc;
+        acc[a.status] = (acc[a.status] || 0) + 1;
         return acc;
       }, {});
 
-      const funil = PIPELINE_STAGES.map(col => ({
+      // O funil mostra as 13 Etapas canonicas na ordem do ADR 0006, terminais inclusive:
+      // Reprovado e Desistente sao desfecho, e some-los escondia para onde o funil vaza.
+      const funil = STAGES.map(col => ({
         stage: col,
         count: stageCounts[col] || 0
       }));

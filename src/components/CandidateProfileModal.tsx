@@ -23,7 +23,8 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/contexts/ToastContext";
 import { errorMessage } from "@/lib/utils";
 import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
-import { deriveCandidateStatus, LIMITED_STAGE_OPTIONS, STAGE_OPTIONS } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { LIMITED_STAGE_OPTIONS, candidateStatusFromApplications } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { STAGES } from "@/lib/stages";
 import { INTERVIEW_STATUSES, normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 
@@ -176,6 +177,16 @@ type CandidateInterview = {
   created_at: string;
   notes?: string | null;
   rejection_reason?: string | null;
+  /** Vincula a linha à Candidatura (ADR 0006, Fase 1). Linha antiga não tem. */
+  job_application_id?: string | null;
+};
+
+// A Candidatura em si — a Etapa é `status`, lido direto (ADR 0006).
+type CandidateApplication = {
+  id: string;
+  status: string;
+  created_at: string;
+  job_requests?: { position_title?: string | null; requested_role?: string | null } | null;
 };
 
 type ProfileInterview = {
@@ -523,12 +534,44 @@ export function CandidateProfileModal({
   const [results, setResults] = useState<BigFiveResult[]>([]);
   const [interviews, setInterviews] = useState<ProfileInterview[]>([]);
   const [candidateInterviews, setCandidateInterviews] = useState<CandidateInterview[]>([]);
+  const [applications, setApplications] = useState<CandidateApplication[]>([]);
   // A restrição de contato protege quem está em processo de ser abordado por fora — mas
   // não pode cegar quem está conduzindo a entrevista e precisa ligar para confirmar (QA B7).
   const contactsAreVisible = useMemo(
     () => !!interviewProgress || canDisplayCandidateContacts(candidateInterviews),
     [candidateInterviews, interviewProgress]
   );
+
+  // Aba "Histórico de Etapas" agrupada por Candidatura — um processo não pode se misturar
+  // com o outro na mesma linha do tempo. Linha antiga sem vínculo (pré-Fase 1) vai para um
+  // grupo à parte, no fim; inventar o vínculo dela seria mentir sobre o processo.
+  const historyGroups = useMemo(() => {
+    const porCandidatura = new Map<string, CandidateInterview[]>();
+    const semVinculo: CandidateInterview[] = [];
+    candidateInterviews.forEach((ci) => {
+      if (ci.job_application_id) {
+        const lista = porCandidatura.get(ci.job_application_id) ?? [];
+        lista.push(ci);
+        porCandidatura.set(ci.job_application_id, lista);
+      } else {
+        semVinculo.push(ci);
+      }
+    });
+
+    const grupos = applications
+      .filter((app) => porCandidatura.has(app.id))
+      .map((app) => ({
+        key: app.id,
+        title: app.job_requests?.position_title || app.job_requests?.requested_role || "Vaga não informada",
+        etapaAtual: app.status as string | null,
+        interviews: porCandidatura.get(app.id)!,
+      }));
+
+    if (semVinculo.length > 0) {
+      grupos.push({ key: "sem-vinculo", title: "Sem candidatura vinculada", etapaAtual: null, interviews: semVinculo });
+    }
+    return grupos;
+  }, [candidateInterviews, applications]);
   const [educations, setEducations] = useState<ProfileEducation[]>([]);
   const [experiences, setExperiences] = useState<ProfileExperience[]>([]);
   const [loading, setLoading] = useState(!initialData);
@@ -660,13 +703,13 @@ export function CandidateProfileModal({
     setOpeningResume(true);
     const supabase = createClient();
     
-    // Marca inscrições novas como lidas
+    // Marca a leitura do currículo — não é Etapa (ADR 0006 Fase 2), é um carimbo à parte.
     if (person.id) {
       await supabase
         .from("job_applications")
-        .update({ status: "Currículo Visualizado" })
+        .update({ resume_viewed_at: new Date().toISOString() })
         .eq("candidate_id", person.id)
-        .eq("status", "Nova Aplicação");
+        .is("resume_viewed_at", null);
     }
 
     const { data, error } = await supabase.storage.from("resumes").createSignedUrl(person.resume_url, 60);
@@ -803,6 +846,7 @@ export function CandidateProfileModal({
       let experiencesData: ProfileExperience[] = [];
       let interviewsData: ProfileInterview[] = [];
       let candidateInterviewsData: CandidateInterview[] = [];
+      let applicationsData: CandidateApplication[] = [];
       let loadError = "";
 
       // 1. Resolver dados da Pessoa
@@ -888,6 +932,16 @@ export function CandidateProfileModal({
       if (targetCandId) {
         const { data } = await supabase.from("candidate_interviews").select("*").eq("candidate_id", targetCandId).order("created_at", { ascending: false });
         if (data) candidateInterviewsData = data;
+      }
+
+      // 3b. Buscar as Candidaturas — fonte da Etapa e do agrupamento do histórico (ADR 0006).
+      if (targetCandId) {
+        const { data } = await supabase
+          .from("job_applications")
+          .select("id, status, created_at, job_requests(position_title, requested_role)")
+          .eq("candidate_id", targetCandId)
+          .order("created_at", { ascending: false });
+        if (data) applicationsData = data as unknown as CandidateApplication[];
       }
 
       // 4. Buscar formações e experiências
@@ -980,6 +1034,7 @@ export function CandidateProfileModal({
       setExperiences(extractedExp);
       setInterviews(interviewsData);
       setCandidateInterviews(candidateInterviewsData);
+      setApplications(applicationsData);
       setLoading(false);
     };
 
@@ -1864,7 +1919,7 @@ export function CandidateProfileModal({
                         <h2 className="text-2xl font-bold">Histórico de Etapas</h2>
                         {/* Efeito da etapa escolhida: o status é derivado, não digitado. */}
                         <span className="rounded-full border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
-                          Status atual: {deriveCandidateStatus(candidateInterviews).status}
+                          Status atual: {candidateStatusFromApplications(applications, person ?? {}).status}
                         </span>
                       </div>
                       {/* O histórico grava direto em candidate_interviews, sem passar pelo
@@ -1889,7 +1944,7 @@ export function CandidateProfileModal({
                               onChange={e => setHistoryForm(prev => ({ ...prev, stage: e.target.value }))}
                             >
                               <option value="">Selecione...</option>
-                              {(level >= 2 ? STAGE_OPTIONS : LIMITED_STAGE_OPTIONS).map((stage: string) => (
+                              {(level >= 2 ? STAGES : LIMITED_STAGE_OPTIONS).map((stage: string) => (
                                 <option key={stage} value={stage}>{stage}</option>
                               ))}
                             </select>
@@ -1974,48 +2029,62 @@ export function CandidateProfileModal({
                         <p className="font-medium text-foreground">Nenhum histórico de etapas registrado na Central.</p>
                       </div>
                     ) : (
-                      <div className="relative border-l-2 border-muted ml-3 space-y-8 pb-4">
-                        {candidateInterviews.map((ci, idx) => (
-                          <div key={ci.id} className="relative pl-6">
-                            <div className="absolute w-3.5 h-3.5 bg-primary rounded-full -left-[9px] top-1.5 ring-4 ring-background" />
-                            <div className="bg-card border rounded-xl p-4 shadow-sm space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-base text-foreground">{ci.stage}</span>
-                                <div className="flex items-center gap-2">
-                                  {ci.created_by_name && (
-                                    <span className="group/author relative inline-flex items-center text-muted-foreground">
-                                      <FileText className="h-4 w-4" aria-label="Autor do registro" />
-                                      <span className="pointer-events-none absolute right-0 top-6 z-10 w-max max-w-56 rounded-md bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow transition-opacity delay-[3000ms] group-hover/author:opacity-100">
-                                        Criado por {ci.created_by_name}
-                                      </span>
-                                    </span>
-                                  )}
-                                  <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
-                                    {new Date(ci.created_at).toLocaleDateString('pt-BR')}
-                                  </span>
+                      <div className="space-y-8">
+                        {historyGroups.map((group) => (
+                          <div key={group.key} className="space-y-4">
+                            <div className="flex flex-wrap items-center gap-2 border-b pb-2">
+                              <h3 className="font-bold text-foreground">{group.title}</h3>
+                              {group.etapaAtual && (
+                                <span className="rounded-full border bg-card px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                                  Etapa atual: {group.etapaAtual}
+                                </span>
+                              )}
+                            </div>
+                            <div className="relative border-l-2 border-muted ml-3 space-y-8 pb-4">
+                              {group.interviews.map((ci) => (
+                                <div key={ci.id} className="relative pl-6">
+                                  <div className="absolute w-3.5 h-3.5 bg-primary rounded-full -left-[9px] top-1.5 ring-4 ring-background" />
+                                  <div className="bg-card border rounded-xl p-4 shadow-sm space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-base text-foreground">{ci.stage}</span>
+                                      <div className="flex items-center gap-2">
+                                        {ci.created_by_name && (
+                                          <span className="group/author relative inline-flex items-center text-muted-foreground">
+                                            <FileText className="h-4 w-4" aria-label="Autor do registro" />
+                                            <span className="pointer-events-none absolute right-0 top-6 z-10 w-max max-w-56 rounded-md bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow transition-opacity delay-[3000ms] group-hover/author:opacity-100">
+                                              Criado por {ci.created_by_name}
+                                            </span>
+                                          </span>
+                                        )}
+                                        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
+                                          {new Date(ci.created_at).toLocaleDateString('pt-BR')}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {(ci.workplace_name || ci.interviewer_name) && (
+                                      <p className="text-sm text-muted-foreground flex gap-3">
+                                        {ci.workplace_name && <span><Building2 className="inline h-3.5 w-3.5 mr-1" /> {ci.workplace_name}</span>}
+                                        {ci.interviewer_name && <span><User className="inline h-3.5 w-3.5 mr-1" /> {ci.interviewer_name}</span>}
+                                      </p>
+                                    )}
+                                    {ci.candidate_future && (
+                                      <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Futuro do candidato:</span> {ci.candidate_future}</p>
+                                    )}
+                                    {ci.notes && (
+                                      <div className="mt-2 text-sm bg-muted/40 p-3 rounded-lg border">
+                                        <span className="font-semibold block mb-1">Observações:</span>
+                                        {ci.notes}
+                                      </div>
+                                    )}
+                                    {ci.rejection_reason && (
+                                      <div className="mt-2 text-sm bg-rose-500/10 text-rose-800 p-3 rounded-lg border border-rose-500/20">
+                                        <span className="font-semibold block mb-1">Motivo Reprovação / Desistência:</span>
+                                        {ci.rejection_reason}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                              {(ci.workplace_name || ci.interviewer_name) && (
-                                <p className="text-sm text-muted-foreground flex gap-3">
-                                  {ci.workplace_name && <span><Building2 className="inline h-3.5 w-3.5 mr-1" /> {ci.workplace_name}</span>}
-                                  {ci.interviewer_name && <span><User className="inline h-3.5 w-3.5 mr-1" /> {ci.interviewer_name}</span>}
-                                </p>
-                              )}
-                              {ci.candidate_future && (
-                                <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Futuro do candidato:</span> {ci.candidate_future}</p>
-                              )}
-                              {ci.notes && (
-                                <div className="mt-2 text-sm bg-muted/40 p-3 rounded-lg border">
-                                  <span className="font-semibold block mb-1">Observações:</span>
-                                  {ci.notes}
-                                </div>
-                              )}
-                              {ci.rejection_reason && (
-                                <div className="mt-2 text-sm bg-rose-500/10 text-rose-800 p-3 rounded-lg border border-rose-500/20">
-                                  <span className="font-semibold block mb-1">Motivo Reprovação / Desistência:</span>
-                                  {ci.rejection_reason}
-                                </div>
-                              )}
+                              ))}
                             </div>
                           </div>
                         ))}

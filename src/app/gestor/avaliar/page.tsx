@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import type { Stage } from "@/lib/stages";
 
 import {
   CheckCircle2, XCircle, FileText, Briefcase, GraduationCap,
@@ -30,7 +31,7 @@ type Application = {
   notes: string | null;
   job_request_id: string | null;
   candidates: Candidate | null;
-  manager_decision: string | null;
+
   job_requests?: {
     position_title: string;
     requested_role: string;
@@ -41,21 +42,14 @@ type Application = {
   } | null;
 };
 
-type Interview = {
-  id: string;
-  candidate_id: string;
-  selection_stage?: string;
-  interview_date?: string;
-  notes?: string;
-  candidates?: { professional_summary: string | null; experience_summary: string | null }[] | null;
-};
-
-const STAGES_FOR_MANAGER = ["Entrevista Gestor", "Entrevista com Gestor", "Entrevista com a Gestão"];
+// A Etapa é uma só, e é a canônica de `src/lib/stages.ts` (ADR 0006). Antes eram três
+// grafias lidas aqui, nenhuma das quais alguma tela gravava em `job_applications.status` —
+// por isso esta fila vinha sempre vazia.
+const STAGE_DO_GESTOR: Stage = "Entrevista Gestor";
 
 export default function PortalGestorPage() {
   const supabase = createClient();
   const [applications, setApplications] = useState<Application[]>([]);
-  const [interviews, setInterviews] = useState<Interview[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -67,32 +61,22 @@ export default function PortalGestorPage() {
     setLoading(true);
     setError("");
 
-    // Busca candidatos em fase "Entrevista Gestor" via job_applications
+    // A Etapa mora em `job_applications.status` e se lê direto, sem derivação (ADR 0006).
     const { data: apps, error: appsErr } = await supabase
       .from("job_applications")
       .select(`
-        id, candidate_id, status, match_score, notes, job_request_id, manager_decision,
+        id, candidate_id, status, match_score, notes, job_request_id,
         candidates (id, full_name, email, phone, city, state, role_interest, resume_url),
         job_requests (position_title, requested_role, requester_name, required_requirements, desired_requirements, manager_expectations)
       `)
-      .in("status", STAGES_FOR_MANAGER)
+      .eq("status", STAGE_DO_GESTOR)
       .order("created_at", { ascending: true });
 
     if (appsErr) {
-      // Fallback: se a tabela estiver vazia, busca de candidate_interviews com estágio gestor
-      const { data: interviewList, error: intErr } = await supabase
-        .from("candidate_interviews")
-        // O resumo do currículo mora em `candidates`; `candidate_interviews` nunca teve
-        // colunas de resumo (o select antigo apontava para colunas inexistentes).
-        .select("id, candidate_id, selection_stage, interview_date, notes, candidates (professional_summary, experience_summary)")
-        .in("selection_stage", STAGES_FOR_MANAGER)
-        .order("interview_date", { ascending: false });
-
-      if (intErr) {
-        setError("Não há candidatos na fila do gestor no momento.");
-      } else {
-        setInterviews((interviewList ?? []) as Interview[]);
-      }
+      // O fallback que existia aqui lia `candidate_interviews.selection_stage` e
+      // `.interview_date`, duas colunas que nunca existiram: ele nunca teve como devolver
+      // nada. Erro de consulta agora é erro, e aparece.
+      setError("Erro ao carregar a fila do gestor: " + appsErr.message);
       setLoading(false);
       return;
     }
@@ -145,15 +129,20 @@ export default function PortalGestorPage() {
       return;
     }
 
-    // Atualiza o status da candidatura
-    const nextStatus = decision === "Aprovado"
-      ? "Testagem Psicológica"
-      : "Reprovado";
+    // A Etapa canônica é o único lugar onde o desfecho é gravado. `manager_decision` sai:
+    // `manager_evaluations` (acima) já registra a decisão, indexada por `application_id`, e
+    // é a cópia que sobrevive — a coluna cai na Fase 3.
+    const nextStatus: Stage = decision === "Aprovado" ? "Testagem Psicológica" : "Reprovado";
 
-    await supabase
+    const { error: stageErr } = await supabase
       .from("job_applications")
-      .update({ status: nextStatus, manager_decision: decision })
+      .update({ status: nextStatus })
       .eq("id", current.id);
+
+    if (stageErr) {
+      // Etapa Terminal não volta atrás, e o banco recusa. Avisar em vez de fingir que foi.
+      setError("Avaliação salva, mas a etapa não avançou: " + stageErr.message);
+    }
 
     setDecided(prev => ({ ...prev, [current.id]: decision }));
     setComment("");
@@ -177,7 +166,7 @@ export default function PortalGestorPage() {
   }
 
   // --- Estado sem candidatos ---
-  if (applications.length === 0 && interviews.length === 0) {
+  if (applications.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/20 p-8">
         <Card className="max-w-md w-full text-center">

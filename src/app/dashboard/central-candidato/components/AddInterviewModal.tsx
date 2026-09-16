@@ -21,7 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { STAGE_OPTIONS, UNLOCK_STAGES } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { isTerminalStage } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { STAGES } from "@/lib/stages";
 
 // Rótulos mais longos que o valor gravado — o valor continua vindo de STAGE_OPTIONS.
 const STAGE_LABELS: Record<string, string> = {
@@ -301,7 +302,7 @@ export default function AddInterviewModal({
       workplaces.find((w) => w.id === workplaceId)?.name
         ?.trim()
         .toLowerCase() !== (currentWorkplace || "").trim().toLowerCase() &&
-      !UNLOCK_STAGES.includes(stage)
+      !isTerminalStage(stage)
   );
 
   return (
@@ -339,7 +340,7 @@ export default function AddInterviewModal({
                   <SelectValue placeholder="Selecione a etapa" />
                 </SelectTrigger>
                 <SelectContent>
-                  {STAGE_OPTIONS.map((option: string) => (
+                  {STAGES.map((option: string) => (
                     <SelectItem key={option} value={option}>{STAGE_LABELS[option] || option}</SelectItem>
                   ))}
                 </SelectContent>
@@ -354,7 +355,7 @@ export default function AddInterviewModal({
                   onValueChange={(val) => setWorkplaceId(val || "")}
                   open={workplaceOpen}
                   onOpenChange={(open) => { setWorkplaceOpen(open); if (open) setStageOpen(false); }}
-                  disabled={(isLocked && !UNLOCK_STAGES.includes(stage)) || loadingWorkplaces}
+                  disabled={(isLocked && !isTerminalStage(stage)) || loadingWorkplaces}
                   required
                 >
                   <SelectTrigger>

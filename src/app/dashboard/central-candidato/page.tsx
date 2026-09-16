@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { Fragment, useEffect, useState, useMemo } from "react";
 import { cn, errorMessage } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { createClient } from "@/utils/supabase/client";
-import { Search, Loader2, Contact, RefreshCw, Plus, Trash2, AlertCircle, Briefcase, CheckCircle2, Users, UserCheck, Funnel, ChevronRight } from "lucide-react";
+import { Search, Loader2, Contact, RefreshCw, Plus, Trash2, AlertCircle, Briefcase, CheckCircle2, Users, UserCheck, Funnel, ChevronRight, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
@@ -12,7 +12,7 @@ import AdvanceStageModal from "./components/AdvanceStageModal";
 import RecusaModal from "./components/RecusaModal";
 import { useRouter } from "next/navigation";
 import {
-  resolveCandidateStatus,
+  candidateStatusFromApplications,
   latestEducationDegree,
   candidateBucket,
   BUCKET_ORDER,
@@ -29,6 +29,28 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+// Formato bruto do embed `job_applications(...)`: o Supabase tipa relação sem schema gerado
+// como array, mesmo sendo N:1 na prática — normalizamos antes de repassar à lógica pura.
+type RawApplication = {
+  id: string;
+  status: string;
+  created_at: string | null;
+  job_requests?: { position_title?: string | null; requested_role?: string | null } | { position_title?: string | null; requested_role?: string | null }[] | null;
+  job_openings?:
+    | { workplace_id?: string | null; workplaces?: { name?: string | null } | { name?: string | null }[] | null }
+    | { workplace_id?: string | null; workplaces?: { name?: string | null } | { name?: string | null }[] | null }[]
+    | null;
+};
+
+// Uma linha de `job_applications` para o detalhamento das Candidaturas (aba expandida).
+type ApplicationRow = {
+  id: string;
+  status: string;
+  created_at: string | null;
+  vaga: string | null;
+  obra: string | null;
+};
+
 type CandidateRow = {
   id: string;
   full_name: string;
@@ -42,9 +64,10 @@ type CandidateRow = {
   bucket: Bucket;
   is_new?: boolean;
   contactsVisible: boolean;
+  applications: ApplicationRow[];
 };
 
-type Bucket = "todos" | "livre" | "entrevista" | "encaminhado" | "obras" | "proposta" | "documentacao" | "contratacao" | "encerrado";
+type Bucket = "todos" | "livre" | "entrevista" | "obras" | "proposta" | "documentacao" | "mp" | "contratacao" | "encerrado";
 
 // Cor por balde para leitura rápida na tabela.
 const BUCKET_STYLE: Record<string, string> = {
@@ -63,6 +86,8 @@ export default function CentralCandidatoPage() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<Bucket>("todos");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  // Linha aberta para ver todas as Candidaturas do candidato, não só a mais recente.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
@@ -111,7 +136,7 @@ export default function CentralCandidatoPage() {
           available_worksites,
           candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, candidate_future, created_at),
           candidate_educations(candidate_id, degree, start_date, end_date),
-          job_applications(id, status)
+          job_applications(id, status, created_at, job_requests(position_title, requested_role), job_openings(workplace_id, workplaces(name)))
         `)
         .order('created_at', { ascending: false });
 
@@ -130,26 +155,25 @@ export default function CentralCandidatoPage() {
           if (ints) interviewsData = ints;
         }
 
-        // Situação da entrevista mais recente: contratado/entrevista agendada não podem
-        // cair no balde "Livres". Chaveia por candidate_id e, para as linhas antigas que
-        // ainda não têm o vínculo, por e-mail. A ordem do select já traz a mais nova primeiro.
-        const progressByKey = new Map<string, { status: string; result: string; destination: string }>();
-        for (const i of interviewsData) {
-          const progresso = {
-            status: i.status || "Aguardando",
-            result: i.result || "N/C",
-            destination: i.destination || "",
-          };
-          for (const chave of [i.candidate_id, i.email]) {
-            if (chave && !progressByKey.has(chave)) progressByKey.set(chave, progresso);
-          }
-        }
-
         const rows: CandidateRow[] = data.map((c) => {
-          const derived = resolveCandidateStatus({
-            ...c,
-            interview_progress: progressByKey.get(c.id) ?? (c.email ? progressByKey.get(c.email) ?? null : null),
+          // O select embute job_requests/job_openings como array (é assim que o Supabase
+          // tipa embed sem schema gerado); a Candidatura é sempre de UMA vaga/obra, então
+          // achata para objeto antes de entregar à lógica pura.
+          const applicationsLike = (c.job_applications ?? []).map((app) => {
+            const raw = app as unknown as RawApplication;
+            const jobRequest = Array.isArray(raw.job_requests) ? raw.job_requests[0] ?? null : raw.job_requests ?? null;
+            const opening = Array.isArray(raw.job_openings) ? raw.job_openings[0] : raw.job_openings;
+            const workplace = opening ? (Array.isArray(opening.workplaces) ? opening.workplaces[0] : opening.workplaces) : null;
+            return {
+              id: raw.id,
+              status: raw.status,
+              created_at: raw.created_at ?? null,
+              job_requests: jobRequest,
+              job_openings: opening ? { workplaces: workplace ?? null } : null,
+            };
           });
+
+          const derived = candidateStatusFromApplications(applicationsLike, c);
           const finalStatus = derived.status;
           const finalChamado = derived.ultimo_chamado;
 
@@ -166,7 +190,15 @@ export default function CentralCandidatoPage() {
             if (assessmentDegree) break;
           }
 
-          const hasNewApplication = Array.isArray(c.job_applications) && c.job_applications.some((app: any) => app.status === "Nova Aplicação");
+          const hasNewApplication = applicationsLike.some((app) => app.status === "Nova");
+
+          const applications: ApplicationRow[] = applicationsLike.map((app) => ({
+            id: app.id,
+            status: app.status,
+            created_at: app.created_at,
+            vaga: app.job_requests?.position_title || app.job_requests?.requested_role || null,
+            obra: app.job_openings?.workplaces?.name ?? null,
+          }));
 
           return {
             id: c.id,
@@ -181,6 +213,7 @@ export default function CentralCandidatoPage() {
             bucket: candidateBucket(finalStatus, derived.etapa_atual),
             is_new: hasNewApplication,
             contactsVisible: canDisplayCandidateContacts(c.candidate_interviews),
+            applications,
           };
         });
         setCandidates(rows);
@@ -334,6 +367,7 @@ export default function CentralCandidatoPage() {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted-foreground uppercase bg-muted/30 border-b border-border/50">
               <tr>
+                <th className="w-8 px-2 py-4 font-medium" aria-label="Expandir" />
                 <th className="px-6 py-4 font-medium">Nome</th>
                 <th className="px-6 py-4 font-medium">Contato</th>
                 <th className="px-6 py-4 font-medium">Escolaridade</th>
@@ -345,24 +379,40 @@ export default function CentralCandidatoPage() {
             <tbody className="divide-y divide-border/50">
               {loading ? (
                 <tr>
-                  <td colSpan={canDelete ? 6 : 5} className="px-6 py-12 text-center">
+                  <td colSpan={canDelete ? 7 : 6} className="px-6 py-12 text-center">
                     <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mb-2" />
                     <p className="text-muted-foreground">Carregando candidatos...</p>
                   </td>
                 </tr>
               ) : filteredCandidates.length === 0 ? (
                 <tr>
-                  <td colSpan={canDelete ? 6 : 5} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={canDelete ? 7 : 6} className="px-6 py-12 text-center text-muted-foreground">
                     Nenhum candidato encontrado.
                   </td>
                 </tr>
               ) : (
                 filteredCandidates.map((candidate) => (
+                  <Fragment key={candidate.id}>
                   <tr
                     key={candidate.id}
                     className="hover:bg-muted/30 transition-colors cursor-pointer group"
                     onClick={() => setSelectedCandidateId(candidate.id)}
                   >
+                    <td className="px-2 py-4 text-center">
+                      {candidate.applications.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedId((cur) => (cur === candidate.id ? null : candidate.id));
+                          }}
+                          className="text-muted-foreground hover:text-foreground"
+                          title="Ver todas as candidaturas"
+                        >
+                          {expandedId === candidate.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                      )}
+                    </td>
                     <td className="px-6 py-4 font-medium text-foreground relative">
                       {candidate.is_new && (
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-red-500 shadow-sm" title="Nova Inscrição Não Lida" />
@@ -492,6 +542,35 @@ export default function CentralCandidatoPage() {
                       </div>
                     </td>
                   </tr>
+                  {expandedId === candidate.id && (
+                    <tr key={`${candidate.id}-hist`} className="bg-muted/20">
+                      <td />
+                      <td colSpan={canDelete ? 6 : 5} className="px-6 py-3">
+                        {/* Todas as Candidaturas do candidato — a linha principal mostra só a mais recente. */}
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          {candidate.applications
+                            .slice()
+                            .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+                            .map((app) => (
+                              <li
+                                key={app.id}
+                                className="flex flex-wrap items-center gap-2 cursor-pointer hover:text-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCandidateId(candidate.id);
+                                }}
+                              >
+                                <span className="font-medium text-foreground">{app.vaga || "Vaga não informada"}</span>
+                                <span>· {app.obra || "Sem obra"}</span>
+                                <span>· {app.status}</span>
+                                {app.created_at && <span>· {new Date(app.created_at).toLocaleDateString("pt-BR")}</span>}
+                              </li>
+                            ))}
+                        </ul>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))
               )}
             </tbody>
