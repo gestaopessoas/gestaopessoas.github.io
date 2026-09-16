@@ -253,6 +253,15 @@ function TestContent() {
           </div>
         )}
 
+        {/* O BFI-44 é feito de fragmentos sem sujeito ("Gosta de conversar, é
+            comunicativa"), que completam este enunciado. A concordância no feminino
+            vem de "pessoa", não do gênero de quem responde: sem o enunciado à vista,
+            o item lido isolado parece dirigido a uma mulher. Não reescrever os itens
+            — são de instrumento validado (Roiz Junior et al. 2023). */}
+        <p className="mb-4 text-base font-medium text-foreground">
+          Eu me vejo como uma pessoa que...
+        </p>
+
         <div className="space-y-6">
           {currentQuestions.map((q, idx) => (
             <div key={q.id} className="rounded-lg border bg-card p-6 shadow-sm">

@@ -21,3 +21,17 @@ export const maskCep = (value: string) => {
   if (digits.length <= 5) return digits;
   return `${digits.slice(0, 5)}-${digits.slice(5)}`;
 };
+
+// Número de endereço não é numérico puro: "123A" e "S/N" são válidos.
+// Restringe a dígitos, letras e barra — o suficiente para barrar texto corrido.
+export const maskAddressNumber = (value: string) => value.replace(/[^\dA-Za-z/]/g, "").slice(0, 10);
+
+export const maskUf = (value: string) => value.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 2);
+
+// Telefone brasileiro: 10 dígitos (fixo) ou 11 (celular com o 9).
+export const isValidPhone = (value: string) => [10, 11].includes(onlyDigits(value).length);
+
+// O nome do arquivo vem do dispositivo do candidato e vira caminho no Supabase
+// Storage. Espaço, acento, parêntese e separador de path ("../") viram hífen; o
+// UUID que acompanha o caminho garante unicidade sem depender do nome.
+export const safeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80);
