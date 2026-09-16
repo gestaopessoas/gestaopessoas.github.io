@@ -257,26 +257,26 @@ function EmployeePersonality({ employeeId }: { employeeId: string }) {
   );
 }
 
-const PHOTO_PURPOSES: { key: "aniversario" | "admissao"; label: string }[] = [
+// As mesmas chaves valem como `?tipo=` no link de /enviar-foto e como pasta no bucket.
+const PHOTO_PURPOSES: { key: string; label: string }[] = [
+  { key: "perfil", label: "Perfil" },
   { key: "aniversario", label: "Aniversário" },
   { key: "admissao", label: "Admissão" },
 ];
 
 function EmployeePhotoLinks({ employeeId }: { employeeId: string }) {
-  const [files, setFiles] = useState<Record<string, { name: string }[]>>({ aniversario: [], admissao: [] });
+  const [files, setFiles] = useState<Record<string, { name: string }[]>>({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
-    const [aniversario, admissao] = await Promise.all([
-      supabase.storage.from("employee-photos").list(`${employeeId}/aniversario`),
-      supabase.storage.from("employee-photos").list(`${employeeId}/admissao`),
-    ]);
-    setFiles({
-      aniversario: (aniversario.data ?? []).filter((f) => f.name && f.id),
-      admissao: (admissao.data ?? []).filter((f) => f.name && f.id),
-    });
+    const listas = await Promise.all(
+      PHOTO_PURPOSES.map(({ key }) => supabase.storage.from("employee-photos").list(`${employeeId}/${key}`))
+    );
+    setFiles(Object.fromEntries(
+      PHOTO_PURPOSES.map(({ key }, i) => [key, (listas[i].data ?? []).filter((f) => f.name && f.id)])
+    ));
     setLoading(false);
   }, [employeeId]);
 
@@ -301,12 +301,12 @@ function EmployeePhotoLinks({ employeeId }: { employeeId: string }) {
     window.open(data.signedUrl, "_blank");
   };
 
-  const total = files.aniversario.length + files.admissao.length;
+  const total = PHOTO_PURPOSES.reduce((soma, { key }) => soma + (files[key]?.length ?? 0), 0);
 
   return (
     <details className="rounded-md border p-3">
       <summary className="cursor-pointer font-medium flex items-center gap-2">
-        <ImageUp className="w-4 h-4 text-muted-foreground" /> Fotos (Aniversário/Admissão) ({total})
+        <ImageUp className="w-4 h-4 text-muted-foreground" /> Fotos (Perfil/Aniversário/Admissão) ({total})
       </summary>
       <div className="mt-3 space-y-4">
         {loading ? (
@@ -320,10 +320,10 @@ function EmployeePhotoLinks({ employeeId }: { employeeId: string }) {
                   <LinkIcon className="w-3 h-3 mr-1" /> Copiar link
                 </Button>
               </div>
-              {files[key].length === 0 ? (
+              {(files[key]?.length ?? 0) === 0 ? (
                 <p className="text-xs italic text-muted-foreground">Nenhuma foto enviada ainda.</p>
               ) : (
-                files[key].map((f) => (
+                files[key]!.map((f) => (
                   <div key={f.name} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm">
                     <span className="truncate">{f.name}</span>
                     <Button type="button" size="sm" variant="ghost" onClick={() => viewFile(key, f.name)}>Ver</Button>

@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
 import { CheckCircle2, ImageUp } from "lucide-react";
+import { compressImage } from "@/lib/imageCompress.mjs";
 
+// Mesmas chaves que PHOTO_PURPOSES na ficha do colaborador — elas viram pasta no bucket.
 const PURPOSE_LABELS: Record<string, string> = {
+  perfil: "perfil",
   aniversario: "aniversário",
   admissao: "admissão",
 };
@@ -32,13 +35,20 @@ export default function EnviarFotoPage() {
     setSending(true);
     setError("");
     const supabase = createClient();
-    const path = `${employeeId}/${purpose}/${crypto.randomUUID()}-${file.name}`;
+    // Redimensiona e recomprime antes de subir: foto de celular chega com 3 a 12 MB e o RH
+    // só olha na tela. Se o navegador não decodificar (HEIC fora do Safari), volta o original.
+    const { blob, contentType } = await compressImage(file);
+    // A extensão vem do que saiu do compressor, não do que entrou: WebP gravado como .jpg
+    // confunde quem baixa o arquivo depois pela ficha.
+    const baseName = file.name.replace(/\.[^.]+$/, "");
+    const ext = contentType.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+    const path = `${employeeId}/${purpose}/${crypto.randomUUID()}-${baseName}.${ext}`;
     // O bucket só aceita image/* (migration 20260916200000). Foto tirada na hora pelo celular
     // às vezes chega com `File.type` vazio; sem este palpite o Storage assumiria
     // application/octet-stream e recusaria uma foto boa.
     const { error: uploadError } = await supabase.storage
       .from("employee-photos")
-      .upload(path, file, { contentType: file.type || "image/jpeg" });
+      .upload(path, blob, { contentType });
     setSending(false);
     if (uploadError) {
       setError("Não foi possível enviar a foto: " + uploadError.message);
