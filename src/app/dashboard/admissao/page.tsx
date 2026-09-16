@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from "@/utils/supabase/client";
 import { CheckCircle2, Circle, FileText, Search, ShieldCheck, Check, Clock, Upload, ExternalLink, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { Stage } from "@/lib/stages";
 
 type Admission = {
   id: string;
@@ -34,13 +35,23 @@ const checklist = [
   "Contrato assinado",
 ];
 
-const doneByStatus: Record<string, number> = {
-  "Nova Aplicação": 1,
+// Quantos passos da admissão já estão vencidos, por Etapa da candidatura. As chaves são as
+// Etapas canônicas (ADR 0006) — "Nova Aplicação" era um sexto vocabulário, e some.
+const doneByStatus: Record<Stage, number> = {
+  Nova: 1,
   Triagem: 1,
   "Entrevista RH": 2,
   "Entrevista Gestor": 2,
+  "Testagem Psicológica": 2,
+  "Aguardando Obra": 2,
+  "Em Avaliação na Obra": 2,
+  "Em Obra": 2,
   Proposta: 3,
+  "Documentação": 4,
+  "Processo de MP": 4,
   Contratado: 5,
+  Reprovado: 0,
+  Desistente: 0,
 };
 
 // New types for the documentation phase
@@ -388,7 +399,9 @@ export default function AdmissaoDigitalPage() {
               {!loading && filteredItems.length === 0 && <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhuma admissão encontrada.</CardContent></Card>}
 
               {filteredItems.map((item) => {
-                const done = doneByStatus[item.status ?? ""] ?? 1;
+                // Etapa fora da lista canônica não deveria existir (o `check` do banco
+                // barra), mas se aparecer dado legado a barra começa do zero em vez de quebrar.
+                const done = doneByStatus[item.status as Stage] ?? 1;
                 const percent = Math.round((done / checklist.length) * 100);
                 return (
                   <Card key={item.id}>
@@ -406,7 +419,7 @@ export default function AdmissaoDigitalPage() {
                     <CardContent className="grid gap-5 md:grid-cols-[180px_1fr]">
                       <div>
                         <div className="text-3xl font-semibold">{percent}%</div>
-                        <p className="mt-1 text-sm text-muted-foreground">{item.status || "Nova Aplicação"}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{item.status || "Nova"}</p>
                         <p className="mt-3 text-sm text-muted-foreground">{item.candidate?.email || "E-mail não informado"}</p>
                         <p className="text-sm text-muted-foreground">{item.candidate?.phone || "Telefone não informado"}</p>
                       </div>

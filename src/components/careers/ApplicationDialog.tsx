@@ -290,7 +290,9 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
 
     const { error: applicationError } = await withRetry(() => supabase
       .from("job_applications")
-      .insert({ candidate_id: candidateId, job_opening_id: job.id, status: "Nova Aplicação" }));
+      // A Etapa canônica do topo do funil (ADR 0006). Era "Nova Aplicação", grafia que só esta
+      // tela usava e que o trigger de tradução da Fase 1 convertia — o trigger morre na Fase 3.
+      .insert({ candidate_id: candidateId, job_opening_id: job.id, status: "Nova" }));
 
     setSaving(false);
     if (applicationError) {

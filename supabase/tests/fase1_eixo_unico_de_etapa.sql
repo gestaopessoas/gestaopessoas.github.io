@@ -9,17 +9,22 @@
 BEGIN;
 
 -- Cenario
+-- ON CONFLICT porque o banco local pode ja ter esse cenario semeado a mao para olhar as
+-- telas no navegador. O teste nao exige banco limpo: exige estas linhas existindo.
 INSERT INTO public.workplaces (id, name) VALUES
   ('11111111-1111-1111-1111-111111111111', 'Obra Alfa'),
-  ('22222222-2222-2222-2222-222222222222', 'Obra Beta');
+  ('22222222-2222-2222-2222-222222222222', 'Obra Beta')
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.job_openings (id, status, workplace_id) VALUES
   ('aaaaaaaa-0000-0000-0000-000000000001', 'Aberta', '11111111-1111-1111-1111-111111111111'),
   ('aaaaaaaa-0000-0000-0000-000000000002', 'Aberta', '11111111-1111-1111-1111-111111111111'),
-  ('aaaaaaaa-0000-0000-0000-000000000003', 'Aberta', '22222222-2222-2222-2222-222222222222');
+  ('aaaaaaaa-0000-0000-0000-000000000003', 'Aberta', '22222222-2222-2222-2222-222222222222')
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.candidates (id, first_name, last_name, email, full_name) VALUES
-  ('cccccccc-0000-0000-0000-000000000001', 'Fulano', 'de Teste', 'fulano@teste.local', 'Fulano de Teste');
+  ('cccccccc-0000-0000-0000-000000000001', 'Fulano', 'de Teste', 'fulano@teste.local', 'Fulano de Teste')
+ON CONFLICT (id) DO NOTHING;
 
 DO $t$
 DECLARE
@@ -27,17 +32,40 @@ DECLARE
   v_status text;
   v_hist int;
   v_erro text;
+  -- O trigger de traducao morre na Fase 3 (20260916130000). Enquanto ele vive, grafia velha
+  -- entra e sai canonica; depois dele, grafia velha simplesmente nao entra mais. Os dois
+  -- comportamentos sao corretos -- cada um na sua fase --, entao o teste pergunta em qual esta.
+  v_traduz boolean := EXISTS (
+    SELECT 1 FROM pg_trigger
+     WHERE tgname = 'trg_job_applications_1_traduz_etapa' AND NOT tgisinternal
+  );
 BEGIN
-  -- 1. INSERT com grafia velha vira Etapa canonica
-  INSERT INTO public.job_applications (candidate_id, job_opening_id, status)
-  VALUES ('cccccccc-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'Nova Aplicação')
-  RETURNING id INTO v_app;
+  -- 1. Grafia velha: traduzida enquanto o trigger vive, recusada depois dele
+  IF v_traduz THEN
+    INSERT INTO public.job_applications (candidate_id, job_opening_id, status)
+    VALUES ('cccccccc-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'Nova Aplicação')
+    RETURNING id INTO v_app;
 
-  SELECT status INTO v_status FROM public.job_applications WHERE id = v_app;
-  ASSERT v_status = 'Nova', format('1. esperava Nova, veio %s', v_status);
+    SELECT status INTO v_status FROM public.job_applications WHERE id = v_app;
+    ASSERT v_status = 'Nova', format('1. esperava Nova, veio %s', v_status);
+  ELSE
+    BEGIN
+      INSERT INTO public.job_applications (candidate_id, job_opening_id, status)
+      VALUES ('cccccccc-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'Nova Aplicação');
+      RAISE EXCEPTION '1. sem o trigger de traducao, a grafia velha deveria ser recusada';
+    EXCEPTION WHEN check_violation THEN
+      NULL;
+    END;
 
-  -- 2. UPDATE com grafia velha colapsa, e grava historico
-  UPDATE public.job_applications SET status = 'Em proposta' WHERE id = v_app;
+    INSERT INTO public.job_applications (candidate_id, job_opening_id, status)
+    VALUES ('cccccccc-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'Nova')
+    RETURNING id INTO v_app;
+  END IF;
+
+  -- 2. Avancar grava historico. A grafia velha so e aceita enquanto o trigger traduz.
+  UPDATE public.job_applications
+     SET status = CASE WHEN v_traduz THEN 'Em proposta' ELSE 'Proposta' END
+   WHERE id = v_app;
   SELECT status INTO v_status FROM public.job_applications WHERE id = v_app;
   ASSERT v_status = 'Proposta', format('2. esperava Proposta, veio %s', v_status);
 
@@ -45,13 +73,15 @@ BEGIN
    WHERE job_application_id = v_app AND stage = 'Proposta';
   ASSERT v_hist = 1, format('2. esperava 1 linha de historico, veio %s', v_hist);
 
-  -- 3. Valor que deixou de ser Etapa nao move a Etapa
-  UPDATE public.job_applications SET status = 'Banco de Talentos' WHERE id = v_app;
-  SELECT status INTO v_status FROM public.job_applications WHERE id = v_app;
-  ASSERT v_status = 'Proposta', format('3. esperava Proposta preservada, veio %s', v_status);
+  -- 3. Valor que deixou de ser Etapa nao move a Etapa (so vale com o trigger de traducao)
+  IF v_traduz THEN
+    UPDATE public.job_applications SET status = 'Banco de Talentos' WHERE id = v_app;
+    SELECT status INTO v_status FROM public.job_applications WHERE id = v_app;
+    ASSERT v_status = 'Proposta', format('3. esperava Proposta preservada, veio %s', v_status);
 
-  SELECT count(*) INTO v_hist FROM public.candidate_interviews WHERE job_application_id = v_app;
-  ASSERT v_hist = 1, format('3. historico nao deveria crescer, veio %s', v_hist);
+    SELECT count(*) INTO v_hist FROM public.candidate_interviews WHERE job_application_id = v_app;
+    ASSERT v_hist = 1, format('3. historico nao deveria crescer, veio %s', v_hist);
+  END IF;
 
   -- 4. Outra Candidatura na MESMA Obra passa
   INSERT INTO public.job_applications (candidate_id, job_opening_id, status)
@@ -100,7 +130,8 @@ $t$;
 
 -- 9. Backfill: entrevista orfa vira Candidatura Espontanea na Obra certa
 INSERT INTO public.candidates (id, first_name, last_name, email, full_name) VALUES
-  ('cccccccc-0000-0000-0000-000000000002', 'Beltrano', 'Espontaneo', 'beltrano@teste.local', 'Beltrano Espontaneo');
+  ('cccccccc-0000-0000-0000-000000000002', 'Beltrano', 'Espontaneo', 'beltrano@teste.local', 'Beltrano Espontaneo')
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.candidate_interviews (candidate_id, stage, workplace_name)
 VALUES ('cccccccc-0000-0000-0000-000000000002', 'Proposta Pendente', ' obra alfa ');
@@ -158,7 +189,8 @@ $b$;
 
 -- 10. Precedencia do sinal de reprovacao, com a query real da migration
 INSERT INTO public.candidates (id, first_name, last_name, email, full_name) VALUES
-  ('cccccccc-0000-0000-0000-000000000003', 'Cicrano', 'Reprovado', 'cicrano@teste.local', 'Cicrano Reprovado');
+  ('cccccccc-0000-0000-0000-000000000003', 'Cicrano', 'Reprovado', 'cicrano@teste.local', 'Cicrano Reprovado')
+ON CONFLICT (id) DO NOTHING;
 
 -- stage diz Proposta Pendente, mas o destino explicito diz Descartado: destino vence.
 INSERT INTO public.candidate_interviews (candidate_id, stage, workplace_name)
