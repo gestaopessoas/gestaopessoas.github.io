@@ -169,11 +169,18 @@ export function candidateStatusFromApplications(applications = [], candidate = {
     sameStage(a?.status, "Contratado")
   );
 
+  const referencia = atualAtiva ?? contratada ?? atualQualquer;
+
   const base = {
-    obra_atual: obraDaCandidatura(atualAtiva ?? contratada ?? atualQualquer) || candidate.city || null,
-    ultimo_chamado: chamadoDaCandidatura(atualAtiva ?? contratada ?? atualQualquer),
-    candidatura_id: (atualAtiva ?? contratada ?? atualQualquer)?.id ?? null,
+    obra_atual: obraDaCandidatura(referencia) || candidate.city || null,
+    ultimo_chamado: chamadoDaCandidatura(referencia),
+    candidatura_id: referencia?.id ?? null,
     total_candidaturas: Array.isArray(applications) ? applications.length : 0,
+    // O motivo só vale quando a Candidatura de referência está em Reprovado/Desistente: em
+    // quem foi reprovado numa obra e hoje está em processo em outra, o motivo antigo na tela
+    // nova seria mentira.
+    motivo_saida: motivoDoDesfecho(referencia),
+    motivo_detalhe: motivoDoDesfecho(referencia) ? referencia?.outcome_details ?? null : null,
   };
 
   if (atualAtiva) {
@@ -189,6 +196,16 @@ export function candidateStatusFromApplications(applications = [], candidate = {
     etapa_atual: atualQualquer?.status ?? null,
     ...base,
   };
+}
+
+/**
+ * Motivo do desfecho, e só quando a Candidatura realmente terminou em Reprovado ou
+ * Desistente. Contratado não tem motivo, e Candidatura em andamento também não.
+ */
+function motivoDoDesfecho(app) {
+  if (!app) return null;
+  if (!sameStage(app.status, "Reprovado") && !sameStage(app.status, "Desistente")) return null;
+  return app.outcome_reason ?? null;
 }
 
 function obraDaCandidatura(app) {

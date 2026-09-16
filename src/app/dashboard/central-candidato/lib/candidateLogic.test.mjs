@@ -182,3 +182,25 @@ test("o fim do funil não vira beco sem saída silencioso", () => {
   assert.deepEqual(nextStageOptions("contratacao"), []);
   assert.ok(nextStageOptions("documentacao").length > 0);
 });
+
+test("o motivo do desfecho só aparece em quem realmente saiu", () => {
+  const reprovada = {
+    id: "a",
+    status: "Reprovado",
+    created_at: "2026-09-10",
+    outcome_reason: "Expectativa salarial acima da faixa",
+    outcome_details: "pediu 20% acima do teto",
+  };
+
+  const saiu = candidateStatusFromApplications([reprovada], {});
+  assert.equal(saiu.status, "Banco de Talentos");
+  assert.equal(saiu.motivo_saida, "Expectativa salarial acima da faixa");
+  assert.equal(saiu.motivo_detalhe, "pediu 20% acima do teto");
+
+  // Reprovado numa obra e em processo em outra: mostrar o motivo velho seria mentira.
+  const emProcesso = { id: "b", status: "Entrevista RH", created_at: "2026-09-14" };
+  const voltou = candidateStatusFromApplications([reprovada, emProcesso], {});
+  assert.equal(voltou.status, "Em Processo");
+  assert.equal(voltou.motivo_saida, null);
+  assert.equal(voltou.motivo_detalhe, null);
+});

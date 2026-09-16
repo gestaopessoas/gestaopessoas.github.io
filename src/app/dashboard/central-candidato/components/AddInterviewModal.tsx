@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { isTerminalStage } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { STAGES } from "@/lib/stages";
+import { fetchInterviewers, type Interviewer } from "@/lib/interviewers";
 
 // Rótulos mais longos que o valor gravado — o valor continua vindo de STAGE_OPTIONS.
 const STAGE_LABELS: Record<string, string> = {
@@ -44,14 +45,6 @@ type Workplace = {
   id: string;
   name: string;
   type: string | null;
-};
-
-type Interviewer = {
-  id: string;
-  name: string;
-  role: string | null;
-  /** "obra" = liderança lotada na obra escolhida; "rh" = Gestão de Pessoas/RH, entrevista para qualquer obra. */
-  origem: "obra" | "rh";
 };
 
 export default function AddInterviewModal({
@@ -102,31 +95,6 @@ export default function AddInterviewModal({
 
   const supabase = createClient();
 
-  // Gestão de Pessoas / RH entrevista para qualquer obra — não depende de lotação.
-  const hrRoles = [
-    "gestão de pessoas",
-    "gestao de pessoas",
-    "recursos humanos",
-    "de rh",
-    "psicólog",
-    "psicolog",
-  ];
-
-  // Roles that can conduct interviews in obras
-  const interviewRoles = [
-    "coordenador de obras",
-    "mestre de obras",
-    "analista técnico",
-    "analista técnico(a) - obras",
-    "encarregado",
-    "supervisor(a) administrativo(a)",
-    "diretor operacional",
-    "gestor",
-    "gerente",
-    "coordenador",
-    "administrativo de obras",
-  ];
-
   // Load workplaces on mount
   useEffect(() => {
     async function loadWorkplaces() {
@@ -169,39 +137,9 @@ export default function AddInterviewModal({
       setLoadingInterviewers(true);
       setInterviewersError(false);
       try {
-        // Match flexible: tolera variação de grafia/acento no texto livre de employees.role
-        const leadershipFilters = interviewRoles.map((r) => `role.ilike.%${r}%`).join(",");
-        const hrFilters = hrRoles.map((r) => `role.ilike.%${r}%`).join(",");
-
-        // Duas consultas: lideranças são restritas à obra, RH não é.
-        const [obraRes, hrRes] = await Promise.all([
-          supabase
-            .from("employees")
-            .select("id, name, role")
-            .eq("status", "Ativo")
-            .eq("workplace_id", workplaceId)
-            .or(leadershipFilters),
-          supabase
-            .from("employees")
-            .select("id, name, role")
-            .eq("status", "Ativo")
-            .or(hrFilters),
-        ]);
-        if (obraRes.error) throw obraRes.error;
-        if (hrRes.error) throw hrRes.error;
+        const lista = await fetchInterviewers(supabase, workplaceId);
         if (!atual) return;
-
-        // RH depois da obra: se a pessoa é das duas, prevalece "obra" (está lotada ali).
-        const porId = new Map<string, Interviewer>();
-        for (const e of hrRes.data ?? []) porId.set(e.id, { ...e, origem: "rh" });
-        for (const e of obraRes.data ?? []) porId.set(e.id, { ...e, origem: "obra" });
-
-        setInterviewers(
-          [...porId.values()].sort(
-            (a, b) =>
-              a.origem.localeCompare(b.origem) || a.name.localeCompare(b.name, "pt-BR")
-          )
-        );
+        setInterviewers(lista);
       } catch (err) {
         console.error("Error loading interviewers:", err);
         if (atual) setInterviewersError(true);

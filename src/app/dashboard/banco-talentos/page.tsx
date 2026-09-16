@@ -12,6 +12,7 @@ import { candidateStatusFromApplications, latestEducationDegree } from "@/app/da
 import { errorMessage } from "@/lib/utils";
 import { fetchInterviewProgress } from "@/lib/candidateHistory.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
+import { OUTCOME_STYLE, isOutcome } from "@/lib/outcomes";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,8 @@ type CandidateRow = {
   role_interest: string;
   status: string;
   etapa_atual: string | null;
+  motivo_saida: string | null;
+  motivo_detalhe: string | null;
   obras: string;
   tags: string[];
   raw_data: { available_worksites?: string[] | null };
@@ -96,7 +99,7 @@ export default function BancoTalentosPage() {
           available_worksites,
           candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, candidate_future, created_at),
           candidate_educations(candidate_id, degree, start_date, end_date),
-          job_applications(id, status, created_at)
+          job_applications(id, status, created_at, outcome_reason, outcome_details)
         `)
         .order('created_at', { ascending: false });
 
@@ -146,11 +149,10 @@ export default function BancoTalentosPage() {
             role_interest: c.role_interest || "Não informado",
             status: finalStatus,
             etapa_atual: derived.etapa_atual,
+            motivo_saida: derived.motivo_saida,
+            motivo_detalhe: derived.motivo_detalhe,
             obras: worksitesStr,
-            // "Banco de Talentos" é marcador de status, não competência — não polui a busca.
-            tags: [...(c.behavioral_tags ?? []), ...(c.search_tags ?? [])].filter(
-              (t: string) => t !== "Banco de Talentos"
-            ),
+            tags: [...(c.behavioral_tags ?? []), ...(c.search_tags ?? [])],
             raw_data: c
           };
         }).filter(c => c.status === "Banco de Talentos");
@@ -305,7 +307,21 @@ export default function BancoTalentosPage() {
                       {candidate.escolaridade}
                     </td>
                     <td className="px-6 py-4 text-xs text-muted-foreground">
-                      {candidate.etapa_atual || "Sem histórico"}
+                      {isOutcome(candidate.etapa_atual) ? (
+                        <>
+                          <span
+                            className={`inline-block rounded px-1.5 py-0.5 font-medium ${OUTCOME_STYLE[candidate.etapa_atual]}`}
+                            title={candidate.motivo_detalhe || undefined}
+                          >
+                            {candidate.etapa_atual}
+                          </span>
+                          {candidate.motivo_saida && (
+                            <div className="mt-1 text-xs text-muted-foreground">{candidate.motivo_saida}</div>
+                          )}
+                        </>
+                      ) : (
+                        candidate.etapa_atual || "Sem histórico"
+                      )}
                     </td>
                     <td className="px-6 py-4 text-xs font-medium text-primary">
                       {candidate.obras}
@@ -356,11 +372,9 @@ export default function BancoTalentosPage() {
               city: data.city || null,
               state: data.state || null,
               role_interest: data.role_interest || data.role || null,
-              // candidates não tem coluna `status`: o status é derivado por
-              // resolveCandidateStatus, que lê a marcação em search_tags. Gravar "status"
-              // aqui quebrava o insert ("Could not find the 'status' column") — e, mesmo
-              // aceito, o candidato não apareceria nesta tela, que filtra pelo derivado.
-              search_tags: ["Banco de Talentos"],
+              // candidates não tem coluna `status`, e não precisa de tag: sem Candidatura
+              // ativa e sem contratação, candidateStatusFromApplications já devolve
+              // "Banco de Talentos" — que é o filtro desta tela.
             }).select("id").single();
             if (error) {
               if (error.code === '23505') alert("Já existe um candidato com este e-mail.");
@@ -407,6 +421,7 @@ export default function BancoTalentosPage() {
           onClose={() => setCandidateToInterview(null)}
           onSuccess={fetchCandidates}
           candidateId={candidateToInterview.id}
+          applicationId={null}
           candidateName={candidateToInterview.name}
           currentBucket="livre"
           currentStage="Banco de Talentos"

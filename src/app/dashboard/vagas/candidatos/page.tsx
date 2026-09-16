@@ -121,20 +121,11 @@ function CandidatosContent() {
 
   useEffect(() => { load(); }, [load]);
 
-  // O modal já grava a etapa na Central (candidate_interviews) e, se for entrevista, agenda
-  // em `interviews`. Aqui só falta refletir o status na candidatura desta vaga.
-  const handleAdvanceSuccess = async (applicant: Applicant) => {
+  // O modal agora move a Etapa na própria Candidatura (recebe `applicationId`) e, se for
+  // entrevista, agenda em `interviews`. O UPDATE que existia aqui repetia o do modal.
+  const handleAdvanceSuccess = (applicant: Applicant) => {
     setApplicantParaEntrevista(null);
-    const { error: updateError } = await createClient()
-      .from("job_applications")
-      .update({ status: "Entrevista RH" })
-      .eq("id", applicant.application_id);
-
-    if (updateError) {
-      toast("Candidato movido para a Central, mas o status da candidatura não pôde ser atualizado.", "error");
-    } else {
-      toast(`${applicant.name} movido para Entrevista RH — agora aparece na Central do Candidato.`, "success");
-    }
+    toast(`${applicant.name} movido para Entrevista RH — agora aparece na Central do Candidato.`, "success");
     setApplicants((prev) => prev.map((a) => (a.application_id === applicant.application_id ? { ...a, stage: "Entrevista RH" } : a)));
     load();
   };
@@ -272,6 +263,7 @@ function CandidatosContent() {
           onClose={() => setApplicantParaEntrevista(null)}
           onSuccess={() => handleAdvanceSuccess(applicantParaEntrevista)}
           candidateId={applicantParaEntrevista.id}
+          applicationId={applicantParaEntrevista.application_id}
           candidateName={applicantParaEntrevista.name}
           currentBucket="livre"
           currentStage={applicantParaEntrevista.stage}

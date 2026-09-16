@@ -33,6 +33,8 @@ export interface ApplicationLike {
   created_at?: string | null;
   job_requests?: { position_title?: string | null; requested_role?: string | null } | null;
   job_openings?: { workplaces?: { name?: string | null } | null; workplace_name?: string | null } | null;
+  outcome_reason?: string | null;
+  outcome_details?: string | null;
 }
 
 export interface CandidateLike {
@@ -46,6 +48,9 @@ export interface CandidateStatus {
   ultimo_chamado: string;
   candidatura_id: string | null;
   total_candidaturas: number;
+  /** Motivo do desfecho, só quando a Candidatura de referência é Reprovado/Desistente. */
+  motivo_saida: string | null;
+  motivo_detalhe: string | null;
 }
 
 export function candidaturaAtual(applications?: ApplicationLike[] | null): ApplicationLike | null;

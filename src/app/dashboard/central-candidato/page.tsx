@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import AdvanceStageModal from "./components/AdvanceStageModal";
-import RecusaModal from "./components/RecusaModal";
+import DesfechoModal from "./components/DesfechoModal";
 import { useRouter } from "next/navigation";
+import { OUTCOME_STYLE, isOutcome, type Outcome } from "@/lib/outcomes";
 import {
   candidateStatusFromApplications,
   latestEducationDegree,
@@ -40,6 +41,8 @@ type RawApplication = {
     | { workplace_id?: string | null; workplaces?: { name?: string | null } | { name?: string | null }[] | null }
     | { workplace_id?: string | null; workplaces?: { name?: string | null } | { name?: string | null }[] | null }[]
     | null;
+  outcome_reason?: string | null;
+  outcome_details?: string | null;
 };
 
 // Uma linha de `job_applications` para o detalhamento das Candidaturas (aba expandida).
@@ -65,6 +68,9 @@ type CandidateRow = {
   is_new?: boolean;
   contactsVisible: boolean;
   applications: ApplicationRow[];
+  candidatura_id: string | null;
+  motivo_saida: string | null;
+  motivo_detalhe: string | null;
 };
 
 type Bucket = "todos" | "livre" | "entrevista" | "obras" | "proposta" | "documentacao" | "mp" | "contratacao" | "encerrado";
@@ -93,8 +99,8 @@ export default function CentralCandidatoPage() {
   const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
-  const [advanceModalData, setAdvanceModalData] = useState<{ id: string; name: string; bucket: string; stage: string | null; workplace: string | null; forcedStage?: string } | null>(null);
-  const [recusaModalData, setRecusaModalData] = useState<{ id: string; name: string; workplace: string | null } | null>(null);
+  const [advanceModalData, setAdvanceModalData] = useState<{ id: string; applicationId: string | null; name: string; bucket: string; stage: string | null; workplace: string | null; forcedStage?: string } | null>(null);
+  const [desfechoModalData, setDesfechoModalData] = useState<{ applicationId: string; name: string; outcome: Outcome; workplace: string | null } | null>(null);
   const { can } = usePermissions();
   const canDelete = can("central_candidato", "delete");
   const canEdit = can("central_candidato", "edit");
@@ -136,7 +142,7 @@ export default function CentralCandidatoPage() {
           available_worksites,
           candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, candidate_future, created_at),
           candidate_educations(candidate_id, degree, start_date, end_date),
-          job_applications(id, status, created_at, job_requests(position_title, requested_role), job_openings(workplace_id, workplaces(name)))
+          job_applications(id, status, created_at, outcome_reason, outcome_details, job_requests(position_title, requested_role), job_openings(workplace_id, workplaces(name)))
         `)
         .order('created_at', { ascending: false });
 
@@ -168,6 +174,8 @@ export default function CentralCandidatoPage() {
               id: raw.id,
               status: raw.status,
               created_at: raw.created_at ?? null,
+              outcome_reason: raw.outcome_reason ?? null,
+              outcome_details: raw.outcome_details ?? null,
               job_requests: jobRequest,
               job_openings: opening ? { workplaces: workplace ?? null } : null,
             };
@@ -214,6 +222,9 @@ export default function CentralCandidatoPage() {
             is_new: hasNewApplication,
             contactsVisible: canDisplayCandidateContacts(c.candidate_interviews),
             applications,
+            candidatura_id: derived.candidatura_id,
+            motivo_saida: derived.motivo_saida,
+            motivo_detalhe: derived.motivo_detalhe,
           };
         });
         setCandidates(rows);
@@ -437,17 +448,31 @@ export default function CentralCandidatoPage() {
                     <td className="px-6 py-4">{candidate.escolaridade}</td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
-                        <span className={`inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${BUCKET_STYLE[candidate.bucket] ?? "bg-primary/10 text-primary"}`}>
-                          {BUCKET_LABELS[candidate.bucket] ?? candidate.status}
-                        </span>
-                        {candidate.bucket === "livre" ? (
-                          <span className="text-xs text-muted-foreground">Disponível para alocação</span>
+                        {candidate.motivo_saida && isOutcome(candidate.etapa_atual) ? (
+                          <>
+                            <span
+                              className={`inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${OUTCOME_STYLE[candidate.etapa_atual]}`}
+                              title={candidate.motivo_detalhe ?? undefined}
+                            >
+                              {candidate.etapa_atual}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{candidate.motivo_saida}</span>
+                          </>
                         ) : (
-                          // etapa_atual é nulo em quem foi encaminhado pela tela de Entrevistas
-                          // sem registro em candidate_interviews — não deixar o separador solto.
-                          <span className="text-xs text-muted-foreground font-medium">
-                            {[candidate.etapa_atual, candidate.obra_atual || "Sem obra"].filter(Boolean).join(" · ")}
-                          </span>
+                          <>
+                            <span className={`inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${BUCKET_STYLE[candidate.bucket] ?? "bg-primary/10 text-primary"}`}>
+                              {BUCKET_LABELS[candidate.bucket] ?? candidate.status}
+                            </span>
+                            {candidate.bucket === "livre" ? (
+                              <span className="text-xs text-muted-foreground">Disponível para alocação</span>
+                            ) : (
+                              // etapa_atual é nulo em quem foi encaminhado pela tela de Entrevistas
+                              // sem registro em candidate_interviews — não deixar o separador solto.
+                              <span className="text-xs text-muted-foreground font-medium">
+                                {[candidate.etapa_atual, candidate.obra_atual || "Sem obra"].filter(Boolean).join(" · ")}
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -466,6 +491,7 @@ export default function CentralCandidatoPage() {
                               e.stopPropagation();
                               setAdvanceModalData({
                                 id: candidate.id,
+                                applicationId: candidate.candidatura_id,
                                 name: candidate.full_name,
                                 bucket: candidate.bucket,
                                 stage: candidate.etapa_atual,
@@ -476,22 +502,40 @@ export default function CentralCandidatoPage() {
                             {candidate.bucket === "livre" ? "Chamar" : "Avançar"}
                           </Button>
                         )}
-                        {candidate.bucket === "obras" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-destructive hover:bg-destructive/10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRecusaModalData({
-                                id: candidate.id,
-                                name: candidate.full_name,
-                                workplace: candidate.obra_atual,
-                              });
-                            }}
-                          >
-                            Recusar
-                          </Button>
+                        {canEdit && candidate.candidatura_id && candidate.bucket !== "contratacao" && candidate.bucket !== "livre" && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:bg-destructive/10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDesfechoModalData({
+                                  applicationId: candidate.candidatura_id!,
+                                  name: candidate.full_name,
+                                  outcome: "Reprovado",
+                                  workplace: candidate.obra_atual,
+                                });
+                              }}
+                            >
+                              Reprovar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDesfechoModalData({
+                                  applicationId: candidate.candidatura_id!,
+                                  name: candidate.full_name,
+                                  outcome: "Desistente",
+                                  workplace: candidate.obra_atual,
+                                });
+                              }}
+                            >
+                              Desistiu
+                            </Button>
+                          </>
                         )}
                         {candidate.bucket === "documentacao" && (
                           <Button
@@ -513,6 +557,7 @@ export default function CentralCandidatoPage() {
                               e.stopPropagation();
                               setAdvanceModalData({
                                 id: candidate.id,
+                                applicationId: candidate.candidatura_id,
                                 name: candidate.full_name,
                                 bucket: candidate.bucket,
                                 stage: candidate.etapa_atual,
@@ -669,6 +714,7 @@ export default function CentralCandidatoPage() {
             fetchCandidates();
           }}
           candidateId={advanceModalData.id}
+          applicationId={advanceModalData.applicationId}
           candidateName={advanceModalData.name}
           currentBucket={advanceModalData.bucket}
           currentStage={advanceModalData.stage}
@@ -677,17 +723,18 @@ export default function CentralCandidatoPage() {
         />
       )}
 
-      {recusaModalData && (
-        <RecusaModal
-          isOpen={!!recusaModalData}
-          onClose={() => setRecusaModalData(null)}
+      {desfechoModalData && (
+        <DesfechoModal
+          isOpen={!!desfechoModalData}
+          onClose={() => setDesfechoModalData(null)}
           onSuccess={() => {
-            setRecusaModalData(null);
+            setDesfechoModalData(null);
             fetchCandidates();
           }}
-          candidateId={recusaModalData.id}
-          candidateName={recusaModalData.name}
-          workplaceName={recusaModalData.workplace}
+          applicationId={desfechoModalData.applicationId}
+          candidateName={desfechoModalData.name}
+          outcome={desfechoModalData.outcome}
+          workplaceName={desfechoModalData.workplace}
         />
       )}
     </div>

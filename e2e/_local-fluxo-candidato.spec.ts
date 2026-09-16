@@ -340,9 +340,10 @@ test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', (
       vagaId = vaga.id;
       await rest('POST', 'job_applications', [{ candidate_id: candidato.id, job_request_id: vagaId }]);
 
-      // A marca e do gatilho no banco, nao da tela: vale para portal, dashboard e importacao.
+      // Nao ha mais tag: Banco de Talentos e consulta derivada (ADR 0006). A prova de que a
+      // pessoa esta la e a tela, verificada logo abaixo.
       const marcado = await candidatoPorNome(NOME);
-      expect(marcado.search_tags, 'candidatar-se nao colocou a pessoa no Banco de Talentos').toContain('Banco de Talentos');
+      expect(marcado.search_tags ?? [], 'a Etapa voltou a ser gravada em search_tags').not.toContain('Banco de Talentos');
 
       await login(page);
       await page.goto('/dashboard/banco-talentos');
