@@ -8,10 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Send, Loader2, ClipboardCheck, Plus, X } from "lucide-react";
-import { useState } from "react";
-import { maskCpf, maskPhone, maskCep, onlyDigits } from "@/lib/masks";
+import { Send, Loader2, ClipboardCheck, Plus, X, Paperclip, CheckCircle2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { maskCpf, maskPhone, maskCep, maskAddressNumber, maskUf, isValidPhone, onlyDigits, safeFileName } from "@/lib/masks";
 import { isValidCpf, maskCurrencyInput } from "@/app/dashboard/colaboradores/lib/employeeFormRules.mjs";
+import { CONSENT_VERSION } from "./consent";
 import type { Career } from "./types";
 
 const MARITAL_STATUS_OPTIONS = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"];
@@ -22,6 +23,23 @@ const EDUCATION_OPTIONS = [
   "Pós-graduação", "Mestrado", "Doutorado",
 ];
 const LANGUAGE_LEVELS = ["Básico", "Intermediário", "Avançado", "Fluente", "Nativo"];
+
+// Dado sensível do art. 11 da LGPD. Texto livre travava o candidato ("escrevo o
+// quê?") e chegava impossível de agregar em indicador. Lista fechada, com
+// "Prefiro não informar" como valor inicial — o preenchimento é voluntário e não
+// entra na avaliação (ver /privacidade).
+const NAO_INFORMAR = "Prefiro não informar";
+const RACE_OPTIONS = [NAO_INFORMAR, "Branca", "Preta", "Parda", "Amarela", "Indígena"];
+const GENDER_OPTIONS = [NAO_INFORMAR, "Mulher cisgênero", "Homem cisgênero", "Mulher transgênero", "Homem transgênero", "Não binária", "Outro"];
+const ORIENTATION_OPTIONS = [NAO_INFORMAR, "Heterossexual", "Homossexual", "Bissexual", "Assexual", "Outro"];
+
+const RESUME_MAX_BYTES = 5 * 1024 * 1024;
+const RESUME_ACCEPT = ".pdf,.doc,.docx";
+const RESUME_EXTENSIONS = ["pdf", "doc", "docx"];
+
+// Idade mínima para contratação (CLT, fora aprendiz). Sem esse teto o campo aceita
+// data futura ou candidato de 3 anos, e o erro só aparece na admissão.
+const MAX_BIRTH_DATE = new Date(Date.now() - 16 * 365.25 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 // Hardening defensivo (não corrige vulnerabilidade real: o insert já é
 // parametrizado via PostgREST). Corta em caracteres de controle e no
@@ -46,11 +64,11 @@ const emptyCandidate = {
   neighborhood: "",
   city: "",
   state: "",
-  gender_identity: "",
-  sexual_orientation: "",
-  race_declaration: "",
+  gender_identity: NAO_INFORMAR,
+  sexual_orientation: NAO_INFORMAR,
+  race_declaration: NAO_INFORMAR,
   salary_expectation: "",
-  has_cnh: false,
+  has_cnh: "" as "" | "sim" | "nao",
   is_pcd: false,
   pcd_description: "",
   has_dependents: false,
@@ -94,6 +112,23 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
   const [cpfError, setCpfError] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
   const [cepError, setCepError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [consentError, setConsentError] = useState("");
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeError, setResumeError] = useState("");
+  const [savedCandidateId, setSavedCandidateId] = useState("");
+  const lastCepLookup = useRef("");
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const cpfRef = useRef<HTMLInputElement>(null);
+  const consentRef = useRef<HTMLDivElement>(null);
+
+  // O botão de envio fica depois de ~35 campos. Sem rolar até o erro, o candidato
+  // clica em Enviar e vê a tela não fazer nada.
+  const focusInvalidField = (ref: React.RefObject<HTMLInputElement | null>) => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    ref.current?.focus({ preventScroll: true });
+  };
 
   const reset = () => {
     setCandidate(emptyCandidate);
@@ -103,6 +138,30 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     setError("");
     setCpfError("");
     setCepError("");
+    setPhoneError("");
+    setConsentAccepted(false);
+    setConsentError("");
+    setResumeFile(null);
+    setResumeError("");
+    setSavedCandidateId("");
+    lastCepLookup.current = "";
+  };
+
+  const pickResume = (file: File | null) => {
+    setResumeError("");
+    if (!file) { setResumeFile(null); return; }
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!RESUME_EXTENSIONS.includes(ext)) {
+      setResumeError("Formato não aceito. Envie PDF, DOC ou DOCX.");
+      setResumeFile(null);
+      return;
+    }
+    if (file.size > RESUME_MAX_BYTES) {
+      setResumeError("Arquivo acima de 5 MB. Envie uma versão menor.");
+      setResumeFile(null);
+      return;
+    }
+    setResumeFile(file);
   };
 
   const update = <K extends keyof typeof emptyCandidate>(field: K, value: typeof emptyCandidate[K]) => {
@@ -112,6 +171,10 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
   const lookupCep = async (rawCep: string) => {
     const digits = onlyDigits(rawCep);
     if (digits.length !== 8) return;
+    // Dispara no onChange, então o mesmo CEP chega a cada tecla depois do oitavo
+    // dígito. Sem essa guarda o ViaCEP leva uma consulta por tecla.
+    if (digits === lastCepLookup.current) return;
+    lastCepLookup.current = digits;
     setCepLoading(true);
     setCepError("");
     try {
@@ -159,9 +222,33 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
 
     if (candidate.cpf && !isValidCpf(candidate.cpf)) {
       setCpfError("CPF inválido.");
+      focusInvalidField(cpfRef);
       return;
     }
     setCpfError("");
+
+    // A máscara garante que só entra dígito, mas não que o número está completo:
+    // "(53) 9982" passa pela máscara e chega ao banco como telefone inútil.
+    if (!isValidPhone(candidate.phone)) {
+      setPhoneError("Telefone incompleto. Informe DDD e número.");
+      focusInvalidField(phoneRef);
+      return;
+    }
+    if (candidate.secondary_phone && !isValidPhone(candidate.secondary_phone)) {
+      setPhoneError("Telefone secundário incompleto.");
+      focusInvalidField(phoneRef);
+      return;
+    }
+    setPhoneError("");
+
+    // Consentimento não registrado é consentimento que não aconteceu: sem o
+    // timestamp gravado não há como provar o aceite se ele for questionado.
+    if (!consentAccepted) {
+      setConsentError("É preciso aceitar a Política de Privacidade para enviar a candidatura.");
+      consentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    setConsentError("");
     setSaving(true);
     setError("");
 
@@ -184,6 +271,22 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     // client evita depender de ler a linha de volta.
     let candidateId = crypto.randomUUID();
     let isExistingCandidate = false;
+
+    // Upload antes do insert porque `resume_url` vai na mesma linha. Se falhar,
+    // aborta sem gravar: o formulário continua preenchido na tela, então o
+    // candidato tenta de novo sem perder nada do que digitou.
+    let resumePath: string | null = null;
+    if (resumeFile) {
+      const upload = await supabase.storage
+        .from("resumes")
+        .upload(`${candidateId}/${crypto.randomUUID()}-${safeFileName(resumeFile.name)}`, resumeFile);
+      if (upload.error) {
+        setResumeError("Não foi possível enviar o currículo: " + upload.error.message);
+        setSaving(false);
+        return;
+      }
+      resumePath = upload.data.path;
+    }
     const { error: candidateError } = await withRetry(() => supabase
       .from("candidates")
       .insert({
@@ -191,13 +294,16 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         full_name: sanitizeText(candidate.full_name, 200),
         first_name: sanitizeText(firstName || "", 100),
         last_name: sanitizeText(lastParts.join(" ") || firstName || "", 100),
-        email: sanitizeText(candidate.email, 255),
+        email: sanitizeText(candidate.email, 255) || null,
         secondary_email: sanitizeText(candidate.secondary_email, 255) || null,
         phone: sanitizeText(candidate.phone, 20) || null,
         secondary_phone: sanitizeText(candidate.secondary_phone, 20) || null,
         city: sanitizeText(candidate.city, 100) || null,
         state: sanitizeText(candidate.state, 50) || null,
         linkedin_url: sanitizeText(candidate.linkedin_url, 500) || null,
+        resume_url: resumePath,
+        consent_accepted_at: new Date().toISOString(),
+        consent_version: CONSENT_VERSION,
         birth_date: candidate.birth_date || null,
         cpf: onlyDigits(candidate.cpf) || null,
         birthplace: sanitizeText(candidate.birthplace, 200) || null,
@@ -208,11 +314,13 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         address_complement: sanitizeText(candidate.address_complement, 100) || null,
         neighborhood: sanitizeText(candidate.neighborhood, 150) || null,
         experience_summary: sanitizeText(experienceSummary, 2000) || null,
-        gender_identity: sanitizeText(candidate.gender_identity, 200) || null,
-        sexual_orientation: sanitizeText(candidate.sexual_orientation, 200) || null,
-        race_declaration: sanitizeText(candidate.race_declaration, 200) || null,
+        gender_identity: candidate.gender_identity === NAO_INFORMAR ? null : sanitizeText(candidate.gender_identity, 200) || null,
+        sexual_orientation: candidate.sexual_orientation === NAO_INFORMAR ? null : sanitizeText(candidate.sexual_orientation, 200) || null,
+        race_declaration: candidate.race_declaration === NAO_INFORMAR ? null : sanitizeText(candidate.race_declaration, 200) || null,
         salary_expectation: sanitizeText(candidate.salary_expectation, 50) || null,
-        has_cnh: candidate.has_cnh,
+        // Vazio = não respondeu. A coluna é nullable, então "não informou" não
+        // vira "não tem" — que era o efeito do default "Não" na tela.
+        has_cnh: candidate.has_cnh === "" ? null : candidate.has_cnh === "sim",
         is_pcd: candidate.is_pcd,
         pcd_description: candidate.is_pcd ? sanitizeText(candidate.pcd_description, 500) || null : null,
         has_dependents: candidate.has_dependents,
@@ -231,12 +339,18 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       // e segue só pro vínculo com a vaga. find_candidate_id_by_email só devolve o id,
       // nunca dados pessoais (anon não tem SELECT em candidates).
       if (candidateError.code === "23505") {
-        const { data: existingId } = await supabase.rpc("find_candidate_id_by_email", {
-          p_email: sanitizeText(candidate.email, 255),
-        });
+        // Sem e-mail, o par de reconhecimento é o telefone — que é obrigatório e
+        // validado. Ordem de casamento do ADR 0010: e-mail, depois telefone.
+        const { data: existingId } = candidate.email
+          ? await supabase.rpc("find_candidate_id_by_email", { p_email: sanitizeText(candidate.email, 255) })
+          : await supabase.rpc("find_candidate_id_by_phone", { p_phone: sanitizeText(candidate.phone, 20) });
         if (!existingId) {
           setSaving(false);
-          setError("Este e-mail já está cadastrado em uma candidatura. Use outro e-mail ou avise o RH.");
+          setError(
+            candidate.email
+              ? "Este e-mail já está cadastrado em uma candidatura. Use outro e-mail ou avise o RH."
+              : "Este telefone já está cadastrado em uma candidatura. Avise o RH."
+          );
           return;
         }
         candidateId = existingId as string;
@@ -307,9 +421,10 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       return;
     }
 
-    onOpenChange(false);
-    reset();
-    window.location.assign(`/candidato/teste-personalidade?candidate_id=${candidateId}`);
+    // Antes daqui a candidatura já está gravada. Redirecionar direto para o teste
+    // fazia o modal sumir sem confirmar nada: quem fechava a aba no questionário
+    // acreditava ter perdido a inscrição.
+    setSavedCandidateId(candidateId);
   };
 
   return (
@@ -318,29 +433,93 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         <DialogHeader>
           <DialogTitle>Candidatar-se a {job?.profile?.title || "esta vaga"}</DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-1.5">
-            <span>Etapa 1 de 2: seus dados.</span>
-            <span className="inline-flex items-center gap-1 font-medium text-primary"><ClipboardCheck className="h-3.5 w-3.5" /> Ao enviar, você segue direto para o teste de perfil.</span>
+            {savedCandidateId ? (
+              <span>Candidatura registrada.</span>
+            ) : (
+              <>
+                <span>Etapa 1 de 2: seus dados.</span>
+                <span className="inline-flex items-center gap-1 font-medium text-primary"><ClipboardCheck className="h-3.5 w-3.5" /> Depois do envio vem um questionário de perfil, de 5 a 10 minutos.</span>
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
+        {savedCandidateId ? (
+          <div className="space-y-5 py-4 text-center">
+            <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+            <div className="space-y-2">
+              <h3 className="text-xl font-semibold">Sua candidatura foi registrada</h3>
+              <p className="text-sm text-muted-foreground">
+                Você já está inscrito em {job?.profile?.title || "esta vaga"}. Nada mais é obrigatório
+                a partir daqui — o RH consegue ver seus dados.
+              </p>
+            </div>
+            <div className="rounded-md border bg-muted/40 p-4 text-left text-sm">
+              <p className="font-medium">Próxima etapa, opcional: mapeamento de perfil</p>
+              <p className="mt-1 text-muted-foreground">
+                44 afirmações curtas, de 5 a 10 minutos. Não há resposta certa ou errada. Responder
+                ajuda o recrutador a entender seu estilo de trabalho, e você pode deixar para depois.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                className="w-full"
+                onClick={() => window.location.assign(`/candidato/teste-personalidade?candidate_id=${savedCandidateId}`)}
+              >
+                <ClipboardCheck className="mr-2 h-4 w-4" />
+                Responder agora
+              </Button>
+              <Button type="button" variant="outline" className="w-full" onClick={() => { onOpenChange(false); reset(); }}>
+                Responder depois
+              </Button>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={submit} className="space-y-6">
           {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-6">
+              <FormSection title="Currículo" description="Anexe seu currículo em PDF, DOC ou DOCX, até 5 MB. É opcional, mas ajuda o recrutador.">
+                <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border border-dashed border-input px-4 py-6 text-center text-sm hover:bg-muted/40">
+                  <Paperclip className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">{resumeFile ? resumeFile.name : "Escolher arquivo"}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {resumeFile ? `${(resumeFile.size / 1024 / 1024).toFixed(1)} MB — toque para trocar` : "PDF, DOC ou DOCX"}
+                  </span>
+                  <input
+                    type="file"
+                    className="sr-only"
+                    accept={RESUME_ACCEPT}
+                    disabled={!job}
+                    onChange={(event) => pickResume(event.target.files?.[0] ?? null)}
+                  />
+                </label>
+                {resumeFile && (
+                  <button type="button" className="text-xs text-muted-foreground underline underline-offset-2" onClick={() => pickResume(null)}>
+                    Remover currículo
+                  </button>
+                )}
+                {resumeError && <p role="alert" className="text-xs text-destructive">{resumeError}</p>}
+              </FormSection>
+
               <FormSection title="Dados pessoais">
                 <Field label="Nome completo *"><Input required disabled={!job} value={candidate.full_name} onChange={(event) => update("full_name", event.target.value)} /></Field>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Field label="E-mail *"><Input required disabled={!job} type="email" value={candidate.email} onChange={(event) => update("email", event.target.value)} /></Field>
+                  <Field label="E-mail"><Input disabled={!job} type="email" value={candidate.email} onChange={(event) => update("email", event.target.value)} /></Field>
                   <Field label="E-mail secundário"><Input disabled={!job} type="email" value={candidate.secondary_email} onChange={(event) => update("secondary_email", event.target.value)} /></Field>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Field label="Telefone *"><Input required disabled={!job} inputMode="numeric" placeholder="(00) 00000-0000" value={candidate.phone} onChange={(event) => update("phone", maskPhone(event.target.value))} /></Field>
-                  <Field label="Telefone secundário"><Input disabled={!job} inputMode="numeric" placeholder="(00) 00000-0000" value={candidate.secondary_phone} onChange={(event) => update("secondary_phone", maskPhone(event.target.value))} /></Field>
+                  <Field label="Telefone *">
+                    <Input ref={phoneRef} required disabled={!job} inputMode="numeric" placeholder="(00) 00000-0000" value={candidate.phone} onChange={(event) => { setPhoneError(""); update("phone", maskPhone(event.target.value)); }} aria-invalid={!!phoneError} />
+                    {phoneError && <p role="alert" className="text-xs text-destructive">{phoneError}</p>}
+                  </Field>
+                  <Field label="Telefone secundário"><Input disabled={!job} inputMode="numeric" placeholder="(00) 00000-0000" value={candidate.secondary_phone} onChange={(event) => { setPhoneError(""); update("secondary_phone", maskPhone(event.target.value)); }} /></Field>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Field label="Data de nascimento"><Input type="date" value={candidate.birth_date} onChange={(event) => update("birth_date", event.target.value)} /></Field>
+                  <Field label="Data de nascimento"><Input type="date" min="1930-01-01" max={MAX_BIRTH_DATE} value={candidate.birth_date} onChange={(event) => update("birth_date", event.target.value)} /></Field>
                   <Field label="CPF">
-                    <Input inputMode="numeric" placeholder="000.000.000-00" value={candidate.cpf} onChange={(event) => { setCpfError(""); update("cpf", maskCpf(event.target.value)); }} aria-invalid={!!cpfError} />
+                    <Input ref={cpfRef} inputMode="numeric" placeholder="000.000.000-00" value={candidate.cpf} onChange={(event) => { setCpfError(""); update("cpf", maskCpf(event.target.value)); }} aria-invalid={!!cpfError} />
                     {cpfError && <p role="alert" className="text-xs text-destructive">{cpfError}</p>}
                   </Field>
                 </div>
@@ -360,7 +539,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="CEP">
                     <div className="relative">
-                      <Input inputMode="numeric" placeholder="00000-000" value={candidate.cep} onChange={(event) => { setCepError(""); update("cep", maskCep(event.target.value)); }} onBlur={(event) => lookupCep(event.target.value)} />
+                      <Input inputMode="numeric" placeholder="00000-000" value={candidate.cep} onChange={(event) => { setCepError(""); const masked = maskCep(event.target.value); update("cep", masked); lookupCep(masked); }} />
                       {cepLoading && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
                     </div>
                     {cepError && <p className="text-xs text-destructive">{cepError}</p>}
@@ -369,12 +548,12 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                 </div>
                 <Field label="Logradouro"><Input value={candidate.address} onChange={(event) => update("address", event.target.value)} /></Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Número"><Input value={candidate.address_number} onChange={(event) => update("address_number", event.target.value)} /></Field>
+                  <Field label="Número"><Input inputMode="numeric" value={candidate.address_number} onChange={(event) => update("address_number", maskAddressNumber(event.target.value))} /></Field>
                   <Field label="Complemento"><Input value={candidate.address_complement} onChange={(event) => update("address_complement", event.target.value)} /></Field>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Cidade"><Input disabled={!job} value={candidate.city} onChange={(event) => update("city", event.target.value)} /></Field>
-                  <Field label="UF"><Input disabled={!job} maxLength={2} value={candidate.state} onChange={(event) => update("state", event.target.value.toUpperCase())} /></Field>
+                  <Field label="UF"><Input disabled={!job} maxLength={2} value={candidate.state} onChange={(event) => update("state", maskUf(event.target.value))} /></Field>
                 </div>
               </FormSection>
             </div>
@@ -395,7 +574,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                       )}
                     </div>
                   ))}
-                  <Button type="button" variant="outline" size="sm" onClick={addEducationRow}><Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar escolaridade</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={addEducationRow}><Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar outra formação</Button>
                 </div>
 
                 <div className="space-y-2">
@@ -412,7 +591,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                       <Textarea rows={2} placeholder="Conte um pouco das atividades" value={row.description} onChange={(event) => updateExperienceRow(index, "description", event.target.value)} />
                     </div>
                   ))}
-                  <Button type="button" variant="outline" size="sm" onClick={addExperienceRow}><Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar experiência</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={addExperienceRow}><Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar outra experiência</Button>
                 </div>
 
                 <div className="space-y-2">
@@ -429,22 +608,35 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                       )}
                     </div>
                   ))}
-                  <Button type="button" variant="outline" size="sm" onClick={addLanguageRow}><Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar idioma</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={addLanguageRow}><Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar outro idioma</Button>
                 </div>
               </FormSection>
 
               <FormSection title="Perfil complementar">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Field label="Autodeclaração de gênero"><Input value={candidate.gender_identity} onChange={(event) => update("gender_identity", event.target.value)} /></Field>
-                  <Field label="Orientação sexual"><Input value={candidate.sexual_orientation} onChange={(event) => update("sexual_orientation", event.target.value)} /></Field>
+                  <Field label="Autodeclaração de gênero">
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.gender_identity} onChange={(event) => update("gender_identity", event.target.value)}>
+                      {GENDER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Orientação sexual">
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.sexual_orientation} onChange={(event) => update("sexual_orientation", event.target.value)}>
+                      {ORIENTATION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </Field>
                 </div>
-                <Field label="Autodeclaração de raça"><Input value={candidate.race_declaration} onChange={(event) => update("race_declaration", event.target.value)} /></Field>
+                <Field label="Autodeclaração de raça">
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.race_declaration} onChange={(event) => update("race_declaration", event.target.value)}>
+                      {RACE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </Field>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Pretensão salarial"><Input value={candidate.salary_expectation} onChange={(event) => update("salary_expectation", maskCurrencyInput(event.target.value))} /></Field>
                   <Field label="Possui CNH?">
-                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.has_cnh ? "sim" : "nao"} onChange={(event) => update("has_cnh", event.target.value === "sim")}>
-                      <option value="nao">Não</option>
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.has_cnh} onChange={(event) => update("has_cnh", event.target.value as "" | "sim" | "nao")}>
+                      <option value="">Selecione...</option>
                       <option value="sim">Sim</option>
+                      <option value="nao">Não</option>
                     </select>
                   </Field>
                 </div>
@@ -471,11 +663,28 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
             </div>
           </div>
 
+          <div ref={consentRef} className="rounded-md border border-border p-4">
+            <label className="flex items-start gap-3 text-sm">
+              <Checkbox className="mt-0.5" checked={consentAccepted} onCheckedChange={(checked) => { setConsentError(""); setConsentAccepted(checked === true); }} aria-invalid={!!consentError} />
+              <span>
+                Li e aceito a{" "}
+                <a href="/privacidade/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                  Política de Privacidade
+                </a>
+                , e autorizo a ACPO Empreendimentos a tratar meus dados para este processo seletivo
+                e para o banco de talentos. Raça, gênero, orientação sexual e condição de PcD são de
+                preenchimento opcional.
+              </span>
+            </label>
+            {consentError && <p role="alert" className="mt-2 text-xs text-destructive">{consentError}</p>}
+          </div>
+
           <Button type="submit" className="w-full" size="lg" disabled={!job || saving}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            {saving ? "Enviando..." : "Enviar candidatura e continuar para o teste"}
+            {saving ? "Enviando..." : "Enviar candidatura"}
           </Button>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

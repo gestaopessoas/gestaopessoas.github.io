@@ -130,6 +130,16 @@ function JobDetailContent() {
         </div>
         </div>
 
+        {/* O questionário de perfil só aparecia depois de ~35 campos preenchidos.
+            Dizer antes o que vem pela frente evita que a pessoa comece sem saber. */}
+        <div className="rounded-md border bg-muted/40 p-4 text-sm">
+          <p className="font-medium">Como é a candidatura</p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
+            <li>Seus dados e, se quiser, o currículo em PDF. Só nome e telefone são obrigatórios — e-mail é opcional.</li>
+            <li>Mapeamento de perfil: 44 afirmações curtas, de 5 a 10 minutos. Opcional, e pode ficar para depois — sua candidatura é registrada antes dele.</li>
+          </ol>
+        </div>
+
         <Button size="lg" className="w-full" onClick={() => setIsApplicationOpen(true)}>
           <Send className="mr-2 h-4 w-4" />
           Candidatar-se
