@@ -36,6 +36,19 @@ const ORIENTATION_OPTIONS = [NAO_INFORMAR, "Heterossexual", "Homossexual", "Biss
 const RESUME_MAX_BYTES = 5 * 1024 * 1024;
 const RESUME_ACCEPT = ".pdf,.doc,.docx";
 const RESUME_EXTENSIONS = ["pdf", "doc", "docx"];
+const RESUME_MIME_BY_EXTENSION: Record<string, string> = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+// O bucket `resumes` recusa tipo fora dessa lista (migration 20260916200000). `File.type` vem
+// vazio em parte dos navegadores, principalmente com .doc, então a extensão — que pickResume
+// já validou — manda, e o tipo do navegador é só reserva.
+function resumeMimeType(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return RESUME_MIME_BY_EXTENSION[extension] ?? file.type ?? "application/octet-stream";
+}
 
 // Idade mínima para contratação (CLT, fora aprendiz). Sem esse teto o campo aceita
 // data futura ou candidato de 3 anos, e o erro só aparece na admissão.
@@ -279,7 +292,14 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     if (resumeFile) {
       const upload = await supabase.storage
         .from("resumes")
-        .upload(`${candidateId}/${crypto.randomUUID()}-${safeFileName(resumeFile.name)}`, resumeFile);
+        .upload(
+          `${candidateId}/${crypto.randomUUID()}-${safeFileName(resumeFile.name)}`,
+          resumeFile,
+          // O bucket só aceita os tipos de RESUME_EXTENSIONS. Navegador às vezes entrega
+          // `File.type` vazio (comum com .doc), e aí o Storage assumiria
+          // application/octet-stream e recusaria um currículo válido.
+          { contentType: resumeMimeType(resumeFile) },
+        );
       if (upload.error) {
         setResumeError("Não foi possível enviar o currículo: " + upload.error.message);
         setSaving(false);
