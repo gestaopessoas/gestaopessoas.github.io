@@ -14,7 +14,7 @@ import { DEFAULT_RESUME_MODEL } from "@/lib/resumeModelSettings";
 import { roleChangedOnSavedInterview } from "@/lib/interviewProgress.mjs";
 import { findExistingCandidateId, hasRealEmail, placeholderEmail } from "@/lib/candidateIdentity.mjs";
 import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
-import type { Stage } from "@/lib/stages";
+import { TERMINAL_STAGES, type Stage } from "@/lib/stages";
 
 type PsychologicalTestInput = {
   test_name: string;
@@ -509,8 +509,41 @@ export default function EntrevistasPage() {
 
     // 1b. Toda entrevista tem uma Candidatura por trás (ADR 0006, Fase 2 — issue #57). Esta
     //     tela nunca teve seletor de Vaga publicada — o "Cargo" é desejo, não vaga —, então a
-    //     Candidatura é sempre Espontânea: presa à Obra do parecer, ou ao pool geral sem Obra.
+    //     Candidatura era sempre Espontânea: presa à Obra do parecer, ou ao pool geral sem Obra.
+    //
+    //     Só que quem entra por uma Vaga já tem Candidatura, e abrir uma Espontânea por cima
+    //     gravava o desfecho no lugar errado: o Destino "Contratado" marcava a Espontânea nova
+    //     e deixava a Candidatura da Vaga parada na etapa anterior — vaga com zero contratados
+    //     e candidato eternamente em "Processo de MP". A Candidatura em andamento manda; a
+    //     Espontânea só entra quando não existe nenhuma.
     if (candidateId) {
+      const etapaDaCandidatura = stageFromInterviewProgress({ result: payloadAny.result, destination: destinoEscolhido });
+
+      const { data: emAndamento } = await supabase
+        .from("job_applications")
+        .select("id")
+        .eq("candidate_id", candidateId)
+        .not("status", "in", `(${TERMINAL_STAGES.join(",")})`)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const candidaturaAtiva = emAndamento?.[0]?.id;
+      if (candidaturaAtiva) {
+        const { error: etapaError } = await supabase
+          .from("job_applications")
+          .update({ status: etapaDaCandidatura })
+          .eq("id", candidaturaAtiva);
+        if (etapaError) {
+          fail("Não foi possível gravar a Etapa da candidatura: " + etapaError.message);
+        }
+      } else {
+        await abrirCandidaturaEspontanea(candidateId, etapaDaCandidatura);
+      }
+    }
+
+    // Candidatura Espontânea: o caminho de quem chegou sem Vaga (indicação, currículo na obra,
+    // entrevista aberta pelo recrutador).
+    async function abrirCandidaturaEspontanea(candidateId: string, etapa: Stage) {
       let workplaceId: string | null = null;
       const worksiteName = String(assessmentData.worksite || "").trim();
       if (worksiteName) {
@@ -529,7 +562,6 @@ export default function EntrevistasPage() {
         fail("Não foi possível abrir a candidatura do candidato: " + (publicacaoError?.message || "publicação não encontrada."));
       }
 
-      const etapa = stageFromInterviewProgress({ result: payloadAny.result, destination: destinoEscolhido });
       const { error: candidaturaError } = await supabase
         .from("job_applications")
         // Reaproveita a Candidatura existente do par candidato x Obra em vez de duplicar —
