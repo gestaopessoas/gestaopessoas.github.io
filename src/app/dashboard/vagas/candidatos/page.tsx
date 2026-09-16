@@ -205,13 +205,19 @@ function CandidatosContent() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <Button
-                        variant={applicant.stage === "Nova" || applicant.stage === "Triagem" ? "default" : "outline"}
-                        size="sm"
-                        onClick={(e) => { e.stopPropagation(); setApplicantParaEntrevista(applicant); }}
-                      >
-                        Mover para Entrevista
-                      </Button>
+                      {/* A coluna se chama ETAPA e só mostrava um botão: enquanto a etapa era
+                          derivada e caía em "Nova" para qualquer valor desconhecido, ela não
+                          dizia nada mesmo. Agora é a Etapa da candidatura (ADR 0006). */}
+                      <div className="flex flex-col items-start gap-2">
+                        <span className="text-sm font-medium text-foreground">{applicant.stage}</span>
+                        <Button
+                          variant={applicant.stage === "Nova" || applicant.stage === "Triagem" ? "default" : "outline"}
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); setApplicantParaEntrevista(applicant); }}
+                        >
+                          Mover para Entrevista
+                        </Button>
+                      </div>
                     </td>
                     <td className="px-6 py-4 max-w-sm">
                       {applicant.summary ? (
