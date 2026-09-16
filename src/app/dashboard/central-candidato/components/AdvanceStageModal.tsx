@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { nextStageOptions, isInterviewStage, stageNeedsWorkplace } from "../lib/candidateLogic.mjs";
+import { nextStageOptions, isInterviewStage, stageNeedsWorkplace, sameStage } from "../lib/candidateLogic.mjs";
 import {
   INTERVIEW_OUTCOME_OPTIONS,
   formatInterviewSchedule,
@@ -108,8 +108,10 @@ export default function AdvanceStageModal({
   const router = useRouter();
 
   // So quem esta livre escolhe vaga: quem ja esta em processo tem Candidatura, e trocar a
-  // vaga no meio do funil seria outra Candidatura, nao um avanco.
-  const precisaDeVaga = currentBucket === "livre" && !forcedStage;
+  // vaga no meio do funil seria outra Candidatura, nao um avanco. Etapa "Nova" tambem mora
+  // no balde `livre`, mas ja veio do portal com Candidatura numa vaga — pedir vaga ali
+  // abriria uma segunda Candidatura para a mesma pessoa.
+  const precisaDeVaga = currentBucket === "livre" && !sameStage(currentStage, "Nova") && !forcedStage;
 
   const registroEntrevistaCompleto =
     !entrevistaMarcada ||

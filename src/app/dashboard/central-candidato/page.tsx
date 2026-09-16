@@ -463,7 +463,7 @@ export default function CentralCandidatoPage() {
                             <span className={`inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${BUCKET_STYLE[candidate.bucket] ?? "bg-primary/10 text-primary"}`}>
                               {BUCKET_LABELS[candidate.bucket] ?? candidate.status}
                             </span>
-                            {candidate.bucket === "livre" ? (
+                            {candidate.status === "Banco de Talentos" ? (
                               <span className="text-xs text-muted-foreground">Disponível para alocação</span>
                             ) : (
                               // etapa_atual é nulo em quem foi encaminhado pela tela de Entrevistas
@@ -499,10 +499,12 @@ export default function CentralCandidatoPage() {
                               });
                             }}
                           >
-                            {candidate.bucket === "livre" ? "Chamar" : "Avançar"}
+                            {candidate.status === "Banco de Talentos" ? "Chamar" : "Avançar"}
                           </Button>
                         )}
-                        {canEdit && candidate.candidatura_id && candidate.bucket !== "contratacao" && candidate.bucket !== "livre" && (
+                        {/* Quem está em Banco de Talentos não tem Candidatura ativa para
+                            reprovar; quem está em "Nova" tem, mesmo caindo no balde livre. */}
+                        {canEdit && candidate.candidatura_id && candidate.bucket !== "contratacao" && candidate.status !== "Banco de Talentos" && (
                           <>
                             <Button
                               variant="ghost"

@@ -62,6 +62,8 @@ test("candidateStatusFromApplications: Contratado", () => {
 
 test("candidateBucket separa os baldes que o adm de obra precisa ver", () => {
   assert.equal(candidateBucket("Banco de Talentos", null), "livre");
+  // Candidatura recém-chegada do portal: existe, mas ninguém encostou nela — não é entrevista.
+  assert.equal(candidateBucket("Em Processo", "Nova"), "livre");
   assert.equal(candidateBucket("Em Processo", "Triagem"), "entrevista");
   assert.equal(candidateBucket("Em Processo", "Entrevista Gestor"), "entrevista");
   assert.equal(candidateBucket("Em Processo", "Testagem Psicológica"), "entrevista");
@@ -79,7 +81,6 @@ test("candidateBucket trata terminais e etapa desconhecida", () => {
 
 test("todo balde declarado em BUCKET_ORDER é alcançável", () => {
   for (const bucket of BUCKET_ORDER) {
-    if (bucket === "livre") continue; // derivado do status, não de uma etapa
     const etapas = STAGE_BUCKETS[bucket];
     assert.ok(etapas?.length, `${bucket} não tem etapas mapeadas`);
     for (const etapa of etapas) {

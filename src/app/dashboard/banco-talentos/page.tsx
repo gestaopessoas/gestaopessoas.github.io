@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import AdvanceStageModal from "@/app/dashboard/central-candidato/components/AdvanceStageModal";
-import { candidateStatusFromApplications, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { candidateStatusFromApplications, candidateBucket, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { errorMessage } from "@/lib/utils";
 import { fetchInterviewProgress } from "@/lib/candidateHistory.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
@@ -31,6 +31,7 @@ type CandidateRow = {
   role_interest: string;
   status: string;
   etapa_atual: string | null;
+  candidatura_id: string | null;
   motivo_saida: string | null;
   motivo_detalhe: string | null;
   obras: string;
@@ -57,7 +58,7 @@ export default function BancoTalentosPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [candidateToInterview, setCandidateToInterview] = useState<{ id: string; name: string } | null>(null);
+  const [candidateToInterview, setCandidateToInterview] = useState<{ id: string; name: string; applicationId: string | null; stage: string | null } | null>(null);
   
   const { can } = usePermissions();
   const canDelete = can("central_candidato", "delete");
@@ -149,13 +150,18 @@ export default function BancoTalentosPage() {
             role_interest: c.role_interest || "Não informado",
             status: finalStatus,
             etapa_atual: derived.etapa_atual,
+            candidatura_id: derived.candidatura_id,
             motivo_saida: derived.motivo_saida,
             motivo_detalhe: derived.motivo_detalhe,
             obras: worksitesStr,
             tags: [...(c.behavioral_tags ?? []), ...(c.search_tags ?? [])],
             raw_data: c
           };
-        }).filter(c => c.status === "Banco de Talentos");
+        // Duas populacoes moram aqui: quem nao tem Candidatura ativa (Banco de Talentos de
+        // sempre) e quem acabou de se candidatar pelo portal e esta na Etapa "Nova" — ninguem
+        // do RH encostou nele ainda, entao ele continua disponivel. Este segundo grupo aparece
+        // nas duas telas de proposito: no funil da vaga dele e aqui.
+        }).filter((c) => c.status === "Banco de Talentos" || candidateBucket(c.status, c.etapa_atual) === "livre");
         
         setCandidates(rows);
         setError("");
@@ -328,7 +334,7 @@ export default function BancoTalentosPage() {
                     </td>
                     <td className="sticky right-0 z-10 bg-card px-6 py-4 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]">
                       <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => setCandidateToInterview({ id: candidate.id, name: candidate.full_name })} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Chamar para entrevista">
+                          <Button variant="ghost" size="icon" onClick={() => setCandidateToInterview({ id: candidate.id, name: candidate.full_name, applicationId: candidate.candidatura_id, stage: candidate.etapa_atual })} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Chamar para entrevista">
                               <CalendarPlus className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => setSelectedCandidateId(candidate.id)} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Editar / Ver Dossiê">
@@ -421,10 +427,10 @@ export default function BancoTalentosPage() {
           onClose={() => setCandidateToInterview(null)}
           onSuccess={fetchCandidates}
           candidateId={candidateToInterview.id}
-          applicationId={null}
+          applicationId={candidateToInterview.applicationId}
           candidateName={candidateToInterview.name}
           currentBucket="livre"
-          currentStage="Banco de Talentos"
+          currentStage={candidateToInterview.stage ?? "Banco de Talentos"}
         />
       )}
 
