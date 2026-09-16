@@ -9,7 +9,6 @@ import { createClient } from "@/utils/supabase/client";
 import { calculateMatchScore, MatchResult } from "@/utils/matchScore";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { useToast } from "@/contexts/ToastContext";
-import { normalizeStage } from "../lib/stages";
 import AdvanceStageModal from "@/app/dashboard/central-candidato/components/AdvanceStageModal";
 
 type Applicant = {
@@ -83,7 +82,9 @@ async function fetchJobApplicants(jobId: string) {
       name: c.full_name || [c.first_name, c.last_name].filter(Boolean).join(" ") || "Sem nome",
       email: c.email,
       phone: c.phone,
-      stage: normalizeStage(app.status),
+      // A Etapa se le direto de `job_applications.status` (ADR 0006). `normalizeStage()`
+      // some: nao ha mais valor desconhecido caindo em "Nova".
+      stage: app.status,
       summary: (c.professional_summary || c.experience_summary || "").trim(),
       match_result: calculateMatchScore(cTags, jobTags),
     });
@@ -126,15 +127,15 @@ function CandidatosContent() {
     setApplicantParaEntrevista(null);
     const { error: updateError } = await createClient()
       .from("job_applications")
-      .update({ status: "Entrevista" })
+      .update({ status: "Entrevista RH" })
       .eq("id", applicant.application_id);
 
     if (updateError) {
       toast("Candidato movido para a Central, mas o status da candidatura não pôde ser atualizado.", "error");
     } else {
-      toast(`${applicant.name} movido para Entrevista — agora aparece na Central do Candidato.`, "success");
+      toast(`${applicant.name} movido para Entrevista RH — agora aparece na Central do Candidato.`, "success");
     }
-    setApplicants((prev) => prev.map((a) => (a.application_id === applicant.application_id ? { ...a, stage: "Entrevista" } : a)));
+    setApplicants((prev) => prev.map((a) => (a.application_id === applicant.application_id ? { ...a, stage: "Entrevista RH" } : a)));
     load();
   };
 
