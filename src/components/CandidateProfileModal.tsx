@@ -1071,7 +1071,7 @@ export function CandidateProfileModal({
           {/* flex-wrap + shrink: a 375px os botões Salvar e fechar saíam da tela (QA B1). */}
           <div className="flex shrink-0 items-center gap-2">
             {/* Sempre visível, em qualquer modo: serve para consultar durante a entrevista. */}
-            <GuiaAvaliadorButton triggerClassName="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3" />
+            <GuiaAvaliadorButton candidateId={candidateId ?? resolvedCandidateId} triggerClassName="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3" />
             {/* Travado, "Editar Perfil" não destrava nada: só o botão do overlay libera. */}
             {isEditable && !isEditing && !locked && (
               <Button onClick={() => setIsEditing(true)} variant="outline" size="sm" className="gap-2">
@@ -1826,6 +1826,7 @@ export function CandidateProfileModal({
                     ) : isEditing && canSaveAssessment ? (
                       <CandidateAssessmentTab 
                         assessmentData={assessmentData} 
+                        candidateId={candidateId ?? resolvedCandidateId}
                         isEditing={true} 
                         onChange={handleAssessmentChange} 
                       />

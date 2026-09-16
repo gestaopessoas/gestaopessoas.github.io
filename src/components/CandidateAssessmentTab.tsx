@@ -13,6 +13,8 @@ type AssessmentData = any;
 
 interface CandidateAssessmentTabProps {
   assessmentData: AssessmentData;
+  /** Repassado ao Guia do Avaliador para ele puxar as competências do cargo da candidatura. */
+  candidateId?: string | null;
   isEditing: boolean;
   onChange: (field: string, value: any) => void;
 }
@@ -45,7 +47,7 @@ const IMPROVEMENTS_LIST = [
   "Falta de Foco", "Impaciência", "Baixa Flexibilidade", "Gestão de Tempo"
 ];
 
-export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: CandidateAssessmentTabProps) {
+export function CandidateAssessmentTab({ assessmentData, candidateId, isEditing, onChange }: CandidateAssessmentTabProps) {
   // Radar Data
   const hardSkillsData = HARD_SKILLS.map(skill => ({
     subject: skill.label,
@@ -107,7 +109,7 @@ export function CandidateAssessmentTab({ assessmentData, isEditing, onChange }: 
           </h3>
           <p className="text-sm text-muted-foreground mt-1">Utilize o método STAR (Situação, Tarefa, Ação, Resultado) para avaliar as competências.</p>
         </div>
-        <GuiaAvaliadorButton label="Ver Roteiro Sugerido" />
+        <GuiaAvaliadorButton candidateId={candidateId} label="Ver Roteiro Sugerido" />
       </div>
 
       {/* 1. GRÁFICOS DE RADAR E NOTAS */}
