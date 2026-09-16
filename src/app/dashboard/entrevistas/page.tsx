@@ -11,9 +11,10 @@ import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { errorMessage } from "@/lib/utils";
 import { useToast } from "@/contexts/ToastContext";
 import { DEFAULT_RESUME_MODEL } from "@/lib/resumeModelSettings";
-import { formatInterviewSchedule, interviewHistoryStage, interviewProgressChanged, roleChangedOnSavedInterview } from "@/lib/interviewProgress.mjs";
+import { roleChangedOnSavedInterview } from "@/lib/interviewProgress.mjs";
 import { findExistingCandidateId, hasRealEmail, placeholderEmail } from "@/lib/candidateIdentity.mjs";
 import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
+import type { Stage } from "@/lib/stages";
 
 type PsychologicalTestInput = {
   test_name: string;
@@ -110,6 +111,24 @@ const destinationStyle: Record<string, string> = {
   Desistente: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-300",
 };
 
+/**
+ * A Etapa que a Candidatura (`job_applications.status`) recebe ao salvar a entrevista (ADR
+ * 0006, Fase 2 — issue #57). Destino escolhido manda; sem destino, a entrevista em si já é
+ * "Entrevista RH". Banco de Talentos deixou de ser Etapa — aqui ele só encerra a Candidatura,
+ * e vira Reprovado apenas quando a tela já apontou reprovação; senão é "não seguir agora"
+ * (Desistente).
+ */
+function stageFromInterviewProgress({ result, destination }: { result?: string | null; destination?: string | null }): Stage {
+  const dest = String(destination || "").trim();
+  if (dest === "Contratado") return "Contratado";
+  // "Descartado" é o nome antigo de "Reprovado" (issue #88).
+  if (dest === "Reprovado" || dest === "Descartado") return "Reprovado";
+  if (dest === "Desistente") return "Desistente";
+  if (dest === "Banco de Talentos") return result === "Reprovado" ? "Reprovado" : "Desistente";
+  if (result === "Reprovado") return "Reprovado";
+  return "Entrevista RH";
+}
+
 const defaultAssessment: Assessment = {
   psychological_test: "Não",
   tests_details: "",
@@ -163,8 +182,6 @@ export default function EntrevistasPage() {
     candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C", destination: ""
   });
   const [assessmentForm, setAssessmentForm] = useState<Assessment>(defaultAssessment);
-  // Quem está logado assina a entrevista no histórico — antes ficava sempre "Desconhecido".
-  const [currentUserName, setCurrentUserName] = useState("");
   const [stageByCandidate, setStageByCandidate] = useState<Record<string, string>>({});
   
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -306,18 +323,6 @@ export default function EntrevistasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interviews]);
 
-  // Nome de quem está logado, para assinar o histórico da entrevista.
-  useEffect(() => {
-    const carregarUsuario = async () => {
-      const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) return;
-      const { data: perfil } = await supabase.from("profiles").select("name").eq("id", data.user.id).maybeSingle();
-      setCurrentUserName(perfil?.name || data.user.email?.split("@")[0] || "");
-    };
-    carregarUsuario();
-  }, []);
-
   // B1: fecha modais com ESC (modais handrolled sem handler)
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -393,13 +398,18 @@ export default function EntrevistasPage() {
     setError("");
     const supabase = createClient();
 
+    // O Destino escolhido decide a Etapa da Candidatura (abaixo), mas não é mais gravado em
+    // `interviews`: a Etapa Terminal mora só na Candidatura (ADR 0006, Fase 2).
+    const destinoEscolhido = interviewProgress?.destination || form.destination || null;
+
     const payload = {
       ...Object.fromEntries(
-        Object.entries(form).map(([key, value]) => [key, value.trim() || null])
+        Object.entries(form)
+          .filter(([key]) => key !== "destination")
+          .map(([key, value]) => [key, value.trim() || null])
       ),
       status: interviewProgress?.status || form.status,
       result: interviewProgress?.result || form.result,
-      destination: interviewProgress?.destination || form.destination || null,
       // Data/hora vêm da ficha: a entrevista marcada fica registrada mesmo sem comparecimento.
       interview_date: interviewProgress?.interview_date || form.interview_date || null,
       interview_time: interviewProgress?.interview_time || form.interview_time || null,
@@ -434,7 +444,6 @@ export default function EntrevistasPage() {
       : [];
     if (payloadAny.candidate_name) {
       const parts = payloadAny.candidate_name.split(" ");
-      const tag = payloadAny.destination || (payloadAny.result === "Aprovado" ? "Aprovado na Entrevista" : payloadAny.result === "Reprovado" ? "Reprovado na Entrevista" : "Entrevistado");
 
       // Quem é esta pessoa: e-mail de verdade, depois CPF, depois telefone. Antes era
       // `upsert onConflict: email` com um e-mail derivado do primeiro nome — dois homônimos
@@ -453,7 +462,9 @@ export default function EntrevistasPage() {
         // "Todas as Obras" em todo candidato (QA B3) e, sem a chave condicional abaixo,
         // o salvamento passaria a apagar a disponibilidade real de quem já tinha uma.
         ...(disponibilidadeInformada.length > 0 ? { available_worksites: disponibilidadeInformada } : {}),
-        search_tags: [tag, assessmentData.selection_stage || "Importado de Entrevistas"].filter(Boolean),
+        // A Etapa não entra mais aqui — `search_tags` é busca livre, não vocabulário de Etapa
+        // (ADR 0006, Fase 2, issue #57): já foi "Aprovado na Entrevista"/"Banco de Talentos".
+        search_tags: [assessmentData.selection_stage || "Importado de Entrevistas"].filter(Boolean),
         birth_date: formData.birth_date || null,
         cpf: formData.cpf || null,
         marital_status: formData.marital_status || null,
@@ -493,6 +504,42 @@ export default function EntrevistasPage() {
           .single();
         if (insertError) console.error("Erro ao enviar para candidatos:", insertError);
         else if (inserido) candidateId = inserido.id;
+      }
+    }
+
+    // 1b. Toda entrevista tem uma Candidatura por trás (ADR 0006, Fase 2 — issue #57). Esta
+    //     tela nunca teve seletor de Vaga publicada — o "Cargo" é desejo, não vaga —, então a
+    //     Candidatura é sempre Espontânea: presa à Obra do parecer, ou ao pool geral sem Obra.
+    if (candidateId) {
+      let workplaceId: string | null = null;
+      const worksiteName = String(assessmentData.worksite || "").trim();
+      if (worksiteName) {
+        const { data: workplace } = await supabase
+          .from("workplaces")
+          .select("id")
+          .ilike("name", worksiteName)
+          .maybeSingle();
+        workplaceId = workplace?.id ?? null;
+      }
+
+      const { data: jobOpeningId, error: publicacaoError } = await supabase.rpc("publicacao_espontanea", {
+        p_workplace_id: workplaceId,
+      });
+      if (publicacaoError || !jobOpeningId) {
+        fail("Não foi possível abrir a candidatura do candidato: " + (publicacaoError?.message || "publicação não encontrada."));
+      }
+
+      const etapa = stageFromInterviewProgress({ result: payloadAny.result, destination: destinoEscolhido });
+      const { error: candidaturaError } = await supabase
+        .from("job_applications")
+        // Reaproveita a Candidatura existente do par candidato x Obra em vez de duplicar —
+        // é o que a constraint `job_applications_candidate_id_job_opening_id_key` garante.
+        .upsert(
+          { candidate_id: candidateId, job_opening_id: jobOpeningId, status: etapa },
+          { onConflict: "candidate_id,job_opening_id" }
+        );
+      if (candidaturaError) {
+        fail("Não foi possível gravar a Etapa da candidatura: " + candidaturaError.message);
       }
     }
 
@@ -553,26 +600,8 @@ export default function EntrevistasPage() {
 
     toast(temParecer ? "Parecer e entrevista salvos com sucesso." : "Entrevista salva.", "success");
 
-    // 4. Histórico do candidato: entrevista nova ou mudança de situação vira linha própria,
-    //    para que a situação anterior não se perca ao sobrescrever `interviews`.
-    if (candidateId) {
-      const novaSituacao = {
-        status: payloadAny.status,
-        result: payloadAny.result,
-        destination: payloadAny.destination || "",
-      };
-      const situacaoAnterior = { status: form.status, result: form.result, destination: form.destination };
-      if (!alvoId || interviewProgressChanged(situacaoAnterior, novaSituacao)) {
-        const { error: historyError } = await supabase.from("candidate_interviews").insert({
-          candidate_id: candidateId,
-          stage: interviewHistoryStage(novaSituacao),
-          workplace_name: assessmentData.worksite || null,
-          interviewer_name: currentUserName || null,
-          notes: `[Entrevista] ${payloadAny.role || "Vaga não informada"} — ${formatInterviewSchedule(payloadAny.interview_date, payloadAny.interview_time)} · Situação: ${novaSituacao.status} · Resultado: ${novaSituacao.result}${novaSituacao.destination ? ` · Destino: ${novaSituacao.destination}` : ""}`,
-        });
-        if (historyError) console.error("Erro ao gravar histórico da entrevista:", historyError.message);
-      }
-    }
+    // O histórico de mudança de Etapa (candidate_interviews) agora é gravado sozinho pelo
+    // trigger de `job_applications` (ADR 0006, Fase 2) — gravar aqui também duplicaria a linha.
 
     setIsModalOpen(false);
     loadInterviews();

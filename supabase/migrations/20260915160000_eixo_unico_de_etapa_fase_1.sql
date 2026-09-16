@@ -300,8 +300,14 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  INSERT INTO public.candidate_interviews (candidate_id, job_application_id, stage, notes)
-  VALUES (NEW.candidate_id, NEW.id, NEW.status, 'Etapa alterada na candidatura');
+  -- `auth.uid()` e quem esta gravando, quando a mudanca vem de uma tela autenticada; em
+  -- backfill e em psql volta NULL, e a linha fica sem autor em vez de com autor errado.
+  -- Sem isso o historico perderia a autoria que 20260915120000 acabou de introduzir, porque
+  -- a tela de Entrevistas parou de escrever essa linha a mao (ADR 0006, Fase 2).
+  INSERT INTO public.candidate_interviews
+    (candidate_id, job_application_id, stage, notes, created_by_user_id)
+  VALUES
+    (NEW.candidate_id, NEW.id, NEW.status, 'Etapa alterada na candidatura', auth.uid());
 
   RETURN NEW;
 END;
@@ -362,6 +368,11 @@ COMMENT ON FUNCTION public.publicacao_espontanea(uuid) IS
   'Publicacao sintetica onde moram as Candidaturas Espontaneas da Obra (NULL = pool geral). Usada pelo backfill da Fase 1 e pela tela de Entrevistas na Fase 2.';
 
 REVOKE ALL ON FUNCTION public.publicacao_espontanea(uuid) FROM PUBLIC, anon;
+
+-- A tela de Entrevistas chama esta funcao quando o recrutador salva uma entrevista sem Vaga
+-- (Fase 2): e o unico caminho pelo qual uma Candidatura Espontanea nasce fora do backfill.
+-- Anon continua de fora -- candidatura espontanea nao vem do portal publico.
+GRANT EXECUTE ON FUNCTION public.publicacao_espontanea(uuid) TO authenticated;
 
 
 -- ---------------------------------------------------------------------------------------
