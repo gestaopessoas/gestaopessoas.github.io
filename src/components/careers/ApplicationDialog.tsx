@@ -313,7 +313,6 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       return;
     }
     let candidateId = ticketId as string;
-    let isExistingCandidate = false;
 
     // Upload antes do insert porque `resume_url` vai na mesma linha. Se falhar,
     // aborta sem gravar: o formulário continua preenchido na tela, então o
@@ -337,11 +336,11 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       }
       resumePath = upload.data.path;
     }
-    const { error: candidateError } = await withRetry(() => supabase
-      .from("candidates")
-      .insert({
-        id: candidateId,
-        full_name: sanitizeText(candidate.full_name, 200),
+    // O mesmo objeto serve para o insert e, quando o cadastro já existe, para o enrich.
+    // Antes ele nascia dentro do `.insert()`: quando o insert era recusado por 23505, tudo
+    // o que a pessoa tinha acabado de digitar ia embora junto com ele.
+    const candidatePayload = {
+      full_name: sanitizeText(candidate.full_name, 200),
         first_name: sanitizeText(firstName || "", 100),
         last_name: sanitizeText(lastParts.join(" ") || firstName || "", 100),
         email: sanitizeText(candidate.email, 255) || null,
@@ -378,7 +377,11 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         // continuam existindo e o RH preenche na ficha, em /dashboard/central-candidato.
         role_interest: job.profile?.title || sanitizeText(candidate.role_interest, 200) || null,
         search_tags: [job.profile?.title || sanitizeText(candidate.role_interest, 200), job.department, job.cost_center].filter(Boolean),
-      }));
+    };
+
+    const { error: candidateError } = await withRetry(() => supabase
+      .from("candidates")
+      .insert({ id: candidateId, ...candidatePayload }));
 
     if (candidateError) {
       // 23505 = e-mail já tem candidato cadastrado. Comum quando a candidatura anterior
@@ -405,7 +408,17 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
           return;
         }
         candidateId = existingId as string;
-        isExistingCandidate = true;
+
+        // O cadastro antigo continua sendo a fonte da verdade, mas o que a pessoa acabou de
+        // digitar não pode evaporar. `enrich_claimed_candidate` preenche só as colunas que
+        // estavam vazias e vincula o currículo recém-enviado — que até aqui ficava órfão no
+        // Storage, numa pasta de ticket que nenhuma tela lê.
+        const { error: enrichError } = await supabase.rpc("enrich_claimed_candidate", {
+          p_candidate: candidateId,
+          p_patch: candidatePayload,
+          p_resume_url: resumePath,
+        });
+        if (enrichError) console.warn("Erro ao completar cadastro existente:", enrichError.message);
       } else {
         setSaving(false);
         setError("Não foi possível cadastrar seus dados. Confira o e-mail e tente novamente.");
@@ -413,7 +426,11 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       }
     }
 
-    if (!isExistingCandidate) {
+    // Roda também para cadastro reaproveitado. Antes ficava atrás de `!isExistingCandidate`,
+    // e quem já era cadastrado via formação, experiência e idiomas irem para o lixo.
+    // ponytail: não desduplica — reaplicar repete a linha, e o RH apaga pela ficha. Deduplicar
+    // exigiria SELECT nestas tabelas para anon, que hoje não existe e não vale abrir por isso.
+    {
       const validEducations = educations.filter((row) => row.level.trim());
       if (validEducations.length > 0) {
         const { error: eduError } = await supabase.from("candidate_educations").insert(
@@ -443,7 +460,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
       }
     }
 
-    if (!isExistingCandidate) {
+    {
       const validLanguages = languages.filter((row) => row.language.trim());
       if (validLanguages.length > 0) {
         const { error: langError } = await supabase.from("candidate_languages").insert(
