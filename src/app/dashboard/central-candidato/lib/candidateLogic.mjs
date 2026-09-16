@@ -40,6 +40,10 @@ export function sameStage(a, b) {
 // administrativo de obra precisa enxergar. A etapa exata continua visível na linha —
 // o balde existe só para filtrar e contar.
 export const STAGE_BUCKETS = {
+  // "Nova" é a Candidatura recém-chegada do portal de vagas: existe, mas ninguém do RH
+  // encostou nela ainda. Sem esta linha ela caía no fallback de `candidateBucket` e a tela
+  // dizia "Em entrevista" para quem nunca foi chamado.
+  livre: ["Nova"],
   entrevista: ["Triagem", "Entrevista RH", "Entrevista Gestor", "Testagem Psicológica"],
   obras: ["Aguardando Obra", "Em Avaliação na Obra", "Em Obra"],
   proposta: ["Proposta"],
@@ -99,8 +103,8 @@ export function candidateBucket(status, etapaAtual) {
 
 /**
  * Etapas oferecidas no avanço da Central: as do balde atual (movimento lateral) e as do
- * balde seguinte. Balde desconhecido — ou `livre`, que não tem etapa própria — começa o
- * funil pela entrevista.
+ * balde seguinte. Balde desconhecido — ou `livre`, cuja única etapa ("Nova") é o começo e
+ * não um destino — começa o funil pela entrevista.
  *
  * Desfecho não mora aqui. Contratado, Banco de Talentos, Reprovado e Desistente são decisão
  * da entrevista, registrada na ficha em /dashboard/entrevistas: é lá que se contrata ou se
@@ -121,7 +125,8 @@ export function nextStageOptions(currentBucket) {
 
   // O filtro é a regra, não a montagem acima: "Contratado" é a etapa do balde `contratacao`
   // e voltaria pela porta dos fundos.
-  const desfechos = ["Contratado", "Reprovado", "Desistente"];
+  // "Nova" pela mesma razão: é onde a Candidatura nasce, não destino de avanço.
+  const desfechos = ["Contratado", "Reprovado", "Desistente", "Nova"];
   return [...new Set(stages)].filter((s) => !desfechos.some((d) => sameStage(d, s)));
 }
 

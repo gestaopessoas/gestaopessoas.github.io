@@ -6,7 +6,7 @@
 // candidate_educations / candidate_experiences perde a data silenciosamente.
 
 import assert from "node:assert"
-import { normalizeResumeDate } from "./resumeDate.ts"
+import { normalizeResumeDate, monthEndDate } from "./resumeDate.ts"
 
 const cases = [
   // já ISO
@@ -65,4 +65,28 @@ for (const [input, expected] of cases) {
   )
 }
 
-console.log(`resumeDate.test.mjs passed (${cases.length} casos)`)
+
+// monthEndDate: o que `<input type="month">` do formulário público entrega (issue #99).
+// Fevereiro bissexto e não bissexto entram porque dia 0 do mês seguinte é a única forma
+// de acertar os dois sem tabela de meses.
+const monthEndCases = [
+  ["2024-02", "2024-02-29"],
+  ["2025-02", "2025-02-28"],
+  ["2024-04", "2024-04-30"],
+  ["2024-12", "2024-12-31"],
+  ["2024-1", null],
+  ["", null],
+  [null, null],
+  [undefined, null],
+]
+
+for (const [input, expected] of monthEndCases) {
+  const actual = monthEndDate(input)
+  assert.strictEqual(
+    actual,
+    expected,
+    `monthEndDate(${JSON.stringify(input)}) => ${JSON.stringify(actual)}, esperado ${JSON.stringify(expected)}`,
+  )
+}
+
+console.log(`resumeDate.test.mjs passed (${cases.length + monthEndCases.length} casos)`)

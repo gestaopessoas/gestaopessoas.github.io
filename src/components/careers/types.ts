@@ -33,6 +33,37 @@ export function formatSalaryRange(min: number | null, max: number | null): strin
   return fmt(min || max || 0);
 }
 
+/**
+ * Quebra os campos de texto livre do perfil (conhecimentos, competências) em itens de lista,
+ * sem repetir.
+ *
+ * Issue #102: `knowledge` e `competencies` são digitados à mão no cadastro do perfil, um por
+ * linha ou separados por ";" / "·" / "-". O portal juntava os dois com " · " e jogava tudo
+ * numa frase só — e como as duas colunas costumam repetir a mesma lista, a vaga PEDREIRO
+ * saiu com "Habilidade manual Organização e limpeza ... Habilidade manual Organização e
+ * limpeza", grudado e em dobro.
+ *
+ * A comparação ignora caixa e acento para não deixar passar "Organização" e "ORGANIZACAO"
+ * como itens diferentes, mas o texto exibido é o primeiro que apareceu, como foi digitado.
+ */
+export function splitProfileList(...fields: (string | null | undefined)[]): string[] {
+  const seen = new Set<string>();
+  const items: string[] = [];
+  for (const field of fields) {
+    // Hífen só separa quando está cercado de espaço ("Corte a frio - manual"); dentro da
+    // palavra ele é parte do item ("Auto-organização").
+    for (const raw of (field ?? "").split(/[\n;·•|]|\s[-–—]\s/)) {
+      const item = raw.replace(/\s+/g, " ").trim().replace(/^[-–—*•]\s*/, "").replace(/[.,;]+$/, "");
+      if (!item) continue;
+      const key = item.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push(item);
+    }
+  }
+  return items;
+}
+
 export function timeAgo(dateString: string): string {
   const diffMs = Date.now() - new Date(dateString).getTime();
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));

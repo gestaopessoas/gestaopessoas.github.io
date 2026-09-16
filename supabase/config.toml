@@ -386,7 +386,11 @@ deno_version = 2
 # secret_key = "env(SECRET_VALUE)"
 
 [analytics]
-enabled = true
+# Desligado de propósito. O container de analytics (Logflare) não sobe nesta máquina, e
+# `supabase start` aborta junto — o contorno era subir só db/kong/auth/rest com `-x`, o que
+# deixava o Storage de fora e impedia testar upload de currículo e de foto no dev local.
+# Analytics aqui é só o visualizador de log local; nada do aplicativo depende dele.
+enabled = false
 port = 54327
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"

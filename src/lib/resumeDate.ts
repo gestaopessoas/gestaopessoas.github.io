@@ -70,3 +70,17 @@ export function normalizeResumeDate(raw: string | null | undefined): string | nu
 
   return null;
 }
+
+/**
+ * Último dia do mês de um "YYYY-MM" (o que `<input type="month">` devolve), em ISO.
+ *
+ * O fim de uma experiência precisa disto e o começo não: `normalizeResumeDate` já manda o
+ * começo para o dia 1º. Usar o dia 1º nos dois extremos encurtaria cada experiência em quase
+ * um mês, e é o tempo de experiência que a vaga cobra como requisito.
+ */
+export function monthEndDate(month: string | null | undefined): string | null {
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) return null;
+  const [year, monthNumber] = month.split("-").map(Number);
+  // Dia 0 do mês seguinte é o último dia deste mês — inclusive fevereiro de ano bissexto.
+  return `${month}-${pad(new Date(year, monthNumber, 0).getDate())}`;
+}

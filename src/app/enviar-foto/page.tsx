@@ -33,7 +33,12 @@ export default function EnviarFotoPage() {
     setError("");
     const supabase = createClient();
     const path = `${employeeId}/${purpose}/${crypto.randomUUID()}-${file.name}`;
-    const { error: uploadError } = await supabase.storage.from("employee-photos").upload(path, file);
+    // O bucket só aceita image/* (migration 20260916200000). Foto tirada na hora pelo celular
+    // às vezes chega com `File.type` vazio; sem este palpite o Storage assumiria
+    // application/octet-stream e recusaria uma foto boa.
+    const { error: uploadError } = await supabase.storage
+      .from("employee-photos")
+      .upload(path, file, { contentType: file.type || "image/jpeg" });
     setSending(false);
     if (uploadError) {
       setError("Não foi possível enviar a foto: " + uploadError.message);
