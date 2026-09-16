@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import AdvanceStageModal from "@/app/dashboard/central-candidato/components/AdvanceStageModal";
-import { resolveCandidateStatus, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
+import { candidateStatusFromApplications, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { errorMessage } from "@/lib/utils";
 import { fetchInterviewProgress } from "@/lib/candidateHistory.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
@@ -29,6 +29,7 @@ type CandidateRow = {
   escolaridade: string;
   role_interest: string;
   status: string;
+  etapa_atual: string | null;
   obras: string;
   tags: string[];
   raw_data: { available_worksites?: string[] | null };
@@ -94,7 +95,8 @@ export default function BancoTalentosPage() {
           behavioral_tags,
           available_worksites,
           candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, candidate_future, created_at),
-          candidate_educations(candidate_id, degree, start_date, end_date)
+          candidate_educations(candidate_id, degree, start_date, end_date),
+          job_applications(id, status, created_at)
         `)
         .order('created_at', { ascending: false });
 
@@ -107,32 +109,23 @@ export default function BancoTalentosPage() {
           .from("interviews")
           .select("candidate_id, email, status, result, destination, created_at, interview_assessments(interview_assessment_values(field,item_index,value))")
           .order("created_at", { ascending: false });
-        const progressoPor = new Map<string, { status: string; result: string; destination: string }>();
         // Escolaridade do parecer como reserva do cadastro (issue #72): a ficha grava
         // `education`, que nenhuma das duas telas lia. A ordem do select já traz a mais nova.
         const escolaridadePor = new Map<string, string>();
         for (const i of ints ?? []) {
-          const progresso = {
-            status: i.status || "Aguardando",
-            result: i.result || "N/C",
-            destination: i.destination || "",
-          };
           const assessment: any = rowsToAssessment(
             (i as any).interview_assessments?.interview_assessment_values ?? []
           );
           const escolaridade = latestEducationDegree([], assessment);
+          if (!escolaridade) continue;
           for (const chave of [i.candidate_id, i.email]) {
-            if (!chave) continue;
-            if (!progressoPor.has(chave)) progressoPor.set(chave, progresso);
-            if (escolaridade && !escolaridadePor.has(chave)) escolaridadePor.set(chave, escolaridade);
+            if (chave && !escolaridadePor.has(chave)) escolaridadePor.set(chave, escolaridade);
           }
         }
 
         const rows: CandidateRow[] = data.map((c) => {
-          const finalStatus = resolveCandidateStatus({
-            ...c,
-            interview_progress: progressoPor.get(c.id) ?? (c.email ? progressoPor.get(c.email) ?? null : null),
-          }).status;
+          const derived = candidateStatusFromApplications(c.job_applications, c);
+          const finalStatus = derived.status;
 
           // Obras Disponíveis reflete só o campo "obras de interesse" do candidato —
           // nunca a cidade/endereço, que é outro dado e não deve aparecer aqui.
@@ -152,6 +145,7 @@ export default function BancoTalentosPage() {
               "Não informado",
             role_interest: c.role_interest || "Não informado",
             status: finalStatus,
+            etapa_atual: derived.etapa_atual,
             obras: worksitesStr,
             // "Banco de Talentos" é marcador de status, não competência — não polui a busca.
             tags: [...(c.behavioral_tags ?? []), ...(c.search_tags ?? [])].filter(
@@ -262,6 +256,7 @@ export default function BancoTalentosPage() {
                 <th className="px-6 py-4 font-medium">Cargo de Interesse</th>
                 <th className="px-6 py-4 font-medium">Contato</th>
                 <th className="px-6 py-4 font-medium">Escolaridade</th>
+                <th className="px-6 py-4 font-medium">Última Etapa</th>
                 <th className="px-6 py-4 font-medium">Obras Disponíveis</th>
                 <th className="sticky right-0 z-10 bg-card px-6 py-4 font-medium text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]">Ações</th>
               </tr>
@@ -269,13 +264,13 @@ export default function BancoTalentosPage() {
             <tbody className="divide-y divide-border/50">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mb-2" />
                   </td>
                 </tr>
               ) : filteredCandidates.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
                     Nenhum talento encontrado.
                   </td>
                 </tr>
@@ -308,6 +303,9 @@ export default function BancoTalentosPage() {
                     </td>
                     <td className="px-6 py-4">
                       {candidate.escolaridade}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-muted-foreground">
+                      {candidate.etapa_atual || "Sem histórico"}
                     </td>
                     <td className="px-6 py-4 text-xs font-medium text-primary">
                       {candidate.obras}
