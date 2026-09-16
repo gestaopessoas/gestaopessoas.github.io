@@ -13,6 +13,7 @@ import { useRef, useState } from "react";
 import { maskCpf, maskPhone, maskCep, maskAddressNumber, maskUf, isValidPhone, onlyDigits, safeFileName } from "@/lib/masks";
 import { isValidCpf, maskCurrencyInput } from "@/app/dashboard/colaboradores/lib/employeeFormRules.mjs";
 import { CONSENT_VERSION } from "./consent";
+import { monthEndDate, normalizeResumeDate } from "@/lib/resumeDate";
 import type { Career } from "./types";
 
 const MARITAL_STATUS_OPTIONS = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"];
@@ -93,10 +94,11 @@ const emptyCandidate = {
 
 type LanguageRow = { language: string; proficiency: string };
 type EducationRow = { level: string; institution: string };
-type ExperienceRow = { company: string; role: string; description: string };
+type ExperienceRow = { company: string; role: string; start: string; end: string; isCurrent: boolean; description: string };
 
 const emptyEducationRow: EducationRow = { level: "", institution: "" };
-const emptyExperienceRow: ExperienceRow = { company: "", role: "", description: "" };
+const emptyExperienceRow: ExperienceRow = { company: "", role: "", start: "", end: "", isCurrent: false, description: "" };
+
 
 // Erro sem `code` = falha de rede/transiente (fetch caiu no meio do caminho), não
 // violação de constraint. Comum em quem preenche esse formulário pelo celular.
@@ -225,7 +227,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
 
   const addExperienceRow = () => setExperiences((prev) => [...prev, { ...emptyExperienceRow }]);
   const removeExperienceRow = (index: number) => setExperiences((prev) => prev.filter((_, i) => i !== index));
-  const updateExperienceRow = (index: number, field: keyof ExperienceRow, value: string) => {
+  const updateExperienceRow = <K extends keyof ExperienceRow>(index: number, field: K, value: ExperienceRow[K]) => {
     setExperiences((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   };
 
@@ -401,6 +403,10 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
             candidate_id: candidateId,
             company_name: sanitizeText(row.company, 200) || "Não informado",
             position_title: sanitizeText(row.role, 200) || "Não informado",
+            // `<input type="month">` devolve "AAAA-MM" e as colunas são `date`.
+            start_date: normalizeResumeDate(row.start),
+            end_date: row.isCurrent ? null : monthEndDate(row.end),
+            is_current: row.isCurrent,
             description: sanitizeText(row.description, 2000) || null,
           }))
         );
@@ -607,6 +613,32 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                         {experiences.length > 1 && (
                           <Button type="button" variant="outline" size="icon" onClick={() => removeExperienceRow(index)}><X className="h-4 w-4" /></Button>
                         )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Label className="text-xs text-muted-foreground" htmlFor={`exp-inicio-${index}`}>Início</Label>
+                        <Input
+                          id={`exp-inicio-${index}`}
+                          type="month"
+                          className="w-auto"
+                          value={row.start}
+                          onChange={(event) => updateExperienceRow(index, "start", event.target.value)}
+                        />
+                        <Label className="text-xs text-muted-foreground" htmlFor={`exp-fim-${index}`}>Fim</Label>
+                        <Input
+                          id={`exp-fim-${index}`}
+                          type="month"
+                          className="w-auto"
+                          value={row.isCurrent ? "" : row.end}
+                          disabled={row.isCurrent}
+                          onChange={(event) => updateExperienceRow(index, "end", event.target.value)}
+                        />
+                        <Label className="flex items-center gap-1.5 text-xs font-normal">
+                          <Checkbox
+                            checked={row.isCurrent}
+                            onCheckedChange={(checked) => updateExperienceRow(index, "isCurrent", checked === true)}
+                          />
+                          Trabalho aqui atualmente
+                        </Label>
                       </div>
                       <Textarea rows={2} placeholder="Conte um pouco das atividades" value={row.description} onChange={(event) => updateExperienceRow(index, "description", event.target.value)} />
                     </div>
