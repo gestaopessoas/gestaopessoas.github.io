@@ -1,11 +1,14 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Building2, Inbox, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { fetchCareers } from "@/components/careers/fetchCareers";
 import { JobCard } from "@/components/careers/JobCard";
+import { ApplicationDialog } from "@/components/careers/ApplicationDialog";
+import { createClient } from "@/utils/supabase/client";
 import type { Career } from "@/components/careers/types";
 
 export default function CarreirasPage() {
@@ -13,6 +16,34 @@ export default function CarreirasPage() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [talentJob, setTalentJob] = useState<Career | null>(null);
+  const [talentOpen, setTalentOpen] = useState(false);
+
+  // A Publicação do pool geral é invisível (status 'Espontanea'), então não vem em
+  // fetchCareers: só o id dela, por RPC. Sem id, o botão não aparece — melhor faltar o
+  // botão do que oferecer um envio que o banco vai recusar.
+  useEffect(() => {
+    createClient().rpc("talent_pool_opening").then(({ data }) => {
+      if (!data) return;
+      setTalentJob({
+        id: data as string,
+        status: "Espontanea",
+        cost_center: null,
+        contract_type: null,
+        target_date: null,
+        observations: null,
+        created_at: new Date().toISOString(),
+        department: null,
+        salary_min: null,
+        salary_max: null,
+        seniority: null,
+        work_mode: null,
+        is_pcd_eligible: false,
+        affirmative_tags: [],
+        profile: null,
+      });
+    });
+  }, []);
 
   useEffect(() => {
     fetchCareers().then(({ careers, error }) => {
@@ -89,8 +120,21 @@ export default function CarreirasPage() {
               <JobCard key={career.id} career={career} />
             ))}
           </div>
+
+          {talentJob && (
+            <div className="rounded-xl border bg-card p-6 text-center">
+              <h3 className="font-semibold">Não achou uma vaga?</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Candidate-se como Talento ACPO. Seu currículo fica no banco de talentos e o RH
+                procura por ali quando abre uma vaga nova.
+              </p>
+              <Button className="mt-4" onClick={() => setTalentOpen(true)}>Candidatar-se como Talento ACPO</Button>
+            </div>
+          )}
         </div>
       </section>
+
+      <ApplicationDialog job={talentJob} open={talentOpen} onOpenChange={setTalentOpen} />
     </main>
   );
 }

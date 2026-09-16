@@ -81,6 +81,7 @@ const emptyCandidate = {
   gender_identity: NAO_INFORMAR,
   sexual_orientation: NAO_INFORMAR,
   race_declaration: NAO_INFORMAR,
+  role_interest: "",
   salary_expectation: "",
   has_cnh: "" as "" | "sim" | "nao",
   is_pcd: false,
@@ -113,6 +114,11 @@ async function withRetry<T extends { error: { code?: string } | null }>(
 }
 
 export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | null; open: boolean; onOpenChange: (open: boolean) => void }) {
+  // A marca é o status da Publicação, não a falta de Perfil: `profile_id` é nullable, então
+  // uma vaga aberta sem Perfil vinculado tambem chega aqui com `profile` null e viraria
+  // "Talento ACPO" por engano. O portal só lista status 'Aberta' — 'Espontanea' é a sintética
+  // do pool geral (migration 20260916235000).
+  const isTalentPool = job?.status === "Espontanea";
   const [candidate, setCandidate] = useState(emptyCandidate);
   const [languages, setLanguages] = useState<LanguageRow[]>([{ language: "", proficiency: "" }]);
   const [educations, setEducations] = useState<EducationRow[]>([{ ...emptyEducationRow }]);
@@ -370,8 +376,8 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         // Dependentes, tamanho de uniforme e tamanho de botina saíram do formulário público
         // (issue #100): são dados de admissão — ninguém compra EPI para candidato. As colunas
         // continuam existindo e o RH preenche na ficha, em /dashboard/central-candidato.
-        role_interest: job.profile?.title || null,
-        search_tags: [job.profile?.title, job.department, job.cost_center].filter(Boolean),
+        role_interest: job.profile?.title || sanitizeText(candidate.role_interest, 200) || null,
+        search_tags: [job.profile?.title || sanitizeText(candidate.role_interest, 200), job.department, job.cost_center].filter(Boolean),
       }));
 
     if (candidateError) {
@@ -480,7 +486,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     <Dialog open={open} onOpenChange={(next) => { onOpenChange(next); if (!next) reset(); }}>
       <DialogContent className="max-h-[90vh] max-w-5xl sm:max-w-5xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Candidatar-se a {job?.profile?.title || "esta vaga"}</DialogTitle>
+          <DialogTitle>{isTalentPool ? "Candidatar-se como Talento ACPO" : `Candidatar-se a ${job?.profile?.title || "esta vaga"}`}</DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-1.5">
             {savedCandidateId ? (
               <span>Candidatura registrada.</span>
@@ -498,7 +504,9 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
             <div className="space-y-2">
               <h3 className="text-xl font-semibold">Sua candidatura foi registrada</h3>
               <p className="text-sm text-muted-foreground">
-                Você já está inscrito em {job?.profile?.title || "esta vaga"}. Nada mais é obrigatório
+                {isTalentPool
+                  ? "Você está no banco de talentos da ACPO: o RH te encontra quando abrir uma vaga compatível."
+                  : `Você já está inscrito em ${job?.profile?.title || "esta vaga"}.`} Nada mais é obrigatório
                 a partir daqui — o RH consegue ver seus dados.
               </p>
             </div>
@@ -537,6 +545,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
               <p className="text-xs text-muted-foreground">Com isto já dá para enviar. O resto é opcional.</p>
             </div>
             <Field label="Nome completo *"><Input required disabled={!job} value={candidate.full_name} onChange={(event) => update("full_name", event.target.value)} /></Field>
+            {isTalentPool && <Field label="Cargo de interesse"><Input disabled={!job} value={candidate.role_interest} onChange={(event) => update("role_interest", event.target.value)} placeholder="Ex.: Pedreiro, Auxiliar administrativo" /></Field>}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Telefone *">
                 <Input ref={phoneRef} required disabled={!job} inputMode="numeric" placeholder="(00) 00000-0000" value={candidate.phone} onChange={(event) => { setPhoneError(""); update("phone", maskPhone(event.target.value)); }} aria-invalid={!!phoneError} />
@@ -591,7 +600,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
           <div className="sticky bottom-0 z-10 -mx-1 bg-background py-2">
             <Button type="submit" className="w-full" size="lg" disabled={!job || saving}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              {saving ? "Enviando..." : "Enviar candidatura"}
+              {saving ? "Enviando..." : isTalentPool ? "Enviar currículo" : "Enviar candidatura"}
             </Button>
           </div>
 
