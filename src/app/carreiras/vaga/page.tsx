@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { fetchCareers } from "@/components/careers/fetchCareers";
-import { formatSalaryRange, timeAgo, type Career } from "@/components/careers/types";
+import { formatSalaryRange, splitProfileList, timeAgo, type Career } from "@/components/careers/types";
 import { ApplicationDialog } from "@/components/careers/ApplicationDialog";
 
 export default function JobDetailPage() {
@@ -58,8 +58,11 @@ function JobDetailContent() {
   }
 
   const salary = formatSalaryRange(career.salary_min, career.salary_max);
-  const location = career.cost_center || career.department || "Área não informada";
+  // Issue #102: rótulo vazio não deve aparecer. Escrever "Área não informada" nos quatro
+  // cards da listagem só ocupa espaço dizendo que não há informação.
+  const location = career.cost_center || career.department;
   const educationLevels = [career.profile?.min_education, career.profile?.desired_education].filter(Boolean) as string[];
+  const competencies = splitProfileList(career.profile?.knowledge, career.profile?.competencies);
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
@@ -74,8 +77,8 @@ function JobDetailContent() {
           <p className="text-sm text-muted-foreground">ACPO Empreendimentos</p>
 
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
-            <span className="inline-flex items-center"><MapPin className="mr-1.5 h-4 w-4" />{location}</span>
-            <span className="inline-flex items-center"><Briefcase className="mr-1.5 h-4 w-4" />{career.contract_type || "Contrato não informado"}</span>
+            {location && <span className="inline-flex items-center"><MapPin className="mr-1.5 h-4 w-4" />{location}</span>}
+            {career.contract_type && <span className="inline-flex items-center"><Briefcase className="mr-1.5 h-4 w-4" />{career.contract_type}</span>}
             {salary && <span className="inline-flex items-center"><DollarSign className="mr-1.5 h-4 w-4" />{salary}</span>}
             {career.is_pcd_eligible && <span className="inline-flex items-center"><Accessibility className="mr-1.5 h-4 w-4" />Elegível PCD</span>}
           </div>
@@ -116,17 +119,21 @@ function JobDetailContent() {
               <p className="text-sm">{[career.profile?.min_experience, career.profile?.desired_experience].filter(Boolean).join(" · ")}</p>
             </div>
           )}
-          {(career.profile?.knowledge || career.profile?.competencies) && (
+          {competencies.length > 0 && (
             <div>
               <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conhecimentos e competências</h3>
-              <p className="text-sm">{[career.profile?.knowledge, career.profile?.competencies].filter(Boolean).join(" · ")}</p>
+              <ul className="space-y-1 text-sm">
+                {competencies.map((item) => (
+                  <li key={item} className="flex gap-2"><span className="text-primary">·</span>{item}</li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
 
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <h2 className="mb-2 font-semibold">Localização</h2>
-          <p className="flex items-center gap-2 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{location} · Pelotas - RS, Brasil</p>
+          <p className="flex items-center gap-2 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{[location, "Pelotas - RS, Brasil"].filter(Boolean).join(" · ")}</p>
         </div>
         </div>
 
