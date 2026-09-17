@@ -210,9 +210,12 @@ export default function VagasAdminPage() {
     setIsEditing(false);
   };
 
-  const abertas = requests.filter((request) => !ENCERRADAS.includes(request.status ?? "")).length;
-  const urgentes = requests.filter((request) => ["Alta", "Crítica"].includes(request.urgency ?? "") && !ENCERRADAS.includes(request.status ?? "")).length;
+  // Os cartões repartem o total sem sobreposição: uma vaga cai em exatamente um deles.
+  // Antes "Em aberto" e "Aprovadas" contavam o mesmo conjunto e a soma passava do total (issue #127).
+  const emAnalise = requests.filter((request) => !ENCERRADAS.includes(request.status ?? "") && request.status !== "Aprovada").length;
   const aprovadas = requests.filter((request) => request.status === "Aprovada").length;
+  const encerradas = requests.filter((request) => ENCERRADAS.includes(request.status ?? "")).length;
+  const urgentes = requests.filter((request) => ["Alta", "Crítica"].includes(request.urgency ?? "") && !ENCERRADAS.includes(request.status ?? "")).length;
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -243,10 +246,10 @@ export default function VagasAdminPage() {
         {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Metric icon={Briefcase} label="Total de Solicitações" value={requests.length} />
-          <Metric icon={Clock} label="Em aberto (Ativas)" value={abertas} />
-          <Metric icon={CheckCircle2} label="Aprovadas" value={aprovadas} />
-          <Metric icon={Clock} label="Urgentes (Em aberto)" value={urgentes} />
+          <Metric icon={Briefcase} label="Total de Solicitações" value={requests.length} hint={urgentes > 0 ? `${urgentes} urgente${urgentes > 1 ? "s" : ""} em aberto` : undefined} />
+          <Metric icon={Clock} label="Aguardando análise" value={emAnalise} />
+          <Metric icon={CheckCircle2} label="Aprovadas (em aberto)" value={aprovadas} />
+          <Metric icon={Archive} label="Encerradas" value={encerradas} />
         </div>
         
         <div className="flex w-full flex-wrap gap-2 rounded-md bg-muted p-1 sm:w-fit">
@@ -487,7 +490,7 @@ export default function VagasAdminPage() {
   );
 }
 
-function Metric({ icon: Icon, label, value }: { icon: typeof Briefcase; label: string; value: number }) {
+function Metric({ icon: Icon, label, value, hint }: { icon: typeof Briefcase; label: string; value: number; hint?: string }) {
   return (
     <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
       <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -496,6 +499,7 @@ function Metric({ icon: Icon, label, value }: { icon: typeof Briefcase; label: s
       <div>
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="text-xl font-bold">{value}</p>
+        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
       </div>
     </div>
   );
