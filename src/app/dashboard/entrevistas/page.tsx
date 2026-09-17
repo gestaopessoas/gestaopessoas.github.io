@@ -101,7 +101,15 @@ const resultStyle: Record<string, string> = {
   "N/C": "text-zinc-500",
 };
 
-const destinationStyle: Record<string, string> = {
+// A Etapa mostrada na lista. O Destino deixou de ser gravado em `interviews` (ADR 0006,
+// Fase 2), então a coluna lia um campo morto e dizia "-" para todo mundo (issue #114): a
+// verdade está na Candidatura. Linhas antigas ainda têm `destination` gravado — ele só entra
+// como reserva.
+function etapaDaLinha(interview: Interview, stageByCandidate: Record<string, string>) {
+  return (interview.candidate_id ? stageByCandidate[interview.candidate_id] : null) || interview.destination || null;
+}
+
+const stageStyle: Record<string, string> = {
   Contratado: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   "Banco de Talentos": "bg-sky-500/10 text-sky-700 dark:text-sky-300",
   // "Descartado" é o nome antigo de "Reprovado" (issue #88): as duas chaves existem porque
@@ -372,7 +380,7 @@ export default function EntrevistasPage() {
 
   const exportToCsv = () => {
     if (filtered.length === 0) return;
-    const headers = ["Candidato", "Telefone", "Email", "Cargo Alvo", "Data", "Hora", "Status", "Resultado", "Destino"];
+    const headers = ["Candidato", "Telefone", "Email", "Cargo Alvo", "Data", "Hora", "Status", "Resultado", "Etapa"];
     const rows = filtered.map(i => [
       `"${i.candidate_name || ''}"`,
       `"${i.phone || ''}"`,
@@ -382,7 +390,7 @@ export default function EntrevistasPage() {
       `"${i.interview_time || ''}"`,
       `"${i.status || ''}"`,
       `"${i.result || ''}"`,
-      `"${i.destination || ''}"`
+      `"${etapaDaLinha(i, stageByCandidate) || ''}"`
     ].join(","));
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows].join("\n");
     const encodedUri = encodeURI(csvContent);
@@ -462,9 +470,6 @@ export default function EntrevistasPage() {
         // "Todas as Obras" em todo candidato (QA B3) e, sem a chave condicional abaixo,
         // o salvamento passaria a apagar a disponibilidade real de quem já tinha uma.
         ...(disponibilidadeInformada.length > 0 ? { available_worksites: disponibilidadeInformada } : {}),
-        // A Etapa não entra mais aqui — `search_tags` é busca livre, não vocabulário de Etapa
-        // (ADR 0006, Fase 2, issue #57): já foi "Aprovado na Entrevista"/"Banco de Talentos".
-        search_tags: [assessmentData.selection_stage || "Importado de Entrevistas"].filter(Boolean),
         birth_date: formData.birth_date || null,
         cpf: formData.cpf || null,
         marital_status: formData.marital_status || null,
@@ -486,6 +491,10 @@ export default function EntrevistasPage() {
       // uma derivada do nome. Num cadastro que já existe, o e-mail atual é preservado.
       const semEmail = dadosDoCandidato.email === undefined;
 
+      // `search_tags` é a classificação livre que o RH deu ao candidato no Banco de Talentos.
+      // Salvar a ficha por aqui reescrevia a lista inteira com uma tag só, apagando o que o RH
+      // tinha marcado, sem aviso e sem desfazer (issue #115). Cadastro que já existe não tem
+      // mais as tags tocadas; só o cadastro novo nasce com a marca de origem.
       if (existente) {
         const { error: updateError } = await supabase
           .from("candidates")
@@ -498,6 +507,7 @@ export default function EntrevistasPage() {
           .from("candidates")
           .insert({
             ...dadosDoCandidato,
+            search_tags: ["Importado de Entrevistas"],
             email: semEmail ? placeholderEmail(payloadAny.candidate_name) : dadosDoCandidato.email,
           })
           .select("id")
@@ -661,7 +671,11 @@ export default function EntrevistasPage() {
       interview_time: interview.interview_time || "",
       status: interview.status || "Aguardando",
       result: interview.result || "N/C",
-      destination: interview.destination || "",
+      // O seletor de Destino recomeça vazio quando a Etapa atual não é um dos destinos
+      // oferecidos ("Banco de Talentos" não é Etapa, e "Entrevista RH" não é desfecho).
+      destination: ["Contratado", "Reprovado", "Desistente"].includes(etapaDaLinha(interview, stageByCandidate) || "")
+        ? (etapaDaLinha(interview, stageByCandidate) as string)
+        : "",
     });
     setAssessmentForm(interview.assessment || defaultAssessment);
     setIsModalOpen(true);
@@ -778,7 +792,7 @@ export default function EntrevistasPage() {
                   <th className="px-4 py-3">Data / Hora</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Resultado</th>
-                  <th className="px-4 py-3">Destino</th>
+                  <th className="px-4 py-3">Etapa</th>
                   <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
@@ -824,17 +838,12 @@ export default function EntrevistasPage() {
                        </span>
                     </td>
                     <td className="px-4 py-3 min-w-36">
-                       {interview.destination ? (
-                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${destinationStyle[interview.destination] || "bg-muted text-muted-foreground"}`}>
-                           {interview.destination}
+                       {etapaDaLinha(interview, stageByCandidate) ? (
+                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${stageStyle[etapaDaLinha(interview, stageByCandidate) || ""] || "bg-muted text-muted-foreground"}`}>
+                           {etapaDaLinha(interview, stageByCandidate)}
                          </span>
                        ) : (
                          <span className="text-muted-foreground">-</span>
-                       )}
-                       {interview.candidate_id && stageByCandidate[interview.candidate_id] && (
-                         <div className="mt-1 text-xs text-muted-foreground">
-                           Etapa: {stageByCandidate[interview.candidate_id]}
-                         </div>
                        )}
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
