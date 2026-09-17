@@ -275,7 +275,7 @@ test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', (
     }
   });
 
-  test('4. botão "Contratar" no balde Documentação tira o candidato da Central', async ({ page }) => {
+  test('4. botão "Contratar" no balde Documentação mantém o candidato na Central, como Contratado', async ({ page }) => {
     const NOME = `${PREFIXO} T4`;
     const EMAIL = `${PREFIXO.toLowerCase()}.t4@local.dev`;
     await limparCandidato(NOME);
@@ -300,7 +300,12 @@ test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', (
       }, { timeout: 30000 }).toBe('Contratado');
 
       await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
-      await expect(page.getByRole('row').filter({ hasText: NOME })).toHaveCount(0, { timeout: 30000 });
+      // Contratado NÃO sai da Central: fica na aba Contratação, sem prazo para expirar.
+      // O teste cobrava o oposto e só passava por corrida com o gatilho que grava o
+      // histórico — verde quando a lista recarregava antes da linha "Contratado" existir.
+      const contratado = page.getByRole('row').filter({ hasText: NOME });
+      await expect(contratado).toBeVisible({ timeout: 30000 });
+      await expect(contratado).toContainText('Contratado');
     } finally {
       await limparCandidato(NOME);
     }

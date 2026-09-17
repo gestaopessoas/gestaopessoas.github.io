@@ -23,7 +23,6 @@ import {
   candidateStatusFromApplications,
   latestEducationDegree,
   candidateBucket,
-  sameStage,
   BUCKET_ORDER,
   BUCKET_LABELS,
 } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
@@ -213,16 +212,6 @@ export default function CentralCandidatoPage() {
             };
           });
 
-          // Quando esta pessoa foi contratada: a aba Contratação mostra só os recentes
-          // (issue #113). A data vem do histórico, que é quem registra a Etapa Contratado.
-          const contratadoEm =
-            (c.candidate_interviews ?? [])
-              .filter((i) => sameStage(i.stage, "Contratado"))
-              .map((i) => i.created_at)
-              .filter(Boolean)
-              .sort()
-              .pop() ?? null;
-
           const derived = candidateStatusFromApplications(applicationsLike, c);
           const finalStatus = derived.status;
           const finalChamado = derived.ultimo_chamado;
@@ -260,7 +249,7 @@ export default function CentralCandidatoPage() {
             ultimo_chamado: finalChamado,
             obra_atual: derived.obra_atual || c.city || null,
             etapa_atual: derived.etapa_atual,
-            bucket: candidateBucket(finalStatus, derived.etapa_atual, contratadoEm),
+            bucket: candidateBucket(finalStatus, derived.etapa_atual),
             is_new: hasNewApplication,
             applications,
             candidatura_id: derived.candidatura_id,
@@ -283,8 +272,7 @@ export default function CentralCandidatoPage() {
     run();
   }, []);
 
-  // Reprovados, desistentes e contratados antigos saem da Central; contratado recente fica
-  // na aba Contratação por 30 dias (issue #113), o resto é visível por balde.
+  // Só reprovados e desistentes saem da Central. Contratado fica, na aba Contratação.
   const emAcompanhamento = useMemo(
     () => candidates.filter((c) => c.bucket !== "encerrado"),
     [candidates]

@@ -64,3 +64,22 @@ VALUES
   ('00000000-0000-4000-b000-000000000001', 'SEDE', 'SEDE', 'Ativo'),
   ('00000000-0000-4000-b000-000000000002', 'Obra Modelo', 'OBRA', 'Ativo')
 ON CONFLICT (id) DO NOTHING;
+
+-- Colaboradores.
+--
+-- Pelo mesmo motivo das Obras acima: sem nenhuma linha em `employees`, o caso 4 de
+-- `e2e/_local-perfil-restrito.spec.ts` ("o que ele TEM permissão de ver continua chegando")
+-- falha com total 0. Ele é a contraprova do caso anterior — apertar a regra de permissão não
+-- pode ter cegado o próprio módulo de quem tem `colaboradores.view` — e uma base vazia faz a
+-- contraprova parecer erro de RLS quando é só falta de dado.
+--
+-- `unit` é texto solto na tabela, não FK: repete o nome das Obras acima de propósito.
+--
+-- `role` NÃO é texto livre para a tela: o select "Cargo *" da ficha só oferece títulos de
+-- `job_profiles`, e um cargo inventado abre a ficha com um obrigatório vazio — que é o que o
+-- caso 7b de `_local-navegacao.spec.ts` reprova. Os dois abaixo já existem lá, em MAIÚSCULAS.
+INSERT INTO public.employees (id, name, role, status, unit, admission_date)
+VALUES
+  ('00000000-0000-4000-c000-000000000001', 'Colaborador Modelo', 'OFICIAL', 'Ativo', 'Obra Modelo', '2026-01-15'),
+  ('00000000-0000-4000-c000-000000000002', 'Colaboradora Modelo', 'ENCARREGADO DE OBRAS', 'Ativo', 'SEDE', '2026-02-01')
+ON CONFLICT (id) DO NOTHING;

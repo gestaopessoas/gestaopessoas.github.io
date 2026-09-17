@@ -382,10 +382,9 @@ export default function EntrevistasPage() {
         });
 
       const derivado = candidateStatusFromApplications(minhas, {});
-      const contratadoEm = historico[id]?.find((e) => e.stage === "Contratado")?.created_at ?? null;
       porCandidato[id] = {
         applicationId: derivado.candidatura_id,
-        bucket: candidateBucket(derivado.status, derivado.etapa_atual, contratadoEm),
+        bucket: candidateBucket(derivado.status, derivado.etapa_atual),
         stage: derivado.etapa_atual,
         workplace: derivado.obra_atual,
       };

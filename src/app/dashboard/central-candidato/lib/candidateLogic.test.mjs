@@ -73,18 +73,18 @@ test("candidateBucket separa os baldes que o adm de obra precisa ver", () => {
 });
 
 // issue #113: a aba Contratação contava zero sempre porque todo desfecho virava "encerrado".
-test("candidateBucket mostra contratado recente e esconde o antigo", () => {
+// O prazo de 30 dias que consertou aquilo caiu: contratado fica na Central, sem expirar.
+test("candidateBucket mantém o contratado na Central", () => {
   const dias = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+  assert.equal(candidateBucket("Contratado", "Contratado"), "contratacao");
+  // A data de contratação deixou de ser argumento: passar uma não muda mais nada.
   assert.equal(candidateBucket("Contratado", "Contratado", dias(3)), "contratacao");
-  assert.equal(candidateBucket("Contratado", "Contratado", dias(29)), "contratacao");
-  assert.equal(candidateBucket("Contratado", "Contratado", dias(31)), "encerrado");
-  // Sem data de contratação (ou com data ilegível) fica fora da Central, como antes.
-  assert.equal(candidateBucket("Contratado", "Contratado", null), "encerrado");
-  assert.equal(candidateBucket("Contratado", "Contratado", "ontem"), "encerrado");
+  assert.equal(candidateBucket("Contratado", "Contratado", dias(400)), "contratacao");
+  assert.equal(candidateBucket("Contratado", "Contratado", null), "contratacao");
 });
 
 test("candidateBucket trata terminais e etapa desconhecida", () => {
-  assert.equal(candidateBucket("Contratado", null), "encerrado");
+  assert.equal(candidateBucket("Contratado", null), "contratacao");
   // Processo ativo com etapa fora do mapa não pode sumir da tela.
   assert.equal(candidateBucket("Em Processo", "Outros"), "entrevista");
   assert.equal(candidateBucket("Em Processo", null), "entrevista");
