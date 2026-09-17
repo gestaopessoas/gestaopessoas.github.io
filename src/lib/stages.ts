@@ -37,3 +37,16 @@ export const TERMINAL_STAGES: readonly Stage[] = ["Contratado", "Reprovado", "De
 export function isTerminal(stage?: string | null): boolean {
   return !!stage && (TERMINAL_STAGES as readonly string[]).includes(stage);
 }
+
+/**
+ * As Etapas que têm alguém, na ordem do funil — para agrupar/filtrar uma lista de Candidaturas.
+ *
+ * Etapa vazia não vira coluna: nenhuma vaga usa as 14 de uma vez, e coluna vazia só ocupa tela.
+ * Valor fora de `STAGES` (linha antiga, gravada antes do `check` da Fase 1) vai pro fim em vez
+ * de sumir: candidato invisível é pior que Etapa estranha.
+ */
+export function stagesPresent(counts: Map<string, number>): string[] {
+  const conhecidas: string[] = STAGES.filter((s) => counts.has(s));
+  const outras = [...counts.keys()].filter((s) => !(STAGES as readonly string[]).includes(s));
+  return [...conhecidas, ...outras];
+}

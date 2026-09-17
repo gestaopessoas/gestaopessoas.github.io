@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, Suspense } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, ArrowLeft, AlertCircle } from "lucide-react";
@@ -10,6 +10,7 @@ import { calculateMatchScore, MatchResult } from "@/utils/matchScore";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { useToast } from "@/contexts/ToastContext";
 import AdvanceStageModal from "@/app/dashboard/central-candidato/components/AdvanceStageModal";
+import { stagesPresent } from "@/lib/stages";
 
 type Applicant = {
   id: string;
@@ -106,6 +107,8 @@ function CandidatosContent() {
   const [error, setError] = useState(id ? "" : "ID da vaga não fornecido");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [applicantParaEntrevista, setApplicantParaEntrevista] = useState<Applicant | null>(null);
+  // `null` = ver todas, agrupadas. Uma Etapa escolhida vira lista plana só daquela Etapa.
+  const [stageFilter, setStageFilter] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!id) return;
@@ -121,6 +124,16 @@ function CandidatosContent() {
 
   useEffect(() => { load(); }, [load]);
 
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    applicants.forEach((a) => m.set(a.stage, (m.get(a.stage) || 0) + 1));
+    return m;
+  }, [applicants]);
+
+  const stagesPresentes = useMemo(() => stagesPresent(counts), [counts]);
+
+  const visible = stageFilter ? applicants.filter((a) => a.stage === stageFilter) : applicants;
+
   // O modal agora move a Etapa na própria Candidatura (recebe `applicationId`) e, se for
   // entrevista, agenda em `interviews`. O UPDATE que existia aqui repetia o do modal.
   const handleAdvanceSuccess = (applicant: Applicant) => {
@@ -129,6 +142,69 @@ function CandidatosContent() {
     setApplicants((prev) => prev.map((a) => (a.application_id === applicant.application_id ? { ...a, stage: "Entrevista RH" } : a)));
     load();
   };
+
+  const renderRow = (applicant: Applicant) => (
+    <tr
+      key={applicant.application_id}
+      className="hover:bg-muted/30 transition-colors cursor-pointer"
+      onClick={() => setSelectedCandidateId(applicant.id)}
+    >
+      <td className="px-6 py-4 font-medium text-foreground">{applicant.name}</td>
+      <td className="px-6 py-4">
+        <div className="flex flex-col">
+          <span>{applicant.phone || "Sem telefone"}</span>
+          <span className="text-xs text-muted-foreground">{applicant.email}</span>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        {/* A coluna se chama ETAPA e só mostrava um botão: enquanto a etapa era
+            derivada e caía em "Nova" para qualquer valor desconhecido, ela não
+            dizia nada mesmo. Agora é a Etapa da candidatura (ADR 0006). */}
+        <div className="flex flex-col items-start gap-2">
+          <span className="text-sm font-medium text-foreground">{applicant.stage}</span>
+          <Button
+            variant={applicant.stage === "Nova" || applicant.stage === "Triagem" ? "default" : "outline"}
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); setApplicantParaEntrevista(applicant); }}
+          >
+            Mover para Entrevista
+          </Button>
+        </div>
+      </td>
+      <td className="px-6 py-4 max-w-sm">
+        {applicant.summary ? (
+          <span className="line-clamp-2 text-muted-foreground" title={applicant.summary}>
+            {applicant.summary}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground italic">Sem resumo extraído</span>
+        )}
+      </td>
+      <td className="px-6 py-4">
+        <span className={`inline-flex flex-col items-start rounded border px-2 py-1 text-[10px] font-medium ${
+          applicant.match_result.score >= 70
+            ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
+            : applicant.match_result.score >= 40
+              ? "bg-amber-500/10 text-amber-700 border-amber-500/20"
+              : "bg-zinc-500/10 text-zinc-700 border-zinc-500/20"
+        }`}>
+          <span className="font-bold">{applicant.match_result.score}% Match</span>
+          <span className="text-[9px] opacity-80">
+            {applicant.match_result.matches} de {applicant.match_result.total} palavras-chave
+          </span>
+        </span>
+      </td>
+      <td className="px-6 py-4 text-right">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={(e) => { e.stopPropagation(); setSelectedCandidateId(applicant.id); }}
+        >
+          Ver perfil
+        </Button>
+      </td>
+    </tr>
+  );
 
   return (
     <div className="p-6 space-y-6">
@@ -154,6 +230,38 @@ function CandidatosContent() {
         </div>
       )}
 
+      {!loading && applicants.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setStageFilter(null)}
+            aria-pressed={stageFilter === null}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              stageFilter === null
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border/60 text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            Todas · {applicants.length}
+          </button>
+          {stagesPresentes.map((stage) => (
+            <button
+              key={stage}
+              type="button"
+              onClick={() => setStageFilter(stage === stageFilter ? null : stage)}
+              aria-pressed={stage === stageFilter}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                stage === stageFilter
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border/60 text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {stage} · {counts.get(stage)}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="rounded-xl border border-border/50 bg-background overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -175,75 +283,29 @@ function CandidatosContent() {
                     <p className="text-muted-foreground">Carregando candidatos...</p>
                   </td>
                 </tr>
-              ) : applicants.length === 0 ? (
+              ) : visible.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                    Nenhum candidato nesta vaga ainda.
+                    {stageFilter
+                      ? `Nenhum candidato na Etapa "${stageFilter}".`
+                      : "Nenhum candidato nesta vaga ainda."}
                   </td>
                 </tr>
               ) : (
-                applicants.map((applicant) => (
-                  <tr
-                    key={applicant.application_id}
-                    className="hover:bg-muted/30 transition-colors cursor-pointer"
-                    onClick={() => setSelectedCandidateId(applicant.id)}
-                  >
-                    <td className="px-6 py-4 font-medium text-foreground">{applicant.name}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span>{applicant.phone || "Sem telefone"}</span>
-                        <span className="text-xs text-muted-foreground">{applicant.email}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {/* A coluna se chama ETAPA e só mostrava um botão: enquanto a etapa era
-                          derivada e caía em "Nova" para qualquer valor desconhecido, ela não
-                          dizia nada mesmo. Agora é a Etapa da candidatura (ADR 0006). */}
-                      <div className="flex flex-col items-start gap-2">
-                        <span className="text-sm font-medium text-foreground">{applicant.stage}</span>
-                        <Button
-                          variant={applicant.stage === "Nova" || applicant.stage === "Triagem" ? "default" : "outline"}
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); setApplicantParaEntrevista(applicant); }}
-                        >
-                          Mover para Entrevista
-                        </Button>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 max-w-sm">
-                      {applicant.summary ? (
-                        <span className="line-clamp-2 text-muted-foreground" title={applicant.summary}>
-                          {applicant.summary}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">Sem resumo extraído</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex flex-col items-start rounded border px-2 py-1 text-[10px] font-medium ${
-                        applicant.match_result.score >= 70
-                          ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
-                          : applicant.match_result.score >= 40
-                            ? "bg-amber-500/10 text-amber-700 border-amber-500/20"
-                            : "bg-zinc-500/10 text-zinc-700 border-zinc-500/20"
-                      }`}>
-                        <span className="font-bold">{applicant.match_result.score}% Match</span>
-                        <span className="text-[9px] opacity-80">
-                          {applicant.match_result.matches} de {applicant.match_result.total} palavras-chave
-                        </span>
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => { e.stopPropagation(); setSelectedCandidateId(applicant.id); }}
-                      >
-                        Ver perfil
-                      </Button>
-                    </td>
-                  </tr>
-                ))
+                stageFilter ? (
+                  visible.map(renderRow)
+                ) : (
+                  stagesPresentes.map((stage) => (
+                    <Fragment key={stage}>
+                      <tr className="bg-muted/40">
+                        <td colSpan={6} className="px-6 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {stage} · {counts.get(stage)}
+                        </td>
+                      </tr>
+                      {applicants.filter((a) => a.stage === stage).map(renderRow)}
+                    </Fragment>
+                  ))
+                )
               )}
             </tbody>
           </table>
