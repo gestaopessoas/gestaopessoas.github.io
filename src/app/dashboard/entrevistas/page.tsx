@@ -534,6 +534,12 @@ export default function EntrevistasPage() {
     setError("");
     const supabase = createClient();
 
+    // A ficha aberta pelo "Novo Candidato" cadastra a pessoa e nada mais. A entrevista nasce
+    // no Avançar, com data, hora, entrevistador e vinculada à Candidatura (issue #141) —
+    // gravar uma linha em `interviews` aqui também dava duas linhas para a mesma entrevista,
+    // uma sem data (o campo saiu da ficha) e outra com.
+    const novoCandidato = !editingId;
+
     // O Destino escolhido decide a Etapa da Candidatura (abaixo), mas não é mais gravado em
     // `interviews`: a Etapa Terminal mora só na Candidatura (ADR 0006, Fase 2).
     const destinoEscolhido = interviewProgress?.destination || form.destination || null;
@@ -655,7 +661,11 @@ export default function EntrevistasPage() {
     //     e candidato eternamente em "Processo de MP". A Candidatura em andamento manda; a
     //     Espontânea só entra quando não existe nenhuma.
     if (candidateId) {
-      const etapaDaCandidatura = stageFromInterviewProgress({ result: payloadAny.result, destination: destinoEscolhido });
+      // Sem a Situação da Entrevista, a ficha do candidato novo não tem o que dizer sobre a
+      // Etapa: ela nasce em "Nova", que é por onde o Avançar começa (`nextStageOptions`).
+      const etapaDaCandidatura = novoCandidato
+        ? ("Nova" as Stage)
+        : stageFromInterviewProgress({ result: payloadAny.result, destination: destinoEscolhido });
 
       const { data: emAndamento } = await supabase
         .from("job_applications")
@@ -667,12 +677,16 @@ export default function EntrevistasPage() {
 
       const candidaturaAtiva = emAndamento?.[0]?.id;
       if (candidaturaAtiva) {
-        const { error: etapaError } = await supabase
-          .from("job_applications")
-          .update({ status: etapaDaCandidatura })
-          .eq("id", candidaturaAtiva);
-        if (etapaError) {
-          fail("Não foi possível gravar a Etapa da candidatura: " + etapaError.message);
+        // Cadastrar a pessoa não mexe na Candidatura que já corre: reescrever a Etapa aqui
+        // jogava para trás quem já estava adiante (de "Processo de MP" para "Entrevista RH").
+        if (!novoCandidato) {
+          const { error: etapaError } = await supabase
+            .from("job_applications")
+            .update({ status: etapaDaCandidatura })
+            .eq("id", candidaturaAtiva);
+          if (etapaError) {
+            fail("Não foi possível gravar a Etapa da candidatura: " + etapaError.message);
+          }
         }
       } else {
         await abrirCandidaturaEspontanea(candidateId, etapaDaCandidatura);
@@ -727,50 +741,58 @@ export default function EntrevistasPage() {
       if (escolha === "nova") alvoId = null;
     }
 
-    // Primeira gravação costuma ter só data, hora e situação. O parecer nunca sai vazio
-    // (o formulário tem padrões: "Não", "Ensino Médio"...), então o que vale é ter mudado
-    // alguma coisa em relação ao padrão — senão o toast anuncia um parecer que não existe
-    // (issue #69).
-    const assessmentRows = assessmentToRows({ ...assessmentForm, ...assessmentData });
-    const temParecer = JSON.stringify(assessmentRows) !== JSON.stringify(assessmentToRows(defaultAssessment));
-
-    // 3. A entrevista em si.
-    const interviewPayload = { ...payload, candidate_id: candidateId };
-    let savedInterviewId = alvoId;
-
-    if (alvoId) {
-      let query = supabase.from("interviews").update(interviewPayload).eq("id", alvoId);
-      if (currentUpdatedAt) {
-        query = query.eq("updated_at", currentUpdatedAt);
-      }
-      const { data, error: saveError } = await query.select("id");
-
-      if (saveError) fail("Erro ao atualizar entrevista: " + saveError.message);
-      else if (!data || data.length === 0) fail("Conflito: A entrevista foi modificada por outro usuário. Por favor, cancele e abra novamente.");
+    // 3. A entrevista em si — e o parecer, que pendura em `interview_id`. Nenhum dos dois
+    //    existe no cadastro de um candidato novo: quem cria a linha em `interviews` é o
+    //    Avançar, logo abaixo. Por isso a aba Parecer fica fechada enquanto não há entrevista
+    //    (`CandidateProfileModal`), senão o RH digitaria um parecer que não teria onde cair.
+    if (novoCandidato) {
+      toast("Candidato cadastrado. Registre a entrevista no Avançar Etapa.", "success");
     } else {
-      const { data, error: saveError } = await supabase.from("interviews").insert(interviewPayload).select("id").single();
-      if (saveError) fail("Erro ao salvar entrevista: " + saveError.message);
-      else savedInterviewId = data.id;
-    }
+      // Primeira gravação costuma ter só data, hora e situação. O parecer nunca sai vazio
+      // (o formulário tem padrões: "Não", "Ensino Médio"...), então o que vale é ter mudado
+      // alguma coisa em relação ao padrão — senão o toast anuncia um parecer que não existe
+      // (issue #69).
+      const assessmentRows = assessmentToRows({ ...assessmentForm, ...assessmentData });
+      const temParecer = JSON.stringify(assessmentRows) !== JSON.stringify(assessmentToRows(defaultAssessment));
 
-    if (savedInterviewId) {
-      const { data: assessment, error: assessmentError } = await supabase
-        .from("interview_assessments")
-        .upsert({ interview_id: savedInterviewId }, { onConflict: "interview_id" })
-        .select("id")
-        .single();
-      // A entrevista já gravou aqui: falha do parecer é salvamento parcial (amarelo).
-      if (assessmentError || !assessment) fail("Entrevista salva, mas o parecer não: " + (assessmentError?.message || "avaliação não encontrada."), "warning");
-      const values = assessmentRows.map((value) => ({ ...value, assessment_id: assessment.id }));
-      // Só apaga quando há linhas novas para gravar — parecer vazio zerava o que existia.
-      if (values.length) {
-        const { error: clearError } = await supabase.from("interview_assessment_values").delete().eq("assessment_id", assessment.id);
-        const { error: valuesError } = clearError ? { error: clearError } : await supabase.from("interview_assessment_values").insert(values);
-        if (clearError || valuesError) fail("Entrevista salva, mas o parecer não: " + (clearError || valuesError)!.message, "warning");
+      const interviewPayload = { ...payload, candidate_id: candidateId };
+      let savedInterviewId = alvoId;
+
+      if (alvoId) {
+        let query = supabase.from("interviews").update(interviewPayload).eq("id", alvoId);
+        if (currentUpdatedAt) {
+          query = query.eq("updated_at", currentUpdatedAt);
+        }
+        const { data, error: saveError } = await query.select("id");
+
+        if (saveError) fail("Erro ao atualizar entrevista: " + saveError.message);
+        else if (!data || data.length === 0) fail("Conflito: A entrevista foi modificada por outro usuário. Por favor, cancele e abra novamente.");
+      } else {
+        // Vaga trocada numa entrevista salva: o usuário pediu uma entrevista nova (issue #125).
+        const { data, error: saveError } = await supabase.from("interviews").insert(interviewPayload).select("id").single();
+        if (saveError) fail("Erro ao salvar entrevista: " + saveError.message);
+        else savedInterviewId = data.id;
       }
-    }
 
-    toast(temParecer ? "Parecer e entrevista salvos com sucesso." : "Entrevista salva.", "success");
+      if (savedInterviewId) {
+        const { data: assessment, error: assessmentError } = await supabase
+          .from("interview_assessments")
+          .upsert({ interview_id: savedInterviewId }, { onConflict: "interview_id" })
+          .select("id")
+          .single();
+        // A entrevista já gravou aqui: falha do parecer é salvamento parcial (amarelo).
+        if (assessmentError || !assessment) fail("Entrevista salva, mas o parecer não: " + (assessmentError?.message || "avaliação não encontrada."), "warning");
+        const values = assessmentRows.map((value) => ({ ...value, assessment_id: assessment.id }));
+        // Só apaga quando há linhas novas para gravar — parecer vazio zerava o que existia.
+        if (values.length) {
+          const { error: clearError } = await supabase.from("interview_assessment_values").delete().eq("assessment_id", assessment.id);
+          const { error: valuesError } = clearError ? { error: clearError } : await supabase.from("interview_assessment_values").insert(values);
+          if (clearError || valuesError) fail("Entrevista salva, mas o parecer não: " + (clearError || valuesError)!.message, "warning");
+        }
+      }
+
+      toast(temParecer ? "Parecer e entrevista salvos com sucesso." : "Entrevista salva.", "success");
+    }
 
     // O histórico de mudança de Etapa (candidate_interviews) agora é gravado sozinho pelo
     // trigger de `job_applications` (ADR 0006, Fase 2) — gravar aqui também duplicaria a linha.
@@ -778,11 +800,11 @@ export default function EntrevistasPage() {
     setIsModalOpen(false);
     loadInterviews();
 
-    // Entrevista nova: a ficha faz o cadastro (nome, telefone, vaga) e o Avançar faz o resto —
+    // Candidato novo: a ficha faz o cadastro (nome, telefone, vaga) e o Avançar faz o resto —
     // é lá que se escolhe a Etapa, a data, a hora e o entrevistador, e é lá que a entrevista
     // nasce vinculada à Candidatura (issue #141). Sem isso a pessoa era cadastrada e ficava
     // sem entrevista marcada, porque o campo de data saiu da ficha.
-    if (!alvoId && candidateId) {
+    if (novoCandidato && candidateId) {
       const historico = historicoPorCandidato(
         (await supabase.from("candidate_interviews").select("candidate_id, stage, created_at").eq("candidate_id", candidateId).order("created_at", { ascending: false })).data
       );
@@ -957,7 +979,7 @@ export default function EntrevistasPage() {
             </Button>
             <Button onClick={openNewModal} className="gap-2">
               <Plus className="h-4 w-4" />
-              Nova Entrevista
+              Novo Candidato
             </Button>
           </div>
         </header>

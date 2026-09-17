@@ -1696,13 +1696,21 @@ export function CandidateProfileModal({
                         O parecer só pode ser editado pela tela de Entrevistas — aqui ele é somente leitura.
                       </div>
                     )}
+                    {/* O parecer pendura em `interview_id`: sem entrevista não há onde gravá-lo.
+                        É o caso da ficha de "Novo Candidato" (issue #141) — ela cadastra a
+                        pessoa, e a entrevista nasce no Avançar Etapa. */}
+                    {isEditing && canSaveAssessment && !interviewId && !assessmentLoadError && (
+                      <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+                        O parecer nasce junto com a entrevista. Cadastre o candidato e registre a entrevista pelo Avançar Etapa.
+                      </div>
+                    )}
                     {assessmentLoadError ? (
                       <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-5 text-sm text-destructive">
                         <p className="font-semibold">Não foi possível carregar o parecer.</p>
                         <p className="mt-1">{assessmentLoadError}</p>
                         <p className="mt-1">Feche e abra a ficha novamente. Editar agora pode sobrescrever o parecer existente.</p>
                       </div>
-                    ) : isEditing && canSaveAssessment ? (
+                    ) : isEditing && canSaveAssessment && interviewId ? (
                       <CandidateAssessmentTab 
                         assessmentData={assessmentData} 
                         candidateId={candidateId ?? resolvedCandidateId}
