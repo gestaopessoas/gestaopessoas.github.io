@@ -98,7 +98,11 @@ export default function NovaVagaPage() {
           level_min: meta.selectedLevelMin || null,
           level_max: meta.selectedLevelMax || null,
           seniority: meta.selectedSeniority || null,
-          status: "Aprovada",
+          // A Vaga nasce em "Nova" e alguém aprova depois, em Gestão de Vagas. Criar já
+          // como "Aprovada" disparava o gatilho que abre a publicação no portal, então
+          // quem tinha acesso à tela publicava vaga com faixa salarial e centro de custo
+          // sem ninguém no circuito (issue #124).
+          status: "Nova",
         });
 
       if (requestError) throw new Error("Erro ao salvar o histórico da vaga (job_requests): " + requestError.message);
@@ -126,7 +130,7 @@ export default function NovaVagaPage() {
           </Link>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Criar Nova Vaga</h1>
-            <p className="text-muted-foreground">Preencha os detalhes para publicar uma vaga diretamente no portal de carreiras.</p>
+            <p className="text-muted-foreground">A vaga é criada como <strong>Nova</strong> e só vai ao portal de carreiras depois de aprovada em Gestão de Vagas.</p>
           </div>
         </header>
 
@@ -134,7 +138,7 @@ export default function NovaVagaPage() {
           mode="create"
           onSubmit={handlePublish}
           submitting={saving}
-          submitLabel="Publicar Vaga"
+          submitLabel="Enviar para aprovação"
           error={error}
         />
       </div>
