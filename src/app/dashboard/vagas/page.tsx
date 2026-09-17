@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Card, CardContent } from "@/components/ui/card";
 import { Briefcase, CheckCircle2, Clock, ExternalLink, MessageCircle, Plus, Search, Edit3, Archive, ListTodo, ArchiveRestore, User, Calendar, MapPin, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import VagaForm, { type VagaFormValues } from "./VagaForm";
@@ -76,6 +77,7 @@ export default function VagasAdminPage() {
   const [activeTab, setActiveTab] = useState<"ativas" | "historico">("ativas");
   
   // Modal State
+  const router = useRouter();
   const [selectedJob, setSelectedJob] = useState<JobRequest | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -296,7 +298,8 @@ export default function VagasAdminPage() {
             <Card 
               key={request.id} 
               className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col"
-              onClick={() => { setSelectedJob(request); setIsEditing(false); }}
+              // A barra antes da query é exigência do `trailingSlash: true` do next.config.
+              onClick={() => router.push(`/dashboard/vagas/candidatos/?id=${request.id}`)}
             >
               <CardContent className="p-5 flex flex-col gap-4 flex-1">
                 <div className="flex justify-between items-start gap-2">
@@ -306,9 +309,22 @@ export default function VagasAdminPage() {
                       {request.workplace?.name || request.unit || "Obra não informada"} • {request.quantity ?? 1} vaga(s)
                     </p>
                   </div>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusStyle[request.status || "Nova"] ?? ""}`}>
-                    {request.status || "Nova"}
-                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusStyle[request.status || "Nova"] ?? ""}`}>
+                      {request.status || "Nova"}
+                    </span>
+                    {/* O card agora leva para os candidatos: o modal da vaga passou a ser este lápis. */}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                      title="Editar vaga"
+                      aria-label={`Editar vaga ${request.position_title || "sem título"}`}
+                      onClick={(e) => { e.stopPropagation(); setSelectedJob(request); setIsEditing(false); }}
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex-1 mt-2 space-y-3 text-sm">
