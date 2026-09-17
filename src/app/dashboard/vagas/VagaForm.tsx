@@ -8,6 +8,7 @@ import { Save, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useEffect } from "react";
 import { buscarTudo } from "@/lib/paginacao";
+import { sortLevels } from "@/lib/salaryLevels.mjs";
 
 export type JobProfile = {
   id: string;
@@ -239,7 +240,7 @@ export default function VagaForm({
     if (form.profile_id && profiles.length > 0 && salaryTable.length > 0) {
       const profile = profiles.find((item) => item.id === form.profile_id);
       const options = salaryTable.filter((s) => s.role_name === profile?.title);
-      setAvailableLevels(Array.from(new Set(options.map((o) => o.level).filter(Boolean))));
+      setAvailableLevels(sortLevels(Array.from(new Set(options.map((o) => o.level).filter(Boolean)))));
       setAvailableSeniorities(Array.from(new Set(options.map((o) => o.seniority).filter(Boolean))) as string[]);
     }
   }
@@ -257,7 +258,7 @@ export default function VagaForm({
     const profile = profiles.find((item) => item.id === profileId);
 
     const options = salaryTable.filter(s => s.role_name === profile?.title);
-    const levels = Array.from(new Set(options.map(o => o.level).filter(Boolean)));
+    const levels = sortLevels(Array.from(new Set(options.map(o => o.level).filter(Boolean))));
     const seniorities = Array.from(new Set(options.map(o => o.seniority).filter(Boolean))) as string[];
 
     setAvailableLevels(levels);
@@ -431,7 +432,7 @@ export default function VagaForm({
               <select value={form.unit} onChange={(event) => handleUnitChange(event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                 <option value="">Selecione...</option>
                 {costCenters.map(cc => (
-                  <option key={cc.id} value={cc.name}>{cc.code}</option>
+                  <option key={cc.id} value={cc.name}>{cc.name}</option>
                 ))}
               </select>
             </Field>
