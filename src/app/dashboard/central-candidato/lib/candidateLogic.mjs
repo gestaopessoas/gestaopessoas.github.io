@@ -120,9 +120,23 @@ export function candidateBucket(status, etapaAtual, contratadoEm) {
 }
 
 /**
+ * A Obra que não é campo. Vaga da sede não passa por obra nenhuma (issue #120).
+ *
+ * ponytail: a regra é o nome da Obra cadastrada, porque "SEDE" já existe em `workplaces` e
+ * é a única assim. No dia em que houver um segundo local que não é canteiro, o caminho é
+ * uma coluna em `workplaces` — não um segundo nome nesta função.
+ */
+export function isHeadquarters(obra) {
+  return sameStage(obra, "SEDE");
+}
+
+/**
  * Etapas oferecidas no avanço da Central: as do balde atual (movimento lateral) e as do
  * balde seguinte. Balde desconhecido — ou `livre`, cuja única etapa ("Nova") é o começo e
  * não um destino — começa o funil pela entrevista.
+ *
+ * Na sede o balde `obras` é pulado: o funil obrigava a marcar "Em Obra" para chegar em
+ * Proposta, e o histórico passava a registrar uma passagem por obra que nunca houve.
  *
  * Desfecho não mora aqui. Contratado, Banco de Talentos, Reprovado e Desistente são decisão
  * da entrevista, registrada na ficha em /dashboard/entrevistas: é lá que se contrata ou se
@@ -133,12 +147,13 @@ export function candidateBucket(status, etapaAtual, contratadoEm) {
  * virar atrito no dia a dia, o caminho é um botão "Encerrar processo" na linha — não
  * devolver os desfechos a este select, que foi de onde eles saíram.
  */
-export function nextStageOptions(currentBucket) {
+export function nextStageOptions(currentBucket, obra) {
   const idx = BUCKET_ORDER.indexOf(currentBucket);
   if (idx === -1) return [...STAGE_BUCKETS.entrevista];
 
   const stages = [...(STAGE_BUCKETS[currentBucket] ?? [])];
-  const proximo = BUCKET_ORDER[idx + 1];
+  let proximo = BUCKET_ORDER[idx + 1];
+  if (proximo === "obras" && isHeadquarters(obra)) proximo = BUCKET_ORDER[idx + 2];
   if (proximo) stages.push(...(STAGE_BUCKETS[proximo] ?? []));
 
   // O filtro é a regra, não a montagem acima: "Contratado" é a etapa do balde `contratacao`

@@ -181,6 +181,17 @@ test("o avanço oferece o balde atual e o seguinte", () => {
   assert.equal(opcoes.includes("Proposta"), false);
 });
 
+// issue #120: sem isso, chegar em Proposta numa vaga de sede exigia carimbar "Em Obra".
+test("vaga da sede pula o balde de obra", () => {
+  const opcoes = nextStageOptions("entrevista", "SEDE");
+  assert.ok(opcoes.includes("Proposta"));
+  for (const etapa of STAGE_BUCKETS.obras) assert.equal(opcoes.includes(etapa), false, etapa);
+  // Acento e caixa não são informação: "Sede" é a mesma Obra.
+  assert.ok(nextStageOptions("entrevista", "Sede").includes("Proposta"));
+  // Obra de verdade continua obrigando a passar por ela.
+  assert.equal(nextStageOptions("entrevista", "OBRA CENTRO").includes("Proposta"), false);
+});
+
 test("quem está no banco de talentos é chamado para entrevista", () => {
   // O balde de quem está livre não tem etapa própria — a única saída é marcar entrevista,
   // que é o que o botão "Chamar para entrevista" do Banco de Talentos usa.

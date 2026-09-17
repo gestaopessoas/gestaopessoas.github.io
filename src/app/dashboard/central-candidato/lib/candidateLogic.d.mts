@@ -94,7 +94,9 @@ export const BUCKET_ORDER: readonly [
 ];
 export const BUCKET_LABELS: Record<string, string>;
 
-export function nextStageOptions(currentBucket: string): string[];
+export function isHeadquarters(obra: string | null | undefined): boolean;
+
+export function nextStageOptions(currentBucket: string, obra?: string | null): string[];
 
 export const DIAS_NA_ABA_CONTRATACAO: number;
 

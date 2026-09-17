@@ -227,7 +227,7 @@ export default function AdvanceStageModal({
 
   // O balde atual e o seguinte, sem desfecho: contratar, mandar para o banco, reprovar e
   // registrar desistência são decisão da entrevista, não do funil (issue #84).
-  const validNextStages = useMemo(() => nextStageOptions(currentBucket), [currentBucket]);
+  const validNextStages = useMemo(() => nextStageOptions(currentBucket, workplaceName), [currentBucket, workplaceName]);
 
   // Quem quiser o parecer vai para a ficha da entrevista recém-criada; quem não quiser
   // termina o avanço em dois cliques.
