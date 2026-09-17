@@ -635,8 +635,10 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
 
           <div ref={consentRef} className="rounded-md border border-border p-4">
             <label className="flex items-start gap-3 text-sm">
-              <Checkbox className="mt-0.5" checked={consentAccepted} onCheckedChange={(checked) => { setConsentError(""); setConsentAccepted(checked === true); }} aria-invalid={!!consentError} />
-              <span>
+              {/* O Checkbox é um <button role="checkbox">: <label> em volta não o nomeia,
+                  então o leitor de tela anunciava só "caixa de seleção" (issue #126). */}
+              <Checkbox className="mt-0.5" checked={consentAccepted} onCheckedChange={(checked) => { setConsentError(""); setConsentAccepted(checked === true); }} aria-invalid={!!consentError} aria-labelledby="consent-text" />
+              <span id="consent-text">
                 Li e aceito a{" "}
                 <a href="/privacidade/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
                   Política de Privacidade
@@ -777,8 +779,9 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                           <Checkbox
                             checked={row.isCurrent}
                             onCheckedChange={(checked) => updateExperienceRow(index, "isCurrent", checked === true)}
+                            aria-labelledby={`exp-atual-${index}`}
                           />
-                          Trabalho aqui atualmente
+                          <span id={`exp-atual-${index}`}>Trabalho aqui atualmente</span>
                         </Label>
                       </div>
                       <Textarea rows={2} placeholder="Conte um pouco das atividades" value={row.description} onChange={(event) => updateExperienceRow(index, "description", event.target.value)} />
@@ -842,8 +845,8 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                   )}
                 </div>
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={candidate.is_pcd} onCheckedChange={(checked) => update("is_pcd", checked === true)} />
-                  Pessoa com deficiência (PcD)
+                  <Checkbox checked={candidate.is_pcd} onCheckedChange={(checked) => update("is_pcd", checked === true)} aria-labelledby="pcd-text" />
+                  <span id="pcd-text">Pessoa com deficiência (PcD)</span>
                 </label>
                 {candidate.is_pcd && <Field label="Descrição PcD"><Input value={candidate.pcd_description} onChange={(event) => update("pcd_description", event.target.value)} /></Field>}
               </FormSection>
