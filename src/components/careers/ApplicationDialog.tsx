@@ -11,7 +11,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Send, Loader2, ClipboardCheck, Plus, X, Paperclip, CheckCircle2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { maskCpf, maskPhone, maskCep, maskAddressNumber, maskUf, isValidPhone, onlyDigits, safeFileName } from "@/lib/masks";
-import { isValidCpf, maskCurrencyInput } from "@/app/dashboard/colaboradores/lib/employeeFormRules.mjs";
+import { formatCurrencyInput, isValidCpf, parseCurrencyInput } from "@/app/dashboard/colaboradores/lib/employeeFormRules.mjs";
 import { CONSENT_VERSION } from "./consent";
 import { monthEndDate, normalizeResumeDate } from "@/lib/resumeDate";
 import type { Career } from "./types";
@@ -30,6 +30,8 @@ const LANGUAGE_LEVELS = ["Básico", "Intermediário", "Avançado", "Fluente", "N
 // "Prefiro não informar" como valor inicial — o preenchimento é voluntário e não
 // entra na avaliação (ver /privacidade).
 const NAO_INFORMAR = "Prefiro não informar";
+const CNH_CATEGORY_OPTIONS = ["A", "B", "AB", "C", "D", "E"];
+
 const RACE_OPTIONS = [NAO_INFORMAR, "Branca", "Preta", "Parda", "Amarela", "Indígena"];
 const GENDER_OPTIONS = [NAO_INFORMAR, "Mulher cisgênero", "Homem cisgênero", "Mulher transgênero", "Homem transgênero", "Não binária", "Outro"];
 const ORIENTATION_OPTIONS = [NAO_INFORMAR, "Heterossexual", "Homossexual", "Bissexual", "Assexual", "Outro"];
@@ -84,6 +86,7 @@ const emptyCandidate = {
   role_interest: "",
   salary_expectation: "",
   has_cnh: "" as "" | "sim" | "nao",
+  cnh_categories: "",
   is_pcd: false,
   pcd_description: "",
 };
@@ -111,6 +114,22 @@ async function withRetry<T extends { error: { code?: string } | null }>(
     result = await fn();
   }
   return result;
+}
+
+
+/**
+ * A pretensão digitada, normalizada para "2.500,00".
+ *
+ * A máscara antiga rodava a cada tecla e tratava tudo como centavos: digitar 2000 virava
+ * R$ 20,00, e selecionar tudo para corrigir concatenava em vez de substituir, porque o
+ * campo era reescrito no meio da digitação (issue #116). Agora o texto só é formatado
+ * quando o campo perde o foco, e digitar segue sendo digitar.
+ */
+function formatSalaryExpectation(value: string) {
+  const limpo = String(value ?? "").trim();
+  if (!limpo) return "";
+  const numero = parseCurrencyInput(limpo);
+  return numero > 0 ? formatCurrencyInput(numero) : "";
 }
 
 export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | null; open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -370,10 +389,14 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
         gender_identity: candidate.gender_identity === NAO_INFORMAR ? null : sanitizeText(candidate.gender_identity, 200) || null,
         sexual_orientation: candidate.sexual_orientation === NAO_INFORMAR ? null : sanitizeText(candidate.sexual_orientation, 200) || null,
         race_declaration: candidate.race_declaration === NAO_INFORMAR ? null : sanitizeText(candidate.race_declaration, 200) || null,
-        salary_expectation: sanitizeText(candidate.salary_expectation, 50) || null,
+        salary_expectation: sanitizeText(formatSalaryExpectation(candidate.salary_expectation), 50) || null,
         // Vazio = não respondeu. A coluna é nullable, então "não informou" não
         // vira "não tem" — que era o efeito do default "Não" na tela.
         has_cnh: candidate.has_cnh === "" ? null : candidate.has_cnh === "sim",
+        // Categoria só existe para quem tem CNH: marcar "Não" e deixar a categoria
+        // preenchida gravaria uma habilitação que a pessoa disse não ter (issue #117).
+        cnh_categories:
+          candidate.has_cnh === "sim" && candidate.cnh_categories ? [candidate.cnh_categories] : [],
         is_pcd: candidate.is_pcd,
         pcd_description: candidate.is_pcd ? sanitizeText(candidate.pcd_description, 500) || null : null,
         // Dependentes, tamanho de uniforme e tamanho de botina saíram do formulário público
@@ -801,7 +824,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                     </select>
                   </Field>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Field label="Pretensão salarial"><Input value={candidate.salary_expectation} onChange={(event) => update("salary_expectation", maskCurrencyInput(event.target.value))} /></Field>
+                  <Field label="Pretensão salarial (R$)"><Input inputMode="decimal" placeholder="Ex.: 2.500,00" value={candidate.salary_expectation} onChange={(event) => update("salary_expectation", event.target.value.replace(/[^\d.,]/g, ""))} onBlur={(event) => update("salary_expectation", formatSalaryExpectation(event.target.value))} /></Field>
                   <Field label="Possui CNH?">
                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.has_cnh} onChange={(event) => update("has_cnh", event.target.value as "" | "sim" | "nao")}>
                       <option value="">Selecione...</option>
@@ -809,6 +832,14 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                       <option value="nao">Não</option>
                     </select>
                   </Field>
+                  {candidate.has_cnh === "sim" && (
+                    <Field label="Categoria da CNH">
+                      <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={candidate.cnh_categories} onChange={(event) => update("cnh_categories", event.target.value)}>
+                        <option value="">Selecione...</option>
+                        {CNH_CATEGORY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </Field>
+                  )}
                 </div>
                 <label className="flex items-center gap-2 text-sm">
                   <Checkbox checked={candidate.is_pcd} onCheckedChange={(checked) => update("is_pcd", checked === true)} />

@@ -199,6 +199,11 @@ test("formata e converte salário brasileiro sem perder centavos", () => {
   assert.equal(parseCurrencyInput("12.345,60"), 12345.6);
   assert.equal(maskCurrencyInput("1234560"), "12.345,60");
   assert.equal(maskCurrencyInput(""), "");
+  // O formulário público não usa mais a máscara de centavos: lá o texto é formatado só no
+  // blur, e formatar de novo o que já está formatado não pode mexer no valor (issue #116).
+  assert.equal(formatCurrencyInput(parseCurrencyInput("2000")), "2.000,00");
+  assert.equal(formatCurrencyInput(parseCurrencyInput("2.000,00")), "2.000,00");
+  assert.equal(formatCurrencyInput(parseCurrencyInput("2500,5")), "2.500,50");
 });
 
 test("avisa a troca salarial sete dias antes do fim da experiência", () => {
