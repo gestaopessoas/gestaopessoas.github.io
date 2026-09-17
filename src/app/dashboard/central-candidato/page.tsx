@@ -4,9 +4,16 @@ import { Fragment, useEffect, useState, useMemo } from "react";
 import { cn, errorMessage } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { createClient } from "@/utils/supabase/client";
-import { Search, Loader2, Contact, RefreshCw, Plus, Trash2, AlertCircle, Briefcase, CheckCircle2, Users, UserCheck, Funnel, ChevronRight, ChevronDown } from "lucide-react";
+import { Search, Loader2, Contact, RefreshCw, Plus, Trash2, AlertCircle, Briefcase, CheckCircle2, Users, UserCheck, Funnel, ChevronRight, ChevronDown, ArrowRight, PhoneCall, ListChecks, DoorOpen, Ban, MoreVertical } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import AdvanceStageModal from "./components/AdvanceStageModal";
 import DesfechoModal from "./components/DesfechoModal";
@@ -419,7 +426,7 @@ export default function CentralCandidatoPage() {
                 <th className="px-6 py-4 font-medium">Escolaridade</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Último Chamado</th>
-                <th className="sticky right-0 z-10 bg-card px-6 py-4 font-medium text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]">Ações</th>
+                <th className="sticky right-0 z-10 bg-card px-3 py-4 font-medium text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)] w-[110px]">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
@@ -508,14 +515,17 @@ export default function CentralCandidatoPage() {
                     <td className="px-6 py-4 text-muted-foreground text-xs">
                       {candidate.ultimo_chamado}
                     </td>
-                    <td className="sticky right-0 z-10 bg-card px-6 py-4 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]">
-                      <div className="flex justify-end gap-2 items-center">
+                    <td className="sticky right-0 z-10 bg-card px-3 py-4 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]">
+                      <div className="flex justify-end gap-1 items-center">
                         {/* Quem está livre também precisa de porta de entrada: sem isto o
                             Banco de Talentos virava lista de leitura (QA B5). */}
                         {candidate.bucket !== "contratacao" && (
                           <Button
-                            variant="outline"
-                            size="sm"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            title={candidate.status === "Banco de Talentos" ? "Chamar" : "Avançar"}
+                            aria-label={candidate.status === "Banco de Talentos" ? "Chamar" : "Avançar"}
                             onClick={(e) => {
                               e.stopPropagation();
                               setAdvanceModalData({
@@ -528,93 +538,111 @@ export default function CentralCandidatoPage() {
                               });
                             }}
                           >
-                            {candidate.status === "Banco de Talentos" ? "Chamar" : "Avançar"}
+                            {candidate.status === "Banco de Talentos" ? <PhoneCall className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
                           </Button>
-                        )}
-                        {/* Quem está em Banco de Talentos não tem Candidatura ativa para
-                            reprovar; quem está em "Nova" tem, mesmo caindo no balde livre. */}
-                        {canEdit && candidate.candidatura_id && candidate.bucket !== "contratacao" && candidate.status !== "Banco de Talentos" && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:bg-destructive/10"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDesfechoModalData({
-                                  applicationId: candidate.candidatura_id!,
-                                  name: candidate.full_name,
-                                  outcome: "Reprovado",
-                                  workplace: candidate.obra_atual,
-                                });
-                              }}
-                            >
-                              Reprovar
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDesfechoModalData({
-                                  applicationId: candidate.candidatura_id!,
-                                  name: candidate.full_name,
-                                  outcome: "Desistente",
-                                  workplace: candidate.obra_atual,
-                                });
-                              }}
-                            >
-                              Desistiu
-                            </Button>
-                          </>
                         )}
                         {candidate.bucket === "documentacao" && (
                           <Button
-                            variant="outline"
-                            size="sm"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            title="Ver checklist"
+                            aria-label="Ver checklist"
                             onClick={(e) => {
                               e.stopPropagation();
                               router.push(`/dashboard/admissao`);
                             }}
                           >
-                            Ver Checklist
+                            <ListChecks className="h-4 w-4" />
                           </Button>
                         )}
-                        {candidate.bucket === "documentacao" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAdvanceModalData({
-                                id: candidate.id,
-                                applicationId: candidate.candidatura_id,
-                                name: candidate.full_name,
-                                bucket: candidate.bucket,
-                                stage: candidate.etapa_atual,
-                                workplace: candidate.obra_atual,
-                                forcedStage: "Contratado",
-                              });
-                            }}
-                          >
-                            <UserCheck className="h-4 w-4 mr-1" />
-                            Contratar
-                          </Button>
-                        )}
-                        {canDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteCandidate(candidate.id, candidate.full_name);
-                            }}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Excluir candidato"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                        {/* Quem está em Banco de Talentos não tem Candidatura ativa para
+                            reprovar; quem está em "Nova" tem, mesmo caindo no balde livre. */}
+                        {(() => {
+                          const showContratar = candidate.bucket === "documentacao";
+                          const showDesistirOuReprovar = Boolean(canEdit && candidate.candidatura_id && candidate.bucket !== "contratacao" && candidate.status !== "Banco de Talentos");
+                          const showExcluir = canDelete;
+                          if (!showContratar && !showDesistirOuReprovar && !showExcluir) return null;
+                          return (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={<Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" title="Mais ações" aria-label="Mais ações" />}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              {showContratar && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAdvanceModalData({
+                                      id: candidate.id,
+                                      applicationId: candidate.candidatura_id,
+                                      name: candidate.full_name,
+                                      bucket: candidate.bucket,
+                                      stage: candidate.etapa_atual,
+                                      workplace: candidate.obra_atual,
+                                      forcedStage: "Contratado",
+                                    });
+                                  }}
+                                >
+                                  <UserCheck className="h-4 w-4" />
+                                  Contratar
+                                </DropdownMenuItem>
+                              )}
+                              {showDesistirOuReprovar && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDesfechoModalData({
+                                      applicationId: candidate.candidatura_id!,
+                                      name: candidate.full_name,
+                                      outcome: "Desistente",
+                                      workplace: candidate.obra_atual,
+                                    });
+                                  }}
+                                >
+                                  <DoorOpen className="h-4 w-4" />
+                                  Desistiu
+                                </DropdownMenuItem>
+                              )}
+                              {(showContratar || showDesistirOuReprovar) && (showDesistirOuReprovar || showExcluir) && (
+                                <DropdownMenuSeparator />
+                              )}
+                              {showDesistirOuReprovar && (
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDesfechoModalData({
+                                      applicationId: candidate.candidatura_id!,
+                                      name: candidate.full_name,
+                                      outcome: "Reprovado",
+                                      workplace: candidate.obra_atual,
+                                    });
+                                  }}
+                                >
+                                  <Ban className="h-4 w-4" />
+                                  Reprovar
+                                </DropdownMenuItem>
+                              )}
+                              {showExcluir && (
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCandidate(candidate.id, candidate.full_name);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          );
+                        })()}
                       </div>
                     </td>
                   </tr>

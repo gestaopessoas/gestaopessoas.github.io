@@ -3,9 +3,15 @@
 import { useEffect, useState, useMemo } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { createClient } from "@/utils/supabase/client";
-import { Search, Loader2, Database, RefreshCw, Trash2, AlertCircle, Edit2, FileText, Plus, CalendarPlus } from "lucide-react";
+import { Search, Loader2, Database, RefreshCw, Trash2, AlertCircle, Edit2, FileText, Plus, CalendarPlus, MoreVertical } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import AdvanceStageModal from "@/app/dashboard/central-candidato/components/AdvanceStageModal";
 import { candidateStatusFromApplications, candidateBucket, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
@@ -291,7 +297,7 @@ export default function BancoTalentosPage() {
                 <th className="px-6 py-4 font-medium">Escolaridade</th>
                 <th className="px-6 py-4 font-medium">Última Etapa</th>
                 <th className="px-6 py-4 font-medium">Obras Disponíveis</th>
-                <th className="sticky right-0 z-10 bg-card px-6 py-4 font-medium text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]">Ações</th>
+                <th className="sticky right-0 z-10 bg-card px-3 py-4 font-medium text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)] w-[110px]">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
@@ -357,23 +363,26 @@ export default function BancoTalentosPage() {
                     <td className="px-6 py-4 text-xs font-medium text-primary">
                       {candidate.obras}
                     </td>
-                    <td className="sticky right-0 z-10 bg-card px-6 py-4 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]">
+                    <td className="sticky right-0 z-10 bg-card px-3 py-4 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.25)]">
                       <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => setCandidateToInterview({ id: candidate.id, name: candidate.full_name, applicationId: candidate.candidatura_id, stage: candidate.etapa_atual })} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Chamar para entrevista">
+                          <Button variant="ghost" size="icon" onClick={() => setCandidateToInterview({ id: candidate.id, name: candidate.full_name, applicationId: candidate.candidatura_id, stage: candidate.etapa_atual })} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Chamar para entrevista" aria-label="Chamar para entrevista">
                               <CalendarPlus className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => setSelectedCandidateId(candidate.id)} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Editar / Ver Dossiê">
+                          <Button variant="ghost" size="icon" onClick={() => setSelectedCandidateId(candidate.id)} className="h-8 w-8 text-muted-foreground hover:text-primary" title="Editar / Ver Dossiê" aria-label="Editar / Ver Dossiê">
                               <Edit2 className="h-4 w-4" />
                           </Button>
                           {canDelete && (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteCandidate(candidate.id, candidate.full_name)}
-                                className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" title="Mais ações" aria-label="Mais ações" />}>
+                                <MoreVertical className="h-4 w-4" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem variant="destructive" onClick={() => handleDeleteCandidate(candidate.id, candidate.full_name)}>
+                                  <Trash2 className="h-4 w-4" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                       </div>
                     </td>
