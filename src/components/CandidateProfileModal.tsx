@@ -24,7 +24,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { errorMessage } from "@/lib/utils";
 import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
 import { LIMITED_STAGE_OPTIONS, candidateStatusFromApplications } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
-import { STAGES } from "@/lib/stages";
+import { STAGES, isTerminal } from "@/lib/stages";
 import { INTERVIEW_STATUSES, normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 
@@ -590,6 +590,21 @@ export function CandidateProfileModal({
   // Opções do campo Cargo: os títulos de job_profiles mais o valor já gravado, para o Select
   // conseguir renderizar o que está selecionado.
   const currentCargo = (formData.role_interest || formData.role || "").trim();
+
+  // Issue #111: no cabecalho da ficha o contexto e a Candidatura, entao quem manda e a Vaga —
+  // `role_interest` e o cargo de interesse do dia do cadastro, e envelhece. Candidatura em
+  // andamento primeiro; sem nenhuma viva, a mais recente. Em edicao o campo continua sendo o
+  // `role_interest`, que e o que a ficha de fato grava.
+  const cargoDaVaga = useMemo(() => {
+    const emOrdem = [...applications].sort(
+      (a, b) => Number(isTerminal(a.status)) - Number(isTerminal(b.status)),
+    );
+    for (const app of emOrdem) {
+      const titulo = (app.job_requests?.position_title || app.job_requests?.requested_role || "").trim();
+      if (titulo) return titulo;
+    }
+    return "";
+  }, [applications]);
   const cargoOptions = useMemo(
     () => Array.from(new Set([...jobProfileOptions, currentCargo].filter(Boolean))),
     [jobProfileOptions, currentCargo],
@@ -1164,7 +1179,7 @@ export function CandidateProfileModal({
                             ))}
                           </select>
                         ) : (
-                          <span className="font-medium text-foreground">{formData.role_interest || formData.role || "Cargo não informado"}</span>
+                          <span className="font-medium text-foreground">{cargoDaVaga || formData.role_interest || formData.role || "Cargo não informado"}</span>
                         )}
                       </div>
                       {isEditing && cargoOptions.length === 0 && (
