@@ -96,7 +96,10 @@ export const BUCKET_LABELS: Record<string, string>;
 
 export function nextStageOptions(currentBucket: string): string[];
 
+export const DIAS_NA_ABA_CONTRATACAO: number;
+
 export function candidateBucket(
   status: string | null | undefined,
-  etapaAtual: string | null | undefined
+  etapaAtual: string | null | undefined,
+  contratadoEm?: string | null
 ): CandidateBucket;

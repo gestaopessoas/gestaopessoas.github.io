@@ -83,15 +83,33 @@ export const BUCKET_LABELS = {
   proposta: "Proposta",
   documentacao: "Documentação",
   mp: "Processo de MP",
-  contratacao: "Contratação",
+  contratacao: "Contratados (30 dias)",
 };
 
+/** Por quantos dias o contratado ainda aparece na aba Contratação (issue #113). */
+export const DIAS_NA_ABA_CONTRATACAO = 30;
+
+function contratacaoRecente(contratadoEm) {
+  if (!contratadoEm) return false;
+  const quando = new Date(contratadoEm).getTime();
+  if (Number.isNaN(quando)) return false;
+  return Date.now() - quando <= DIAS_NA_ABA_CONTRATACAO * 24 * 60 * 60 * 1000;
+}
+
 /**
- * Em qual balde o candidato cai. `encerrado` cobre Contratado/Reprovado/Desistente,
- * que não aparecem na Central.
+ * Em qual balde o candidato cai. `encerrado` cobre Reprovado/Desistente — e o Contratado
+ * antigo —, que não aparecem na Central.
+ *
+ * Contratado é o caso especial: a aba Contratação existia e contava zero sempre, porque
+ * todo desfecho caía em `encerrado` (issue #113). Agora ele fica visível pelos primeiros
+ * `DIAS_NA_ABA_CONTRATACAO` dias e depois sai sozinho — a aba é caixa de saída recente,
+ * não arquivo. Sem `contratadoEm` (quem chama sem a data) o comportamento é o antigo.
  */
-export function candidateBucket(status, etapaAtual) {
+export function candidateBucket(status, etapaAtual, contratadoEm) {
   if (sameStage(status, "Banco de Talentos")) return "livre";
+  if (sameStage(status, "Contratado")) {
+    return contratacaoRecente(contratadoEm) ? "contratacao" : "encerrado";
+  }
   if (!sameStage(status, "Em Processo")) return "encerrado";
 
   for (const bucket of BUCKET_ORDER) {
