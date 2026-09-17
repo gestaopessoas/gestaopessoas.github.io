@@ -22,7 +22,7 @@ import { normalizeResumeDate } from "@/lib/resumeDate";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/contexts/ToastContext";
 import { errorMessage } from "@/lib/utils";
-import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
+import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
 import { LIMITED_STAGE_OPTIONS, candidateStatusFromApplications } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { STAGES, isTerminal } from "@/lib/stages";
 import { INTERVIEW_STATUSES, normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
@@ -535,12 +535,6 @@ export function CandidateProfileModal({
   const [interviews, setInterviews] = useState<ProfileInterview[]>([]);
   const [candidateInterviews, setCandidateInterviews] = useState<CandidateInterview[]>([]);
   const [applications, setApplications] = useState<CandidateApplication[]>([]);
-  // A restrição de contato protege quem está em processo de ser abordado por fora — mas
-  // não pode cegar quem está conduzindo a entrevista e precisa ligar para confirmar (QA B7).
-  const contactsAreVisible = useMemo(
-    () => !!interviewProgress || canDisplayCandidateContacts(candidateInterviews),
-    [candidateInterviews, interviewProgress]
-  );
 
   // Aba "Histórico de Etapas" agrupada por Candidatura — um processo não pode se misturar
   // com o outro na mesma linha do tempo. Linha antiga sem vínculo (pré-Fase 1) vai para um
@@ -1193,32 +1187,28 @@ export function CandidateProfileModal({
 
                       <div className="flex items-center gap-2.5 break-all">
                         <Mail className="h-4 w-4 text-primary shrink-0" />
-                        {isEditing && contactsAreVisible ? (
+                        {isEditing ? (
                           <Input 
                             value={formData.email || formData.email_personal || ""} 
                             onChange={(e) => handleChange('email', e.target.value)}
                             placeholder="E-mail"
                             className="h-7 text-xs"
                           />
-                        ) : contactsAreVisible ? (
-                          formData.email || formData.email_corporate || formData.email_personal || "Sem e-mail"
                         ) : (
-                          "Contato restrito durante o processo"
+                          formData.email || formData.email_corporate || formData.email_personal || "Sem e-mail"
                         )}
                       </div>
                       <div className="flex items-center gap-2.5">
                         <Phone className="h-4 w-4 text-primary shrink-0" />
-                        {isEditing && contactsAreVisible ? (
+                        {isEditing ? (
                           <Input 
                             value={formData.phone || ""} 
                             onChange={(e) => handleChange('phone', e.target.value)}
                             placeholder="Telefone"
                             className="h-7 text-xs"
                           />
-                        ) : contactsAreVisible ? (
-                          formData.phone || "Sem telefone"
                         ) : (
-                          "Contato restrito durante o processo"
+                          formData.phone || "Sem telefone"
                         )}
                       </div>
                     </div>
@@ -1499,22 +1489,18 @@ export function CandidateProfileModal({
                         </div>
                         <div className="space-y-1.5">
                           <span className="text-xs text-muted-foreground block font-medium">Telefone Secundário</span>
-                          {isEditing && contactsAreVisible ? (
+                          {isEditing ? (
                             <Input value={formData.secondary_phone || ""} onChange={(e) => handleChange('secondary_phone', e.target.value)} />
-                          ) : contactsAreVisible ? (
-                            <span className="font-semibold">{formData.secondary_phone || "-"}</span>
                           ) : (
-                            <span className="font-semibold">Contato restrito</span>
+                            <span className="font-semibold">{formData.secondary_phone || "-"}</span>
                           )}
                         </div>
                         <div className="space-y-1.5">
                           <span className="text-xs text-muted-foreground block font-medium">E-mail Secundário</span>
-                          {isEditing && contactsAreVisible ? (
+                          {isEditing ? (
                             <Input type="email" value={formData.secondary_email || ""} onChange={(e) => handleChange('secondary_email', e.target.value)} />
-                          ) : contactsAreVisible ? (
-                            <span className="font-semibold break-all">{formData.secondary_email || "-"}</span>
                           ) : (
-                            <span className="font-semibold">Contato restrito</span>
+                            <span className="font-semibold break-all">{formData.secondary_email || "-"}</span>
                           )}
                         </div>
                         <div className="space-y-1.5">
@@ -1539,19 +1525,17 @@ export function CandidateProfileModal({
                         </div>
                         <div className="space-y-1.5 md:col-span-2">
                           <span className="text-xs text-muted-foreground block font-medium">Contato de Emergência</span>
-                          {isEditing && contactsAreVisible ? (
+                          {isEditing ? (
                             <div className="flex gap-2">
                               <Input placeholder="Nome" value={formData.emergency_contact_name || ""} onChange={(e) => handleChange('emergency_contact_name', e.target.value)} />
                               <Input placeholder="Telefone" value={formData.emergency_contact_phone || ""} onChange={(e) => handleChange('emergency_contact_phone', e.target.value)} />
                             </div>
-                          ) : contactsAreVisible ? (
+                          ) : (
                             <span className="font-semibold">
                               {formData.emergency_contact_name || formData.emergency_contact_phone ? 
                                 `${formData.emergency_contact_name || ''} ${formData.emergency_contact_phone ? `- ${formData.emergency_contact_phone}` : ''}` 
                                 : "-"}
                             </span>
-                          ) : (
-                            <span className="font-semibold">Contato restrito</span>
                           )}
                         </div>
                       </div>

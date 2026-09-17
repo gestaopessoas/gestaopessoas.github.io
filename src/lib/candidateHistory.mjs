@@ -46,15 +46,6 @@ export function buildCandidateFromInterviewProfile(profile = {}) {
   };
 }
 
-export function canDisplayCandidateContacts(interviews = []) {
-  if (!Array.isArray(interviews) || interviews.length === 0) return true;
-  const latest = [...interviews].sort(
-    (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-  )[0];
-  const status = normalizeStage(latest?.candidate_future || latest?.stage);
-  return status === "livre" || status === "banco de talentos";
-}
-
 /**
  * `interviews.candidate_id` é o vínculo de verdade (migração 20260914210000). E-mail e nome
  * continuam como fallback enquanto houver linha antiga sem o vínculo preenchido.

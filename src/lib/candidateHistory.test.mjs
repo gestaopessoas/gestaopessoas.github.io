@@ -1,4 +1,4 @@
-import { buildCandidateHistoryRecord, buildCandidateFromInterviewProfile, canDisplayCandidateContacts, getCandidateHistoryTargetId } from "./candidateHistory.mjs";
+import { buildCandidateHistoryRecord, buildCandidateFromInterviewProfile, getCandidateHistoryTargetId } from "./candidateHistory.mjs";
 
 const record = buildCandidateHistoryRecord({
   candidateId: "candidate-1",
@@ -28,15 +28,6 @@ for (const [key, value] of Object.entries(expected)) {
 
 console.log("candidateHistory.test.mjs passed");
 
-if (!canDisplayCandidateContacts([{ candidate_future: "Livre" }])) {
-  throw new Error("Contacts must remain visible for a free candidate");
-}
-if (!canDisplayCandidateContacts([{ candidate_future: "Banco de talentos" }])) {
-  throw new Error("Contacts must remain visible for a candidate in the talent pool");
-}
-if (canDisplayCandidateContacts([{ candidate_future: "Avançar no processo" }])) {
-  throw new Error("Contacts must be hidden during an active process");
-}
 
 if (getCandidateHistoryTargetId({ candidateId: "candidate-1", resolvedCandidateId: "candidate-2" }) !== "candidate-1") {
   throw new Error("An explicit candidate ID must be used for the history record");

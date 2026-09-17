@@ -20,7 +20,7 @@ import {
   BUCKET_ORDER,
   BUCKET_LABELS,
 } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
-import { canDisplayCandidateContacts, fetchInterviewProgress } from "@/lib/candidateHistory.mjs";
+import { fetchInterviewProgress } from "@/lib/candidateHistory.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 import {
   Dialog,
@@ -67,7 +67,6 @@ type CandidateRow = {
   etapa_atual: string | null;
   bucket: Bucket;
   is_new?: boolean;
-  contactsVisible: boolean;
   applications: ApplicationRow[];
   candidatura_id: string | null;
   motivo_saida: string | null;
@@ -231,7 +230,6 @@ export default function CentralCandidatoPage() {
             etapa_atual: derived.etapa_atual,
             bucket: candidateBucket(finalStatus, derived.etapa_atual, contratadoEm),
             is_new: hasNewApplication,
-            contactsVisible: canDisplayCandidateContacts(c.candidate_interviews),
             applications,
             candidatura_id: derived.candidatura_id,
             motivo_saida: derived.motivo_saida,
@@ -447,14 +445,8 @@ export default function CentralCandidatoPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        {candidate.contactsVisible ? (
-                          <>
-                            <span>{candidate.phone}</span>
-                            <span className="text-xs text-muted-foreground">{candidate.email}</span>
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground">Contato restrito durante o processo</span>
-                        )}
+                        <span>{candidate.phone}</span>
+                        <span className="text-xs text-muted-foreground">{candidate.email}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">{candidate.escolaridade}</td>
