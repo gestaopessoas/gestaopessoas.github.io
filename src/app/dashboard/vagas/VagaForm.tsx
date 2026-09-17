@@ -317,7 +317,13 @@ export default function VagaForm({
         ...prev,
         salary_min: matchMin?.salary ? String(matchMin.salary) : prev.salary_min,
         salary_max: matchMax?.salary ? String(matchMax.salary) : (matchMin?.salary ? String(matchMin.salary) : prev.salary_max),
-        contract_type: modalityMatch?.modality === "Estágio" ? "Estágio" : modalityMatch?.modality === "Jovem Aprendiz" ? "Jovem Aprendiz" : "CLT"
+        // Só a tabela salarial manda em Estágio e Jovem Aprendiz, que são regime do próprio
+        // cargo. Fora esses dois, o que o usuário escolheu fica: o "CLT" fixo que estava aqui
+        // devolvia toda vaga PJ para CLT ao escolher o cargo, sem aviso (issue #123).
+        contract_type:
+          modalityMatch?.modality === "Estágio" || modalityMatch?.modality === "Jovem Aprendiz"
+            ? modalityMatch.modality
+            : prev.contract_type
       }));
     }
   }
@@ -566,8 +572,8 @@ export default function VagaForm({
             <textarea rows={4} maxLength={1000} value={form.manager_expectations} onChange={(event) => set("manager_expectations", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm resize-none max-h-56 overflow-y-auto" />
             <div className="text-right text-xs text-muted-foreground">{form.manager_expectations.length}/1000</div>
           </Field>
-          <Field label="Observações adicionais (exclusivas do Portal)">
-            <textarea rows={3} maxLength={1000} value={form.notes} onChange={(event) => set("notes", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm resize-none max-h-56 overflow-y-auto" placeholder="Aparecerá nos detalhes da vaga se não houver um perfil estruturado" />
+          <Field label="Observações adicionais (reserva do portal)">
+            <textarea rows={3} maxLength={1000} value={form.notes} onChange={(event) => set("notes", event.target.value)} className="w-full rounded-md border bg-background p-3 text-sm resize-none max-h-56 overflow-y-auto" placeholder="Só aparece no portal quando a vaga não tem perfil de competência. Com perfil, o portal mostra as atividades dele e este texto fica guardado na vaga." />
             <div className="text-right text-xs text-muted-foreground">{form.notes.length}/1000</div>
           </Field>
         </div>
