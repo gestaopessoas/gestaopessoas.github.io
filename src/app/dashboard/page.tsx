@@ -23,7 +23,7 @@ export default function DashboardPage() {
       
       const [empRes, jobsRes] = await Promise.all([
         supabase.from("employees").select("id, status, birthday, admission_date").in("status", ["Ativo", "Férias", "Afastado"]),
-        supabase.from("job_requests").select("id", { count: "exact", head: true }).neq("status", "Recusada").neq("status", "Arquivada")
+        supabase.from("job_requests").select("id", { count: "exact", head: true }).neq("status", "Recusada").neq("status", "Arquivada").neq("status", "Preenchida")
       ]);
 
       const employees = empRes.data || [];

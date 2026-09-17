@@ -57,9 +57,13 @@ const statusStyle: Record<string, string> = {
   Aprovada: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   Recusada: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-300",
   Arquivada: "bg-zinc-800/10 text-zinc-500 dark:text-zinc-400",
+  Preenchida: "bg-emerald-600/15 text-emerald-800 dark:text-emerald-200",
 };
 
-const nextStatus = ["Nova", "Em análise", "Aprovada", "Recusada", "Arquivada"];
+const nextStatus = ["Nova", "Em análise", "Aprovada", "Recusada", "Arquivada", "Preenchida"];
+
+// Vaga que nao esta mais em andamento: recusada, desistida ou cumprida (issue #110).
+const ENCERRADAS = ["Recusada", "Arquivada", "Preenchida"];
 
 export default function VagasAdminPage() {
   const [requests, setRequests] = useState<JobRequest[]>([]);
@@ -106,9 +110,9 @@ export default function VagasAdminPage() {
     let result = requests;
     
     if (activeTab === "ativas") {
-      result = result.filter(r => !["Recusada", "Arquivada"].includes(r.status || ""));
+      result = result.filter(r => !ENCERRADAS.includes(r.status || ""));
     } else {
-      result = result.filter(r => ["Recusada", "Arquivada"].includes(r.status || ""));
+      result = result.filter(r => ENCERRADAS.includes(r.status || ""));
     }
     
     if (!term) return result;
@@ -206,8 +210,8 @@ export default function VagasAdminPage() {
     setIsEditing(false);
   };
 
-  const abertas = requests.filter((request) => !["Recusada", "Arquivada"].includes(request.status ?? "")).length;
-  const urgentes = requests.filter((request) => ["Alta", "Crítica"].includes(request.urgency ?? "") && !["Recusada", "Arquivada"].includes(request.status ?? "")).length;
+  const abertas = requests.filter((request) => !ENCERRADAS.includes(request.status ?? "")).length;
+  const urgentes = requests.filter((request) => ["Alta", "Crítica"].includes(request.urgency ?? "") && !ENCERRADAS.includes(request.status ?? "")).length;
   const aprovadas = requests.filter((request) => request.status === "Aprovada").length;
 
   return (
