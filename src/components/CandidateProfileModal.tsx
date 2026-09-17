@@ -21,7 +21,7 @@ import { normalizeResumeDate } from "@/lib/resumeDate";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/contexts/ToastContext";
 import { errorMessage } from "@/lib/utils";
-import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
+import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, getCandidateHistoryTargetId, parseCandidateHistoryNotes } from "@/lib/candidateHistory.mjs";
 import { LIMITED_STAGE_OPTIONS, candidateStatusFromApplications } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { STAGES, isTerminal } from "@/lib/stages";
 import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
@@ -1959,12 +1959,15 @@ export function CandidateProfileModal({
                                     {ci.candidate_future && (
                                       <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Futuro do candidato:</span> {ci.candidate_future}</p>
                                     )}
-                                    {ci.notes && (
-                                      <div className="mt-2 text-sm bg-muted/40 p-3 rounded-lg border">
-                                        <span className="font-semibold block mb-1">Observações:</span>
-                                        {ci.notes}
+                                    {/* As notas vieram concatenadas num bloco só ("[Motivo]
+texto"):
+                                        na tela cada rótulo volta a ser um campo próprio (issue #142). */}
+                                    {parseCandidateHistoryNotes(ci.notes).map((section, index) => (
+                                      <div key={`${ci.id}-nota-${index}`} className="mt-2 text-sm bg-muted/40 p-3 rounded-lg border">
+                                        <span className="font-semibold block mb-1">{section.label ?? "Observações"}:</span>
+                                        <span className="whitespace-pre-line">{section.value}</span>
                                       </div>
-                                    )}
+                                    ))}
                                     {ci.rejection_reason && (
                                       <div className="mt-2 text-sm bg-rose-500/10 text-rose-800 p-3 rounded-lg border border-rose-500/20">
                                         <span className="font-semibold block mb-1">Motivo Reprovação / Desistência:</span>

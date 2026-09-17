@@ -81,3 +81,34 @@ export async function fetchInterviewProgress(supabase, { candidateId, email = ""
     interview_time: data.interview_time || "",
   };
 }
+
+/**
+ * As notas do histórico são gravadas como um bloco só, com rótulos entre colchetes
+ * ("[Motivo]\ntexto"). Para a tela mostrar campo a campo, o bloco volta a ser uma lista
+ * de { label, value }. Registro antigo, escrito como texto livre, vira um item sem rótulo
+ * em vez de sumir da tela.
+ */
+export function parseCandidateHistoryNotes(notes) {
+  const text = String(notes || "").trim();
+  if (!text) return [];
+
+  const sections = [];
+  let current = null;
+  for (const line of text.split(/\r?\n/)) {
+    const labelMatch = line.match(/^\[(.+)\]$/);
+    if (labelMatch) {
+      current = { label: labelMatch[1].trim(), lines: [] };
+      sections.push(current);
+      continue;
+    }
+    if (!current) {
+      current = { label: null, lines: [] };
+      sections.push(current);
+    }
+    current.lines.push(line);
+  }
+
+  return sections
+    .map((section) => ({ label: section.label, value: section.lines.join("\n").trim() }))
+    .filter((section) => section.value);
+}
