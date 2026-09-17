@@ -26,8 +26,14 @@ export type Career = {
   } | null;
 };
 
-export function formatSalaryRange(min: number | null, max: number | null): string | null {
-  if (!min && !max) return null;
+/**
+ * Vaga que esconde o salario nao traz `salary_min`/`salary_max`: a migration
+ * `20260917150000_vaga_esconde_salario_no_portal` faz o gatilho de publicacao NAO copiar o valor
+ * para `job_openings`. Entao "sem salario" aqui cobre dois casos -- a vaga que escondeu e a que
+ * nunca informou -- e "A combinar" e verdade nos dois.
+ */
+export function formatSalaryRange(min: number | null, max: number | null): string {
+  if (!min && !max) return "A combinar";
   const fmt = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 });
   if (min && max && min !== max) return `${fmt(min)} - ${fmt(max)}`;
   return fmt(min || max || 0);

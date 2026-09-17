@@ -96,6 +96,8 @@ export const initialForm = {
   manager_expectations: "",
   notes: "",
   benefits: [] as string[],
+  // Vaga nova nasce escondendo o salario; o banco tem o mesmo default.
+  hide_salary: true,
   stages: [] as string[],
 };
 
@@ -566,6 +568,25 @@ export default function VagaForm({
             {tagBox("benefits", companyBenefits.map(b => b.name))}
           </Field>
         </div>
+      </section>
+
+      <section className="rounded-lg border bg-card p-5">
+        <h2 className="mb-4 text-lg font-semibold">Portal de carreiras</h2>
+        <label htmlFor="hide-salary" className="flex items-start gap-2 text-sm">
+          <input
+            id="hide-salary"
+            type="checkbox"
+            checked={form.hide_salary}
+            onChange={(e) => set("hide_salary", e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-input"
+          />
+          <span>
+            Não mostrar o salário no anúncio público
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              O candidato vê &quot;A combinar&quot;. O valor não sai daqui: ele nem chega a ser enviado ao portal.
+            </span>
+          </span>
+        </label>
       </section>
 
       <section className="rounded-lg border bg-card p-5">

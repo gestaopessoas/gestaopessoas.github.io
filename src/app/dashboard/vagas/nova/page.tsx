@@ -95,6 +95,7 @@ export default function NovaVagaPage() {
           work_mode: form.work_mode || null,
           is_pcd_eligible: form.is_pcd_eligible,
           affirmative_tags: form.affirmative_tags,
+          hide_salary: form.hide_salary,
           stages: form.stages.length ? form.stages : null,
           level_min: meta.selectedLevelMin || null,
           level_max: meta.selectedLevelMax || null,

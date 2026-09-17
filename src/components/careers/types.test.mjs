@@ -35,7 +35,7 @@ assert.deepStrictEqual(splitProfileList("Alvenaria.", null, "", undefined, "   "
 assert.deepStrictEqual(splitProfileList(null, undefined), [])
 
 // Faixa salarial, que já existia sem teste.
-assert.strictEqual(formatSalaryRange(null, null), null)
+assert.strictEqual(formatSalaryRange(null, null), "A combinar")
 assert.strictEqual(formatSalaryRange(2000, 2000), formatSalaryRange(2000, null))
 
 console.log("types.test.mjs passed")

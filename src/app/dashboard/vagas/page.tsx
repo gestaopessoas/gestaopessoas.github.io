@@ -41,6 +41,7 @@ type JobRequest = {
   affirmative_tags: string[] | null;
   benefits: string[] | null;
   stages: string[] | null;
+  hide_salary: boolean | null;
   reason: string | null;
   level_min: string | null;
   level_max: string | null;
@@ -50,7 +51,7 @@ type JobRequest = {
 
 // Mesma projecao na leitura e na gravacao: sem isso o join da Obra some depois de salvar.
 const JOB_REQUEST_SELECT =
-  "id, requester_name, requester_area, requester_whatsapp, position_title, unit, workplace_id, workplace:workplaces(name), quantity, contract_type, urgency, status, created_at, behavioral_tags, search_tags, required_requirements, desired_requirements, manager_expectations, profile_id, department_id, target_date, salary_min, salary_max, salary_notes, work_schedule, work_mode, is_pcd_eligible, affirmative_tags, benefits, reason, level_min, level_max, seniority, notes, stages";
+  "id, requester_name, requester_area, requester_whatsapp, position_title, unit, workplace_id, workplace:workplaces(name), quantity, contract_type, urgency, status, created_at, behavioral_tags, search_tags, required_requirements, desired_requirements, manager_expectations, profile_id, department_id, target_date, salary_min, salary_max, salary_notes, work_schedule, work_mode, is_pcd_eligible, affirmative_tags, benefits, reason, level_min, level_max, seniority, notes, stages, hide_salary";
 
 const statusStyle: Record<string, string> = {
   Nova: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
@@ -186,6 +187,7 @@ export default function VagasAdminPage() {
       work_mode: values.work_mode || null,
       is_pcd_eligible: values.is_pcd_eligible,
       affirmative_tags: values.affirmative_tags,
+      hide_salary: values.hide_salary,
       stages: values.stages.length ? values.stages : null,
       level_min: meta.selectedLevelMin || null,
       level_max: meta.selectedLevelMax || null,
@@ -468,6 +470,7 @@ export default function VagasAdminPage() {
                       manager_expectations: selectedJob.manager_expectations || "",
                       notes: selectedJob.notes || "",
                       benefits: selectedJob.benefits ?? [],
+                      hide_salary: selectedJob.hide_salary ?? false,
                       stages: selectedJob.stages ?? [],
                     }}
                     initialSelectedLevels={{
