@@ -135,6 +135,9 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [resumeError, setResumeError] = useState("");
   const [savedCandidateId, setSavedCandidateId] = useState("");
+  // Issue #112: o teste de perfil abre por sessao assinada, com validade e uso unico — nao
+  // pelo uuid do candidato, que vaza em historico de navegador e link compartilhado.
+  const [bfiSessionId, setBfiSessionId] = useState("");
   const lastCepLookup = useRef("");
   const phoneRef = useRef<HTMLInputElement>(null);
   const cpfRef = useRef<HTMLInputElement>(null);
@@ -170,6 +173,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     setResumeFile(null);
     setResumeError("");
     setSavedCandidateId("");
+    setBfiSessionId("");
     setCepFound(false);
     lastCepLookup.current = "";
   };
@@ -497,6 +501,16 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     // fazia o modal sumir sem confirmar nada: quem fechava a aba no questionário
     // acreditava ter perdido a inscrição.
     setSavedCandidateId(candidateId);
+
+    // O ticket da candidatura e quem autoriza a emissao: sem ele, qualquer um com o uuid
+    // emitiria sessao (issue #112). Falhar aqui nao derruba a candidatura, que ja esta
+    // gravada — o teste e opcional, e o botao some.
+    const { data: sessionId, error: sessionError } = await supabase.rpc("new_bfi_candidate_session", {
+      p_candidate: candidateId,
+      p_ticket: ticketId,
+    });
+    if (sessionError) console.warn("Erro ao emitir sessao do teste de perfil:", sessionError.message);
+    else if (sessionId) setBfiSessionId(sessionId as string);
   };
 
   return (
@@ -538,7 +552,8 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
               <Button
                 type="button"
                 className="w-full"
-                onClick={() => window.location.assign(`/candidato/teste-personalidade?candidate_id=${savedCandidateId}`)}
+                disabled={!bfiSessionId}
+                onClick={() => window.location.assign(`/candidato/teste-personalidade?session=${bfiSessionId}`)}
               >
                 <ClipboardCheck className="mr-2 h-4 w-4" />
                 Responder agora

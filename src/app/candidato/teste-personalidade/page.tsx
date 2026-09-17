@@ -75,18 +75,31 @@ export default function BigFiveTestPage() {
     setError("");
     setSaving(true);
     
-    const candidateId = new URLSearchParams(window.location.search).get("candidate_id") || new URLSearchParams(window.location.search).get("id") || null;
+    // Issue #112: a sessao e o link assinado — tem validade e so aceita uma resposta. O
+    // `?candidate_id=` de antes deixava qualquer um com o uuid responder em nome do candidato.
+    const sessionId = new URLSearchParams(window.location.search).get("session");
+    if (!sessionId) {
+      setSaving(false);
+      setError("Este link não é válido. Peça um novo link do mapeamento ao RH.");
+      return;
+    }
 
     const supabase = createClient();
     const { error: submitError } = await supabase
-      .rpc("submit_bfi_candidate_answers", { p_candidate_id: candidateId, p_answers: answers })
+      .rpc("submit_bfi_answers", { p_session_id: sessionId, p_answers: answers })
       .single();
 
     setSaving(false);
 
     if (submitError) {
       console.error(submitError);
-      setError("Houve um erro ao salvar suas respostas. Tente novamente.");
+      setError(
+        submitError.message?.includes("expirado")
+          ? "Este link expirou. Peça um novo link do mapeamento ao RH."
+          : submitError.message?.includes("respondida")
+            ? "Este mapeamento já foi respondido."
+            : "Houve um erro ao salvar suas respostas. Tente novamente."
+      );
     } else {
       setCompleted(true);
     }
