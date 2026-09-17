@@ -187,13 +187,17 @@ test.describe('Registro de entrevistas (banco local)', () => {
     expect(entrevista).not.toHaveProperty('cpf');
     expect(entrevista).not.toHaveProperty('uniform_size');
 
-    // A Etapa da entrevista vai para a Candidatura (ADR 0006, Fase 2), e é só isso: salvar
-    // entrevista não gera mais Registro de Etapa. A Candidatura nasce aqui, por INSERT, e o
-    // trigger que escreve histórico é BEFORE UPDATE (migration 20260916150000). O
-    // `interviewer_name` também saiu de vez: quem clicou vai em created_by_user_id, e quem
+    // A Etapa da entrevista vai para a Candidatura (ADR 0006, Fase 2), e a Candidatura nasce
+    // aqui, por INSERT — o que desde a issue #130 é a PRIMEIRA linha do histórico. Salvar
+    // entrevista continua não escrevendo no histórico com as próprias mãos: a linha é do
+    // trigger de nascimento (migration 20260917170000), e vem com a Etapa de nascimento.
+    // O `interviewer_name` saiu de vez: quem clicou vai em created_by_user_id, e quem
     // entrevista mora em interviews.interviewer_id.
     await esperarCandidatura();
-    expect(await historicoDoTeste()).toHaveLength(0);
+    const nascimento = await historicoDoTeste();
+    expect(nascimento).toHaveLength(1);
+    expect(nascimento[0].stage).toBe('Entrevista RH');
+    expect(nascimento[0].interviewer_name).toBeNull();
   });
 
   test('mudar a situação reescreve a entrevista sem duplicar registro nem mexer na Etapa', async ({ page }) => {
@@ -225,9 +229,10 @@ test.describe('Registro de entrevistas (banco local)', () => {
 
     // Situação de entrevista não é Etapa de candidatura: Aguardando e Compareceu/Aprovado
     // levam à mesma Etapa (Entrevista RH), então a Candidatura não se move e nenhuma linha
-    // de histórico nasce. A troca de situação vive na própria entrevista, acima.
+    // NOVA de histórico nasce. A troca de situação vive na própria entrevista, acima. A
+    // única linha que existe é a do nascimento da Candidatura (issue #130).
     expect((await candidaturaDoTeste())[0].status).toBe('Entrevista RH');
-    expect(await historicoDoTeste()).toHaveLength(0);
+    expect(await historicoDoTeste()).toHaveLength(1);
   });
 
   test('segunda vaga cria entrevista nova sem apagar a primeira', async ({ page }) => {
