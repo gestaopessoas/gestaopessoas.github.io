@@ -50,3 +50,30 @@ export function stagesPresent(counts: Map<string, number>): string[] {
   const outras = [...counts.keys()].filter((s) => !(STAGES as readonly string[]).includes(s));
   return [...conhecidas, ...outras];
 }
+
+/**
+ * As Etapas que toda Vaga tem, escolha ela o que escolher.
+ *
+ * `Nova` é por onde a Candidatura entra — sem ela a vaga não recebe ninguém. As três Terminais
+ * são por onde ela sai: vaga que não pode reprovar deixa candidato presa no funil para sempre.
+ */
+export const OBLIGATORY_STAGES: readonly Stage[] = ["Nova", ...TERMINAL_STAGES];
+
+/**
+ * O funil de uma Vaga: o subconjunto das 13 que ela escolheu, na ordem canônica.
+ *
+ * A ordem **não** é configurável, e isso é decisão, não preguiça: ela vem de `STAGES`. Deixar a
+ * vaga reordenar significaria "Contratado" antes de "Triagem", e nenhuma tela que hoje pergunta
+ * "que etapa vem depois" sobreviveria a isso.
+ *
+ * Vaga sem configuração (`null`, e é o caso de toda vaga que já existe) usa as 13 — assim a
+ * coluna nasce vazia sem backfill e sem mudar o comportamento de ninguém.
+ *
+ * As Obrigatórias entram mesmo que não venham na lista: a checagem do banco recusa sem elas,
+ * mas quem lê não deve depender disso para não montar uma tela quebrada.
+ */
+export function jobStages(configured?: readonly string[] | null): Stage[] {
+  if (!configured || configured.length === 0) return [...STAGES];
+  const escolhidas = new Set<string>([...configured, ...OBLIGATORY_STAGES]);
+  return STAGES.filter((s) => escolhidas.has(s));
+}

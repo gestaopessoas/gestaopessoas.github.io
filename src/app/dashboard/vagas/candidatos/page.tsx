@@ -10,7 +10,7 @@ import { calculateMatchScore, MatchResult } from "@/utils/matchScore";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { useToast } from "@/contexts/ToastContext";
 import AdvanceStageModal from "@/app/dashboard/central-candidato/components/AdvanceStageModal";
-import { stagesPresent } from "@/lib/stages";
+import { jobStages, stagesPresent } from "@/lib/stages";
 
 type Applicant = {
   id: string;
@@ -41,7 +41,7 @@ async function fetchJobApplicants(jobId: string) {
 
   const { data: job, error: jobError } = await supabase
     .from("job_requests")
-    .select("position_title, requested_role, search_tags, behavioral_tags")
+    .select("position_title, requested_role, search_tags, behavioral_tags, stages")
     .eq("id", jobId)
     .single();
 
@@ -92,7 +92,12 @@ async function fetchJobApplicants(jobId: string) {
   });
 
   applicants.sort((a, b) => b.match_result.score - a.match_result.score);
-  return { title: job.position_title || job.requested_role || "Vaga", applicants };
+  return {
+    title: job.position_title || job.requested_role || "Vaga",
+    applicants,
+    // `null` = a vaga nao escolheu funil e usa as 14 (ADR 0006, issue #49).
+    stages: (job.stages as string[] | null) || null,
+  };
 }
 
 function CandidatosContent() {
@@ -102,6 +107,7 @@ function CandidatosContent() {
 
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [jobTitle, setJobTitle] = useState("");
+  const [jobStagesConfig, setJobStagesConfig] = useState<string[] | null>(null);
   // Sem `id` na URL não há o que buscar: o estado inicial já é o estado final.
   const [loading, setLoading] = useState(Boolean(id));
   const [error, setError] = useState(id ? "" : "ID da vaga não fornecido");
@@ -113,9 +119,10 @@ function CandidatosContent() {
   const load = useCallback(() => {
     if (!id) return;
     fetchJobApplicants(id)
-      .then(({ title, applicants: rows }) => {
+      .then(({ title, applicants: rows, stages }) => {
         setJobTitle(title);
         setApplicants(rows);
+        setJobStagesConfig(stages);
         setError("");
       })
       .catch((err: Error) => setError(err.message))
@@ -130,7 +137,13 @@ function CandidatosContent() {
     return m;
   }, [applicants]);
 
-  const stagesPresentes = useMemo(() => stagesPresent(counts), [counts]);
+  // Vaga com funil proprio mostra o funil INTEIRO, etapa vazia inclusive: e a etapa vazia que
+  // diz "ninguem chegou na Proposta ainda". Vaga sem funil proprio usaria as 14, e 14 grupos
+  // quase todos vazios viram ruido -- ali continua valendo so o que tem gente.
+  const stagesPresentes = useMemo(
+    () => (jobStagesConfig ? jobStages(jobStagesConfig) : stagesPresent(counts)),
+    [jobStagesConfig, counts],
+  );
 
   const visible = stageFilter ? applicants.filter((a) => a.stage === stageFilter) : applicants;
 
@@ -256,7 +269,7 @@ function CandidatosContent() {
                   : "border-border/60 text-muted-foreground hover:bg-muted"
               }`}
             >
-              {stage} · {counts.get(stage)}
+              {stage} · {counts.get(stage) ?? 0}
             </button>
           ))}
         </div>
@@ -299,7 +312,7 @@ function CandidatosContent() {
                     <Fragment key={stage}>
                       <tr className="bg-muted/40">
                         <td colSpan={6} className="px-6 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          {stage} · {counts.get(stage)}
+                          {stage} · {counts.get(stage) ?? 0}
                         </td>
                       </tr>
                       {applicants.filter((a) => a.stage === stage).map(renderRow)}

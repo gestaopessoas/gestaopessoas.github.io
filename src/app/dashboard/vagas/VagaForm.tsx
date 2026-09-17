@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useEffect } from "react";
 import { buscarTudo } from "@/lib/paginacao";
 import { sortLevels } from "@/lib/salaryLevels.mjs";
+import { STAGES, OBLIGATORY_STAGES } from "@/lib/stages";
 
 export type JobProfile = {
   id: string;
@@ -95,6 +96,7 @@ export const initialForm = {
   manager_expectations: "",
   notes: "",
   benefits: [] as string[],
+  stages: [] as string[],
 };
 
 export type VagaFormValues = typeof initialForm;
@@ -563,6 +565,39 @@ export default function VagaForm({
           <Field label="Benefícios disponíveis">
             {tagBox("benefits", companyBenefits.map(b => b.name))}
           </Field>
+        </div>
+      </section>
+
+      <section className="rounded-lg border bg-card p-5">
+        <h2 className="mb-4 text-lg font-semibold">Etapas do processo seletivo</h2>
+        <p className="mb-3 mt-1 text-sm text-muted-foreground">Por padrão a vaga usa todas as etapas. Desmarque para encurtar o funil desta vaga.</p>
+        <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+          {STAGES.map((stage) => {
+            const obligatory = (OBLIGATORY_STAGES as readonly string[]).includes(stage);
+            // Obrigatória aparece marcada sempre: o checkbox dela é `disabled`, então um estado
+            // "desmarcada" seria um estado que o usuário não teria como desfazer.
+            const checked = obligatory || form.stages.length === 0 || form.stages.includes(stage);
+            const inputId = `stage-${stage}`;
+            return (
+              <label key={stage} htmlFor={inputId} className="flex items-center gap-2 text-sm">
+                <input
+                  id={inputId}
+                  type="checkbox"
+                  checked={checked}
+                  disabled={obligatory}
+                  onChange={() => {
+                    const base = form.stages.length === 0 ? [...STAGES] : form.stages;
+                    const next = base.includes(stage) ? base.filter((s) => s !== stage) : [...base, stage];
+                    // Regrava na ordem do funil: remarcar uma etapa a jogava para o fim da lista.
+                    set("stages", STAGES.filter((s) => next.includes(s)));
+                  }}
+                  className="h-4 w-4 rounded border-input disabled:cursor-not-allowed disabled:opacity-60"
+                />
+                {stage}
+                {obligatory && <span className="text-xs text-muted-foreground">(obrigatória)</span>}
+              </label>
+            );
+          })}
         </div>
       </section>
 
