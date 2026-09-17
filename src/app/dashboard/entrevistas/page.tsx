@@ -15,6 +15,7 @@ import { roleChangedOnSavedInterview } from "@/lib/interviewProgress.mjs";
 import { findExistingCandidateId, hasRealEmail, placeholderEmail } from "@/lib/candidateIdentity.mjs";
 import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 import { TERMINAL_STAGES, type Stage } from "@/lib/stages";
+import { etapaDaLinha, historicoPorCandidato, type HistoricoPorCandidato } from "./lib/etapaDaLinha.mjs";
 
 type TrocaDeVaga = "nova" | "alterar" | "cancelar";
 
@@ -103,14 +104,6 @@ const resultStyle: Record<string, string> = {
   "N/C": "text-zinc-500",
 };
 
-// A Etapa mostrada na lista. O Destino deixou de ser gravado em `interviews` (ADR 0006,
-// Fase 2), então a coluna lia um campo morto e dizia "-" para todo mundo (issue #114): a
-// verdade está na Candidatura. Linhas antigas ainda têm `destination` gravado — ele só entra
-// como reserva.
-function etapaDaLinha(interview: Interview, stageByCandidate: Record<string, string>) {
-  return (interview.candidate_id ? stageByCandidate[interview.candidate_id] : null) || interview.destination || null;
-}
-
 const stageStyle: Record<string, string> = {
   Contratado: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   "Banco de Talentos": "bg-sky-500/10 text-sky-700 dark:text-sky-300",
@@ -194,7 +187,7 @@ export default function EntrevistasPage() {
     candidate_name: "", role: "", phone: "", email: "", interview_date: "", interview_time: "", status: "Aguardando", result: "N/C", destination: ""
   });
   const [assessmentForm, setAssessmentForm] = useState<Assessment>(defaultAssessment);
-  const [stageByCandidate, setStageByCandidate] = useState<Record<string, string>>({});
+  const [stageByCandidate, setStageByCandidate] = useState<HistoricoPorCandidato>({});
   
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   // Os provedores salvos já valem no primeiro render — evita renderizar uma vez
@@ -300,8 +293,9 @@ export default function EntrevistasPage() {
       assessment: rowsToAssessment(interview.interview_assessments?.interview_assessment_values ?? []),
     })) as Interview[]);
 
-    // Etapa atual do candidato é lida do histórico, não copiada para dentro da entrevista:
-    // o Destino continua sendo a decisão daquele dia.
+    // A Etapa é lida do histórico, não copiada para dentro da entrevista: o Destino continua
+    // sendo a decisão daquele dia. Vem o histórico INTEIRO de cada candidato, não só a última
+    // Etapa — a linha mostra a Etapa do momento dela (ver `etapaDaLinha`).
     const candidateIds = Array.from(new Set((data ?? []).map((i: any) => i.candidate_id).filter(Boolean)));
     if (candidateIds.length > 0) {
       const { data: etapas } = await supabase
@@ -309,11 +303,7 @@ export default function EntrevistasPage() {
         .select("candidate_id, stage, created_at")
         .in("candidate_id", candidateIds)
         .order("created_at", { ascending: false });
-      const mapa: Record<string, string> = {};
-      for (const etapa of etapas ?? []) {
-        if (etapa.candidate_id && etapa.stage && !mapa[etapa.candidate_id]) mapa[etapa.candidate_id] = etapa.stage;
-      }
-      setStageByCandidate(mapa);
+      setStageByCandidate(historicoPorCandidato(etapas));
     } else {
       setStageByCandidate({});
     }
