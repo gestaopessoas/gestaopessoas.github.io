@@ -1962,12 +1962,17 @@ export function CandidateProfileModal({
                                     {/* As notas vieram concatenadas num bloco só ("[Motivo]
 texto"):
                                         na tela cada rótulo volta a ser um campo próprio (issue #142). */}
-                                    {parseCandidateHistoryNotes(ci.notes).map((section, index) => (
+                                    {parseCandidateHistoryNotes(ci.notes)
+                                      // O "Futuro do Candidato" já tem linha própria acima: o AddInterviewModal
+                                      // grava o mesmo valor na coluna e dentro das notas. Antes a repetição ficava
+                                      // escondida no bloco de texto; agora seria um card duplicado.
+                                      .filter((section) => !(section.label === "Futuro do Candidato" && section.value === (ci.candidate_future || "").trim()))
+                                      .map((section, index) => (
                                       <div key={`${ci.id}-nota-${index}`} className="mt-2 text-sm bg-muted/40 p-3 rounded-lg border">
                                         <span className="font-semibold block mb-1">{section.label ?? "Observações"}:</span>
                                         <span className="whitespace-pre-line">{section.value}</span>
                                       </div>
-                                    ))}
+                                      ))}
                                     {ci.rejection_reason && (
                                       <div className="mt-2 text-sm bg-rose-500/10 text-rose-800 p-3 rounded-lg border border-rose-500/20">
                                         <span className="font-semibold block mb-1">Motivo Reprovação / Desistência:</span>
