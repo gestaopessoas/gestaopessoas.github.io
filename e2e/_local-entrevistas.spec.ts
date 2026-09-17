@@ -50,6 +50,22 @@ const historicoDoTeste = async () => {
   return rest('GET', `candidate_interviews?candidate_id=eq.${candidato.id}&select=*&order=created_at.asc`);
 };
 
+const candidaturaDoTeste = async () => {
+  const [candidato] = await candidatoDoTeste();
+  if (!candidato) return [];
+  return rest('GET', `job_applications?candidate_id=eq.${candidato.id}&select=*&order=created_at.asc`);
+};
+
+// Sinal de que o salvamento terminou de verdade. Era o histórico; deixou de servir na
+// migration 20260916150000: o trigger só escreve em UPDATE de Etapa, e a Candidatura que
+// esta tela abre NASCE por INSERT — insert não dispara o trigger. Quem chega depois da
+// entrevista agora é a Candidatura, não a linha de histórico.
+const esperarCandidatura = async (etapa = 'Entrevista RH') => {
+  await expect
+    .poll(async () => (await candidaturaDoTeste())[0]?.status, { timeout: 30000 })
+    .toBe(etapa);
+};
+
 async function limpar() {
   const entrevistas = await entrevistasDoTeste();
   for (const entrevista of entrevistas) {
@@ -82,6 +98,19 @@ async function abrirNovaEntrevista(page: Page) {
   await expect(page.getByRole('button', { name: 'Editar Perfil' })).toHaveCount(0);
   await page.getByRole('button', { name: /Registrar nova entrevista/ }).click();
   await expect(campoData(page)).toBeVisible({ timeout: 30000 });
+}
+
+// A Etapa de destino destes testes. "Encaminhado - Pool Geral" deixou de existir na Fase 1
+// do eixo único de Etapa (migration 20260915160000: `etapa_canonica` devolve NULL para ela),
+// então o select não a oferece mais. Serve qualquer Etapa que a Central ofereça a partir de
+// "Entrevista RH" — o que estes casos provam é a TRAVA da entrevista pendente, não o destino.
+// Etapa de entrevista pede data no próprio avanço; é o caminho que não depende de haver Obra
+// cadastrada no banco local.
+const PROXIMA_ETAPA = 'Entrevista Gestor';
+
+async function escolherProximaEtapa(page: Page) {
+  await page.getByRole('option', { name: PROXIMA_ETAPA }).click();
+  await page.locator('input[type="date"]').first().fill(AMANHA);
 }
 
 async function preencherPessoa(page: Page, vaga: string) {
@@ -129,7 +158,7 @@ test.describe('Registro de entrevistas (banco local)', () => {
     expect(await entrevistasDoTeste()).toHaveLength(0);
   });
 
-  test('situação escolhida é a que fica gravada, com data, hora e histórico', async ({ page }) => {
+  test('situação escolhida é a que fica gravada, com data, hora e Etapa na Candidatura', async ({ page }) => {
     await abrirNovaEntrevista(page);
     await preencherPessoa(page, VAGA);
     await campoData(page).fill(HOJE);
@@ -158,18 +187,22 @@ test.describe('Registro de entrevistas (banco local)', () => {
     expect(entrevista).not.toHaveProperty('cpf');
     expect(entrevista).not.toHaveProperty('uniform_size');
 
-    const historico = await historicoDoTeste();
-    expect(historico).toHaveLength(1);
-    expect(historico[0].notes).toContain('Situação: Confirmado');
-    expect(historico[0].interviewer_name).toBeTruthy();
+    // A Etapa da entrevista vai para a Candidatura (ADR 0006, Fase 2), e é só isso: salvar
+    // entrevista não gera mais Registro de Etapa. A Candidatura nasce aqui, por INSERT, e o
+    // trigger que escreve histórico é BEFORE UPDATE (migration 20260916150000). O
+    // `interviewer_name` também saiu de vez: quem clicou vai em created_by_user_id, e quem
+    // entrevista mora em interviews.interviewer_id.
+    await esperarCandidatura();
+    expect(await historicoDoTeste()).toHaveLength(0);
   });
 
-  test('mudar a situação não apaga a anterior: vira linha no histórico', async ({ page }) => {
+  test('mudar a situação reescreve a entrevista sem duplicar registro nem mexer na Etapa', async ({ page }) => {
     await abrirNovaEntrevista(page);
     await preencherPessoa(page, VAGA);
     await campoData(page).fill(HOJE);
     await salvar(page).click();
     await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
+    await esperarCandidatura();
     await expect(page.getByRole('cell', { name: NOME })).toBeVisible({ timeout: 30000 });
 
     await page.getByRole('cell', { name: NOME }).click();
@@ -190,11 +223,11 @@ test.describe('Registro de entrevistas (banco local)', () => {
     expect(entrevistas).toHaveLength(1);
     expect(entrevistas[0].result).toBe('Aprovado');
 
-    // O histórico é gravado depois da entrevista: esperar a linha nova, não supor que já veio.
-    await expect.poll(async () => (await historicoDoTeste()).length, { timeout: 30000 }).toBe(2);
-    const historico = await historicoDoTeste();
-    expect(historico[0].notes).toContain('Situação: Aguardando');
-    expect(historico[1].notes).toContain('Resultado: Aprovado');
+    // Situação de entrevista não é Etapa de candidatura: Aguardando e Compareceu/Aprovado
+    // levam à mesma Etapa (Entrevista RH), então a Candidatura não se move e nenhuma linha
+    // de histórico nasce. A troca de situação vive na própria entrevista, acima.
+    expect((await candidaturaDoTeste())[0].status).toBe('Entrevista RH');
+    expect(await historicoDoTeste()).toHaveLength(0);
   });
 
   test('segunda vaga cria entrevista nova sem apagar a primeira', async ({ page }) => {
@@ -235,9 +268,9 @@ test.describe('Registro de entrevistas (banco local)', () => {
     await campoStatus(page).selectOption('Confirmado');
     await salvar(page).click();
     await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
-    // O histórico é gravado depois da entrevista: sair da tela antes disso deixa o insert
+    // A Candidatura é gravada depois da entrevista: sair da tela antes disso deixa o insert
     // correndo e ele pode aterrissar no meio do avanço.
-    await expect.poll(async () => (await historicoDoTeste()).length, { timeout: 30000 }).toBe(1);
+    await esperarCandidatura();
 
     await page.goto('/dashboard/central-candidato');
     await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
@@ -253,7 +286,7 @@ test.describe('Registro de entrevistas (banco local)', () => {
     const confirmar = page.getByRole('button', { name: 'Confirmar Avanço' });
     // O bloco da entrevista também tem um select: o da etapa é o que traz o placeholder.
     await page.getByRole('combobox').filter({ hasText: 'Selecione a etapa' }).click();
-    await page.getByRole('option', { name: 'Encaminhado - Pool Geral' }).click();
+    await escolherProximaEtapa(page);
 
     // Sem registro da entrevista, o avanço não sai do lugar.
     await expect(confirmar).toBeDisabled();
@@ -270,7 +303,7 @@ test.describe('Registro de entrevistas (banco local)', () => {
 
     // E o que houve fica no histórico, junto da etapa nova — não numa linha que a contradiga.
     const historico = await historicoDoTeste();
-    const avanco = historico.find((h: { stage: string }) => h.stage === 'Encaminhado - Pool Geral');
+    const avanco = historico.find((h: { stage: string }) => h.stage === PROXIMA_ETAPA);
     expect(avanco, 'o avanço precisa virar Registro de Etapa').toBeTruthy();
     expect(avanco.notes).toContain('[Entrevista]');
     expect(avanco.notes).toContain('Não compareceu');
@@ -287,6 +320,7 @@ test.describe('Registro de entrevistas (banco local)', () => {
     await campoHora(page).fill('09:00');
     await salvar(page).click();
     await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
+    await esperarCandidatura();
     const [entrevista] = await entrevistasDoTeste();
 
     await page.goto('/dashboard/central-candidato');
@@ -317,9 +351,9 @@ test.describe('Registro de entrevistas (banco local)', () => {
     await campoHora(page).fill('14:00');
     await salvar(page).click();
     await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
-    // O histórico é gravado depois da entrevista: sair da tela antes disso deixa o insert
+    // A Candidatura é gravada depois da entrevista: sair da tela antes disso deixa o insert
     // correndo e ele pode aterrissar no meio do avanço.
-    await expect.poll(async () => (await historicoDoTeste()).length, { timeout: 30000 }).toBe(1);
+    await esperarCandidatura();
 
     await page.goto('/dashboard/central-candidato');
     await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
@@ -332,7 +366,7 @@ test.describe('Registro de entrevistas (banco local)', () => {
 
     const confirmar = page.getByRole('button', { name: 'Confirmar Avanço' });
     await page.getByRole('combobox').filter({ hasText: 'Selecione a etapa' }).click();
-    await page.getByRole('option', { name: 'Encaminhado - Pool Geral' }).click();
+    await escolherProximaEtapa(page);
     await expect(confirmar).toBeDisabled();
 
     // "Compareceu" sem resultado não diz o que ocorreu: continua travado.
@@ -357,7 +391,7 @@ test.describe('Registro de entrevistas (banco local)', () => {
     await salvar(page).click();
     await expect.poll(async () => (await entrevistasDoTeste()).length, { timeout: 30000 }).toBe(1);
 
-    await expect.poll(async () => (await historicoDoTeste()).length, { timeout: 30000 }).toBe(1);
+    await esperarCandidatura();
 
     const [entrevista] = await entrevistasDoTeste();
     await rest('PATCH', `interviews?id=eq.${entrevista.id}`, { interview_date: null, interview_time: null });
@@ -376,7 +410,7 @@ test.describe('Registro de entrevistas (banco local)', () => {
 
     const confirmar = page.getByRole('button', { name: 'Confirmar Avanço' });
     await page.getByRole('combobox').filter({ hasText: 'Selecione a etapa' }).click();
-    await page.getByRole('option', { name: 'Encaminhado - Pool Geral' }).click();
+    await escolherProximaEtapa(page);
     await expect(confirmar).toBeDisabled();
 
     await page.locator('#avanco-situacao-entrevista').selectOption('Desistente');
