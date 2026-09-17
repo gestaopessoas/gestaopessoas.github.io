@@ -67,6 +67,7 @@ export default function AdvanceStageModal({
   currentStage,
   workplaceName,
   forcedStage,
+  jobStagesConfig,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -80,6 +81,8 @@ export default function AdvanceStageModal({
   workplaceName?: string | null;
   /** Etapa fixa (ex.: "Contratado") — some com o select e vira uma caixa de leitura. */
   forcedStage?: string;
+  /** Funil configurado na Vaga da Candidatura. Null/ausente = usa as 14 Etapas. */
+  jobStagesConfig?: string[] | null;
 }) {
   const [selectedStage, setSelectedStage] = useState(forcedStage || "");
   // Avançar para uma etapa de entrevista marca a entrevista: data e hora entram aqui e
@@ -227,7 +230,10 @@ export default function AdvanceStageModal({
 
   // O balde atual e o seguinte, sem desfecho: contratar, mandar para o banco, reprovar e
   // registrar desistência são decisão da entrevista, não do funil (issue #84).
-  const validNextStages = useMemo(() => nextStageOptions(currentBucket, workplaceName), [currentBucket, workplaceName]);
+  const validNextStages = useMemo(
+    () => nextStageOptions(currentBucket, workplaceName, jobStagesConfig),
+    [currentBucket, workplaceName, jobStagesConfig]
+  );
 
   // Quem quiser o parecer vai para a ficha da entrevista recém-criada; quem não quiser
   // termina o avanço em dois cliques.
@@ -545,6 +551,14 @@ export default function AdvanceStageModal({
           ) : (
             <div className="grid gap-2">
               <label className="text-sm font-medium">Próxima Etapa *</label>
+              {/* Funil da vaga pode nao sobrar nenhuma etapa de avanco (vaga configurada so com
+                  as Obrigatorias). Um seletor vazio sem explicacao vira "o sistema travou". */}
+              {validNextStages.length === 0 ? (
+                <div className="rounded-md border border-dashed bg-muted/40 p-3 text-sm text-muted-foreground">
+                  O funil desta vaga não tem etapa seguinte a partir daqui. Para liberar o avanço,
+                  inclua a etapa desejada no cadastro da vaga.
+                </div>
+              ) : (
               <Select value={selectedStage} onValueChange={(val) => setSelectedStage(val || "")}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a etapa..." />
@@ -557,6 +571,7 @@ export default function AdvanceStageModal({
                   ))}
                 </SelectContent>
               </Select>
+              )}
             </div>
           )}
 

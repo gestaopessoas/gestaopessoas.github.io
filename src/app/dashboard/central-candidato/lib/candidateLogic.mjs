@@ -147,7 +147,10 @@ export function isHeadquarters(obra) {
  * virar atrito no dia a dia, o caminho é um botão "Encerrar processo" na linha — não
  * devolver os desfechos a este select, que foi de onde eles saíram.
  */
-export function nextStageOptions(currentBucket, obra) {
+// `funilDaVaga` é opcional porque nem toda chamada tem uma Vaga à mão (Candidatura
+// Espontânea, ou tela que ainda não buscou `job_requests.stages`) — nesses casos o
+// comportamento é o de sempre, as 14 Etapas.
+export function nextStageOptions(currentBucket, obra, funilDaVaga) {
   const idx = BUCKET_ORDER.indexOf(currentBucket);
   if (idx === -1) return [...STAGE_BUCKETS.entrevista];
 
@@ -160,7 +163,10 @@ export function nextStageOptions(currentBucket, obra) {
   // e voltaria pela porta dos fundos.
   // "Nova" pela mesma razão: é onde a Candidatura nasce, não destino de avanço.
   const desfechos = ["Contratado", "Reprovado", "Desistente", "Nova"];
-  return [...new Set(stages)].filter((s) => !desfechos.some((d) => sameStage(d, s)));
+  const result = [...new Set(stages)].filter((s) => !desfechos.some((d) => sameStage(d, s)));
+
+  if (!Array.isArray(funilDaVaga) || funilDaVaga.length === 0) return result;
+  return result.filter((s) => funilDaVaga.some((f) => sameStage(f, s)));
 }
 
 export function latestInterview(interviews = []) {

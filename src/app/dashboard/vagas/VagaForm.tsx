@@ -105,6 +105,7 @@ export type VagaFormValues = typeof initialForm;
 
 export type VagaFormProps = {
   mode: "create" | "edit";
+  jobId?: string;
   initialValues?: Partial<VagaFormValues>;
   initialSelectedLevels?: { levelMin?: string; levelMax?: string; seniority?: string };
   requesterName?: string;
@@ -118,6 +119,7 @@ export type VagaFormProps = {
 
 export default function VagaForm({
   mode,
+  jobId,
   initialValues,
   initialSelectedLevels,
   requesterName: requesterNameProp,
@@ -149,6 +151,7 @@ export default function VagaForm({
   const [loading, setLoading] = useState(true);
   const [localError, setLocalError] = useState("");
   const error = externalError || localError;
+  const [ocupacao, setOcupacao] = useState<Record<string, number>>({});
 
   useEffect(() => {
     let active = true;
@@ -233,6 +236,26 @@ export default function VagaForm({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Conta candidatos por Etapa desta vaga, para travar a Etapa ocupada abaixo.
+  useEffect(() => {
+    if (!jobId) return;
+    let active = true;
+    const fetchOcupacao = async () => {
+      const supabase = createClient();
+      const { data } = await supabase.from("job_applications").select("status").eq("job_request_id", jobId);
+      if (!active) return;
+      const counts: Record<string, number> = {};
+      for (const row of data ?? []) {
+        if (row.status) counts[row.status] = (counts[row.status] ?? 0) + 1;
+      }
+      setOcupacao(counts);
+    };
+    fetchOcupacao();
+    return () => {
+      active = false;
+    };
+  }, [jobId]);
 
   // Recalcula os níveis/senioridades disponíveis quando o perfil já vem preenchido
   // (edição) assim que a tabela salarial e os perfis carregam. Estado derivado
@@ -591,13 +614,18 @@ export default function VagaForm({
 
       <section className="rounded-lg border bg-card p-5">
         <h2 className="mb-4 text-lg font-semibold">Etapas do processo seletivo</h2>
-        <p className="mb-3 mt-1 text-sm text-muted-foreground">Por padrão a vaga usa todas as etapas. Desmarque para encurtar o funil desta vaga.</p>
+        <p className="mb-3 mt-1 text-sm text-muted-foreground">
+          Por padrão a vaga usa todas as etapas. Desmarque para encurtar o funil desta vaga. Etapa
+          com candidato parado nela não pode ser removida — mova as pessoas antes para liberar.
+        </p>
         <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
           {STAGES.map((stage) => {
             const obligatory = (OBLIGATORY_STAGES as readonly string[]).includes(stage);
-            // Obrigatória aparece marcada sempre: o checkbox dela é `disabled`, então um estado
-            // "desmarcada" seria um estado que o usuário não teria como desfazer.
-            const checked = obligatory || form.stages.length === 0 || form.stages.includes(stage);
+            const ocupada = (ocupacao[stage] ?? 0) > 0;
+            // Obrigatória e Etapa ocupada aparecem marcadas sempre: o checkbox delas é
+            // `disabled`, então um estado "desmarcada" seria um estado que o usuário não teria
+            // como desfazer.
+            const checked = obligatory || ocupada || form.stages.length === 0 || form.stages.includes(stage);
             const inputId = `stage-${stage}`;
             return (
               <label key={stage} htmlFor={inputId} className="flex items-center gap-2 text-sm">
@@ -605,17 +633,26 @@ export default function VagaForm({
                   id={inputId}
                   type="checkbox"
                   checked={checked}
-                  disabled={obligatory}
+                  disabled={obligatory || ocupada}
                   onChange={() => {
                     const base = form.stages.length === 0 ? [...STAGES] : form.stages;
                     const next = base.includes(stage) ? base.filter((s) => s !== stage) : [...base, stage];
                     // Regrava na ordem do funil: remarcar uma etapa a jogava para o fim da lista.
-                    set("stages", STAGES.filter((s) => next.includes(s)));
+                    // Etapa ocupada e obrigatoria vao junto mesmo sem estarem em `next`: elas
+                    // aparecem marcadas e travadas, e tela marcada com payload sem o valor
+                    // faria a tela mentir sobre o que foi salvo.
+                    const travadas = STAGES.filter((s) => (ocupacao[s] ?? 0) > 0 || (OBLIGATORY_STAGES as readonly string[]).includes(s));
+                    set("stages", STAGES.filter((s) => next.includes(s) || travadas.includes(s)));
                   }}
                   className="h-4 w-4 rounded border-input disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 {stage}
                 {obligatory && <span className="text-xs text-muted-foreground">(obrigatória)</span>}
+                {!obligatory && ocupada && (
+                  <span className="text-xs text-muted-foreground">
+                    ({ocupacao[stage]} candidato{ocupacao[stage] === 1 ? "" : "s"} nesta etapa)
+                  </span>
+                )}
               </label>
             );
           })}

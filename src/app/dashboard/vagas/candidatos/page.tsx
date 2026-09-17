@@ -343,6 +343,7 @@ function CandidatosContent() {
           currentBucket="livre"
           currentStage={applicantParaEntrevista.stage}
           forcedStage="Entrevista RH"
+          jobStagesConfig={jobStagesConfig}
         />
       )}
     </div>

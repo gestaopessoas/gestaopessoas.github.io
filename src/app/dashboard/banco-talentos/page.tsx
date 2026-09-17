@@ -59,7 +59,32 @@ export default function BancoTalentosPage() {
   const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [candidateToInterview, setCandidateToInterview] = useState<{ id: string; name: string; applicationId: string | null; stage: string | null } | null>(null);
-  
+  // Funil da Vaga da Candidatura chamada para entrevista: sem Vaga (Banco de Talentos "puro"),
+  // fica null e o modal cai nas 14 Etapas de sempre.
+  const [jobStagesConfig, setJobStagesConfig] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (!candidateToInterview?.applicationId) {
+      setJobStagesConfig(null);
+      return;
+    }
+    let atual = true;
+    createClient()
+      .from("job_applications")
+      .select("job_request_id, job_requests(stages)")
+      .eq("id", candidateToInterview.applicationId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!atual) return;
+        const pedido = data?.job_requests as { stages?: string[] | null } | { stages?: string[] | null }[] | null;
+        const row = Array.isArray(pedido) ? pedido[0] : pedido;
+        setJobStagesConfig(row?.stages ?? null);
+      });
+    return () => {
+      atual = false;
+    };
+  }, [candidateToInterview?.applicationId]);
+
   const { can } = usePermissions();
   const canDelete = can("central_candidato", "delete");
 
@@ -431,6 +456,7 @@ export default function BancoTalentosPage() {
           candidateName={candidateToInterview.name}
           currentBucket="livre"
           currentStage={candidateToInterview.stage ?? "Banco de Talentos"}
+          jobStagesConfig={jobStagesConfig}
         />
       )}
 

@@ -227,3 +227,25 @@ test("o motivo do desfecho só aparece em quem realmente saiu", () => {
   assert.equal(voltou.motivo_saida, null);
   assert.equal(voltou.motivo_detalhe, null);
 });
+
+// issue #128: o seletor so pode oferecer Etapa que a Vaga usa
+test("funil da vaga corta as etapas que ela nao usa", () => {
+  const todas = nextStageOptions("entrevista");
+  assert.ok(todas.length > 1, "o caso so vale se houver mais de uma opcao sem funil");
+
+  const umaSo = nextStageOptions("entrevista", null, [todas[0]]);
+  assert.deepEqual(umaSo, [todas[0]]);
+});
+
+test("funil nulo ou vazio nao filtra nada", () => {
+  const todas = nextStageOptions("entrevista");
+  assert.deepEqual(nextStageOptions("entrevista", null, null), todas);
+  assert.deepEqual(nextStageOptions("entrevista", null, []), todas);
+});
+
+test("funil so com Obrigatorias nao deixa etapa de avanco", () => {
+  assert.deepEqual(
+    nextStageOptions("entrevista", null, ["Nova", "Contratado", "Reprovado", "Desistente"]),
+    [],
+  );
+});

@@ -100,6 +100,8 @@ export default function CentralCandidatoPage() {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [advanceModalData, setAdvanceModalData] = useState<{ id: string; applicationId: string | null; name: string; bucket: string; stage: string | null; workplace: string | null; forcedStage?: string } | null>(null);
+  // Funil da Vaga da Candidatura em avanço: sem Candidatura (livre) fica null, 14 Etapas.
+  const [advanceJobStagesConfig, setAdvanceJobStagesConfig] = useState<string[] | null>(null);
   const [desfechoModalData, setDesfechoModalData] = useState<{ applicationId: string; name: string; outcome: Outcome; workplace: string | null } | null>(null);
   const { can } = usePermissions();
   const canDelete = can("central_candidato", "delete");
@@ -123,6 +125,29 @@ export default function CentralCandidatoPage() {
   }, [selectedCandidateId]);
   // Amarrado ao id: sem isso a situação do candidato anterior vazava para o próximo.
   const selectedProgress = loadedProgress?.id === selectedCandidateId ? loadedProgress.progress : undefined;
+
+  useEffect(() => {
+    if (!advanceModalData?.applicationId) {
+      setAdvanceJobStagesConfig(null);
+      return;
+    }
+    let atual = true;
+    supabase
+      .from("job_applications")
+      .select("job_request_id, job_requests(stages)")
+      .eq("id", advanceModalData.applicationId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!atual) return;
+        const pedido = data?.job_requests as { stages?: string[] | null } | { stages?: string[] | null }[] | null;
+        const row = Array.isArray(pedido) ? pedido[0] : pedido;
+        setAdvanceJobStagesConfig(row?.stages ?? null);
+      });
+    return () => {
+      atual = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advanceModalData?.applicationId]);
 
   const fetchCandidates = async () => {
     setLoading(true);
@@ -726,6 +751,7 @@ export default function CentralCandidatoPage() {
           currentStage={advanceModalData.stage}
           workplaceName={advanceModalData.workplace}
           forcedStage={advanceModalData.forcedStage}
+          jobStagesConfig={advanceJobStagesConfig}
         />
       )}
 

@@ -445,6 +445,7 @@ export default function VagasAdminPage() {
                 ) : (
                   <VagaForm
                     mode="edit"
+                    jobId={selectedJob.id}
                     initialValues={{
                       profile_id: selectedJob.profile_id || "",
                       sector_id: selectedJob.department_id || "",
