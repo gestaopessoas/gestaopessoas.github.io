@@ -45,3 +45,22 @@ BEGIN
   VALUES (v_user_id, 'Admin Local', 'Admin Local', 99, 'admin')
   ON CONFLICT (id) DO UPDATE SET level = 99;
 END $$;
+
+-- Obras (issue #131).
+--
+-- Sem nenhuma linha em `workplaces`, as Etapas que exigem Obra ("Aguardando Obra",
+-- "Em Avaliação na Obra", "Em Obra") ficam inalcançáveis pela tela: o AdvanceStageModal
+-- pede a Obra e não há nenhuma para escolher. Três das 14 Etapas ficavam sem cobertura
+-- local, e quem escreve e2e descobria isso do jeito difícil.
+--
+-- A SEDE entra porque `isHeadquarters()` em `candidateLogic.mjs` compara o NOME da Obra com
+-- "SEDE" e muda o cálculo da próxima Etapa — esse caminho também não tinha como ser
+-- exercitado. A outra é uma obra comum, para o caminho normal.
+--
+-- `company_id` fica NULL de propósito: é nullable, e nenhuma tela de candidato lê a empresa
+-- da Obra. Se um dia ler, aí se cria a empresa aqui.
+INSERT INTO public.workplaces (id, name, type, status)
+VALUES
+  ('00000000-0000-4000-b000-000000000001', 'SEDE', 'SEDE', 'Ativo'),
+  ('00000000-0000-4000-b000-000000000002', 'Obra Modelo', 'OBRA', 'Ativo')
+ON CONFLICT (id) DO NOTHING;
