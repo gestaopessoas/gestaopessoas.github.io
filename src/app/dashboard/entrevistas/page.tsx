@@ -16,6 +16,8 @@ import { findExistingCandidateId, hasRealEmail, placeholderEmail } from "@/lib/c
 import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 import { TERMINAL_STAGES, type Stage } from "@/lib/stages";
 
+type TrocaDeVaga = "nova" | "alterar" | "cancelar";
+
 type PsychologicalTestInput = {
   test_name: string;
   table_name?: string;
@@ -184,6 +186,8 @@ export default function EntrevistasPage() {
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // Troca de vaga numa entrevista já salva: o salvamento espera a escolha deste modal.
+  const [trocaVaga, setTrocaVaga] = useState<{ de: string; para: string; decidir: (escolha: TrocaDeVaga) => void } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [currentUpdatedAt, setCurrentUpdatedAt] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -589,12 +593,14 @@ export default function EntrevistasPage() {
     //    anterior. Outra vaga é outra entrevista — o usuário decide na hora.
     let alvoId = editingId;
     if (roleChangedOnSavedInterview(editingId, form.role, payloadAny.role)) {
-      const criarNova = window.confirm(
-        `A vaga mudou de "${form.role}" para "${payloadAny.role}".` +
-        "\n\nOK = registrar como entrevista NOVA (a anterior fica no histórico)." +
-        "\nCancelar = alterar a entrevista atual."
-      );
-      if (criarNova) alvoId = null;
+      // Diálogo nativo dava só "OK/Cancelar" — e "Cancelar" não cancelava, escolhia a outra
+      // opção. Agora cada botão diz o que faz, e cancelar cancela mesmo (issue #125).
+      const escolha = await new Promise<TrocaDeVaga>((resolve) => {
+        setTrocaVaga({ de: form.role, para: String(payloadAny.role), decidir: resolve });
+      });
+      setTrocaVaga(null);
+      if (escolha === "cancelar") throw Object.assign(new Error("Salvamento cancelado."), { handled: true });
+      if (escolha === "nova") alvoId = null;
     }
 
     // Primeira gravação costuma ter só data, hora e situação. O parecer nunca sai vazio
@@ -886,6 +892,25 @@ export default function EntrevistasPage() {
           onClose={() => setIsModalOpen(false)}
           onSave={handleModalSave}
         />
+      )}
+
+      {/* Troca de vaga em entrevista salva: acima do modal da ficha (z-60), como o de chaves de IA. */}
+      {trocaVaga && (
+        <div role="dialog" aria-modal="true" aria-labelledby="troca-vaga-titulo" className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-background w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            <div className="p-4 border-b">
+              <h2 id="troca-vaga-titulo" className="text-lg font-semibold">A vaga desta entrevista mudou</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                De <strong>{trocaVaga.de || "sem vaga"}</strong> para <strong>{trocaVaga.para || "sem vaga"}</strong>. Outra vaga é outra entrevista — o parecer atual fica com a vaga anterior.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 p-4">
+              <Button onClick={() => trocaVaga.decidir("nova")}>Registrar entrevista nova</Button>
+              <Button variant="outline" onClick={() => trocaVaga.decidir("alterar")}>Alterar esta entrevista</Button>
+              <Button variant="ghost" onClick={() => trocaVaga.decidir("cancelar")}>Cancelar e voltar ao formulário</Button>
+            </div>
+          </div>
+        </div>
       )}
 
 
