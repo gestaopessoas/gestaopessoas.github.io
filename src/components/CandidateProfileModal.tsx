@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +9,7 @@ import {
   X, Briefcase, MapPin, Mail, Phone, Calendar, Paperclip, Loader2, FileText, 
   Sparkles, GraduationCap, Building2, Award, CheckCircle2, User, Contact, 
   Info, Heart, DollarSign, Users, ChevronRight, Edit2, Save, History, FileCheck, FileUp,
-  Plus, Pencil, Trash2, ExternalLink
+  Plus, Pencil, Trash2
 } from "lucide-react";
 import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
 import GuiaAvaliadorButton from "@/components/GuiaAvaliadorButton";
@@ -25,7 +24,7 @@ import { errorMessage } from "@/lib/utils";
 import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, getCandidateHistoryTargetId } from "@/lib/candidateHistory.mjs";
 import { LIMITED_STAGE_OPTIONS, candidateStatusFromApplications } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { STAGES, isTerminal } from "@/lib/stages";
-import { INTERVIEW_STATUSES, normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
+import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -225,7 +224,8 @@ type CandidateProfileModalProps = {
   defaultEditMode?: boolean;
   initialData?: Partial<ProfilePerson>;
   initialAssessmentData?: any;
-  /** `id` é o da entrevista: é o que permite abrir a ficha dela (issue #74). */
+  /** Só atravessa o dado para `onSave` — a ficha não edita mais isso aqui, quem exige e
+   *  edita a situação da entrevista é o Avançar Etapa (issue #141, trava da #75). */
   interviewProgress?: { id?: string; status: string; result: string; destination?: string; interview_date?: string; interview_time?: string };
   /** Entrevista nova abre travada: só depois de confirmar é que os campos liberam. */
   startLocked?: boolean;
@@ -264,10 +264,6 @@ export function CandidateProfileModal({
   // Ficha nova abrindo em branco e já editável fazia o usuário digitar por cima de um
   // registro que ele achava que era o antigo. Agora precisa destravar de propósito.
   const [locked, setLocked] = useState(startLocked);
-  // Recolher "Situação da Entrevista" escondia o campo obrigatório: o salvamento era
-  // recusado e não havia para onde olhar (issue #70).
-  const situacaoRef = useRef<HTMLDetailsElement>(null);
-  const dataEntrevistaRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [assessmentLoadError, setAssessmentLoadError] = useState("");
   const [isParsingCv, setIsParsingCv] = useState(false);
@@ -741,15 +737,6 @@ export function CandidateProfileModal({
   const handleSave = async () => {
     if (!onSave) {
       toast("Esta tela não permite salvar alterações da ficha.", "error");
-      return;
-    }
-    // Entrevista sem data não vira registro: é o dado que sustenta agenda e histórico,
-    // inclusive de quem não compareceu.
-    if (interviewProgress && !progress.interview_date) {
-      if (situacaoRef.current) situacaoRef.current.open = true;
-      dataEntrevistaRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-      dataEntrevistaRef.current?.focus({ preventScroll: true });
-      toast("Informe a data da entrevista antes de salvar.", "error");
       return;
     }
     setIsSaving(true);
@@ -1307,113 +1294,6 @@ export function CandidateProfileModal({
                       )}
                     </div>
 
-                    {interviewProgress && (
-                      <details ref={situacaoRef} open className="group rounded-xl border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden">
-                        <summary className="flex cursor-pointer items-center justify-between font-bold text-foreground p-5 border-b">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-5 w-5 text-primary" />
-                            Situação da Entrevista
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {/* Aqui os campos são só leitura: esta tela não grava entrevista.
-                                Sem este link o usuário fechava a ficha e caçava o candidato na
-                                tela de Entrevistas na mão (issue #74). */}
-                            {interviewProgress.id && (
-                              <Link
-                                href={`/dashboard/entrevistas?entrevista=${interviewProgress.id}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                                Abrir entrevista
-                              </Link>
-                            )}
-                            <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-open:rotate-90" />
-                          </div>
-                        </summary>
-                        <div className="p-5 grid gap-4 sm:grid-cols-2 text-sm">
-                          {/* Data e hora ficam no registro mesmo quando o candidato não
-                              compareceu: é o que aconteceu com a entrevista marcada. */}
-                          <label className="space-y-1.5">
-                            <span className="text-xs text-muted-foreground block font-medium">Data da entrevista</span>
-                            <input
-                              ref={dataEntrevistaRef}
-                              type="date"
-                              disabled={!isEditing}
-                              value={progress.interview_date || ""}
-                              onChange={(e) => setProgress(normalizeInterviewProgress({ ...progress, interview_date: e.target.value }))}
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
-                            />
-                          </label>
-                          <label className="space-y-1.5">
-                            <span className="text-xs text-muted-foreground block font-medium">Hora</span>
-                            <input
-                              type="time"
-                              disabled={!isEditing}
-                              value={progress.interview_time || ""}
-                              onChange={(e) => setProgress(normalizeInterviewProgress({ ...progress, interview_time: e.target.value }))}
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
-                            />
-                          </label>
-                          <label className="space-y-1.5">
-                            <span className="text-xs text-muted-foreground block font-medium">Status</span>
-                            <select
-                              disabled={!isEditing}
-                              value={progress.status}
-                              onChange={(e) => setProgress(normalizeInterviewProgress({ ...progress, status: e.target.value }))}
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
-                            >
-                              {INTERVIEW_STATUSES.map((s: string) => (
-                                <option key={s} value={s}>{s}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="space-y-1.5">
-                            <span className="text-xs text-muted-foreground block font-medium">Resultado</span>
-                            <select
-                              disabled={!isEditing}
-                              value={progress.result}
-                              onChange={(e) => setProgress(normalizeInterviewProgress({ ...progress, result: e.target.value }))}
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
-                            >
-                              <option value="N/C">N/C</option>
-                              <option value="Aprovado">Aprovado</option>
-                              <option value="Reprovado">Reprovado</option>
-                            </select>
-                          </label>
-                          <label className="space-y-1.5">
-                            <span className="text-xs text-muted-foreground block font-medium">Destino</span>
-                            <select
-                              disabled={!isEditing}
-                              value={progress.destination}
-                              onChange={(e) => setProgress(normalizeInterviewProgress({ ...progress, destination: e.target.value }))}
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-70"
-                            >
-                              <option value="">-</option>
-                              <option value="Contratado">Contratado</option>
-                              <option value="Banco de Talentos">Banco de Talentos</option>
-                              <option value="Reprovado">Reprovado</option>
-                              <option value="Desistente">Desistente</option>
-                            </select>
-                          </label>
-                        </div>
-                        {/* Quem gravou a última versão desta entrevista (issue #81). Vem do
-                            gatilho set_interview_editor, e por isso só existe para quem foi
-                            salvo depois dele — linha antiga fica sem o rastro. Só aparece na
-                            ficha de uma entrevista: aberta pelo candidato, a lista traz
-                            várias e o rodapé mentiria sobre qual delas mudou. */}
-                        {interviewId && interviews[0]?.updated_by_name && (
-                          <p className="px-5 pb-5 -mt-1 text-xs text-muted-foreground">
-                            Última alteração por {interviews[0].updated_by_name}
-                            {interviews[0].updated_at
-                              ? ` em ${new Date(interviews[0].updated_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`
-                              : ""}
-                            .
-                          </p>
-                        )}
-                      </details>
-                    )}
-                    
                     {/* Dados Pessoais & Contato (Accordion) */}
                     <details open className="group rounded-xl border bg-card shadow-sm [&_summary::-webkit-details-marker]:hidden">
                       <summary className="flex cursor-pointer items-center justify-between font-bold text-foreground p-5 border-b">

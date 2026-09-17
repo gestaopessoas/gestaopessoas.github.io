@@ -16,8 +16,36 @@ import { findExistingCandidateId, hasRealEmail, placeholderEmail } from "@/lib/c
 import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 import { TERMINAL_STAGES, type Stage } from "@/lib/stages";
 import { etapaDaLinha, historicoPorCandidato, type HistoricoPorCandidato } from "./lib/etapaDaLinha.mjs";
+// O avanço de Etapa é o mesmo da Central do Candidato, e de propósito: é lá que mora a trava
+// que exige registrar o que ocorreu na entrevista antes de seguir (issue #75). Duplicar o
+// modal aqui duplicaria a regra, e é a regra que não pode ter duas versões (issue #141).
+import AdvanceStageModal from "../central-candidato/components/AdvanceStageModal";
+import { candidateBucket, candidateStatusFromApplications } from "../central-candidato/lib/candidateLogic.mjs";
 
 type TrocaDeVaga = "nova" | "alterar" | "cancelar";
+
+/** O que o Avançar precisa saber sobre a Candidatura de quem está na lista de entrevistas. */
+type CandidaturaDoCandidato = {
+  applicationId: string | null;
+  bucket: string;
+  stage: string | null;
+  workplace: string | null;
+};
+
+/** Avanço em curso: o candidato escolhido na lista, já com a Candidatura resolvida. */
+type AvancoAberto = CandidaturaDoCandidato & { candidateId: string; candidateName: string };
+
+/** A Candidatura como o Supabase devolve: embed sem schema gerado vem como objeto OU array. */
+type CandidaturaCrua = {
+  id: string;
+  candidate_id: string | null;
+  status: string | null;
+  created_at: string | null;
+  outcome_reason: string | null;
+  outcome_details: string | null;
+  job_requests?: { position_title?: string | null; requested_role?: string | null } | { position_title?: string | null; requested_role?: string | null }[] | null;
+  job_openings?: { workplaces?: { name?: string | null } | { name?: string | null }[] | null } | { workplaces?: { name?: string | null } | { name?: string | null }[] | null }[] | null;
+};
 
 type PsychologicalTestInput = {
   test_name: string;
@@ -188,7 +216,13 @@ export default function EntrevistasPage() {
   });
   const [assessmentForm, setAssessmentForm] = useState<Assessment>(defaultAssessment);
   const [stageByCandidate, setStageByCandidate] = useState<HistoricoPorCandidato>({});
-  
+  // A Candidatura de cada candidato da lista: é ela que o Avançar move, e sem ela o modal não
+  // sabe de onde a pessoa está saindo. Vem junto do carregamento das entrevistas.
+  const [candidaturaPorCandidato, setCandidaturaPorCandidato] = useState<Record<string, CandidaturaDoCandidato>>({});
+  const [advanceData, setAdvanceData] = useState<AvancoAberto | null>(null);
+  // Funil configurado na Vaga da Candidatura que está avançando. Null = as 14 Etapas.
+  const [advanceStagesConfig, setAdvanceStagesConfig] = useState<string[] | null>(null);
+
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   // Os provedores salvos já valem no primeiro render — evita renderizar uma vez
   // com os defaults e sobrescrever logo depois.
@@ -303,15 +337,87 @@ export default function EntrevistasPage() {
         .select("candidate_id, stage, created_at")
         .in("candidate_id", candidateIds)
         .order("created_at", { ascending: false });
-      setStageByCandidate(historicoPorCandidato(etapas));
+      const historico = historicoPorCandidato(etapas);
+      setStageByCandidate(historico);
+      setCandidaturaPorCandidato(await carregarCandidaturas(candidateIds as string[], historico));
     } else {
       setStageByCandidate({});
+      setCandidaturaPorCandidato({});
     }
   };
+
+  /**
+   * A Candidatura de cada candidato, na forma que o Avançar consome.
+   *
+   * Depende do histórico porque o balde (`candidateBucket`) precisa saber QUANDO a contratação
+   * aconteceu, e essa data mora na linha "Contratado" do histórico — não na Candidatura.
+   *
+   * A derivação é a mesma da Central do Candidato, e por isso usa as mesmas funções puras: o
+   * dia em que "qual é a Candidatura de referência" mudar, muda nos dois lugares de uma vez.
+   */
+  const carregarCandidaturas = async (candidateIds: string[], historico: HistoricoPorCandidato) => {
+    if (candidateIds.length === 0) return {};
+    const { data: candidaturas } = await createClient()
+      .from("job_applications")
+      .select("id, candidate_id, status, created_at, outcome_reason, outcome_details, job_requests(position_title, requested_role), job_openings(workplaces(name))")
+      .in("candidate_id", candidateIds);
+
+    const porCandidato: Record<string, CandidaturaDoCandidato> = {};
+    for (const id of candidateIds) {
+      // O Supabase tipa embed sem schema gerado como array; a Candidatura é de UMA vaga.
+      const minhas = ((candidaturas ?? []) as unknown as CandidaturaCrua[])
+        .filter((app) => app.candidate_id === id)
+        .map((app) => {
+          const opening = Array.isArray(app.job_openings) ? app.job_openings[0] : app.job_openings;
+          const obra = opening ? (Array.isArray(opening.workplaces) ? opening.workplaces[0] : opening.workplaces) : null;
+          return {
+            ...app,
+            job_requests: Array.isArray(app.job_requests) ? app.job_requests[0] ?? null : app.job_requests ?? null,
+            job_openings: opening ? { workplaces: obra ?? null } : null,
+          };
+        });
+
+      const derivado = candidateStatusFromApplications(minhas, {});
+      const contratadoEm = historico[id]?.find((e) => e.stage === "Contratado")?.created_at ?? null;
+      porCandidato[id] = {
+        applicationId: derivado.candidatura_id,
+        bucket: candidateBucket(derivado.status, derivado.etapa_atual, contratadoEm),
+        stage: derivado.etapa_atual,
+        workplace: derivado.obra_atual,
+      };
+    }
+    return porCandidato;
+  };
+
+  // O funil da Vaga limita as Etapas oferecidas no avanço (issue #128). Mesmo carregamento da
+  // Central do Candidato: sem Candidatura não há Vaga, e aí valem as 14 Etapas.
+  // Zerado por quem abre o avanço (`abrirAvanco`), não aqui: reset dentro do efeito é
+  // render em cascata, e o eslint do projeto recusa.
+  useEffect(() => {
+    if (!advanceData?.applicationId) return;
+    let atual = true;
+    createClient()
+      .from("job_applications")
+      .select("job_requests(stages)")
+      .eq("id", advanceData.applicationId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!atual) return;
+        const pedido = data?.job_requests as { stages?: string[] | null } | { stages?: string[] | null }[] | null;
+        const row = Array.isArray(pedido) ? pedido[0] : pedido;
+        setAdvanceStagesConfig(row?.stages ?? null);
+      });
+    return () => {
+      atual = false;
+    };
+  }, [advanceData?.applicationId]);
 
   useEffect(() => {
     const run = async () => { await loadInterviews(); };
     run();
+    // Carga inicial, uma vez só: `loadInterviews` é recriada a cada render e entrar na lista
+    // de dependências faria a tela recarregar em loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Vindo do "Avançar e preencher parecer" da Central: abre direto a entrevista criada lá.
@@ -671,6 +777,24 @@ export default function EntrevistasPage() {
 
     setIsModalOpen(false);
     loadInterviews();
+
+    // Entrevista nova: a ficha faz o cadastro (nome, telefone, vaga) e o Avançar faz o resto —
+    // é lá que se escolhe a Etapa, a data, a hora e o entrevistador, e é lá que a entrevista
+    // nasce vinculada à Candidatura (issue #141). Sem isso a pessoa era cadastrada e ficava
+    // sem entrevista marcada, porque o campo de data saiu da ficha.
+    if (!alvoId && candidateId) {
+      const historico = historicoPorCandidato(
+        (await supabase.from("candidate_interviews").select("candidate_id, stage, created_at").eq("candidate_id", candidateId).order("created_at", { ascending: false })).data
+      );
+      const candidatura = (await carregarCandidaturas([candidateId], historico))[candidateId];
+      setAdvanceStagesConfig(null);
+      setAdvanceData({
+        ...candidatura,
+        candidateId,
+        candidateName: String(payloadAny.candidate_name || form.candidate_name || ""),
+      });
+    }
+
     return candidateId ?? undefined;
   };
   
@@ -720,6 +844,27 @@ export default function EntrevistasPage() {
 
   // A mesma linha serve para quem tem uma entrevista só e para as que ficam dentro de um
   // grupo — `ordem` é o que muda: dentro do grupo ela numera a entrevista da Etapa.
+  /**
+   * Abre o avanço de Etapa a partir de uma linha da lista. É por aqui que a Situação da
+   * Entrevista passa a ser registrada: o modal não deixa concluir o avanço enquanto ninguém
+   * disser o que ocorreu numa entrevista pendente (issue #75).
+   */
+  const abrirAvanco = (interview: Interview) => {
+    if (!interview.candidate_id) return;
+    const candidatura = candidaturaPorCandidato[interview.candidate_id] ?? {
+      applicationId: null,
+      bucket: "livre",
+      stage: null,
+      workplace: null,
+    };
+    setAdvanceStagesConfig(null);
+    setAdvanceData({
+      ...candidatura,
+      candidateId: interview.candidate_id,
+      candidateName: interview.candidate_name || "",
+    });
+  };
+
   const linhaEntrevista = (interview: Interview, ordem?: number) => (
     <tr key={interview.id} onClick={() => openEditModal(interview)} className={`hover:bg-muted/30 cursor-pointer transition-colors group ${ordem ? "bg-background" : ""}`}>
       <td className="px-4 py-3 min-w-64">
@@ -770,6 +915,18 @@ export default function EntrevistasPage() {
         )}
       </td>
       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+        {/* Linha antiga sem `candidate_id` não tem a quem avançar: o vínculo só passou a ser
+            obrigatório na migração 20260914210000. */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => abrirAvanco(interview)}
+          disabled={!interview.candidate_id}
+          className="mr-1 h-8"
+          title={interview.candidate_id ? "Avançar etapa deste candidato" : "Entrevista antiga, sem candidato vinculado"}
+        >
+          Avançar
+        </Button>
         <Button
           variant="ghost"
           size="icon"
@@ -957,6 +1114,24 @@ export default function EntrevistasPage() {
           canSaveAssessment={true}
           onClose={() => setIsModalOpen(false)}
           onSave={handleModalSave}
+        />
+      )}
+
+      {advanceData && (
+        <AdvanceStageModal
+          isOpen={!!advanceData}
+          onClose={() => setAdvanceData(null)}
+          onSuccess={() => {
+            setAdvanceData(null);
+            loadInterviews();
+          }}
+          candidateId={advanceData.candidateId}
+          applicationId={advanceData.applicationId}
+          candidateName={advanceData.candidateName}
+          currentBucket={advanceData.bucket}
+          currentStage={advanceData.stage}
+          workplaceName={advanceData.workplace}
+          jobStagesConfig={advanceStagesConfig}
         />
       )}
 
