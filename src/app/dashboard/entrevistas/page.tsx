@@ -3,8 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Search, Download, Briefcase, Calendar, CalendarClock, Clock, Trash2, User, CheckCircle2, X, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Search, Download, Briefcase, Calendar, CalendarClock, ChevronRight, Clock, Trash2, User, CheckCircle2, X, Plus } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
@@ -346,6 +346,14 @@ export default function EntrevistasPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  const [gruposAbertos, setGruposAbertos] = useState<Set<string>>(new Set());
+  const alternarGrupo = (chave: string) =>
+    setGruposAbertos((atual) => {
+      const novo = new Set(atual);
+      if (!novo.delete(chave)) novo.add(chave);
+      return novo;
+    });
+
   const filtered = useMemo(() => {
     let result = interviews;
     if (selectedMonth) {
@@ -363,6 +371,26 @@ export default function EntrevistasPage() {
     }
     return result;
   }, [query, selectedMonth, interviews]);
+
+  // Uma pessoa tem uma entrevista por Etapa (Triagem, RH, Gestor, Testagem...), então quatro
+  // linhas com o mesmo nome e a mesma vaga são o normal — mas na lista achatada pareciam
+  // registro repetido. Quem tem mais de uma entrevista vira um grupo que abre; quem tem uma
+  // só continua sendo uma linha comum, sem clique a mais.
+  const grupos = useMemo(() => {
+    const quando = (i: Interview) => `${i.interview_date || ""}${i.interview_time || ""}`;
+    const mapa = new Map<string, { chave: string; itens: Interview[] }>();
+    for (const i of filtered) {
+      const chave = i.candidate_id || `nome:${(i.candidate_name || "sem nome").toLowerCase()}`;
+      const grupo = mapa.get(chave) ?? { chave, itens: [] };
+      grupo.itens.push(i);
+      mapa.set(chave, grupo);
+    }
+    const grupos = [...mapa.values()];
+    for (const g of grupos) g.itens.sort((a, b) => quando(a).localeCompare(quando(b)));
+    // A ordem da lista continua sendo a da entrevista mais recente, como era antes de agrupar.
+    return grupos.sort((a, b) =>
+      quando(b.itens[b.itens.length - 1]).localeCompare(quando(a.itens[a.itens.length - 1])));
+  }, [filtered]);
 
   // Agenda: o que ainda vai acontecer, sem depender do filtro de mês/busca. É a lista que
   // o RH abre de manhã — por isso ignora `filtered` e olha a base inteira.
@@ -700,6 +728,71 @@ export default function EntrevistasPage() {
     if (editingId === id) setIsModalOpen(false);
   };
 
+  // A mesma linha serve para quem tem uma entrevista só e para as que ficam dentro de um
+  // grupo — `ordem` é o que muda: dentro do grupo ela numera a entrevista da Etapa.
+  const linhaEntrevista = (interview: Interview, ordem?: number) => (
+    <tr key={interview.id} onClick={() => openEditModal(interview)} className={`hover:bg-muted/30 cursor-pointer transition-colors group ${ordem ? "bg-background" : ""}`}>
+      <td className="px-4 py-3 min-w-64">
+        {ordem ? (
+          <div className="pl-7 text-sm text-muted-foreground">{ordem}ª entrevista</div>
+        ) : (
+          <>
+            <div className="font-medium text-foreground">{interview.candidate_name || "Sem nome"}</div>
+            <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
+              {interview.phone && <div>{interview.phone}</div>}
+              {interview.email && <div>{interview.email}</div>}
+            </div>
+          </>
+        )}
+      </td>
+      <td className="px-4 py-3 min-w-44 font-medium text-muted-foreground">
+        {interview.role || "Não informado"}
+      </td>
+      <td className="px-4 py-3 min-w-36 text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <Calendar className="h-3.5 w-3.5" />
+          {interview.interview_date ? new Date(interview.interview_date).toLocaleDateString("pt-BR", {timeZone: "UTC"}) : "N/D"}
+        </div>
+        {interview.interview_time && (
+          <div className="flex items-center gap-1.5 mt-1 text-xs">
+            <Clock className="h-3.5 w-3.5" />
+            {interview.interview_time}
+          </div>
+        )}
+      </td>
+      <td className="px-4 py-3 min-w-36">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusStyle[interview.status || ""] || "bg-muted text-muted-foreground"}`}>
+          {interview.status || "N/A"}
+        </span>
+      </td>
+      <td className="px-4 py-3 min-w-36 font-medium">
+        <span className={resultStyle[interview.result || ""] || ""}>
+          {interview.result || "-"}
+        </span>
+      </td>
+      <td className="px-4 py-3 min-w-36">
+        {etapaDaLinha(interview, stageByCandidate) ? (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${stageStyle[etapaDaLinha(interview, stageByCandidate) || ""] || "bg-muted text-muted-foreground"}`}>
+            {etapaDaLinha(interview, stageByCandidate)}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(e) => handleDelete(interview.id, e)}
+          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8"
+          title="Excluir entrevista"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </td>
+    </tr>
+  );
+
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex-1 p-8 space-y-6 max-w-7xl mx-auto w-full">
@@ -809,62 +902,45 @@ export default function EntrevistasPage() {
                 {!loading && filtered.length === 0 && (
                   <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>Nenhum registro encontrado.</td></tr>
                 )}
-                {!loading && filtered.map((interview) => (
-                  <tr key={interview.id} onClick={() => openEditModal(interview)} className="hover:bg-muted/30 cursor-pointer transition-colors group">
-                    <td className="px-4 py-3 min-w-64">
-                      <div className="font-medium text-foreground">{interview.candidate_name || "Sem nome"}</div>
-                      <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
-                        {interview.phone && <div>{interview.phone}</div>}
-                        {interview.email && <div>{interview.email}</div>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 min-w-44 font-medium text-muted-foreground">
-                      {interview.role || "Não informado"}
-                    </td>
-                    <td className="px-4 py-3 min-w-36 text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {interview.interview_date ? new Date(interview.interview_date).toLocaleDateString("pt-BR", {timeZone: "UTC"}) : "N/D"}
-                      </div>
-                      {interview.interview_time && (
-                        <div className="flex items-center gap-1.5 mt-1 text-xs">
-                          <Clock className="h-3.5 w-3.5" />
-                          {interview.interview_time}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 min-w-36">
-                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusStyle[interview.status || ""] || "bg-muted text-muted-foreground"}`}>
-                         {interview.status || "N/A"}
-                       </span>
-                    </td>
-                    <td className="px-4 py-3 min-w-36 font-medium">
-                       <span className={resultStyle[interview.result || ""] || ""}>
-                         {interview.result || "-"}
-                       </span>
-                    </td>
-                    <td className="px-4 py-3 min-w-36">
-                       {etapaDaLinha(interview, stageByCandidate) ? (
-                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${stageStyle[etapaDaLinha(interview, stageByCandidate) || ""] || "bg-muted text-muted-foreground"}`}>
-                           {etapaDaLinha(interview, stageByCandidate)}
-                         </span>
-                       ) : (
-                         <span className="text-muted-foreground">-</span>
-                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => handleDelete(interview.id, e)}
-                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8"
-                        title="Excluir entrevista"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {!loading && grupos.map((grupo) => {
+                  const ultima = grupo.itens[grupo.itens.length - 1];
+                  const aberto = gruposAbertos.has(grupo.chave);
+                  if (grupo.itens.length === 1) return linhaEntrevista(ultima);
+                  return (
+                    <Fragment key={grupo.chave}>
+                      <tr onClick={() => alternarGrupo(grupo.chave)} className="hover:bg-muted/30 cursor-pointer transition-colors bg-muted/20">
+                        <td className="px-4 py-3 min-w-64">
+                          <div className="flex items-center gap-1.5 font-medium text-foreground">
+                            <ChevronRight className={`h-4 w-4 shrink-0 transition-transform ${aberto ? "rotate-90" : ""}`} />
+                            {ultima.candidate_name || "Sem nome"}
+                          </div>
+                          <div className="mt-1 ml-6 text-xs text-muted-foreground space-y-0.5">
+                            {ultima.phone && <div>{ultima.phone}</div>}
+                            {ultima.email && <div>{ultima.email}</div>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 min-w-44 font-medium text-muted-foreground">
+                          {ultima.role || "Não informado"}
+                        </td>
+                        <td className="px-4 py-3 min-w-36 text-muted-foreground" colSpan={3}>
+                          {grupo.itens.length} entrevistas · última em{" "}
+                          {ultima.interview_date ? new Date(ultima.interview_date).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "N/D"}
+                        </td>
+                        <td className="px-4 py-3 min-w-36">
+                          {etapaDaLinha(ultima, stageByCandidate) ? (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${stageStyle[etapaDaLinha(ultima, stageByCandidate) || ""] || "bg-muted text-muted-foreground"}`}>
+                              {etapaDaLinha(ultima, stageByCandidate)}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3" />
+                      </tr>
+                      {aberto && grupo.itens.map((interview, indice) => linhaEntrevista(interview, indice + 1))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
