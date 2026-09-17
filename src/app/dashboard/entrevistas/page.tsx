@@ -857,7 +857,7 @@ export default function EntrevistasPage() {
                         variant="ghost"
                         size="icon"
                         onClick={(e) => handleDelete(interview.id, e)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8"
                         title="Excluir entrevista"
                       >
                         <Trash2 className="h-4 w-4" />
