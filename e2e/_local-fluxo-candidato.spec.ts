@@ -8,6 +8,12 @@ import { test, expect, type Page } from '@playwright/test';
 // ganhou "Chamar para entrevista"; a aba Entrevistas perdeu o ícone por linha; e o
 // "Guia do Avaliador" é sempre visível no header da ficha.
 //
+// A issue #141 mudou de novo o começo do fluxo: a ficha do candidato não tem mais o bloco
+// "Situação da Entrevista". O botão da tela de Entrevistas virou "Novo Candidato" — ele
+// cadastra a pessoa e o "Avançar Etapa" abre em seguida, que é quem marca a entrevista.
+// Encerrar candidatura (Reprovar / Desistiu) saiu da ficha e mora no menu da linha da
+// Central.
+//
 // Cada teste prepara o estado "antes" por REST — a UI não é o que está sendo testado
 // naquele passo — e usa a interface só para o clique/efeito do item da issue.
 
@@ -49,7 +55,14 @@ const historicoPorCandidato = (candidateId: string) =>
 async function seedCandidato(
   nome: string,
   email: string,
-  opts: { interview?: { status: string; result?: string; destination?: string | null }; stage?: string } = {}
+  opts: {
+    interview?: { status: string; result?: string; destination?: string | null };
+    stage?: string;
+    /** Etapa de uma Candidatura ativa. Sem ela o candidato cai no Banco de Talentos. */
+    candidatura?: string;
+    /** Publicação aberta, que é o que o "Chamar" oferece para abrir a Candidatura. */
+    publicacao?: boolean;
+  } = {}
 ) {
   const partes = nome.split(' ');
   const [candidato] = await rest('POST', 'candidates', [{
@@ -79,6 +92,18 @@ async function seedCandidato(
       interviewer_name: 'QA',
     }]);
   }
+  if (opts.publicacao) {
+    const [vaga] = await rest('POST', 'job_requests', [{ position_title: `${nome} VAGA`, requested_role: VAGA }]);
+    await rest('POST', 'job_openings', [{ job_request_id: vaga.id, status: 'Aberta' }]);
+  }
+  if (opts.candidatura) {
+    // Candidatura presa a uma Vaga de mentira: o que importa aqui é existir uma ativa,
+    // porque é ela que liga os desfechos no menu da linha da Central.
+    const [vaga] = await rest('POST', 'job_requests', [{ position_title: `${nome} VAGA`, requested_role: VAGA }]);
+    await rest('POST', 'job_applications', [
+      { candidate_id: candidato.id, job_request_id: vaga.id, status: opts.candidatura },
+    ]);
+  }
   return candidato;
 }
 
@@ -95,14 +120,25 @@ async function limparCandidato(nome: string) {
   const candidato = await candidatoPorNome(nome);
   if (candidato) {
     await fetch(`${API}/rest/v1/candidate_interviews?candidate_id=eq.${candidato.id}`, { method: 'DELETE', headers: H });
+    await fetch(`${API}/rest/v1/job_applications?candidate_id=eq.${candidato.id}`, { method: 'DELETE', headers: H });
     await fetch(`${API}/rest/v1/candidates?id=eq.${candidato.id}`, { method: 'DELETE', headers: H });
+  }
+  const vagas = await rest('GET', `job_requests?position_title=eq.${encodeURIComponent(`${nome} VAGA`)}&select=id`);
+  for (const vaga of vagas) {
+    await fetch(`${API}/rest/v1/job_openings?job_request_id=eq.${vaga.id}`, { method: 'DELETE', headers: H });
+    await fetch(`${API}/rest/v1/job_requests?id=eq.${vaga.id}`, { method: 'DELETE', headers: H });
   }
 }
 
+// Data e hora agora são do "Avançar Etapa", não da ficha (issue #141).
 const campoData = (page: Page) => page.locator('input[type="date"]').first();
-const campoStatus = (page: Page) => page.locator('select').filter({ hasText: 'Compareceu' }).first();
-const campoDestino = (page: Page) => page.locator('select').filter({ hasText: 'Banco de Talentos' }).first();
 const salvar = (page: Page) => page.getByRole('button', { name: 'Salvar' }).first();
+
+/** Os desfechos saíram da linha e foram para o menu "Mais ações" (issue #133). */
+async function acaoDaLinha(page: Page, linha: ReturnType<Page['getByRole']>, acao: string) {
+  await linha.getByRole('button', { name: 'Mais ações' }).click();
+  await page.getByRole('menuitem', { name: acao }).click();
+}
 
 async function login(page: Page) {
   await page.goto('/login');
@@ -110,15 +146,6 @@ async function login(page: Page) {
   await page.getByLabel('Senha').fill('admin123');
   await page.getByRole('button', { name: /entrar/i }).click();
   await page.waitForURL('**/dashboard**', { timeout: 30000 });
-}
-
-async function abrirFichaNaEntrevistas(page: Page, nome: string) {
-  await page.goto('/dashboard/entrevistas');
-  await page.getByPlaceholder('Buscar candidato, cargo, status...').fill(nome);
-  const linha = page.getByRole('row').filter({ hasText: nome });
-  await expect(linha).toBeVisible({ timeout: 30000 });
-  await linha.click();
-  await expect(campoDestino(page)).toBeVisible({ timeout: 30000 });
 }
 
 test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', () => {
@@ -135,21 +162,27 @@ test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', (
     await login(page);
   });
 
-  test('1. criar entrevista pelo botão "Nova Entrevista" leva o candidato para "Em entrevista" na Central', async ({ page }) => {
+  test('1. cadastrar pelo botão "Novo Candidato" e marcar no Avançar leva o candidato para "Em entrevista" na Central', async ({ page }) => {
     const NOME = `${PREFIXO} T1`;
     const EMAIL = `${PREFIXO.toLowerCase()}.t1@local.dev`;
     await limparCandidato(NOME);
     try {
       await page.goto('/dashboard/entrevistas');
-      await page.getByRole('button', { name: 'Nova Entrevista' }).click();
-      await page.getByRole('button', { name: /Registrar nova entrevista/ }).click();
-      await expect(campoData(page)).toBeVisible({ timeout: 30000 });
+      await page.getByRole('button', { name: 'Novo Candidato' }).click();
+      await page.getByRole('button', { name: /Cadastrar candidato/ }).click();
+      await expect(page.getByPlaceholder('Nome completo')).toBeVisible({ timeout: 30000 });
       await page.getByPlaceholder('Nome completo').fill(NOME);
       await page.getByPlaceholder('E-mail').fill(EMAIL);
       await page.getByLabel('Cargo').selectOption(VAGA);
-      await campoData(page).fill(HOJE);
       await salvar(page).click();
-      await expect(page.getByText('Entrevista salva.', { exact: true })).toBeVisible({ timeout: 30000 });
+
+      // A ficha só cadastra a pessoa: a entrevista nasce aqui (issue #141).
+      await expect(page.getByRole('button', { name: 'Confirmar Avanço' })).toBeVisible({ timeout: 30000 });
+      await page.getByRole('combobox').filter({ hasText: 'Selecione a etapa' }).click();
+      await page.getByRole('option', { name: 'Entrevista RH', exact: true }).click();
+      await campoData(page).fill(HOJE);
+      await page.getByRole('button', { name: 'Confirmar Avanço' }).click();
+      await expect.poll(async () => (await interviewsPorNome(NOME)).length, { timeout: 30000 }).toBe(1);
 
       await page.goto('/dashboard/central-candidato');
       await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
@@ -161,20 +194,28 @@ test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', (
     }
   });
 
-  test('2. destino "Banco de Talentos" na ficha da entrevista tira o candidato de "Em entrevista" e o leva ao Banco de Talentos', async ({ page }) => {
+  // O destino deixou de morar na ficha da entrevista (issue #141). Encerrar a candidatura é
+  // o menu da linha na Central, e o efeito cobrado é o mesmo: sai de "Em entrevista" e
+  // volta a aparecer no Banco de Talentos.
+  test('2. registrar desistência na Central tira o candidato de "Em entrevista" e o leva ao Banco de Talentos', async ({ page }) => {
     const NOME = `${PREFIXO} T2`;
     const EMAIL = `${PREFIXO.toLowerCase()}.t2@local.dev`;
     await limparCandidato(NOME);
     try {
-      await seedCandidato(NOME, EMAIL, { interview: { status: 'Aguardando' } });
+      await seedCandidato(NOME, EMAIL, { interview: { status: 'Aguardando' }, candidatura: 'Entrevista RH' });
 
-      await abrirFichaNaEntrevistas(page, NOME);
-      // Entrevista ainda "Aguardando"/"Confirmado" prende o candidato em "Em entrevista"
-      // de propósito (issue #75) — resolver a situação é o que libera o destino.
-      await campoStatus(page).selectOption('Compareceu');
-      await campoDestino(page).selectOption('Banco de Talentos');
-      await salvar(page).click();
-      await expect(page.getByText(/Entrevista salva|Parecer e entrevista salvos/)).toBeVisible({ timeout: 30000 });
+      await page.goto('/dashboard/central-candidato');
+      await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
+      const linha = page.getByRole('row').filter({ hasText: NOME });
+      await expect(linha).toBeVisible({ timeout: 30000 });
+      await expect(linha).toContainText('Em entrevista');
+      await acaoDaLinha(page, linha, 'Desistiu');
+
+      // Motivo é obrigatório: encerrar sem dizer por quê é o que o banco recusa.
+      const dialogo = page.getByRole('dialog');
+      await expect(dialogo).toBeVisible({ timeout: 30000 });
+      await dialogo.locator('select').selectOption('Aceitou outra proposta');
+      await dialogo.getByRole('button', { name: 'Registrar desistência' }).click();
 
       await page.goto('/dashboard/central-candidato');
       await page.getByRole('button', { name: /Em entrevista/ }).click();
@@ -194,7 +235,10 @@ test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', (
     const EMAIL = `${PREFIXO.toLowerCase()}.t3@local.dev`;
     await limparCandidato(NOME);
     try {
-      await seedCandidato(NOME, EMAIL, { interview: { status: 'Compareceu', destination: 'Banco de Talentos' } });
+      await seedCandidato(NOME, EMAIL, {
+        interview: { status: 'Compareceu', destination: 'Banco de Talentos' },
+        publicacao: true,
+      });
 
       await page.goto('/dashboard/banco-talentos');
       await page.getByPlaceholder('Buscar por nome, cargo, obra ou tag...').fill(NOME);
@@ -202,6 +246,10 @@ test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', (
       await expect(linha).toBeVisible({ timeout: 30000 });
       await linha.getByTitle('Chamar para entrevista').click();
 
+      // Quem está no Banco de Talentos não tem Candidatura: chamar é abrir uma, e o modal
+      // exige dizer para qual Vaga publicada (ADR 0006).
+      const opcao = page.locator('#avanco-vaga option', { hasText: `${NOME} VAGA` });
+      await page.locator('#avanco-vaga').selectOption((await opcao.getAttribute('value')) as string);
       await page.getByRole('combobox').filter({ hasText: 'Selecione a etapa' }).click();
       await page.getByRole('option', { name: 'Entrevista RH' }).click();
       await expect(campoData(page)).toBeVisible({ timeout: 30000 });
@@ -232,14 +280,16 @@ test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', (
     const EMAIL = `${PREFIXO.toLowerCase()}.t4@local.dev`;
     await limparCandidato(NOME);
     try {
-      await seedCandidato(NOME, EMAIL, { stage: 'Coleta de Documentos & Exames' });
+      // A Etapa mora em `job_applications`, não no histórico (ADR 0006, Fase 2): semear só
+      // `candidate_interviews` deixava o candidato no balde "Livres".
+      await seedCandidato(NOME, EMAIL, { candidatura: 'Documentação' });
 
       await page.goto('/dashboard/central-candidato');
       await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
       const linha = page.getByRole('row').filter({ hasText: NOME });
       await expect(linha).toBeVisible({ timeout: 30000 });
       await expect(linha).toContainText('Documentação');
-      await linha.getByRole('button', { name: 'Contratar' }).click();
+      await acaoDaLinha(page, linha, 'Contratar');
       await expect(page.getByRole('dialog').getByText('Contratado', { exact: true })).toBeVisible({ timeout: 30000 });
       await page.getByRole('button', { name: 'Confirmar Avanço' }).click();
 
@@ -249,26 +299,6 @@ test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', (
         return historico[historico.length - 1]?.stage;
       }, { timeout: 30000 }).toBe('Contratado');
 
-      await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
-      await expect(page.getByRole('row').filter({ hasText: NOME })).toHaveCount(0, { timeout: 30000 });
-    } finally {
-      await limparCandidato(NOME);
-    }
-  });
-
-  test('5. destino "Contratado" na ficha da entrevista também tira o candidato da Central', async ({ page }) => {
-    const NOME = `${PREFIXO} T5`;
-    const EMAIL = `${PREFIXO.toLowerCase()}.t5@local.dev`;
-    await limparCandidato(NOME);
-    try {
-      await seedCandidato(NOME, EMAIL, { interview: { status: 'Aguardando' } });
-
-      await abrirFichaNaEntrevistas(page, NOME);
-      await campoDestino(page).selectOption('Contratado');
-      await salvar(page).click();
-      await expect(page.getByText(/Entrevista salva|Parecer e entrevista salvos/)).toBeVisible({ timeout: 30000 });
-
-      await page.goto('/dashboard/central-candidato');
       await page.getByPlaceholder('Buscar candidatos...').fill(NOME);
       await expect(page.getByRole('row').filter({ hasText: NOME })).toHaveCount(0, { timeout: 30000 });
     } finally {
@@ -286,10 +316,12 @@ test.describe('Fluxo Central x Entrevistas x Banco de Talentos (banco local)', (
     try {
       await seedCandidato(NOME, EMAIL, { interview: { status: 'Aguardando' } });
 
-      // Entrevistas: sem "Nova entrevista para outra vaga" por linha, com "Nova Entrevista" no topo.
+      // Entrevistas: sem "Nova entrevista para outra vaga" por linha, com "Novo Candidato"
+      // no topo — a ficha cadastra a pessoa, e o Avançar marca a entrevista (issue #141).
       await page.goto('/dashboard/entrevistas');
       await expect(page.getByTitle('Nova entrevista para outra vaga')).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Nova Entrevista' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Novo Candidato' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Nova Entrevista' })).toHaveCount(0);
 
       // Ficha: Guia do Avaliador sempre visível.
       await page.getByPlaceholder('Buscar candidato, cargo, status...').fill(NOME);

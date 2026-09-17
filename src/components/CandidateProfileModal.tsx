@@ -1097,14 +1097,15 @@ export function CandidateProfileModal({
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/40">
             <div className="flex flex-col items-center gap-3 rounded-xl border bg-background/95 px-8 py-6 text-center shadow-lg">
               <p className="max-w-xs text-sm text-muted-foreground">
-                Nada foi registrado ainda. Confirme abaixo para abrir os campos e registrar uma
-                entrevista nova — os dados já preenchidos são só o ponto de partida.
+                Nada foi registrado ainda. Confirme abaixo para abrir os campos e cadastrar o
+                candidato — os dados já preenchidos são só o ponto de partida. A entrevista vem
+                depois, no Avançar Etapa.
               </p>
               <Button
                 onClick={() => { setLocked(false); setIsEditing(true); }}
                 className="gap-2 bg-amber-500 text-amber-950 hover:bg-amber-500/90"
               >
-                <Plus className="h-4 w-4" /> Registrar nova entrevista
+                <Plus className="h-4 w-4" /> Cadastrar candidato
               </Button>
             </div>
           </div>

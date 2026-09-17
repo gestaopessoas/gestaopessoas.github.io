@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
 import { Search, Download, Briefcase, Calendar, CalendarClock, ChevronRight, Clock, Trash2, User, CheckCircle2, X, Plus } from "lucide-react";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
@@ -207,6 +207,10 @@ export default function EntrevistasPage() {
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // Entrevista recém-criada pelo Avançar desta tela, para abrir o parecer dela. O ref marca
+  // a que já foi aberta: sem ele, o próximo recarregamento da lista reabriria a mesma ficha.
+  const [parecerPendente, setParecerPendente] = useState<string | null>(null);
+  const parecerAberto = useRef<string | null>(null);
   // Troca de vaga numa entrevista já salva: o salvamento espera a escolha deste modal.
   const [trocaVaga, setTrocaVaga] = useState<{ de: string; para: string; decidir: (escolha: TrocaDeVaga) => void } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -420,16 +424,19 @@ export default function EntrevistasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Vindo do "Avançar e preencher parecer" da Central: abre direto a entrevista criada lá.
+  // Vindo do "Avançar e preencher parecer": abre direto a entrevista criada lá. Da Central
+  // o alvo chega pela URL; do avanço aberto nesta mesma tela ele chega pelo `onSuccess`,
+  // porque a URL do `router.push` só troca depois que a lista já recarregou.
   useEffect(() => {
-    const alvo = new URLSearchParams(window.location.search).get("entrevista");
-    if (!alvo || isModalOpen) return;
+    const alvo = parecerPendente ?? new URLSearchParams(window.location.search).get("entrevista");
+    if (!alvo || isModalOpen || parecerAberto.current === alvo) return;
     const entrevista = interviews.find((i) => i.id === alvo);
     if (!entrevista) return;
+    parecerAberto.current = alvo;
     openEditModal(entrevista);
     window.history.replaceState({}, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interviews]);
+  }, [interviews, parecerPendente]);
 
   // B1: fecha modais com ESC (modais handrolled sem handler)
   useEffect(() => {
@@ -1143,8 +1150,9 @@ export default function EntrevistasPage() {
         <AdvanceStageModal
           isOpen={!!advanceData}
           onClose={() => setAdvanceData(null)}
-          onSuccess={() => {
+          onSuccess={(interviewIdParaParecer) => {
             setAdvanceData(null);
+            setParecerPendente(interviewIdParaParecer ?? null);
             loadInterviews();
           }}
           candidateId={advanceData.candidateId}

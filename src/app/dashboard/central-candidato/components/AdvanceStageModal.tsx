@@ -71,7 +71,12 @@ export default function AdvanceStageModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  /**
+   * Recebe o id da entrevista recém-criada quando o avanço foi "Avançar e preencher
+   * parecer". Quem já está na tela de Entrevistas abre a ficha com ele em vez de esperar
+   * a URL do `router.push`, que chega depois do recarregamento da lista.
+   */
+  onSuccess: (interviewIdParaParecer?: string) => void;
   candidateId: string;
   /** Candidatura que se move. Nula em quem esta livre — ali o avanco abre uma nova. */
   applicationId: string | null;
@@ -324,6 +329,7 @@ export default function AdvanceStageModal({
 
       // A entrevista é gravada antes do avanço: se o registro do encontro falhar, a etapa
       // não anda — é isso que impede a entrevista de continuar marcada sem ninguém saber.
+      let entrevistaParaParecer: string | undefined;
       let notaEntrevista = "";
       if (entrevistaMarcada) {
         const situacao = normalizeInterviewProgress({
@@ -409,11 +415,17 @@ export default function AdvanceStageModal({
           return;
         }
         if (abrirParecer && entrevista) {
+          // Duas mãos de propósito. O `router.push` serve a quem veio de outra tela (a
+          // Central), que recarrega a página inteira e lê o `?entrevista=`. Quem já está na
+          // tela de Entrevistas não pode depender dele: a URL só troca quando a transição
+          // do router entra, e isso chega DEPOIS do recarregamento da lista — a ficha nunca
+          // abria. Para esse caso o id vai direto no `onSuccess`.
           router.push(`/dashboard/entrevistas?entrevista=${entrevista.id}`);
+          entrevistaParaParecer = entrevista.id;
         }
       }
 
-      onSuccess();
+      onSuccess(entrevistaParaParecer);
       setSelectedStage("");
       setSelectedWorkplace("");
       setStageDate("");
