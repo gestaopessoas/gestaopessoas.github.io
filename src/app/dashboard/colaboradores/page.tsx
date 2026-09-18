@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History, Package } from "lucide-react";
+import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History, Package, Send } from "lucide-react";
 import { useEffect, useState, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
@@ -28,6 +28,7 @@ import { listWorkAnniversaries } from "./lib/anniversaryCounter";
 import { buscarTudo } from "@/lib/paginacao";
 import { EmployeeAvatar, signedPhotoUrl } from "@/components/EmployeeAvatar";
 import { PhotoCropper, type CropPercent } from "@/components/PhotoCropper";
+import { birthdayPhotoMessage, whatsappLink } from "@/lib/birthdayInvite.mjs";
 
 type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; seniority: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
 type TrialPeriod = { id: string; name: string; daysRemaining: number; endDate: string; isWarning: boolean; isOverdue: boolean };
@@ -555,6 +556,48 @@ function ColaboradoresPageInner() {
     setRemovendoFoto(false);
     setConfirmandoRemocao(false);
     setReenquadrando(null);
+  };
+
+  // Abre a foto em tamanho real. A aba é aberta ANTES do await: depois dele o navegador já
+  // não trata o window.open como resposta a um clique e engole a janela.
+  const verFoto = async (employee: Employee) => {
+    if (!employee.photo_path) return;
+    const aba = window.open("", "_blank");
+    const url = await signedPhotoUrl(employee.photo_path);
+    if (!url) {
+      aba?.close();
+      setError("Não foi possível abrir a foto de " + employee.name + ".");
+      return;
+    }
+    if (aba) aba.location.href = url;
+  };
+
+  // Convite do mural: gera o link com prazo e abre o WhatsApp com a mensagem pronta. Quem
+  // aperta "enviar" é o RH, na conversa — daqui não sai mensagem nenhuma sozinha.
+  const convidarFoto = async (employee: Employee) => {
+    const aba = window.open("", "_blank");
+    const { data, error: ticketError } = await createClient()
+      .rpc("new_photo_upload_ticket", { p_employee: employee.id, p_purpose: "aniversario" })
+      .single<{ ticket: string; expires_at: string }>();
+    if (ticketError || !data) {
+      aba?.close();
+      setError("Não foi possível gerar o link de envio de foto: " + (ticketError?.message ?? "erro desconhecido"));
+      return;
+    }
+    // O prazo sai do ticket, não de "hoje + 7": clicar de novo reaproveita o link que já foi
+    // mandado, e a data na mensagem tem que ser a dele.
+    const mensagem = birthdayPhotoMessage({
+      name: employee.name,
+      link: `${window.location.origin}/enviar-foto?t=${data.ticket}`,
+      deadline: new Date(data.expires_at).toLocaleDateString("pt-BR"),
+    });
+    const url = whatsappLink(String(employee.phone ?? ""), mensagem);
+    if (!url) {
+      aba?.close();
+      setError("O telefone de " + employee.name + " não está cadastrado ou está incompleto.");
+      return;
+    }
+    if (aba) aba.location.href = url;
   };
 
   const startEdit = (employee: Employee) => {
@@ -1357,13 +1400,35 @@ function ColaboradoresPageInner() {
                 {birthdaysThisMonth.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum aniversariante neste mês.</p>
                 ) : birthdaysThisMonth.map(({ employee, info }) => (
-                  <div key={employee.id} className="flex items-center justify-between rounded-md border bg-background p-3 shadow-sm">
-                    <div>
-                      <div className="font-medium">{employee.name}</div>
-                      <div className="text-xs text-muted-foreground">Dia {info.day.toString().padStart(2, '0')}</div>
+                  <div key={employee.id} className="flex items-center justify-between gap-3 rounded-md border bg-background p-3 shadow-sm">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => verFoto(employee)}
+                        disabled={!employee.photo_path}
+                        title={employee.photo_path ? `Ver a foto de ${employee.name}` : "Sem foto no cadastro"}
+                        className="rounded-full disabled:cursor-default"
+                      >
+                        <EmployeeAvatar name={employee.name} photoPath={employee.photo_path} photoCrop={employee.photo_crop} className="h-10 w-10" textClassName="text-xs" />
+                      </button>
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{employee.name}</div>
+                        <div className="text-xs text-muted-foreground">Dia {info.day.toString().padStart(2, '0')}</div>
+                      </div>
                     </div>
-                    <div className="rounded-full bg-pink-100 px-2.5 py-1 text-xs font-semibold text-pink-700 dark:bg-pink-950/50 dark:text-pink-300">
-                      {differenceInYears(new Date(), info.date)} anos
+                    <div className="flex shrink-0 items-center gap-2">
+                      <div className="rounded-full bg-pink-100 px-2.5 py-1 text-xs font-semibold text-pink-700 dark:bg-pink-950/50 dark:text-pink-300">
+                        {differenceInYears(new Date(), info.date)} anos
+                      </div>
+                      <Button
+                        type="button" size="sm" variant="outline" className="h-8 w-8 p-0"
+                        onClick={() => convidarFoto(employee)}
+                        disabled={!employee.phone}
+                        title={employee.phone ? `Pedir a foto a ${employee.name} pelo WhatsApp` : "Sem telefone no cadastro"}
+                      >
+                        <Send className="h-4 w-4" />
+                        <span className="sr-only">Pedir foto pelo WhatsApp</span>
+                      </Button>
                     </div>
                   </div>
                 ))}

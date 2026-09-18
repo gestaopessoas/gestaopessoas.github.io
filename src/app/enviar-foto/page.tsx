@@ -25,11 +25,40 @@ export default function EnviarFotoPage() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  // Com `?t=`, o destino só existe depois da ida ao banco: até lá não dá para decidir entre
+  // o formulário e a tela de link inválido.
+  const [resolvendo, setResolvendo] = useState(true);
+  const [expirado, setExpirado] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setEmployeeId(params.get("employee"));
-    setPurpose(params.get("tipo"));
+    const ticket = params.get("t");
+
+    // Link antigo, `?employee=&tipo=`: continua valendo. É o que o botão "Copiar link" da
+    // ficha gera, com o RH do lado copiando e colando. Prazo só onde o link viaja sozinho.
+    if (!ticket) {
+      setEmployeeId(params.get("employee"));
+      setPurpose(params.get("tipo"));
+      setResolvendo(false);
+      return;
+    }
+
+    let vivo = true;
+    createClient()
+      .rpc("photo_ticket_target", { p_ticket: ticket })
+      .maybeSingle<{ employee_id: string; employee_name: string; purpose: string }>()
+      .then(({ data }) => {
+        if (!vivo) return;
+        // Ticket vencido e ticket inexistente chegam iguais aqui, e é o que a pessoa
+        // precisa saber: o link não serve mais, peça outro.
+        if (!data) setExpirado(true);
+        else {
+          setEmployeeId(data.employee_id);
+          setPurpose(data.purpose);
+        }
+        setResolvendo(false);
+      });
+    return () => { vivo = false; };
   }, []);
 
   const valid = employeeId && purpose && PURPOSE_LABELS[purpose];
@@ -99,12 +128,24 @@ export default function EnviarFotoPage() {
     setSent(true);
   };
 
+  if (resolvendo) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-muted/30 p-6">
+        <p className="text-sm text-muted-foreground">Abrindo...</p>
+      </main>
+    );
+  }
+
   if (!valid) {
     return (
       <main className="grid min-h-screen place-items-center bg-muted/30 p-6">
         <section className="w-full max-w-lg rounded-lg border bg-card p-8 text-center shadow-sm">
-          <h1 className="text-xl font-semibold">Link inválido</h1>
-          <p className="mt-3 text-muted-foreground">Este link de envio de foto está incompleto ou incorreto. Peça ao RH para gerar um novo link.</p>
+          <h1 className="text-xl font-semibold">{expirado ? "Link expirado" : "Link inválido"}</h1>
+          <p className="mt-3 text-muted-foreground">
+            {expirado
+              ? "Este link de envio de foto tinha prazo e já venceu. Peça ao RH para gerar um novo link."
+              : "Este link de envio de foto está incompleto ou incorreto. Peça ao RH para gerar um novo link."}
+          </p>
         </section>
       </main>
     );
