@@ -203,6 +203,10 @@ function ColaboradoresPageInner() {
   // Reenquadrar: a foto original continua a mesma no bucket, só as quatro coordenadas mudam.
   const [reenquadrando, setReenquadrando] = useState<{ url: string; crop: CropPercent | null } | null>(null);
   const [salvandoRecorte, setSalvandoRecorte] = useState(false);
+  // Remover apaga o arquivo do bucket: o botão pede uma segunda batida em vez de abrir outro
+  // Dialog por cima deste, que já é um Dialog.
+  const [confirmandoRemocao, setConfirmandoRemocao] = useState(false);
+  const [removendoFoto, setRemovendoFoto] = useState(false);
   const [birthdayError, setBirthdayError] = useState("");
   const [cpfError, setCpfError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
@@ -515,6 +519,41 @@ function ColaboradoresPageInner() {
     setFoto((atual) => ({ ...atual, crop: reenquadrando.crop }));
     // A listagem por trás do modal mostra o mesmo avatar; sem isto ela ficaria com o recorte velho.
     setEmployees((lista) => lista.map((e) => (e.id === editingId ? { ...e, photo_crop: reenquadrando.crop } : e)));
+    setReenquadrando(null);
+  };
+
+  // Tira a foto do cadastro E apaga o arquivo. O bucket é a única cópia do lado do RH, então
+  // isto é irreversível — daí a confirmação antes.
+  const removerFoto = async () => {
+    if (!editingId || !foto.path) return;
+    setRemovendoFoto(true);
+    const supabase = createClient();
+
+    // Primeiro o cadastro: é o que a tela mostra. Se o arquivo sobreviver, vira lixo no
+    // bucket; se fosse ao contrário, a ficha ficaria apontando para um caminho morto.
+    const { error: cadastroError } = await supabase
+      .from("employees_todos")
+      .update({ photo_path: null, photo_crop: null })
+      .eq("id", editingId);
+    if (cadastroError) {
+      setRemovendoFoto(false);
+      setError("Não foi possível remover a foto: " + cadastroError.message);
+      return;
+    }
+
+    // `.remove()` barrado por RLS devolve lista vazia com `error` null — o array é a única
+    // forma de saber que o arquivo continua lá.
+    const { data: apagados, error: bucketError } = await supabase.storage
+      .from("employee-photos")
+      .remove([foto.path]);
+    if (bucketError || !apagados?.length) {
+      setError("A foto saiu do cadastro, mas o arquivo continua no bucket" + (bucketError ? ": " + bucketError.message : "."));
+    }
+
+    setFoto({ path: null, crop: null });
+    setEmployees((lista) => lista.map((e) => (e.id === editingId ? { ...e, photo_path: null, photo_crop: null } : e)));
+    setRemovendoFoto(false);
+    setConfirmandoRemocao(false);
     setReenquadrando(null);
   };
 
@@ -944,7 +983,7 @@ function ColaboradoresPageInner() {
       {error && !isEmployeeModalOpen && <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">{error}</div>}
 
       {/* Reenquadrar a foto de perfil: não sobe arquivo nenhum, grava quatro números. */}
-      <Dialog open={!!reenquadrando} onOpenChange={(aberto) => !aberto && setReenquadrando(null)}>
+      <Dialog open={!!reenquadrando} onOpenChange={(aberto) => { if (!aberto) { setReenquadrando(null); setConfirmandoRemocao(false); } }}>
         <DialogContent className="max-w-[95vw] sm:max-w-lg p-6">
           <DialogHeader className="mb-4">
             <DialogTitle className="text-xl">Enquadrar a foto de {form.name || "perfil"}</DialogTitle>
@@ -956,9 +995,23 @@ function ColaboradoresPageInner() {
               onChange={(crop) => setReenquadrando((atual) => (atual ? { ...atual, crop } : atual))}
             />
           )}
-          <div className="mt-5 flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setReenquadrando(null)}>Cancelar</Button>
-            <Button type="button" onClick={salvarRecorte} disabled={salvandoRecorte || !reenquadrando?.crop}>
+          <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant={confirmandoRemocao ? "destructive" : "outline"}
+              className="mr-auto"
+              disabled={removendoFoto || salvandoRecorte}
+              onClick={() => (confirmandoRemocao ? removerFoto() : setConfirmandoRemocao(true))}
+            >
+              {removendoFoto ? "Removendo..." : confirmandoRemocao ? "Confirmar: apagar a foto" : "Remover foto"}
+            </Button>
+            {confirmandoRemocao && (
+              <span className="w-full text-xs text-muted-foreground sm:w-auto sm:mr-auto">
+                O arquivo é apagado do servidor. Não dá para desfazer.
+              </span>
+            )}
+            <Button type="button" variant="ghost" onClick={() => { setReenquadrando(null); setConfirmandoRemocao(false); }}>Cancelar</Button>
+            <Button type="button" onClick={salvarRecorte} disabled={salvandoRecorte || removendoFoto || !reenquadrando?.crop}>
               {salvandoRecorte ? "Salvando..." : "Salvar enquadramento"}
             </Button>
           </div>
