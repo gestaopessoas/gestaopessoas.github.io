@@ -112,3 +112,40 @@ export function parseCandidateHistoryNotes(notes) {
     .map((section) => ({ label: section.label, value: section.lines.join("\n").trim() }))
     .filter((section) => section.value);
 }
+
+/**
+ * O caminho de volta de `parseCandidateHistoryNotes`: a lista de { label, value } vira de
+ * novo o bloco único gravado em `candidate_interviews.notes`. Existe para a edição do
+ * registro (issue #142) não achatar as notas — quem edita mexe num campo de cada vez, e os
+ * rótulos que não foram tocados voltam iguais, na mesma ordem.
+ */
+export function buildCandidateHistoryNotes(sections = []) {
+  const texto = (Array.isArray(sections) ? sections : [])
+    .map((section) => ({
+      label: section?.label ? String(section.label).trim() : null,
+      value: String(section?.value ?? "").trim(),
+    }))
+    .filter((section) => section.value)
+    .map((section) => (section.label ? `[${section.label}]\n${section.value}` : section.value))
+    .join("\n\n")
+    .trim();
+  return texto || null;
+}
+
+/**
+ * Quem pode corrigir um registro já gravado da linha do tempo (issue #142).
+ *
+ * Duas regras, decididas pelo dono do projeto:
+ *   - só Admin (nível 50) — registrar uma Etapa é nível 30, reescrever a de outra pessoa não;
+ *   - Candidatura Contratada fica fechada: o histórico até a contratação vira documento.
+ *
+ * ponytail: a exceção pedida ("editar o registro do rompimento de contrato") não tem alvo
+ * hoje — rompimento não é Etapa de `candidate_interviews`, vive em `employees.status`. No dia
+ * em que o rompimento virar linha da Etapa, a exceção entra aqui, liberando só esse registro.
+ *
+ * @param {{ level?: number, applicationStatus?: string | null }} [params]
+ */
+export function canEditCandidateHistory({ level = 0, applicationStatus = null } = {}) {
+  if (Number(level) < 50) return false;
+  return normalizeStage(applicationStatus) !== normalizeStage("Contratado");
+}

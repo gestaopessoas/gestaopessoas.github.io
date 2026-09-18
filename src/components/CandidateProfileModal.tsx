@@ -22,7 +22,7 @@ import { normalizeResumeDate } from "@/lib/resumeDate";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/contexts/ToastContext";
 import { errorMessage } from "@/lib/utils";
-import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, getCandidateHistoryTargetId, parseCandidateHistoryNotes } from "@/lib/candidateHistory.mjs";
+import { buildCandidateFromInterviewProfile, buildCandidateHistoryRecord, buildCandidateHistoryNotes, canEditCandidateHistory, getCandidateHistoryTargetId, parseCandidateHistoryNotes } from "@/lib/candidateHistory.mjs";
 import { LIMITED_STAGE_OPTIONS, candidateStatusFromApplications } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { STAGES, isTerminal } from "@/lib/stages";
 import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
@@ -279,7 +279,68 @@ export function CandidateProfileModal({
   const [jobProfileOptions, setJobProfileOptions] = useState<string[]>([]);
   const [jobProfilesFailed, setJobProfilesFailed] = useState(false);
   const [isSavingHistory, setIsSavingHistory] = useState(false);
-  
+
+  // Issue #142, passo 2: corrigir um registro já gravado (data errada, resultado trocado).
+  // Um registro por vez — `null` = nenhum aberto.
+  const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
+  const [historyEditForm, setHistoryEditForm] = useState({
+    stage: "",
+    workplaceName: "",
+    interviewerName: "",
+    candidateFuture: "",
+    rejectionReason: "",
+    // As notas viram um campo por rótulo: editar o bloco inteiro como texto livre era o
+    // problema que a issue veio resolver.
+    sections: [] as { label: string | null; value: string }[],
+  });
+  const [isSavingHistoryEdit, setIsSavingHistoryEdit] = useState(false);
+
+  const abrirEdicaoHistorico = (ci: CandidateInterview) => {
+    setEditingHistoryId(ci.id);
+    setHistoryEditForm({
+      stage: ci.stage ?? "",
+      workplaceName: ci.workplace_name ?? "",
+      interviewerName: ci.interviewer_name ?? "",
+      candidateFuture: ci.candidate_future ?? "",
+      rejectionReason: ci.rejection_reason ?? "",
+      sections: parseCandidateHistoryNotes(ci.notes),
+    });
+  };
+
+  const handleUpdateHistory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingHistoryId) return;
+    setIsSavingHistoryEdit(true);
+    const supabase = createClient();
+    try {
+      const { error } = await supabase
+        .from("candidate_interviews")
+        .update({
+          stage: historyEditForm.stage.trim(),
+          workplace_name: historyEditForm.workplaceName.trim() || null,
+          interviewer_name: historyEditForm.interviewerName.trim() || null,
+          candidate_future: historyEditForm.candidateFuture.trim() || null,
+          rejection_reason: historyEditForm.rejectionReason.trim() || null,
+          notes: buildCandidateHistoryNotes(historyEditForm.sections),
+        })
+        .eq("id", editingHistoryId);
+      if (error) throw error;
+
+      const targetCandId = getCandidateHistoryTargetId({ candidateId, resolvedCandidateId });
+      const { data } = await supabase
+        .from("candidate_interviews")
+        .select("*")
+        .eq("candidate_id", targetCandId)
+        .order("created_at", { ascending: false });
+      if (data) setCandidateInterviews(data);
+      setEditingHistoryId(null);
+    } catch (err: any) {
+      toast(`Erro ao corrigir o registro: ${errorMessage(err) || "tente novamente."}`, "error");
+    } finally {
+      setIsSavingHistoryEdit(false);
+    }
+  };
+
   const handleSaveHistory = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingHistory(true);
@@ -2004,8 +2065,105 @@ export function CandidateProfileModal({
                                         <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
                                           {new Date(ci.created_at).toLocaleDateString('pt-BR')}
                                         </span>
+                                        {/* Corrigir o registro é do Admin, e Candidatura Contratada fica
+                                            fechada — a regra mora em canEditCandidateHistory (issue #142). */}
+                                        {canEditCandidateHistory({ level, applicationStatus: group.etapaAtual }) && editingHistoryId !== ci.id && (
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                            title="Corrigir registro"
+                                            aria-label="Corrigir registro"
+                                            onClick={() => abrirEdicaoHistorico(ci)}
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                          </Button>
+                                        )}
                                       </div>
                                     </div>
+                                    {editingHistoryId === ci.id ? (
+                                    <form onSubmit={handleUpdateHistory} className="space-y-3 pt-1">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                          <label className="text-xs font-medium" htmlFor={`edit-stage-${ci.id}`}>Etapa *</label>
+                                          <select
+                                            id={`edit-stage-${ci.id}`}
+                                            required
+                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            value={historyEditForm.stage}
+                                            onChange={e => setHistoryEditForm(prev => ({ ...prev, stage: e.target.value }))}
+                                          >
+                                            <option value="">Selecione...</option>
+                                            {/* A Etapa gravada entra na lista mesmo se sair do catálogo depois:
+                                                senão o select abriria vazio e a correção apagaria o valor. */}
+                                            {Array.from(new Set<string>([...STAGES, ...(historyEditForm.stage ? [historyEditForm.stage] : [])])).map((stage: string) => (
+                                              <option key={stage} value={stage}>{stage}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="text-xs font-medium" htmlFor={`edit-future-${ci.id}`}>Futuro do candidato</label>
+                                          <Input
+                                            id={`edit-future-${ci.id}`}
+                                            value={historyEditForm.candidateFuture}
+                                            onChange={e => setHistoryEditForm(prev => ({ ...prev, candidateFuture: e.target.value }))}
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="text-xs font-medium" htmlFor={`edit-workplace-${ci.id}`}>Obra / Unidade</label>
+                                          <Input
+                                            id={`edit-workplace-${ci.id}`}
+                                            list="candidate-history-workplaces"
+                                            value={historyEditForm.workplaceName}
+                                            onChange={e => setHistoryEditForm(prev => ({ ...prev, workplaceName: e.target.value }))}
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="text-xs font-medium" htmlFor={`edit-interviewer-${ci.id}`}>Entrevistador</label>
+                                          <Input
+                                            id={`edit-interviewer-${ci.id}`}
+                                            list="candidate-history-interviewers"
+                                            value={historyEditForm.interviewerName}
+                                            onChange={e => setHistoryEditForm(prev => ({ ...prev, interviewerName: e.target.value }))}
+                                          />
+                                        </div>
+                                      </div>
+                                      {/* Um campo por rótulo. O que não foi tocado volta igual, na mesma
+                                          ordem — buildCandidateHistoryNotes remonta o bloco. */}
+                                      {historyEditForm.sections.map((section, index) => (
+                                        <div key={`${ci.id}-edit-nota-${index}`} className="space-y-1">
+                                          <label className="text-xs font-medium" htmlFor={`edit-nota-${ci.id}-${index}`}>{section.label ?? "Observações"}</label>
+                                          <Textarea
+                                            id={`edit-nota-${ci.id}-${index}`}
+                                            rows={3}
+                                            value={section.value}
+                                            onChange={e => setHistoryEditForm(prev => ({
+                                              ...prev,
+                                              sections: prev.sections.map((s, i) => (i === index ? { ...s, value: e.target.value } : s)),
+                                            }))}
+                                          />
+                                        </div>
+                                      ))}
+                                      <div className="space-y-1">
+                                        <label className="text-xs font-medium" htmlFor={`edit-reason-${ci.id}`}>Motivo Reprovação / Desistência</label>
+                                        <Input
+                                          id={`edit-reason-${ci.id}`}
+                                          value={historyEditForm.rejectionReason}
+                                          onChange={e => setHistoryEditForm(prev => ({ ...prev, rejectionReason: e.target.value }))}
+                                        />
+                                      </div>
+                                      <div className="flex justify-end gap-2">
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => setEditingHistoryId(null)}>Cancelar</Button>
+                                        <Button type="submit" size="sm" disabled={isSavingHistoryEdit || !historyEditForm.stage.trim()}>
+                                          {isSavingHistoryEdit ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                                          Salvar correção
+                                        </Button>
+                                      </div>
+                                    </form>
+                                    ) : (
+                                    <>
+
                                     {(ci.workplace_name || ci.interviewer_name) && (
                                       <p className="text-sm text-muted-foreground flex gap-3">
                                         {ci.workplace_name && <span><Building2 className="inline h-3.5 w-3.5 mr-1" /> {ci.workplace_name}</span>}
@@ -2034,6 +2192,8 @@ texto"):
                                         <span className="font-semibold block mb-1">Motivo Reprovação / Desistência:</span>
                                         {ci.rejection_reason}
                                       </div>
+                                    )}
+                                    </>
                                     )}
                                   </div>
                                 </div>
