@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
 import { CheckCircle2, ImageUp } from "lucide-react";
 import { compressImage } from "@/lib/imageCompress.mjs";
+import { uploadUnique, dateParts, extFromContentType } from "@/lib/storageFileName.mjs";
+import { PhotoCropper, type CropPercent } from "@/components/PhotoCropper";
 
 // Mesmas chaves que PHOTO_PURPOSES na ficha do colaborador — elas viram pasta no bucket.
 const PURPOSE_LABELS: Record<string, string> = {
@@ -17,6 +19,9 @@ export default function EnviarFotoPage() {
   const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [purpose, setPurpose] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  // Só a foto de perfil é enquadrada. Aniversário e admissão são foto de contexto, não avatar.
+  const [preview, setPreview] = useState<string | null>(null);
+  const [crop, setCrop] = useState<CropPercent | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
@@ -34,26 +39,63 @@ export default function EnviarFotoPage() {
     if (!file || !valid || !employeeId || !purpose) return;
     setSending(true);
     setError("");
+    try {
+      await enviar();
+    } catch (falha) {
+      // Rede fora do ar no meio do envio: sem isto a promessa rejeitava sozinha e a tela
+      // ficava em "Enviando..." para sempre, sem dizer nada a quem está com o celular na mão.
+      setSending(false);
+      setError("Não foi possível enviar a foto agora. Verifique a conexão e tente de novo.");
+      console.error(falha);
+    }
+  };
+
+  const enviar = async () => {
+    if (!file || !employeeId || !purpose) return;
     const supabase = createClient();
     // Redimensiona e recomprime antes de subir: foto de celular chega com 3 a 12 MB e o RH
     // só olha na tela. Se o navegador não decodificar (HEIC fora do Safari), volta o original.
     const { blob, contentType } = await compressImage(file);
-    // A extensão vem do que saiu do compressor, não do que entrou: WebP gravado como .jpg
-    // confunde quem baixa o arquivo depois pela ficha.
-    const baseName = file.name.replace(/\.[^.]+$/, "");
-    const ext = contentType.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
-    const path = `${employeeId}/${purpose}/${crypto.randomUUID()}-${baseName}.${ext}`;
+    // O nome do arquivo sai do propósito e da data, nunca do aparelho: o que chegava aqui era
+    // "WhatsApp Image 2026-09-17 at 14.22.31.jpeg", ilegível na ficha e para quem baixa.
+    // A extensão vem do que saiu do compressor — WebP gravado como .jpg confunde depois.
     // O bucket só aceita image/* (migration 20260916200000). Foto tirada na hora pelo celular
     // às vezes chega com `File.type` vazio; sem este palpite o Storage assumiria
     // application/octet-stream e recusaria uma foto boa.
-    const { error: uploadError } = await supabase.storage
-      .from("employee-photos")
-      .upload(path, blob, { contentType });
-    setSending(false);
+    const { path, error: uploadError } = await uploadUnique(
+      supabase.storage.from("employee-photos"),
+      `${employeeId}/${purpose}`,
+      ["foto", purpose, dateParts()],
+      extFromContentType(contentType, "jpg"),
+      blob,
+      { contentType },
+    );
     if (uploadError) {
+      setSending(false);
       setError("Não foi possível enviar a foto: " + uploadError.message);
       return;
     }
+    // A foto de perfil passa a ser a foto oficial da pessoa. Quem grava é a função no banco:
+    // esta tela é pública (link aberto no celular, sem login) e a policy `employees_no_anon`
+    // barra qualquer escrita anônima em `employees` — e é para continuar assim.
+    // Os arquivos antigos ficam no bucket como histórico, só deixam de ser o avatar.
+    // O recorte foi feito sobre a foto original e o que subiu foi a versão comprimida; como
+    // ele está em porcentagem e `compressImage` só reduz mantendo a proporção, continua valendo.
+    if (purpose === "perfil") {
+      const { error: linkError } = await supabase.rpc("set_employee_photo", {
+        p_employee: employeeId,
+        p_path: path,
+        p_crop: crop,
+      });
+      if (linkError) {
+        setSending(false);
+        // A foto subiu; o que falhou foi apontá-la como avatar. Dizer isso, em vez de
+        // "enviada com sucesso" sobre um avatar que não mudou.
+        setError("A foto foi enviada, mas não foi possível defini-la como foto de perfil: " + linkError.message);
+        return;
+      }
+    }
+    setSending(false);
     setSent(true);
   };
 
@@ -96,9 +138,22 @@ export default function EnviarFotoPage() {
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            onChange={(event) => {
+              const escolhido = event.target.files?.[0] ?? null;
+              setFile(escolhido);
+              setCrop(null);
+              setPreview((anterior) => {
+                if (anterior) URL.revokeObjectURL(anterior);
+                return escolhido && purpose === "perfil" ? URL.createObjectURL(escolhido) : null;
+              });
+            }}
           />
         </label>
+        {preview && (
+          <div className="mt-5">
+            <PhotoCropper src={preview} value={crop} onChange={setCrop} />
+          </div>
+        )}
         <Button type="submit" className="mt-5 w-full" disabled={!file || sending}>
           {sending ? "Enviando..." : "Enviar foto"}
         </Button>
