@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState, useMemo } from "react";
 import { cn, errorMessage } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { createClient } from "@/utils/supabase/client";
 import { Search, Loader2, Contact, RefreshCw, Plus, Trash2, AlertCircle, Briefcase, CheckCircle2, Users, UserCheck, Funnel, ChevronRight, ChevronDown, ArrowRight, PhoneCall, ListChecks, DoorOpen, Ban, MoreVertical } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -271,6 +272,7 @@ export default function CentralCandidatoPage() {
     const run = async () => { await fetchCandidates(); };
     run();
   }, []);
+  useRefetchOnFocus(fetchCandidates);
 
   // Só reprovados e desistentes saem da Central. Contratado fica, na aba Contratação.
   const emAcompanhamento = useMemo(
@@ -312,14 +314,23 @@ export default function CentralCandidatoPage() {
 
     setDeleting(true);
     try {
-      const { error } = await supabase
+      const { data: apagados, error } = await supabase
         .from("candidates")
         .delete()
-        .eq("id", candidateToDelete.id);
+        .eq("id", candidateToDelete.id)
+        .select("id");
 
       if (error) {
         console.error("Error deleting candidate:", error);
         alert("Erro ao excluir candidato: " + error.message);
+        return;
+      }
+
+      if (!apagados || apagados.length === 0) {
+        // Delete sem linha de volta é delete barrado pelo RLS, não sucesso: continua no banco.
+        alert("Nada foi excluído: seu usuário não tem permissão para esta exclusão.");
+        setIsDeleteModalOpen(false);
+        setCandidateToDelete(null);
         return;
       }
 

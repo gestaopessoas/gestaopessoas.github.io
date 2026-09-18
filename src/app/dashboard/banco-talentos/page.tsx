@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { createClient } from "@/utils/supabase/client";
 import { Search, Loader2, Database, RefreshCw, Trash2, AlertCircle, Edit2, FileText, Plus, CalendarPlus, MoreVertical } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -218,6 +219,7 @@ export default function BancoTalentosPage() {
     const run = async () => { await fetchCandidates(); };
     run();
   }, []);
+  useRefetchOnFocus(fetchCandidates);
 
   const filteredCandidates = useMemo(() => {
     if (!search.trim()) return candidates;
@@ -242,8 +244,19 @@ export default function BancoTalentosPage() {
     if (!candidateToDelete) return;
     setDeleting(true);
     try {
-      const { error } = await supabase.from("candidates").delete().eq("id", candidateToDelete.id);
+      const { data: apagados, error } = await supabase
+        .from("candidates")
+        .delete()
+        .eq("id", candidateToDelete.id)
+        .select("id");
       if (error) throw error;
+      if (!apagados || apagados.length === 0) {
+        // Delete sem linha de volta é delete barrado pelo RLS, não sucesso: continua no banco.
+        alert("Nada foi excluído: seu usuário não tem permissão para esta exclusão.");
+        setIsDeleteModalOpen(false);
+        setCandidateToDelete(null);
+        return;
+      }
       setCandidates(candidates.filter(c => c.id !== candidateToDelete.id));
       setIsDeleteModalOpen(false);
       setCandidateToDelete(null);

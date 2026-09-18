@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
 import { Search, Download, Briefcase, Calendar, CalendarClock, ChevronRight, Clock, Trash2, User, CheckCircle2, X, Plus } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
@@ -422,6 +423,7 @@ export default function EntrevistasPage() {
     // de dependências faria a tela recarregar em loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useRefetchOnFocus(loadInterviews);
 
   // Vindo do "Avançar e preencher parecer": abre direto a entrevista criada lá. Da Central
   // o alvo chega pela URL; do avanço aberto nesta mesma tela ele chega pelo `onSuccess`,
@@ -864,9 +866,18 @@ export default function EntrevistasPage() {
     if (e) e.stopPropagation();
     if (!confirm("Tem certeza que deseja excluir esta entrevista definitivamente?")) return;
     const supabase = createClient();
-    const { error: delError } = await supabase.from("interviews").delete().eq("id", id);
+    const { data: apagadas, error: delError } = await supabase
+      .from("interviews")
+      .delete()
+      .eq("id", id)
+      .select("id");
     if (delError) {
       alert("Erro ao excluir entrevista: " + delError.message);
+      return;
+    }
+    if (!apagadas || apagadas.length === 0) {
+      // Delete sem linha de volta é delete barrado pelo RLS, não sucesso: continua no banco.
+      alert("Nada foi excluído: seu usuário não tem permissão para esta exclusão.");
       return;
     }
     setInterviews((prev) => prev.filter((i) => i.id !== id));
