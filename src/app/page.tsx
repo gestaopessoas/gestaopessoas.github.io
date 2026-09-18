@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Briefcase, Building2, type LucideIcon, Users, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { TalentPoolButton } from "@/components/careers/TalentPoolButton";
 
 const cards: { title: string; text: string; Icon: LucideIcon }[] = [
   { title: "ATS", text: "Requisições, vagas, candidatos por vaga e triagem.", Icon: Briefcase },
@@ -43,11 +44,7 @@ export default function Home() {
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             </Link>
-            <Link href="/carreiras">
-              <Button size="lg" variant="ghost" className="font-semibold text-muted-foreground hover:text-foreground transition-all">
-                Portal de carreiras
-              </Button>
-            </Link>
+            <TalentPoolButton />
           </div>
         </div>
 

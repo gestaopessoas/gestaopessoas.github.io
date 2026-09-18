@@ -13,9 +13,9 @@ export const metadata = {
 export default function PrivacidadePage() {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10">
-      <Link href="/carreiras" className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" />
-        Voltar para as vagas
+        Voltar para a página inicial
       </Link>
 
       <h1 className="text-3xl font-semibold tracking-tight">Política de Privacidade</h1>
