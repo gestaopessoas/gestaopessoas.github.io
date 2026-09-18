@@ -20,6 +20,10 @@ export interface Department {
 export interface Employee extends Record<string, unknown> {
   id: string;
   name: string;
+  // Caminho no bucket employee-photos da foto que vale como avatar, e o recorte redondo
+  // dela em porcentagem. Os dois nulos = mostra as iniciais.
+  photo_path?: string | null;
+  photo_crop?: { x: number; y: number; width: number; height: number } | null;
   registration_number?: string | null;
   ficha?: string | null;
   profile_code?: string | null;

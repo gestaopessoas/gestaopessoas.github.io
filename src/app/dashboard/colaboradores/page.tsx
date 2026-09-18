@@ -26,6 +26,8 @@ import { openTrialPeriods } from "./lib/trialPeriodRules.mjs";
 import { exportBirthdaysPdf } from "./birthdaysPdf";
 import { listWorkAnniversaries } from "./lib/anniversaryCounter";
 import { buscarTudo } from "@/lib/paginacao";
+import { EmployeeAvatar, signedPhotoUrl } from "@/components/EmployeeAvatar";
+import { PhotoCropper, type CropPercent } from "@/components/PhotoCropper";
 
 type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; seniority: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
 type TrialPeriod = { id: string; name: string; daysRemaining: number; endDate: string; isWarning: boolean; isOverdue: boolean };
@@ -106,7 +108,7 @@ const embedBeneficio = (filtros: AdvancedFilters) =>
   filtros.benefit ? ", employee_benefits!inner(benefit_name, active)" : "";
 
 const fields = [
-  "id", "name", "registered_name", "pharmacy_card", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "company_anniversary", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission"
+  "id", "name", "registered_name", "pharmacy_card", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "company_anniversary", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission", "photo_path", "photo_crop"
 ].join(", ");
 
 const emptyForm = {
@@ -194,6 +196,13 @@ function ColaboradoresPageInner() {
   //    `null` por `""`, então um cargo vazio virava `"" !== null` — "mudou o cargo".
   //    Essa vale para qualquer campo em branco, não só para arquivado.
   const [editingOriginal, setEditingOriginal] = useState<EmployeeForm | null>(null);
+  // Foto do colaborador aberto na ficha. Fora do `form` de propósito: o form é todo string
+  // (`canonicalizeEmployeeForm` faz `String(...)` em tudo) e vai inteiro no payload do save,
+  // então um jsonb ali chegaria ao banco como "[object Object]".
+  const [foto, setFoto] = useState<{ path: string | null; crop: Employee["photo_crop"] }>({ path: null, crop: null });
+  // Reenquadrar: a foto original continua a mesma no bucket, só as quatro coordenadas mudam.
+  const [reenquadrando, setReenquadrando] = useState<{ url: string; crop: CropPercent | null } | null>(null);
+  const [salvandoRecorte, setSalvandoRecorte] = useState(false);
   const [birthdayError, setBirthdayError] = useState("");
   const [cpfError, setCpfError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
@@ -288,6 +297,7 @@ function ColaboradoresPageInner() {
           setEditingId(emp.id);
           setEditingOriginal(canonicalizeEmployeeForm(emp));
           setForm(canonicalizeEmployeeForm(emp));
+          setFoto({ path: emp.photo_path ?? null, crop: emp.photo_crop ?? null });
           setIsEmployeeModalOpen(true);
           window.history.replaceState({}, document.title, window.location.pathname);
         }
@@ -478,10 +488,41 @@ function ColaboradoresPageInner() {
     setIsEmployeeModalOpen(true);
   };
 
+  const abrirReenquadrar = async () => {
+    if (!foto.path) return;
+    const url = await signedPhotoUrl(foto.path);
+    if (!url) {
+      setError("Não foi possível abrir a foto para reenquadrar.");
+      return;
+    }
+    setReenquadrando({ url, crop: foto.crop ?? null });
+  };
+
+  const salvarRecorte = async () => {
+    if (!editingId || !reenquadrando?.crop) return;
+    setSalvandoRecorte(true);
+    // Grava por employees_todos, como o resto da ficha: o gatilho INSTEAD OF manda para
+    // `public` ou para o arquivo conforme onde a pessoa está.
+    const { error: recorteError } = await createClient()
+      .from("employees_todos")
+      .update({ photo_crop: reenquadrando.crop })
+      .eq("id", editingId);
+    setSalvandoRecorte(false);
+    if (recorteError) {
+      setError("Não foi possível salvar o enquadramento: " + recorteError.message);
+      return;
+    }
+    setFoto((atual) => ({ ...atual, crop: reenquadrando.crop }));
+    // A listagem por trás do modal mostra o mesmo avatar; sem isto ela ficaria com o recorte velho.
+    setEmployees((lista) => lista.map((e) => (e.id === editingId ? { ...e, photo_crop: reenquadrando.crop } : e)));
+    setReenquadrando(null);
+  };
+
   const startEdit = (employee: Employee) => {
     setEditingId(employee.id);
     setEditingOriginal(canonicalizeEmployeeForm(employee));
     setForm(canonicalizeEmployeeForm(employee));
+    setFoto({ path: employee.photo_path ?? null, crop: employee.photo_crop ?? null });
     setBirthdayError("");
     setCpfError("");
     setIsEmployeeModalOpen(true);
@@ -902,12 +943,47 @@ function ColaboradoresPageInner() {
 
       {error && !isEmployeeModalOpen && <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">{error}</div>}
 
+      {/* Reenquadrar a foto de perfil: não sobe arquivo nenhum, grava quatro números. */}
+      <Dialog open={!!reenquadrando} onOpenChange={(aberto) => !aberto && setReenquadrando(null)}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg p-6">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl">Enquadrar a foto de {form.name || "perfil"}</DialogTitle>
+          </DialogHeader>
+          {reenquadrando && (
+            <PhotoCropper
+              src={reenquadrando.url}
+              value={reenquadrando.crop}
+              onChange={(crop) => setReenquadrando((atual) => (atual ? { ...atual, crop } : atual))}
+            />
+          )}
+          <div className="mt-5 flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setReenquadrando(null)}>Cancelar</Button>
+            <Button type="button" onClick={salvarRecorte} disabled={salvandoRecorte || !reenquadrando?.crop}>
+              {salvandoRecorte ? "Salvando..." : "Salvar enquadramento"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Colaborador Edit/Create Modal */}
       <Dialog open={isEmployeeModalOpen} onOpenChange={setIsEmployeeModalOpen}>
         <DialogContent className="max-w-[95vw] lg:max-w-4xl max-h-[95vh] overflow-y-auto p-6 md:p-8">
           <DialogHeader className="mb-4">
             <div className="flex items-center justify-between gap-2">
-              <DialogTitle className="text-2xl">{editingId ? "Registro completo do colaborador" : "Novo colaborador"}</DialogTitle>
+              <div className="flex items-center gap-3 min-w-0">
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={abrirReenquadrar}
+                    disabled={!foto.path}
+                    title={foto.path ? "Reenquadrar a foto de perfil" : "Este colaborador ainda não enviou foto de perfil"}
+                    className="rounded-full disabled:cursor-default"
+                  >
+                    <EmployeeAvatar name={form.name} photoPath={foto.path} photoCrop={foto.crop} className="h-12 w-12" textClassName="text-sm" />
+                  </button>
+                )}
+                <DialogTitle className="text-2xl">{editingId ? "Registro completo do colaborador" : "Novo colaborador"}</DialogTitle>
+              </div>
               {editingId && (() => {
                 const idx = employees.findIndex(emp => emp.id === editingId);
                 return (
@@ -1092,6 +1168,7 @@ function ColaboradoresPageInner() {
                 <tr key={employee.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => startEdit(employee)}>
                   <td className="p-3">
                     <div className="font-medium flex items-center gap-2">
+                      <EmployeeAvatar name={employee.name} photoPath={employee.photo_path} photoCrop={employee.photo_crop} className="h-8 w-8" textClassName="text-[10px]" />
                       {employee.name}
                       <div className="flex gap-1.5 ml-1">
                         {isIncomplete && <span title="Cadastro Incompleto (Admissão, Matrícula, Nascimento, Centro de Custo, Empresa, Obra ou Desligamento)" className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-sm" />}
