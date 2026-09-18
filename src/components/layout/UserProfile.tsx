@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { User, Shield, Bell, Briefcase, Phone, Key, CheckCircle2, Pencil, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,8 +101,13 @@ export function UserProfile() {
     setConfirmPassword("");
   }, []);
 
+  // Sem isso, o avatar do header só troca das iniciais para a foto depois que o usuário abre o
+  // modal uma vez — é este efeito que preenche `avatar.path`. Roda fechado na primeira montagem
+  // para o header já nascer com a foto certa, e só depois volta a exigir `open` para recarregar.
+  const jaCarregou = useRef(false);
   useEffect(() => {
-    if (!open) return;
+    if (!open && jaCarregou.current) return;
+    jaCarregou.current = true;
     let vivo = true;
 
     const carregar = async () => {
