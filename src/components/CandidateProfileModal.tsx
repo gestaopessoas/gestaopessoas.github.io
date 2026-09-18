@@ -12,6 +12,7 @@ import {
   Plus, Pencil, Trash2
 } from "lucide-react";
 import { CandidateAssessmentTab } from "./CandidateAssessmentTab";
+import { BfiLinkField } from "@/components/careers/BfiLinkField";
 import GuiaAvaliadorButton from "@/components/GuiaAvaliadorButton";
 import * as pdfjsLib from "pdfjs-dist";
 import { itemsToText, parseSolidesResume } from "@/lib/resumeParser";
@@ -528,6 +529,24 @@ export function CandidateProfileModal({
   };
   
   const [results, setResults] = useState<BigFiveResult[]>([]);
+  // Issue #147: o teste abre por sessao assinada, nunca pelo uuid do candidato. O RPC do
+  // candidato publico exige ticket de candidatura, que o RH logado nao tem — por isso a porta
+  // aqui e `new_bfi_session_for_staff`.
+  const [bfiSessionId, setBfiSessionId] = useState("");
+  const [bfiSessionLoading, setBfiSessionLoading] = useState(false);
+  const [bfiSessionError, setBfiSessionError] = useState("");
+
+  const gerarLinkDoTeste = async () => {
+    const targetId = resolvedCandidateId || candidateId;
+    if (!targetId) return;
+    setBfiSessionLoading(true);
+    setBfiSessionError("");
+    const { data, error } = await createClient().rpc("new_bfi_session_for_staff", { p_candidate: targetId });
+    setBfiSessionLoading(false);
+    if (error || !data) setBfiSessionError(errorMessage(error) || "Não foi possível gerar o link.");
+    else setBfiSessionId(data as string);
+  };
+
   const [interviews, setInterviews] = useState<ProfileInterview[]>([]);
   const [candidateInterviews, setCandidateInterviews] = useState<CandidateInterview[]>([]);
   const [applications, setApplications] = useState<CandidateApplication[]>([]);
@@ -1025,7 +1044,10 @@ export function CandidateProfileModal({
         setAssessmentData({});
       }
       setFormData(personData || {});
-      setResults(resultsData);
+      // Sessao emitida e nao respondida tambem e uma linha em candidate_big_five_results —
+      // sem nota nenhuma. Contar como resultado escondia o vazio da aba e desenhava um card de
+      // barras vazias.
+      setResults(resultsData.filter((row: BigFiveResult) => row.openness_score !== null));
       setEducations(extractedEdu);
       setExperiences(extractedExp);
       setInterviews(interviewsData);
@@ -1346,6 +1368,25 @@ export function CandidateProfileModal({
                             </select>
                           ) : (
                             <span className="font-semibold">{formData.marital_status || "-"}</span>
+                          )}
+                        </div>
+                        {/* Issue #144: a Obra da Candidatura Espontânea vinha do parecer, que
+                            não existe no cadastro de candidato novo (issue #141). Aqui é onde
+                            quem cadastra sabendo a Obra consegue dizer isso. Opcional: sem Obra
+                            a candidatura continua caindo no pool geral. */}
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Obra</span>
+                          {isEditing ? (
+                            <select
+                              value={formData.workplace || ""}
+                              onChange={(e) => handleChange('workplace', e.target.value)}
+                              className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            >
+                              <option value="">Sem obra definida (pool geral)</option>
+                              {workplaceOptions.map((workplace) => <option key={workplace} value={workplace}>{workplace}</option>)}
+                            </select>
+                          ) : (
+                            <span className="font-semibold">{formData.workplace || "-"}</span>
                           )}
                         </div>
                         <div className="space-y-1.5">
@@ -1777,6 +1818,21 @@ export function CandidateProfileModal({
                         <Sparkles className="h-10 w-10 mx-auto text-muted-foreground/40" />
                         <p className="font-medium text-foreground text-lg">Nenhum mapeamento concluído</p>
                         <p className="text-sm max-w-md mx-auto">O candidato ainda não respondeu ao teste de perfil comportamental BFI-44.</p>
+                        {(resolvedCandidateId || candidateId) && (
+                          bfiSessionId ? (
+                            <div className="mx-auto max-w-xl pt-2 text-left">
+                              <BfiLinkField sessionId={bfiSessionId} />
+                            </div>
+                          ) : (
+                            <div className="space-y-2 pt-2">
+                              <Button type="button" onClick={gerarLinkDoTeste} disabled={bfiSessionLoading}>
+                                {bfiSessionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                Gerar link para o candidato
+                              </Button>
+                              {bfiSessionError && <p className="text-sm text-destructive">{bfiSessionError}</p>}
+                            </div>
+                          )
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-6">

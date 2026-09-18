@@ -703,7 +703,10 @@ export default function EntrevistasPage() {
     // entrevista aberta pelo recrutador).
     async function abrirCandidaturaEspontanea(candidateId: string, etapa: Stage) {
       let workplaceId: string | null = null;
-      const worksiteName = String(assessmentData.worksite || "").trim();
+      // A Obra sai do seletor da aba Cadastro (issue #144). O `worksite` do parecer continua
+      // valendo para a entrevista que já existe — mas no cadastro de candidato novo a aba
+      // Parecer nem abre (issue #141), e ali ele chega sempre vazio.
+      const worksiteName = String(formData.workplace || assessmentData.worksite || "").trim();
       if (worksiteName) {
         const { data: workplace } = await supabase
           .from("workplaces")
