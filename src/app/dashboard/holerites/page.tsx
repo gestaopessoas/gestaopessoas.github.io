@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, FileText, Download } from "lucide-react";
 import { format } from "date-fns";
+import { storageFileName, extForFile } from "@/lib/storageFileName.mjs";
 
 type PayslipEmployee = { id: string; name: string; cpf: string | null };
 type PayslipFile = { name: string; employee_id: string };
@@ -17,6 +18,8 @@ export default function HoleritesPage() {
   const [employees, setEmployees] = useState<PayslipEmployee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  // Competência do holerite (aaaa-mm). Começa no mês corrente, que é o caso de uso normal.
+  const [competence, setCompetence] = useState(() => format(new Date(), "yyyy-MM"));
   const [uploading, setUploading] = useState(false);
   const [myPayslips, setMyPayslips] = useState<PayslipFile[]>([]);
   const [isHR, setIsHR] = useState(false);
@@ -49,9 +52,14 @@ export default function HoleritesPage() {
   }, [supabase]);
 
   const handleUpload = async () => {
-    if (!file || !selectedEmployee) return alert("Selecione um funcionário e um arquivo.");
+    if (!file || !selectedEmployee || !competence) return alert("Selecione o colaborador, a competência e o arquivo.");
     setUploading(true);
-    const filePath = `${selectedEmployee}/${file.name}`;
+    // O nome sai da competência, não do arquivo do RH: holerite_09_2026.pdf diz ao colaborador
+    // de que mês é o documento. `competence` vem de <input type="month">, no formato aaaa-mm.
+    const [ano, mes] = competence.split("-");
+    const filePath = `${selectedEmployee}/${storageFileName(["holerite", mes, ano], extForFile(file, "pdf"))}`;
+    // upsert continua ligado de propósito: reenviar a mesma competência é correção, e o certo é
+    // substituir. Como o nome agora é determinístico, não sobra mais o holerite errado do lado.
     const { error } = await supabase.storage.from('payslips').upload(filePath, file, { upsert: true });
     setUploading(false);
     if (error) {
@@ -126,11 +134,16 @@ export default function HoleritesPage() {
               </div>
               
               <div className="space-y-2">
+                <Label htmlFor="payslip_competence">Competência</Label>
+                <Input id="payslip_competence" type="month" value={competence} onChange={e => setCompetence(e.target.value)} />
+              </div>
+
+              <div className="space-y-2">
                 <Label>Arquivo PDF</Label>
                 <Input type="file" accept=".pdf" onChange={e => setFile(e.target.files?.[0] || null)} />
               </div>
 
-              <Button className="w-full gap-2" disabled={uploading || !file || !selectedEmployee} onClick={handleUpload}>
+              <Button className="w-full gap-2" disabled={uploading || !file || !selectedEmployee || !competence} onClick={handleUpload}>
                 {uploading ? "Enviando..." : <><Upload className="w-4 h-4" /> Realizar Upload</>}
               </Button>
             </CardContent>

@@ -6,12 +6,15 @@ import "react-image-crop/dist/ReactCrop.css";
 import { X, Upload, Check, Loader2, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { errorMessage } from "@/lib/utils";
+import { uploadUnique, slug } from "@/lib/storageFileName.mjs";
 
 interface LogoCropperModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCropped: (url: string) => void;
   initialImageUrl?: string;
+  // Nome do parceiro: vira o nome do arquivo no bucket, em slug.
+  partnerName?: string;
 }
 
 // Inicializa o crop centralizado com proporção 1:1
@@ -31,7 +34,7 @@ function centerAspectCrop(mediaWidth: number, mediaHeight: number, aspect: numbe
   );
 }
 
-export const LogoCropperModal: React.FC<LogoCropperModalProps> = ({ isOpen, onClose, onCropped, initialImageUrl }) => {
+export const LogoCropperModal: React.FC<LogoCropperModalProps> = ({ isOpen, onClose, onCropped, initialImageUrl, partnerName }) => {
   const [imgSrc, setImgSrc] = useState("");
   const imgRef = useRef<HTMLImageElement>(null);
   const [crop, setCrop] = useState<Crop>();
@@ -144,24 +147,28 @@ export const LogoCropperModal: React.FC<LogoCropperModalProps> = ({ isOpen, onCl
       const croppedBlob = await getCroppedImg(imgRef.current, crop);
 
       // 2. Faz o Upload pro Supabase
-      const fileName = `logo_${Date.now()}_${Math.random().toString(36).substring(7)}.webp`;
-      
-      const { data, error } = await supabase.storage
-        .from("partner_logos")
-        .upload(fileName, croppedBlob, {
-          cacheControl: "31536000",
-          upsert: false,
-          contentType: "image/webp"
-        });
+      // logo_unimed-saude.webp: quem abre o bucket sabe de quem e o logo. Parceiro ainda sem
+      // nome digitado cai no horario, que e o unico identificador que existe nesse momento.
+      // Trocar o logo do mesmo parceiro gera logo_unimed-saude_2.webp em vez de sobrescrever:
+      // a URL publica e cacheada por um ano, entao gravar por cima deixaria o logo velho na
+      // tela de quem ja tinha visitado.
+      const { path, error } = await uploadUnique(
+        supabase.storage.from("partner_logos"),
+        "",
+        ["logo", slug(partnerName) || String(Date.now())],
+        "webp",
+        croppedBlob,
+        { cacheControl: "31536000", contentType: "image/webp" },
+      );
 
-      if (error) {
-        throw error;
+      if (error || !path) {
+        throw error ?? new Error("Upload sem caminho de retorno.");
       }
 
       // 3. Pega a URL pública
       const { data: publicData } = supabase.storage
         .from("partner_logos")
-        .getPublicUrl(data.path);
+        .getPublicUrl(path);
 
       // 4. Retorna pro Form principal
       onCropped(publicData.publicUrl);

@@ -894,6 +894,7 @@ export default function ParceirosAdminPage() {
           setIsCropperOpen(false);
         }} 
         initialImageUrl={form.logo_url}
+        partnerName={form.name}
       />
     </div>
   );

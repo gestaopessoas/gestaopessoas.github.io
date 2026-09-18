@@ -8,6 +8,7 @@ import { createClient } from "@/utils/supabase/client";
 import { CheckCircle2, Circle, FileText, Search, ShieldCheck, Check, Clock, Upload, ExternalLink, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { Stage } from "@/lib/stages";
+import { uploadUnique, slug, dateParts, extForFile } from "@/lib/storageFileName.mjs";
 
 type Admission = {
   id: string;
@@ -95,11 +96,15 @@ function DocumentItem({ candidateId, docType, existingDoc, onDocUploaded }: { ca
     setSaving(true);
     const supabase = createClient();
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${docType.replace(/\s+/g, '_')}_${Date.now()}.${fileExt}`;
-    const filePath = `${candidateId}/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, file);
+    // Nome legível para quem baixa: rg-ou-cnh_17_09_2026.pdf. O nome que veio do aparelho do
+    // candidato não entra no caminho — chegava aqui sem sanitização nenhuma.
+    const { path: filePath, error: uploadError } = await uploadUnique(
+      supabase.storage.from("documents"),
+      candidateId,
+      [slug(docType), dateParts()],
+      extForFile(file, "pdf"),
+      file,
+    );
 
     if (uploadError) {
       alert(`Erro ao fazer upload: ${uploadError.message}`);

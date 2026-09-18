@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { createClient } from "@/utils/supabase/client";
 import { Send, Loader2, ClipboardCheck, Plus, X, Paperclip, CheckCircle2 } from "lucide-react";
 import { useRef, useState } from "react";
-import { maskCpf, maskPhone, maskCep, maskAddressNumber, maskUf, isValidPhone, onlyDigits, safeFileName } from "@/lib/masks";
+import { maskCpf, maskPhone, maskCep, maskAddressNumber, maskUf, isValidPhone, onlyDigits } from "@/lib/masks";
+import { uploadUnique, dateParts, extForFile } from "@/lib/storageFileName.mjs";
 import { formatCurrencyInput, isValidCpf, parseCurrencyInput } from "@/app/dashboard/colaboradores/lib/employeeFormRules.mjs";
 import { CONSENT_VERSION } from "./consent";
 import { monthEndDate, normalizeResumeDate } from "@/lib/resumeDate";
@@ -342,22 +343,25 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     // candidato tenta de novo sem perder nada do que digitou.
     let resumePath: string | null = null;
     if (resumeFile) {
-      const upload = await supabase.storage
-        .from("resumes")
-        .upload(
-          `${candidateId}/${crypto.randomUUID()}-${safeFileName(resumeFile.name)}`,
-          resumeFile,
-          // O bucket só aceita os tipos de RESUME_EXTENSIONS. Navegador às vezes entrega
-          // `File.type` vazio (comum com .doc), e aí o Storage assumiria
-          // application/octet-stream e recusaria um currículo válido.
-          { contentType: resumeMimeType(resumeFile) },
-        );
+      // O nome sai do sistema, não do arquivo do candidato: curriculo_17_09_2026.pdf.
+      // O bucket só aceita os tipos de RESUME_EXTENSIONS. Navegador às vezes entrega
+      // `File.type` vazio (comum com .doc), e aí o Storage assumiria
+      // application/octet-stream e recusaria um currículo válido.
+      const contentType = resumeMimeType(resumeFile);
+      const upload = await uploadUnique(
+        supabase.storage.from("resumes"),
+        candidateId,
+        ["curriculo", dateParts()],
+        extForFile({ name: resumeFile.name, type: contentType }, "pdf"),
+        resumeFile,
+        { contentType },
+      );
       if (upload.error) {
         setResumeError("Não foi possível enviar o currículo: " + upload.error.message);
         setSaving(false);
         return;
       }
-      resumePath = upload.data.path;
+      resumePath = upload.path;
     }
     // O mesmo objeto serve para o insert e, quando o cadastro já existe, para o enrich.
     // Antes ele nascia dentro do `.insert()`: quando o insert era recusado por 23505, tudo
