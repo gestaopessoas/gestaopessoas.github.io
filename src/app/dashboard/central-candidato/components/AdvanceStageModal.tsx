@@ -355,42 +355,15 @@ export default function AdvanceStageModal({
 
       const quando = marcaEntrevista ? formatInterviewSchedule(stageDate, stageTime) : "";
 
-      // A Etapa muda na Candidatura, que e onde ela mora (ADR 0006) — antes este avanco so
-      // escrevia historico, e a lista continuava mostrando a etapa velha.
-      //
-      // A nota viaja no mesmo UPDATE: o trigger `job_applications_grava_historico` grava UMA
-      // linha completa. A tela nao escreve mais em `candidate_interviews` — duas maos
-      // escrevendo davam duas linhas por clique.
-      //
-      // A obra nao vai junto: ela e da Vaga e se le por join (decisao da Fase 1). Aqui ela
-      // continua servindo para achar os entrevistadores daquela obra.
-      const { error: etapaError } = await supabase
-        .from("job_applications")
-        .update({
-          status: selectedStage,
-          advance_notes:
-            [notaEntrevista, quando ? `[Entrevista marcada]\n${quando}` : "", finalNotes.trim()]
-              .filter(Boolean)
-              .join("\n\n") || null,
-          advance_candidate_future: candidateFuture.join(", ") || null,
-        })
-        .eq("id", alvo);
-
-      if (etapaError) {
-        const msg = etapaError.message || "";
-        setError(
-          msg.includes("Etapa Terminal")
-            ? "Esta candidatura já foi encerrada. Para reconsiderar o candidato, chame-o para uma vaga nova."
-            : msg.includes("processo ativo na obra")
-              ? msg
-              : `Não foi possível mover a etapa: ${msg}`
-        );
-        setSaving(false);
-        return;
-      }
-
       // A entrevista agendada aqui precisa existir em `interviews`: é de lá que saem a
       // agenda, a situação do candidato e o parecer.
+      //
+      // Ela é criada ANTES do UPDATE porque o id dela viaja junto com a mudança de Etapa
+      // (`advance_interview_id`): é esse id que amarra a linha do histórico à entrevista, e
+      // é o que faz excluir a entrevista apagar a Etapa dela. Depois do UPDATE seria tarde —
+      // o trigger já teria gravado a linha, e procurá-la para completar seria a corrida que
+      // a migration 20260916150000 evitou de propósito.
+      let entrevistaNova: string | null = null;
       if (marcaEntrevista) {
         const { data: candidato } = await supabase
           .from("candidates")
@@ -410,19 +383,61 @@ export default function AdvanceStageModal({
           interviewer_id: selectedInterviewerId || null,
         }).select("id").single();
         if (interviewError) {
-          setError(`Etapa salva, mas a entrevista não foi agendada: ${interviewError.message}`);
+          setError(`A etapa não avançou: a entrevista não pôde ser agendada (${interviewError.message}).`);
           setSaving(false);
           return;
         }
-        if (abrirParecer && entrevista) {
-          // Duas mãos de propósito. O `router.push` serve a quem veio de outra tela (a
-          // Central), que recarrega a página inteira e lê o `?entrevista=`. Quem já está na
-          // tela de Entrevistas não pode depender dele: a URL só troca quando a transição
-          // do router entra, e isso chega DEPOIS do recarregamento da lista — a ficha nunca
-          // abria. Para esse caso o id vai direto no `onSuccess`.
-          router.push(`/dashboard/entrevistas?entrevista=${entrevista.id}`);
-          entrevistaParaParecer = entrevista.id;
-        }
+        entrevistaNova = entrevista?.id ?? null;
+      }
+
+      // A Etapa muda na Candidatura, que e onde ela mora (ADR 0006) — antes este avanco so
+      // escrevia historico, e a lista continuava mostrando a etapa velha.
+      //
+      // A nota viaja no mesmo UPDATE: o trigger `job_applications_grava_historico` grava UMA
+      // linha completa. A tela nao escreve mais em `candidate_interviews` — duas maos
+      // escrevendo davam duas linhas por clique.
+      //
+      // A obra nao vai junto: ela e da Vaga e se le por join (decisao da Fase 1). Aqui ela
+      // continua servindo para achar os entrevistadores daquela obra.
+      const { error: etapaError } = await supabase
+        .from("job_applications")
+        .update({
+          status: selectedStage,
+          advance_notes:
+            [notaEntrevista, quando ? `[Entrevista marcada]\n${quando}` : "", finalNotes.trim()]
+              .filter(Boolean)
+              .join("\n\n") || null,
+          advance_candidate_future: candidateFuture.join(", ") || null,
+          advance_interview_id: entrevistaNova,
+        })
+        .eq("id", alvo);
+
+      if (etapaError) {
+        // A Etapa não andou, então a entrevista criada há dois statements não tem mais dono:
+        // ela apareceria na agenda de um avanço que nunca aconteceu.
+        if (entrevistaNova) await supabase.from("interviews").delete().eq("id", entrevistaNova);
+        const msg = etapaError.message || "";
+        setError(
+          msg.includes("Etapa Terminal")
+            ? "Esta candidatura já foi encerrada. Para reconsiderar o candidato, chame-o para uma vaga nova."
+            : msg.includes("processo ativo na obra")
+              ? msg
+              : `Não foi possível mover a etapa: ${msg}`
+        );
+        setSaving(false);
+        return;
+      }
+
+      // Só agora, com a Etapa movida: navegar antes levaria o usuário ao parecer de um
+      // avanço que ainda podia ser recusado.
+      if (abrirParecer && entrevistaNova) {
+        // Duas mãos de propósito. O `router.push` serve a quem veio de outra tela (a
+        // Central), que recarrega a página inteira e lê o `?entrevista=`. Quem já está na
+        // tela de Entrevistas não pode depender dele: a URL só troca quando a transição
+        // do router entra, e isso chega DEPOIS do recarregamento da lista — a ficha nunca
+        // abria. Para esse caso o id vai direto no `onSuccess`.
+        router.push(`/dashboard/entrevistas?entrevista=${entrevistaNova}`);
+        entrevistaParaParecer = entrevistaNova;
       }
 
       onSuccess(entrevistaParaParecer);
