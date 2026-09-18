@@ -15,6 +15,7 @@ import { uploadUnique, dateParts, extForFile } from "@/lib/storageFileName.mjs";
 import { formatCurrencyInput, isValidCpf, parseCurrencyInput } from "@/app/dashboard/colaboradores/lib/employeeFormRules.mjs";
 import { CONSENT_VERSION } from "./consent";
 import { monthEndDate, normalizeResumeDate } from "@/lib/resumeDate";
+import { BfiLinkField } from "./BfiLinkField";
 import type { Career } from "./types";
 
 const MARITAL_STATUS_OPTIONS = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"];
@@ -133,7 +134,14 @@ function formatSalaryExpectation(value: string) {
   return numero > 0 ? formatCurrencyInput(numero) : "";
 }
 
-export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | null; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function ApplicationDialog({ job, open, onOpenChange, internal = false }: {
+  job: Career | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Quem preencheu foi o RH, não o candidato: a tela final entrega o link do teste para
+   *  enviar, em vez de abrir o teste aqui mesmo (issue #146). */
+  internal?: boolean;
+}) {
   // A marca é o status da Publicação, não a falta de Perfil: `profile_id` é nullable, então
   // uma vaga aberta sem Perfil vinculado tambem chega aqui com `profile` null e viraria
   // "Talento ACPO" por engano. O portal só lista status 'Aberta' — 'Espontanea' é a sintética
@@ -544,10 +552,12 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
     <Dialog open={open} onOpenChange={(next) => { onOpenChange(next); if (!next) reset(); }}>
       <DialogContent className="max-h-[90vh] max-w-5xl sm:max-w-5xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isTalentPool ? "Candidatar-se como Talento ACPO" : `Candidatar-se a ${job?.profile?.title || "esta vaga"}`}</DialogTitle>
+          <DialogTitle>{internal ? "Novo talento" : isTalentPool ? "Candidatar-se como Talento ACPO" : `Candidatar-se a ${job?.profile?.title || "esta vaga"}`}</DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-1.5">
             {savedCandidateId ? (
               <span>Candidatura registrada.</span>
+            ) : internal ? (
+              <span>Cadastro do candidato no banco de talentos. Só nome e contato são obrigatórios.</span>
             ) : (
               <>
                 <span>Etapa 1 de 2: seus dados.</span>
@@ -560,14 +570,16 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
           <div className="space-y-5 py-4 text-center">
             <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
             <div className="space-y-2">
-              <h3 className="text-xl font-semibold">Sua candidatura foi registrada</h3>
+              <h3 className="text-xl font-semibold">{internal ? "Candidato cadastrado" : "Sua candidatura foi registrada"}</h3>
               <p className="text-sm text-muted-foreground">
-                {isTalentPool
-                  ? "Você está no banco de talentos da ACPO: o RH te encontra quando abrir uma vaga compatível."
-                  : `Você já está inscrito em ${job?.profile?.title || "esta vaga"}.`} Nada mais é obrigatório
-                a partir daqui — o RH consegue ver seus dados.
+                {internal
+                  ? "O candidato entrou no banco de talentos e já aparece na lista."
+                  : isTalentPool
+                  ? "Você está no banco de talentos da ACPO: o RH te encontra quando abrir uma vaga compatível. Nada mais é obrigatório a partir daqui — o RH consegue ver seus dados."
+                  : `Você já está inscrito em ${job?.profile?.title || "esta vaga"}. Nada mais é obrigatório a partir daqui — o RH consegue ver seus dados.`}
               </p>
             </div>
+            {!internal && (
             <div className="rounded-md border bg-muted/40 p-4 text-left text-sm">
               <p className="font-medium">Próxima etapa, opcional: mapeamento de perfil</p>
               <p className="mt-1 text-muted-foreground">
@@ -575,6 +587,25 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                 ajuda o recrutador a entender seu estilo de trabalho, e você pode deixar para depois.
               </p>
             </div>
+            )}
+            {internal ? (
+              <div className="space-y-4 text-left">
+                {bfiSessionId ? (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Link do teste, para enviar ao candidato</p>
+                    <BfiLinkField sessionId={bfiSessionId} />
+                  </div>
+                ) : (
+                  <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+                    O cadastro foi gravado, mas não foi possível gerar o link do teste agora. O
+                    teste pode ser enviado depois, pela aba Teste Comportamental da ficha.
+                  </p>
+                )}
+                <Button type="button" variant="outline" className="w-full" onClick={() => { onOpenChange(false); reset(); }}>
+                  Fechar
+                </Button>
+              </div>
+            ) : (
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
                 type="button"
@@ -589,6 +620,7 @@ export function ApplicationDialog({ job, open, onOpenChange }: { job: Career | n
                 Responder depois
               </Button>
             </div>
+            )}
           </div>
         ) : (
         <form onSubmit={submit} className="space-y-6">

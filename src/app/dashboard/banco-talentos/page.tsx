@@ -13,6 +13,9 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import { ApplicationDialog } from "@/components/careers/ApplicationDialog";
+import { fetchTalentPoolJob } from "@/components/careers/talentPool";
+import type { Career } from "@/components/careers/types";
 import AdvanceStageModal from "@/app/dashboard/central-candidato/components/AdvanceStageModal";
 import { candidateStatusFromApplications, candidateBucket, latestEducationDegree } from "@/app/dashboard/central-candidato/lib/candidateLogic.mjs";
 import { errorMessage } from "@/lib/utils";
@@ -60,6 +63,12 @@ export default function BancoTalentosPage() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
+  // O "Novo talento" passa pelo mesmo formulário do candidato (issue #146), e ele grava a
+  // Candidatura na Publicação do pool. Sem o id da Publicação não há onde gravar: o botão
+  // não aparece, em vez de abrir um formulário que o banco vai recusar no fim.
+  const [talentPoolJob, setTalentPoolJob] = useState<Career | null>(null);
+
+  useEffect(() => { fetchTalentPoolJob().then(setTalentPoolJob); }, []);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [candidateToDelete, setCandidateToDelete] = useState<{ id: string; name: string } | null>(null);
@@ -272,10 +281,12 @@ export default function BancoTalentosPage() {
           <Button variant="outline" size="icon" onClick={fetchCandidates}>
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button onClick={() => setIsAddCandidateModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo talento
-          </Button>
+          {talentPoolJob && (
+            <Button onClick={() => setIsAddCandidateModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo talento
+            </Button>
+          )}
         </div>
       </div>
 
@@ -394,39 +405,17 @@ export default function BancoTalentosPage() {
         </div>
       </div>
 
-      {isAddCandidateModalOpen && (
-        <CandidateProfileModal
-          isEditable={true}
-          defaultEditMode={true}
-          initialData={{}}
-          onClose={() => setIsAddCandidateModalOpen(false)}
-          onSave={async (data) => {
-            if (!data.full_name && !data.name) { alert("Nome é obrigatório."); throw new Error("Validation"); }
-            if (!data.email) { alert("E-mail é obrigatório."); throw new Error("Validation"); }
-            const { data: insertedData, error } = await supabase.from("candidates").insert({
-              full_name: data.full_name || data.name,
-              first_name: (data.full_name || data.name || "").split(" ")[0],
-              last_name: (data.full_name || data.name || "").split(" ").slice(1).join(" "),
-              email: data.email,
-              phone: data.phone || null,
-              city: data.city || null,
-              state: data.state || null,
-              role_interest: data.role_interest || data.role || null,
-              // candidates não tem coluna `status`, e não precisa de tag: sem Candidatura
-              // ativa e sem contratação, candidateStatusFromApplications já devolve
-              // "Banco de Talentos" — que é o filtro desta tela.
-            }).select("id").single();
-            if (error) {
-              if (error.code === '23505') alert("Já existe um candidato com este e-mail.");
-              else alert("Erro ao salvar: " + error.message);
-              throw error;
-            }
-            setIsAddCandidateModalOpen(false);
-            fetchCandidates();
-            return insertedData.id;
-          }}
-        />
-      )}
+      <ApplicationDialog
+        job={talentPoolJob}
+        open={isAddCandidateModalOpen}
+        internal
+        onOpenChange={(next) => {
+          setIsAddCandidateModalOpen(next);
+          // Fechar o formulário é o único sinal de que o cadastro terminou: o modal grava
+          // sozinho e a lista aqui não saberia disso.
+          if (!next) fetchCandidates();
+        }}
+      />
 
       {selectedCandidateId && (
         <CandidateProfileModal
