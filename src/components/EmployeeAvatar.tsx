@@ -97,8 +97,11 @@ export function EmployeeAvatar({
     );
   }
 
+  // `block` não é decoração: `span` nasce inline, e caixa inline ignora width/height. O único
+  // filho aqui é a `img` absoluta, então o elemento ficava com 0x0 — o avatar sumia da tela
+  // inteiro, sem círculo nem foto. O ramo das iniciais escapava disso por causa do `grid`.
   return (
-    <span className={base} title={name ?? undefined}>
+    <span className={`${base} block`} title={name ?? undefined}>
       {/* eslint-disable-next-line @next/next/no-img-element -- URL assinada e temporária: o
           otimizador de imagem do Next não consegue trabalhar com ela. */}
       <img

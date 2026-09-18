@@ -265,8 +265,11 @@ const PHOTO_PURPOSES: { key: string; label: string }[] = [
 ];
 
 function EmployeePhotoLinks({ employeeId }: { employeeId: string }) {
-  const [files, setFiles] = useState<Record<string, { name: string }[]>>({});
+  const [files, setFiles] = useState<Record<string, { name: string; created_at?: string | null }[]>>({});
   const [loading, setLoading] = useState(true);
+  // Apagar arquivo é irreversível: o botão pede uma segunda batida em vez de abrir diálogo.
+  const [confirmando, setConfirmando] = useState<string | null>(null);
+  const [apagando, setApagando] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -275,7 +278,14 @@ function EmployeePhotoLinks({ employeeId }: { employeeId: string }) {
       PHOTO_PURPOSES.map(({ key }) => supabase.storage.from("employee-photos").list(`${employeeId}/${key}`))
     );
     setFiles(Object.fromEntries(
-      PHOTO_PURPOSES.map(({ key }, i) => [key, (listas[i].data ?? []).filter((f) => f.name && f.id)])
+      PHOTO_PURPOSES.map(({ key }, i) => [
+        key,
+        // Mais recente primeiro, em cada categoria: "a última enviada" é a primeira da lista,
+        // e é ela que o cadastro usa.
+        (listas[i].data ?? [])
+          .filter((f) => f.name && f.id)
+          .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))),
+      ])
     ));
     setLoading(false);
   }, [employeeId]);
@@ -301,6 +311,55 @@ function EmployeePhotoLinks({ employeeId }: { employeeId: string }) {
     window.open(data.signedUrl, "_blank");
   };
 
+  // `download` faz o Storage mandar Content-Disposition: attachment. Sem isso o navegador
+  // abre a foto numa aba em vez de salvar, que é o que "Ver" já faz.
+  const downloadFile = async (purpose: string, fileName: string) => {
+    const supabase = createClient();
+    const { data, error } = await supabase.storage
+      .from("employee-photos")
+      .createSignedUrl(`${employeeId}/${purpose}/${fileName}`, 60, { download: fileName });
+    if (error || !data) {
+      alert("Não foi possível baixar a foto: " + (error?.message ?? "erro desconhecido"));
+      return;
+    }
+    window.location.href = data.signedUrl;
+  };
+
+  const deleteFile = async (purpose: string, fileName: string) => {
+    const caminho = `${employeeId}/${purpose}/${fileName}`;
+    setApagando(caminho);
+    const supabase = createClient();
+
+    // `.remove()` barrado por RLS devolve lista vazia com `error` null: o array é a única
+    // forma de saber que o arquivo continua lá.
+    const { data: apagados, error: bucketError } = await supabase.storage.from("employee-photos").remove([caminho]);
+    if (bucketError || !apagados?.length) {
+      setApagando(null);
+      alert("Não foi possível excluir a foto" + (bucketError ? ": " + bucketError.message : "."));
+      return;
+    }
+
+    // O cadastro aponta para a foto de perfil mais recente. Apagar a que estava valendo faz
+    // ele cair para a anterior, não ficar apontando para um caminho morto.
+    if (purpose === "perfil") {
+      const { data: restantes } = await supabase.storage.from("employee-photos").list(`${employeeId}/perfil`);
+      const maisNova = (restantes ?? [])
+        .filter((f) => f.name && f.id)
+        .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")))[0];
+      const novoCaminho = maisNova ? `${employeeId}/perfil/${maisNova.name}` : null;
+      // O recorte é daquela foto: mantê-lo sobre outra imagem enquadraria o lugar errado.
+      const { error: cadastroError } = await supabase
+        .from("employees_todos")
+        .update({ photo_path: novoCaminho, photo_crop: null })
+        .eq("id", employeeId);
+      if (cadastroError) alert("A foto foi apagada, mas o cadastro não foi atualizado: " + cadastroError.message);
+    }
+
+    setApagando(null);
+    setConfirmando(null);
+    await load();
+  };
+
   const total = PHOTO_PURPOSES.reduce((soma, { key }) => soma + (files[key]?.length ?? 0), 0);
 
   return (
@@ -323,12 +382,31 @@ function EmployeePhotoLinks({ employeeId }: { employeeId: string }) {
               {(files[key]?.length ?? 0) === 0 ? (
                 <p className="text-xs italic text-muted-foreground">Nenhuma foto enviada ainda.</p>
               ) : (
-                files[key]!.map((f) => (
-                  <div key={f.name} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm">
-                    <span className="truncate">{f.name}</span>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => viewFile(key, f.name)}>Ver</Button>
-                  </div>
-                ))
+                files[key]!.map((f, i) => {
+                  const caminho = `${employeeId}/${key}/${f.name}`;
+                  return (
+                    <div key={f.name} className="flex flex-wrap items-center justify-between gap-2 rounded bg-muted/40 px-3 py-2 text-sm">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate">{f.name}</span>
+                        {/* "Mais recente" e não "Em uso": para Perfil as duas coisas são a
+                            mesma, mas Aniversário e Admissão ainda não alimentam tela nenhuma. */}
+                        {i === 0 && <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Mais recente</span>}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1">
+                        <Button type="button" size="sm" variant="ghost" onClick={() => viewFile(key, f.name)}>Ver</Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => downloadFile(key, f.name)}>Baixar</Button>
+                        <Button
+                          type="button" size="sm"
+                          variant={confirmando === caminho ? "destructive" : "ghost"}
+                          disabled={apagando === caminho}
+                          onClick={() => (confirmando === caminho ? deleteFile(key, f.name) : setConfirmando(caminho))}
+                        >
+                          {apagando === caminho ? "Excluindo..." : confirmando === caminho ? "Confirmar" : "Excluir"}
+                        </Button>
+                      </span>
+                    </div>
+                  );
+                })
               )}
             </div>
           ))

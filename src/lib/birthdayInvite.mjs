@@ -22,20 +22,24 @@ export function whatsappNumber(phone) {
   return null;
 }
 
+// Os emojis vao escapados de proposito. O minificador escapa acento (\xe1) mas deixa
+// emoji como bytes crus no bundle: qualquer etapa que leia o arquivo como latin-1 entrega o
+// acento certo e o emoji virando caractere de substituicao -- que foi o que apareceu no
+// WhatsApp. Escapado, o bundle sai ASCII puro e nao ha etapa que possa estragar.
 export function birthdayPhotoMessage({ name, link, deadline }) {
-  return `Seu aniversário está chegando! 🎉 Envie sua foto para a nossa homenagem
+  return `Seu aniversário está chegando! \u{1F389} Envie sua foto para a nossa homenagem
 
 Olá, ${firstName(name)}, tudo bem?
 
-O seu aniversário está quase aí e nós não poderíamos deixar de celebrar com você! 🎈
+O seu aniversário está quase aí e nós não poderíamos deixar de celebrar com você! \u{1F388}
 
 Para prepararmos o nosso mural de aniversariantes e deixarmos a homenagem bem com a sua cara, gostaríamos que você escolhesse e nos enviasse uma foto bem legal.
 
 Basta acessar o link abaixo e fazer o envio:
 
-🔗 ${link}
+\u{1F517} ${link}
 
-⚠️ Observação importante: Caso a foto não seja enviada até o dia ${deadline}, não se preocupe! Utilizaremos a foto padrão que já consta em seu cadastro para não deixarmos a data passar em branco.
+\u{26A0}\u{FE0F} Observação importante: Caso a foto não seja enviada até o dia ${deadline}, não se preocupe! Utilizaremos a foto padrão que já consta em seu cadastro para não deixarmos a data passar em branco.
 
 Qualquer dúvida com o link, é só avisar.
 
