@@ -560,13 +560,13 @@ function ColaboradoresPageInner() {
 
   // Abre a foto em tamanho real. A aba é aberta ANTES do await: depois dele o navegador já
   // não trata o window.open como resposta a um clique e engole a janela.
-  const verFoto = async (employee: Employee) => {
-    if (!employee.photo_path) return;
+  const verFoto = async (nome: string, caminho: string | null) => {
+    if (!caminho) return;
     const aba = window.open("", "_blank");
-    const url = await signedPhotoUrl(employee.photo_path);
+    const url = await signedPhotoUrl(caminho);
     if (!url) {
       aba?.close();
-      setError("Não foi possível abrir a foto de " + employee.name + ".");
+      setError("Não foi possível abrir a foto de " + nome + ".");
       return;
     }
     if (aba) aba.location.href = url;
@@ -857,6 +857,47 @@ function ColaboradoresPageInner() {
     .sort((a, b) => a.info.day - b.info.day);
 
   const workAnniversariesThisMonth = listWorkAnniversaries(employees, selectedMonth);
+
+  // No mural vale a foto que a pessoa mandou PARA o aniversário; a de perfil é o retrato
+  // institucional e fica como reserva de quem não mandou nada.
+  //
+  // Sai do bucket na hora em vez de virar coluna: assim é sempre a última enviada, sem um
+  // ponteiro no cadastro para manter em dia — e o gatilho INSTEAD OF de `employees_todos`
+  // lista as colunas uma a uma, então cada coluna nova ali é uma chance de gravar em silêncio
+  // pela metade.
+  // ponytail: uma listagem por aniversariante do mês, ~30 no pior caso, refeita ao trocar de
+  // mês. Se virar peso, o caminho é uma coluna em employees escrita no upload.
+  const [birthdayPhotos, setBirthdayPhotos] = useState<Record<string, string>>({});
+  const idsDoMes = birthdaysThisMonth.map(({ employee }) => employee.id).join(",");
+  useEffect(() => {
+    const ids = idsDoMes ? idsDoMes.split(",") : [];
+    if (ids.length === 0) return;
+    let vivo = true;
+    const supabase = createClient();
+    Promise.all(
+      ids.map((id) => supabase.storage.from("employee-photos").list(`${id}/aniversario`))
+    ).then((listas) => {
+      if (!vivo) return;
+      const achadas: Record<string, string> = {};
+      listas.forEach(({ data }, i) => {
+        const maisNova = (data ?? [])
+          .filter((f) => f.name && f.id)
+          .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")))[0];
+        if (maisNova) achadas[ids[i]] = `${ids[i]}/aniversario/${maisNova.name}`;
+      });
+      setBirthdayPhotos(achadas);
+    });
+    return () => { vivo = false; };
+  }, [idsDoMes]);
+
+  // O recorte guardado é da foto de perfil. Aplicá-lo sobre a de aniversário enquadraria o
+  // lugar errado, então ele só acompanha quando a exibida é a de perfil mesmo.
+  const fotoDoMural = (employee: Employee) => {
+    const aniversario = birthdayPhotos[employee.id];
+    return aniversario
+      ? { path: aniversario, crop: null }
+      : { path: employee.photo_path ?? null, crop: employee.photo_crop ?? null };
+  };
 
   // Relatório do que está filtrado na tela, com a contagem no fim.
   //
@@ -1399,17 +1440,19 @@ function ColaboradoresPageInner() {
               <div className="space-y-3">
                 {birthdaysThisMonth.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum aniversariante neste mês.</p>
-                ) : birthdaysThisMonth.map(({ employee, info }) => (
+                ) : birthdaysThisMonth.map(({ employee, info }) => {
+                  const foto = fotoDoMural(employee);
+                  return (
                   <div key={employee.id} className="flex items-center justify-between gap-3 rounded-md border bg-background p-3 shadow-sm">
                     <div className="flex min-w-0 items-center gap-3">
                       <button
                         type="button"
-                        onClick={() => verFoto(employee)}
-                        disabled={!employee.photo_path}
-                        title={employee.photo_path ? `Ver a foto de ${employee.name}` : "Sem foto no cadastro"}
+                        onClick={() => verFoto(employee.name, foto.path)}
+                        disabled={!foto.path}
+                        title={foto.path ? `Ver a foto de ${employee.name}` : "Sem foto no cadastro"}
                         className="rounded-full disabled:cursor-default"
                       >
-                        <EmployeeAvatar name={employee.name} photoPath={employee.photo_path} photoCrop={employee.photo_crop} className="h-10 w-10" textClassName="text-xs" />
+                        <EmployeeAvatar name={employee.name} photoPath={foto.path} photoCrop={foto.crop} className="h-10 w-10" textClassName="text-xs" />
                       </button>
                       <div className="min-w-0">
                         <div className="truncate font-medium">{employee.name}</div>
@@ -1431,7 +1474,8 @@ function ColaboradoresPageInner() {
                       </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
