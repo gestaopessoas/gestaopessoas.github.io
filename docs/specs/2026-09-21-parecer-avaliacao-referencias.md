@@ -129,22 +129,59 @@ diferente: uma é juízo do avaliador, a outra é dado do candidato.
 
 ---
 
-## 4. Perguntas em aberto para a conversa
+## 4. Decisões tomadas (21/09/2026)
 
-Nenhuma destas tem resposta óbvia — são as que mudam o desenho.
+As seis perguntas que mudavam o desenho foram respondidas pelo usuário na mesma
+sessão. Ficam registradas aqui; nenhuma foi implementada ainda.
 
-1. **Veredito:** escala forçada de 4 pontos sem meio-termo (estilo Greenhouse),
-   ou a bandeira 🟢🟡🔴 que a equipe já entende, promovida a veredito geral?
-2. **Competências por cargo:** puxar de `job_profiles` significa que cargo sem
-   perfil cadastrado fica sem notas. Cai para um conjunto padrão, ou bloqueia?
-3. **Histórico:** mudar o conjunto de competências quebra a comparação com
-   pareceres antigos. Migra, congela o passado, ou aceita a descontinuidade?
-4. **Evidência em texto:** um campo de "principais conclusões" por entrevista, ou
-   um campo de evidência por competência (mais rigoroso, muito mais digitação)?
-5. **Submissão cega:** faz sentido na ACPO, com o volume de entrevistas que
-   existe, ou é rigor caro demais para o tamanho do processo?
-6. **Separar a aba:** o teste psicológico e os históricos saem daqui para a ficha
-   do candidato, ou o parecer continua sendo a tela única da entrevista?
+1. ~~**Veredito:** escala forçada de 4 pontos sem meio-termo (estilo Greenhouse),
+   ou a bandeira 🟢🟡🔴 que a equipe já entende, promovida a veredito geral?~~
+   **Decidido em 21/09/2026: a bandeira.** O vocabulário 🟢🟡🔴 já existe na casa
+   (hoje preso ao fit cultural) e é promovido a veredito geral da entrevista, no
+   rodapé do parecer, com justificativa obrigatória. A bandeira **não** é média
+   das notas — é juízo do avaliador, como o Overall Recommendation do Greenhouse.
+   Fica em aberto o que sobra do fit cultural: vira uma das competências
+   avaliadas, ou some, já que a bandeira que era dele agora responde pelo todo.
+
+   *Tensão assumida:* a bandeira tem meio-termo (🟡), e a escala de 4 pontos do
+   Greenhouse não tem justamente para obrigar uma posição. O 🟡 vai atrair o
+   avaliador indeciso. Mitigação possível sem trocar o vocabulário: exigir
+   justificativa escrita quando a bandeira for 🟡, e mostrar no relatório quantos
+   🟡 cada avaliador emite — quem nunca se decide fica visível.
+2. **Competências por cargo: `job_profiles` com fallback padrão.** Cada cargo é
+   avaliado pelas competências do seu perfil. Cargo sem perfil cadastrado cai
+   para um conjunto padrão de cinco — entrevista nunca trava por falta de
+   cadastro. O `GuiaAvaliadorButton` já faz essa busca; a novidade é as notas
+   passarem a usá-la.
+
+3. **Histórico: o passado congela.** *(Assumido, não perguntado — o custo de
+   errar aqui é baixo e reversível.)* Pareceres antigos continuam sendo lidos
+   com as competências que tinham quando foram escritos. O EAV guarda o nome do
+   campo em cada linha, então não há migração a fazer: o parecer antigo renderiza
+   a régua antiga. O que se perde é comparar candidato de 2026 com candidato de
+   2027 por competência — comparação que hoje, com a régua genérica, já era
+   ilusória. **Se a decisão for outra, é aqui que muda.**
+
+4. **Evidência: um campo de conclusões por entrevista.** Um texto no rodapé,
+   junto da bandeira — o *key takeaways* do Greenhouse. Evidência por competência
+   foi descartada por atrito: multiplica a digitação por cinco e o risco real é
+   ficar vazio.
+
+5. **Submissão cega: não como regra obrigatória.** O ganho contra viés de
+   ancoragem está documentado, mas não vira requisito do desenho. Fica registrado
+   aqui para o dia em que o volume de avaliadores por candidato justificar.
+
+6. **Escopo da aba: teste psicológico e históricos saem** para a ficha do
+   candidato. O parecer fica só com juízo do avaliador; dado do candidato mora no
+   cadastro. É a mesma linha do [ADR 0010](../adr/0010-entrevista-e-evento-com-situacao-propria.md),
+   que já tirou o cadastro pessoal de `interviews`.
+
+### O que continua em aberto
+
+- **O que sobra do fit cultural** depois que a bandeira dele virou veredito geral:
+  vira uma das competências avaliadas, ou desaparece?
+- **Quantas competências por entrevista** quando o perfil do cargo tiver mais que
+  cinco — corta nas cinco primeiras, ou o RH marca quais são as de foco?
 
 ---
 
