@@ -91,6 +91,12 @@ Vale rodar uma varredura estática nas migrations (tabelas referenciadas e nunca
 criadas; `CREATE POLICY` repetido sem `DROP` anterior) — é muito mais rápido que
 descobrir de migration em migration a cada `supabase start`.
 
+**Push na `main` já é deploy — migration primeiro, código depois.**
+`.github/workflows/deploy.yml` publica no GitHub Pages a cada push na `main`, e o site
+fala com o banco de PRODUÇÃO. Commit que seleciona coluna nova quebra a tela inteira
+(PostgREST recusa o select) até a migration ser aplicada. Segurar o push até o
+`db push` ter rodado, ou subir os dois na mesma janela.
+
 **`supabase db dump --linked` é bloqueado por ser leitura em produção.**
 Precisa de autorização explícita do usuário nomeando produção como alvo.
 
