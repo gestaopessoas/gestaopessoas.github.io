@@ -3,59 +3,23 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from "@/utils/supabase/client";
-import { CheckCircle2, Circle, FileText, Search, ShieldCheck, Check, Clock, Upload, ExternalLink, Loader2 } from "lucide-react";
+import { CheckCircle2, Search, ShieldCheck, Clock, Upload, ExternalLink, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { Stage } from "@/lib/stages";
 import { uploadUnique, slug, dateParts, extForFile } from "@/lib/storageFileName.mjs";
 
-type Admission = {
-  id: string;
-  status: string | null;
-  created_at: string | null;
-  candidate: {
-    full_name: string | null;
-    email: string | null;
-    phone: string | null;
-    city: string | null;
-    state: string | null;
-  } | null;
-  job_opening: {
-    cost_center: string | null;
-    contract_type: string | null;
-    profile: { title: string | null; profile_code: string | null } | null;
-  } | null;
-};
+/**
+ * As Etapas que colocam a Candidatura nesta tela.
+ *
+ * Admissão começa na coleta de documentos (CONTEXT.md) — antes disso o candidato ainda está
+ * em seleção e não tem o que fazer aqui. A tela lê `job_applications.status`, que É a Etapa
+ * (ADR 0006); a lista antiga saía de `candidate_interviews` (histórico) com a grafia velha
+ * 'Coleta de Documentos & Exames', e a aba "ATS Legado" listava as 100 Candidaturas mais
+ * recentes sem filtro nenhum — era ela que trazia para cá gente que nem proposta tinha.
+ */
+const ADMISSION_STAGES: readonly Stage[] = ["Documentação", "Processo de MP"];
 
-const checklist = [
-  "Documentos pessoais",
-  "Comprovante de residência",
-  "ASO admissional",
-  "Dados bancários",
-  "Contrato assinado",
-];
-
-// Quantos passos da admissão já estão vencidos, por Etapa da candidatura. As chaves são as
-// Etapas canônicas (ADR 0006) — "Nova Aplicação" era um sexto vocabulário, e some.
-const doneByStatus: Record<Stage, number> = {
-  Nova: 1,
-  Triagem: 1,
-  "Entrevista RH": 2,
-  "Entrevista Gestor": 2,
-  "Testagem Psicológica": 2,
-  "Aguardando Obra": 2,
-  "Em Avaliação na Obra": 2,
-  "Em Obra": 2,
-  Proposta: 3,
-  "Documentação": 4,
-  "Processo de MP": 4,
-  Contratado: 5,
-  Reprovado: 0,
-  Desistente: 0,
-};
-
-// New types for the documentation phase
 type CandidateDocument = {
   id: string;
   document_type: string;
@@ -64,12 +28,17 @@ type CandidateDocument = {
   notes: string | null;
 };
 
-type ActiveCandidate = {
-  id: string;
-  full_name: string | null;
+type Admission = {
+  /** id da Candidatura — é ela que muda de Etapa, não o Candidato. */
+  applicationId: string;
+  stage: string;
+  candidateId: string;
+  fullName: string | null;
   email: string | null;
   phone: string | null;
-  candidate_documents: CandidateDocument[];
+  vaga: string | null;
+  obra: string | null;
+  documents: CandidateDocument[];
 };
 
 const requiredDocuments = [
@@ -83,6 +52,12 @@ const requiredDocuments = [
   "Contrato assinado",
   "Exame toxicológico"
 ];
+
+/** O Supabase embute relação 1:1 ora como objeto, ora como array de um item. */
+function um<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
 
 function DocumentItem({ candidateId, docType, existingDoc, onDocUploaded }: { candidateId: string, docType: string, existingDoc?: CandidateDocument, onDocUploaded: (doc: CandidateDocument) => void }) {
   const [saving, setSaving] = useState(false);
@@ -116,19 +91,27 @@ function DocumentItem({ candidateId, docType, existingDoc, onDocUploaded }: { ca
     const payload = { candidate_id: candidateId, document_type: docType, status: "entregue", file_url: filePath, notes: null as string | null };
 
     let saved: CandidateDocument | null = null;
+    let saveError: { message: string } | null = null;
     if (existingDoc?.id) {
-      const { data } = await supabase.from("candidate_documents")
+      const { data, error } = await supabase.from("candidate_documents")
         .update(payload).eq("id", existingDoc.id)
         .select("id, document_type, status, file_url, notes").single();
       saved = data as CandidateDocument;
+      saveError = error;
     } else {
-      const { data } = await supabase.from("candidate_documents")
+      const { data, error } = await supabase.from("candidate_documents")
         .insert(payload)
         .select("id, document_type, status, file_url, notes").single();
       saved = data as CandidateDocument;
+      saveError = error;
     }
 
     setSaving(false);
+    // O arquivo subiu e o registro não: sem aviso, a tela ficava idêntica a "nada aconteceu".
+    if (saveError) {
+      alert(`Arquivo enviado, mas não foi possível registrar o documento: ${saveError.message}`);
+      return;
+    }
     setViewUrl(null); // invalida cache de signed url do arquivo anterior
     if (saved) onDocUploaded(saved);
   };
@@ -199,114 +182,95 @@ function DocumentItem({ candidateId, docType, existingDoc, onDocUploaded }: { ca
 
 export default function AdmissaoDigitalPage() {
   const [items, setItems] = useState<Admission[]>([]);
-  const [activeCandidates, setActiveCandidates] = useState<ActiveCandidate[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
-  const [loadingDocs, setLoadingDocs] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  const fetchLegacy = async () => {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("job_applications")
-      .select("id,status,created_at,candidate:candidates(full_name,email,phone,city,state),job_opening:job_openings(cost_center,contract_type,profile:job_profiles(title,profile_code))")
-      .order("created_at", { ascending: false })
-      .limit(100);
-    setLoading(false);
-    if (error) {
-      setError("Não foi possível carregar admissões do legado.");
-      return;
-    }
-    setItems((data ?? []) as unknown as Admission[]);
-  };
-
-  const fetchDocs = async () => {
-    const supabase = createClient();
-    // Busca candidatos e suas entrevistas/documentos
-    const { data, error } = await supabase
-      .from("candidates")
-      .select(`
-        id, full_name, email, phone,
-        candidate_interviews(stage, created_at),
-        candidate_documents(id, document_type, status, file_url, notes)
-      `);
-      
-    setLoadingDocs(false);
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    const filtered = (data || []).filter(c => {
-      if (!c.candidate_interviews || c.candidate_interviews.length === 0) return false;
-      const sorted = [...c.candidate_interviews].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      return sorted[0].stage === 'Coleta de Documentos & Exames';
-    });
-    
-    setActiveCandidates(filtered as unknown as ActiveCandidate[]);
-  };
-
-  // Depois das declarações: o efeito não pode referenciar `fetchLegacy`/`fetchDocs`
-  // antes de existirem (react-hooks/immutability).
   useEffect(() => {
-    const run = async () => { await Promise.all([fetchLegacy(), fetchDocs()]); };
-    run();
+    const fetchAdmissions = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("job_applications")
+        .select(`
+          id, status, created_at,
+          candidates!inner(id, full_name, email, phone,
+            candidate_documents(id, document_type, status, file_url, notes)),
+          job_requests(position_title, requested_role),
+          job_openings(workplaces(name))
+        `)
+        .in("status", ADMISSION_STAGES as readonly string[])
+        .order("created_at", { ascending: false });
+
+      setLoading(false);
+      if (error) {
+        setError("Não foi possível carregar as admissões.");
+        return;
+      }
+
+      type Row = {
+        id: string;
+        status: string | null;
+        candidates: { id: string; full_name: string | null; email: string | null; phone: string | null; candidate_documents: CandidateDocument[] | null };
+        job_requests: { position_title: string | null; requested_role: string | null } | { position_title: string | null; requested_role: string | null }[] | null;
+        job_openings: { workplaces: { name: string | null } | { name: string | null }[] | null } | { workplaces: { name: string | null } | { name: string | null }[] | null }[] | null;
+      };
+
+      setItems(((data ?? []) as unknown as Row[]).map((row) => {
+        const candidate = um(row.candidates)!;
+        const vaga = um(row.job_requests);
+        const workplace = um(um(row.job_openings)?.workplaces);
+        return {
+          applicationId: row.id,
+          stage: row.status ?? "Documentação",
+          candidateId: candidate.id,
+          fullName: candidate.full_name,
+          email: candidate.email,
+          phone: candidate.phone,
+          vaga: vaga?.position_title || vaga?.requested_role || null,
+          obra: workplace?.name ?? null,
+          documents: candidate.candidate_documents ?? [],
+        };
+      }));
+    };
+    fetchAdmissions();
   }, []);
 
   const filteredItems = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term) return items;
     return items.filter((item) => [
-      item.candidate?.full_name,
-      item.candidate?.email,
-      item.candidate?.phone,
-      item.job_opening?.profile?.title,
-      item.job_opening?.cost_center,
-      item.status,
-    ].some((value) => value?.toLowerCase().includes(term)));
-  }, [items, query]);
-  
-  const filteredDocs = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return activeCandidates;
-    return activeCandidates.filter((item) => [
-      item.full_name,
+      item.fullName,
       item.email,
       item.phone,
+      item.vaga,
+      item.obra,
     ].some((value) => value?.toLowerCase().includes(term)));
-  }, [activeCandidates, query]);
+  }, [items, query]);
 
-  const moveToHiredLegacy = async (item: Admission) => {
-    setSavingId(item.id);
+  const completos = items.filter((item) =>
+    requiredDocuments.every((rd) => item.documents.some((d) => d.document_type === rd && d.status === "entregue"))
+  ).length;
+
+  const hireCandidate = async (item: Admission) => {
+    setSavingId(item.applicationId);
     setError("");
     const supabase = createClient();
-    const { error } = await supabase.from("job_applications").update({ status: "Contratado" }).eq("id", item.id);
+    // A Etapa muda na Candidatura; o histórico em `candidate_interviews` sai do trigger
+    // (ADR 0006). Escrever o histórico direto, como esta tela fazia, deixava a Candidatura
+    // parada em Documentação para todas as outras telas.
+    const { error } = await supabase
+      .from("job_applications")
+      .update({ status: "Contratado" })
+      .eq("id", item.applicationId);
     setSavingId(null);
     if (error) {
-      setError("Não foi possível atualizar a admissão.");
+      setError("Não foi possível marcar o candidato como contratado.");
       return;
     }
-    setItems((prev) => prev.map((current) => current.id === item.id ? { ...current, status: "Contratado" } : current));
+    // Contratado sai desta tela: a Admissão acabou.
+    setItems((prev) => prev.filter((c) => c.applicationId !== item.applicationId));
   };
-  
-  const hireCandidate = async (candidate: ActiveCandidate) => {
-    setSavingId(candidate.id);
-    const supabase = createClient();
-    const { error } = await supabase.from("candidate_interviews").insert({
-      candidate_id: candidate.id,
-      stage: "Contratado",
-    });
-    setSavingId(null);
-    if (!error) {
-      // Remove o candidato da lista local — não precisa rebuscar toda a base
-      setActiveCandidates(prev => prev.filter(c => c.id !== candidate.id));
-    }
-  };
-
-  const total = items.length;
-  const hired = items.filter((item) => item.status === "Contratado").length;
-  const pending = Math.max(total - hired, 0);
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -314,7 +278,7 @@ export default function AdmissaoDigitalPage() {
         <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Admissão Digital</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Checklist de entrada e gestão de documentos.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Coleta de documentos dos candidatos em admissão.</p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm text-muted-foreground">
             <ShieldCheck className="h-4 w-4" />
@@ -324,129 +288,75 @@ export default function AdmissaoDigitalPage() {
 
         {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
 
+        <div className="grid gap-4 md:grid-cols-2">
+          <Metric title="Em admissão" value={items.length} />
+          <Metric title="Documentação completa" value={completos} />
+        </div>
+
         <div className="relative max-w-md">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Buscar por candidato, vaga ou obra..." className="pl-9" />
         </div>
 
-        <Tabs defaultValue="docs" className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="docs">Em Documentação</TabsTrigger>
-            <TabsTrigger value="legacy">ATS Legado</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="docs" className="mt-0">
-             {loadingDocs && <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando candidatos...</CardContent></Card>}
-             {!loadingDocs && filteredDocs.length === 0 && <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhum candidato em documentação.</CardContent></Card>}
-             
-             <div className="grid gap-4">
-               {filteredDocs.map(candidate => {
-                 const docsCount = requiredDocuments.filter(rd => 
-                   candidate.candidate_documents?.find(d => d.document_type === rd && d.status === "entregue")
-                 ).length;
-                 const percent = Math.round((docsCount / requiredDocuments.length) * 100);
-                 
-                 return (
-                   <Card key={candidate.id}>
-                     <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                       <div>
-                         <CardTitle>{candidate.full_name || "Sem nome"}</CardTitle>
-                         <CardDescription>{candidate.email} · {candidate.phone}</CardDescription>
-                       </div>
-                       <Button size="sm" disabled={savingId === candidate.id} onClick={() => hireCandidate(candidate)}>
-                         {savingId === candidate.id ? "Salvando..." : "Marcar Contratado"}
-                       </Button>
-                     </CardHeader>
-                     <CardContent className="grid gap-5 md:grid-cols-[180px_1fr]">
-                       <div>
-                         <div className="text-3xl font-semibold">{percent}%</div>
-                         <p className="mt-1 text-sm text-muted-foreground">Coleta de Documentos & Exames</p>
-                       </div>
-                       <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-                          {requiredDocuments.map(doc => (
-                            <DocumentItem
-                              key={doc}
-                              candidateId={candidate.id}
-                              docType={doc}
-                              existingDoc={candidate.candidate_documents?.find(d => d.document_type === doc)}
-                              onDocUploaded={(saved) => {
-                                setActiveCandidates(prev => prev.map(c => {
-                                  if (c.id !== candidate.id) return c;
-                                  const docs = c.candidate_documents ?? [];
-                                  const idx = docs.findIndex(d => d.id === saved.id);
-                                  return {
-                                    ...c,
-                                    candidate_documents: idx >= 0
-                                      ? docs.map(d => d.id === saved.id ? saved : d)
-                                      : [...docs, saved],
-                                  };
-                                }));
-                              }}
-                            />
-                          ))}
-                       </div>
-                     </CardContent>
-                   </Card>
-                 );
-               })}
-             </div>
-          </TabsContent>
-          
-          <TabsContent value="legacy" className="mt-0">
-            <div className="mb-6 grid gap-4 md:grid-cols-3">
-              <Metric title="Processos (Legado)" value={total} />
-              <Metric title="Pendentes" value={pending} />
-              <Metric title="Contratados" value={hired} />
-            </div>
+        {loading && <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando candidatos...</CardContent></Card>}
+        {!loading && filteredItems.length === 0 && <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhum candidato em admissão.</CardContent></Card>}
 
-            <div className="grid gap-4">
-              {loading && <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando admissões...</CardContent></Card>}
-              {!loading && filteredItems.length === 0 && <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhuma admissão encontrada.</CardContent></Card>}
+        <div className="grid gap-4">
+          {filteredItems.map((item) => {
+            const docsCount = requiredDocuments.filter((rd) =>
+              item.documents.some((d) => d.document_type === rd && d.status === "entregue")
+            ).length;
+            const percent = Math.round((docsCount / requiredDocuments.length) * 100);
 
-              {filteredItems.map((item) => {
-                // Etapa fora da lista canônica não deveria existir (o `check` do banco
-                // barra), mas se aparecer dado legado a barra começa do zero em vez de quebrar.
-                const done = doneByStatus[item.status as Stage] ?? 1;
-                const percent = Math.round((done / checklist.length) * 100);
-                return (
-                  <Card key={item.id}>
-                    <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <CardTitle>{item.candidate?.full_name || "Candidato sem nome"}</CardTitle>
-                        <CardDescription>
-                          {item.job_opening?.profile?.title || "Vaga não informada"} · {item.job_opening?.cost_center || "Área não informada"}
-                        </CardDescription>
-                      </div>
-                      <Button size="sm" variant={item.status === "Contratado" ? "secondary" : "default"} disabled={item.status === "Contratado" || savingId === item.id} onClick={() => moveToHiredLegacy(item)}>
-                        {savingId === item.id ? "Atualizando..." : item.status === "Contratado" ? "Concluído" : "Marcar contratado"}
-                      </Button>
-                    </CardHeader>
-                    <CardContent className="grid gap-5 md:grid-cols-[180px_1fr]">
-                      <div>
-                        <div className="text-3xl font-semibold">{percent}%</div>
-                        <p className="mt-1 text-sm text-muted-foreground">{item.status || "Nova"}</p>
-                        <p className="mt-3 text-sm text-muted-foreground">{item.candidate?.email || "E-mail não informado"}</p>
-                        <p className="text-sm text-muted-foreground">{item.candidate?.phone || "Telefone não informado"}</p>
-                      </div>
-                      <ul className="grid gap-2 md:grid-cols-2">
-                        {checklist.map((label, index) => {
-                          const complete = index < done;
-                          return (
-                            <li key={label} className="flex items-center gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm">
-                              {complete ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
-                              <FileText className="h-4 w-4 text-muted-foreground" />
-                              {label}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </TabsContent>
-        </Tabs>
+            return (
+              <Card key={item.applicationId}>
+                <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <CardTitle>{item.fullName || "Candidato sem nome"}</CardTitle>
+                    <CardDescription>
+                      {item.vaga || "Vaga não informada"} · {item.obra || "Obra não informada"}
+                    </CardDescription>
+                  </div>
+                  <Button size="sm" disabled={savingId === item.applicationId} onClick={() => hireCandidate(item)}>
+                    {savingId === item.applicationId ? "Salvando..." : "Marcar Contratado"}
+                  </Button>
+                </CardHeader>
+                <CardContent className="grid gap-5 md:grid-cols-[180px_1fr]">
+                  <div>
+                    <div className="text-3xl font-semibold">{percent}%</div>
+                    <p className="mt-1 text-sm text-muted-foreground">{item.stage}</p>
+                    <p className="mt-3 text-sm text-muted-foreground">{item.email || "E-mail não informado"}</p>
+                    <p className="text-sm text-muted-foreground">{item.phone || "Telefone não informado"}</p>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                    {requiredDocuments.map((doc) => (
+                      <DocumentItem
+                        key={doc}
+                        candidateId={item.candidateId}
+                        docType={doc}
+                        existingDoc={item.documents.find((d) => d.document_type === doc)}
+                        onDocUploaded={(saved) => {
+                          setItems((prev) => prev.map((c) => {
+                            // O mesmo Candidato pode ter mais de uma Candidatura aberta: o
+                            // documento é dele, e aparece em todas as linhas dele.
+                            if (c.candidateId !== item.candidateId) return c;
+                            const idx = c.documents.findIndex((d) => d.id === saved.id);
+                            return {
+                              ...c,
+                              documents: idx >= 0
+                                ? c.documents.map((d) => d.id === saved.id ? saved : d)
+                                : [...c.documents, saved],
+                            };
+                          }));
+                        }}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
