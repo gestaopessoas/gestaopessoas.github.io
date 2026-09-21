@@ -15,10 +15,26 @@ então cada máquina precisa criar o seu. Precisa de `NEXT_PUBLIC_SUPABASE_URL` 
 pode estar sem elas — o build falha com "Cannot find module". Resolver com `npm install`
 antes de diagnosticar como erro de código.
 
-**`npm install` sujeita o `package-lock.json`.**
+**`npm install` sujeita o `package-lock.json` — usar `npm ci`.**
 A versão local do npm remove blocos `"libc": ["glibc"]` de binários opcionais do sharp,
-gerando ~130 linhas de diff sem efeito funcional. Reverter com
-`git checkout -- package-lock.json` para não poluir o commit.
+gerando ~130 linhas de diff sem efeito funcional. `npm ci` instala a partir do lock sem
+reescrevê-lo e resolve o problema na origem (verificado em 21/09/2026: árvore limpa depois).
+Se ainda assim precisar do `npm install`, reverter com `git checkout -- package-lock.json`.
+
+**O `node_modules` costuma estar vazio no começo da sessão.**
+Não é dependência faltando no `package.json` — é a pasta zerada mesmo. `npm ci` leva
+alguns minutos; vale disparar em background logo que souber que vai precisar rodar
+lint, typecheck ou build, em vez de esperar o erro "Cannot find module".
+
+**O ESLint deste projeto leva mais de 5 minutos.**
+Mesmo apontado para um único arquivo, `npx eslint <arquivo>` estoura qualquer timeout
+curto. Rodar sempre em background. O `npx tsc --noEmit` é bem mais rápido (~2 min) e
+pega a maior parte dos erros — vale rodar os dois em paralelo.
+
+**`src/app/dashboard/central-candidato/page.tsx` já entra em `main` com 3 erros de lint.**
+`setState` dentro de efeito (linha do `setAdvanceJobStagesConfig(null)`) e dois `any` no
+`fetchCandidates`. São pré-existentes: ao mexer nesse arquivo, comparar o lint com o do
+`HEAD` antes de concluir que a mudança nova quebrou alguma coisa.
 
 **`$TMPDIR` é vazio no Git Bash deste Windows.**
 Escrever arquivo temporário em `"$TMPDIR/x.md"` vira `/x.md` e falha com
