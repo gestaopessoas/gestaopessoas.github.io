@@ -8,6 +8,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Search, Loader2, Contact, RefreshCw, Plus, Trash2, AlertCircle, Briefcase, CheckCircle2, Users, UserCheck, Funnel, ChevronRight, ChevronDown, ArrowRight, PhoneCall, ListChecks, DoorOpen, Ban, MoreVertical } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -70,6 +71,10 @@ type CandidateRow = {
   escolaridade: string;
   status: string;
   ultimo_chamado: string;
+  // `city` vive separada de `obra_atual`: aquela é reserva de exibição quando não há obra,
+  // esta é o dado do cadastro que o filtro de Cidade precisa ler puro (issue #148).
+  city: string | null;
+  entrevistadores: string[];
   obra_atual: string | null;
   etapa_atual: string | null;
   bucket: Bucket;
@@ -93,11 +98,60 @@ const BUCKET_STYLE: Record<string, string> = {
   contratacao: "bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300",
 };
 
+// Candidatura sem obra é chamado da Sede: o filtro precisa de um rótulo, não de um vazio.
+const OBRA_SEDE = "Sede";
+
+// O Select não aceita string vazia como valor de item; o sentinela representa "sem filtro".
+const SEM_FILTRO = "__todos";
+
+// `created_at` é timestamp e o <input type="date"> devolve AAAA-MM-DD: comparar só o dia
+// evita que o fuso engula a candidatura feita no último dia do intervalo.
+function diaDe(createdAt: string | null): string {
+  return createdAt ? createdAt.slice(0, 10) : "";
+}
+
+// O rótulo do seletor é a própria opção "todas/todos": sem valor escolhido, é ele que
+// aparece no gatilho e diz de que filtro se trata.
+function FiltroSelect({
+  rotuloTodos,
+  value,
+  onChange,
+  options,
+}: {
+  rotuloTodos: string;
+  value: string;
+  onChange: (valor: string) => void;
+  options: string[];
+}) {
+  return (
+    <Select value={value || SEM_FILTRO} onValueChange={(v) => onChange(!v || v === SEM_FILTRO ? "" : String(v))}>
+      <SelectTrigger className="w-full sm:w-48" aria-label={rotuloTodos}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={SEM_FILTRO}>{rotuloTodos}</SelectItem>
+        {options.map((opcao) => (
+          <SelectItem key={opcao} value={opcao}>
+            {opcao}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export default function CentralCandidatoPage() {
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<Bucket>("todos");
+  // Filtros da issue #148. Vazio é "todas/todos" — o padrão é a tela de sempre.
+  const [filtroVaga, setFiltroVaga] = useState("");
+  const [filtroCidade, setFiltroCidade] = useState("");
+  const [filtroObra, setFiltroObra] = useState("");
+  const [filtroEntrevistador, setFiltroEntrevistador] = useState("");
+  const [dataDe, setDataDe] = useState("");
+  const [dataAte, setDataAte] = useState("");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   // Linha aberta para ver todas as Candidaturas do candidato, não só a mais recente.
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -232,6 +286,16 @@ export default function CentralCandidatoPage() {
 
           const hasNewApplication = applicationsLike.some((app) => app.status === "Nova");
 
+          // Um candidato pode ter passado por vários entrevistadores; o filtro casa se
+          // qualquer um deles for o escolhido (issue #148).
+          const entrevistadoresDoCandidato = Array.from(
+            new Set(
+              (c.candidate_interviews ?? [])
+                .map((i) => (i as { interviewer_name?: string | null }).interviewer_name?.trim())
+                .filter((nome): nome is string => Boolean(nome))
+            )
+          );
+
           const applications: ApplicationRow[] = applicationsLike.map((app) => ({
             id: app.id,
             status: app.status,
@@ -248,6 +312,8 @@ export default function CentralCandidatoPage() {
             escolaridade: latestEducationDegree(c.candidate_educations) || assessmentDegree || "Não informado",
             status: finalStatus,
             ultimo_chamado: finalChamado,
+            city: c.city || null,
+            entrevistadores: entrevistadoresDoCandidato,
             obra_atual: derived.obra_atual || c.city || null,
             etapa_atual: derived.etapa_atual,
             bucket: candidateBucket(finalStatus, derived.etapa_atual),
@@ -280,18 +346,79 @@ export default function CentralCandidatoPage() {
     [candidates]
   );
 
-  const contagens = useMemo(() => {
-    const acc: Record<string, number> = { todos: emAcompanhamento.length };
-    for (const bucket of BUCKET_ORDER) acc[bucket] = 0;
-    for (const c of emAcompanhamento) acc[c.bucket] = (acc[c.bucket] ?? 0) + 1;
-    return acc;
+  // As opções saem dos próprios candidatos carregados: nada de lista fixa no código nem
+  // de consulta extra ao banco (issue #148).
+  const opcoes = useMemo(() => {
+    const vagas = new Set<string>();
+    const cidades = new Set<string>();
+    const obras = new Set<string>();
+    const entrevistadores = new Set<string>();
+    for (const c of emAcompanhamento) {
+      if (c.city) cidades.add(c.city);
+      for (const nome of c.entrevistadores) entrevistadores.add(nome);
+      for (const app of c.applications) {
+        if (app.vaga) vagas.add(app.vaga);
+        obras.add(app.obra ?? OBRA_SEDE);
+      }
+    }
+    const ordenar = (s: Set<string>) => Array.from(s).sort((a, b) => a.localeCompare(b, "pt-BR"));
+    return {
+      vagas: ordenar(vagas),
+      cidades: ordenar(cidades),
+      obras: ordenar(obras),
+      entrevistadores: ordenar(entrevistadores),
+    };
   }, [emAcompanhamento]);
+
+  const temFiltroAtivo = Boolean(filtroVaga || filtroCidade || filtroObra || filtroEntrevistador || dataDe || dataAte);
+
+  const limparFiltros = () => {
+    setFiltroVaga("");
+    setFiltroCidade("");
+    setFiltroObra("");
+    setFiltroEntrevistador("");
+    setDataDe("");
+    setDataAte("");
+  };
+
+  // Os cinco seletores valem antes da divisão por balde, para as contagens dos chips
+  // acompanharem os filtros. A busca por texto segue fora da contagem, como já era.
+  const porFiltros = useMemo(() => {
+    if (!temFiltroAtivo) return emAcompanhamento;
+    return emAcompanhamento.filter((c) => {
+      if (filtroCidade && c.city !== filtroCidade) return false;
+      if (filtroEntrevistador && !c.entrevistadores.includes(filtroEntrevistador)) return false;
+      // Candidatura é o recorte de vaga, obra e data: basta uma casar (issue #148).
+      if (filtroVaga && !c.applications.some((app) => app.vaga === filtroVaga)) return false;
+      if (filtroObra && !c.applications.some((app) => (app.obra ?? OBRA_SEDE) === filtroObra)) return false;
+      // O intervalo é um predicado só: checar "de" e "até" em separado deixaria passar
+      // quem tem uma candidatura antes e outra depois, sem nenhuma dentro do período.
+      if (
+        (dataDe || dataAte) &&
+        !c.applications.some((app) => {
+          const dia = diaDe(app.created_at);
+          if (!dia) return false;
+          return (!dataDe || dia >= dataDe) && (!dataAte || dia <= dataAte);
+        })
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [emAcompanhamento, temFiltroAtivo, filtroVaga, filtroCidade, filtroObra, filtroEntrevistador, dataDe, dataAte]);
+
+  const contagens = useMemo(() => {
+    const acc: Record<string, number> = { todos: porFiltros.length };
+    for (const bucket of BUCKET_ORDER) acc[bucket] = 0;
+    for (const c of porFiltros) acc[c.bucket] = (acc[c.bucket] ?? 0) + 1;
+    return acc;
+  }, [porFiltros]);
 
   const filteredCandidates = useMemo(() => {
     const list =
       activeTab === "todos"
-        ? emAcompanhamento
-        : emAcompanhamento.filter((c) => c.bucket === activeTab);
+        ? porFiltros
+        : porFiltros.filter((c) => c.bucket === activeTab);
 
     if (!search.trim()) return list;
     const s = search.toLowerCase();
@@ -302,7 +429,7 @@ export default function CentralCandidatoPage() {
         (c.phone && c.phone?.toLowerCase().includes(s)) ||
         (c.obra_atual && c.obra_atual?.toLowerCase().includes(s)) || false
     );
-  }, [emAcompanhamento, search, activeTab]);
+  }, [porFiltros, search, activeTab]);
 
   const handleDeleteCandidate = (candidateId: string, candidateName: string) => {
     setCandidateToDelete({ id: candidateId, name: candidateName });
@@ -402,6 +529,49 @@ export default function CentralCandidatoPage() {
             </span>
           </Button>
         ))}
+      </div>
+
+      {/* Filtros da issue #148: cruzam entre si, com os chips e com a busca. Nenhum ativo
+          é a tela de sempre. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <FiltroSelect rotuloTodos="Todas as vagas" value={filtroVaga} onChange={setFiltroVaga} options={opcoes.vagas} />
+        <FiltroSelect rotuloTodos="Todas as cidades" value={filtroCidade} onChange={setFiltroCidade} options={opcoes.cidades} />
+        <FiltroSelect rotuloTodos="Todas as obras" value={filtroObra} onChange={setFiltroObra} options={opcoes.obras} />
+        <FiltroSelect
+          rotuloTodos="Todos os entrevistadores"
+          value={filtroEntrevistador}
+          onChange={setFiltroEntrevistador}
+          options={opcoes.entrevistadores}
+        />
+        <div className="flex items-center gap-2">
+          <label htmlFor="filtro-data-de" className="text-sm text-muted-foreground">
+            De
+          </label>
+          <Input
+            id="filtro-data-de"
+            type="date"
+            value={dataDe}
+            max={dataAte || undefined}
+            onChange={(e) => setDataDe(e.target.value)}
+            className="w-auto"
+          />
+          <label htmlFor="filtro-data-ate" className="text-sm text-muted-foreground">
+            até
+          </label>
+          <Input
+            id="filtro-data-ate"
+            type="date"
+            value={dataAte}
+            min={dataDe || undefined}
+            onChange={(e) => setDataAte(e.target.value)}
+            className="w-auto"
+          />
+        </div>
+        {temFiltroAtivo && (
+          <Button variant="ghost" size="sm" onClick={limparFiltros}>
+            Limpar filtros
+          </Button>
+        )}
       </div>
 
       {error && (
