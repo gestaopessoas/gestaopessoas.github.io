@@ -123,6 +123,13 @@ O processo entre aceitar a proposta e virar Colaborador: coleta de documentos, A
 assinatura de contrato.
 _Avoid_: onboarding, integração, contratação
 
+**ASO**:
+Atestado de Saúde Ocupacional — o exame médico admissional. Tem dois momentos distintos na
+Admissão: **marcado** (a Candidatura tem data de exame em `aso_scheduled_at`) e **recebido**
+(o documento chegou e está em `candidate_documents`). Nenhum dos dois é Etapa: são fatos
+lidos de dentro de `Documentação` (ADR 0011).
+_Avoid_: exame admissional, atestado, exame médico
+
 **MP**:
 Memorando de Pessoal — o documento que formaliza a entrada ou a movimentação de um
 Colaborador. Existe em duas formas: MP de contratação e MP de movimentação.

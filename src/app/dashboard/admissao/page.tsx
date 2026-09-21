@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { CheckCircle2, Search, ShieldCheck, Clock, Upload, ExternalLink, Loader2 } from "lucide-react";
+import { CheckCircle2, Search, ShieldCheck, Clock, Upload, ExternalLink, Loader2, AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { Stage } from "@/lib/stages";
 import { uploadUnique, slug, dateParts, extForFile } from "@/lib/storageFileName.mjs";
+import { GRUPOS, asoAtrasado, grupoDaAdmissao } from "./lib/grupoDaAdmissao.mjs";
 
 /**
  * As Etapas que colocam a Candidatura nesta tela.
@@ -38,6 +39,8 @@ type Admission = {
   phone: string | null;
   vaga: string | null;
   obra: string | null;
+  /** Data marcada do exame, `YYYY-MM-DD`. NULL = ainda não marcado (ADR 0011). */
+  aso_scheduled_at: string | null;
   documents: CandidateDocument[];
 };
 
@@ -193,7 +196,7 @@ export default function AdmissaoDigitalPage() {
       const { data, error } = await supabase
         .from("job_applications")
         .select(`
-          id, status, created_at,
+          id, status, created_at, aso_scheduled_at,
           candidates!inner(id, full_name, email, phone,
             candidate_documents(id, document_type, status, file_url, notes)),
           job_requests(position_title, requested_role),
@@ -211,6 +214,7 @@ export default function AdmissaoDigitalPage() {
       type Row = {
         id: string;
         status: string | null;
+        aso_scheduled_at: string | null;
         candidates: { id: string; full_name: string | null; email: string | null; phone: string | null; candidate_documents: CandidateDocument[] | null };
         job_requests: { position_title: string | null; requested_role: string | null } | { position_title: string | null; requested_role: string | null }[] | null;
         job_openings: { workplaces: { name: string | null } | { name: string | null }[] | null } | { workplaces: { name: string | null } | { name: string | null }[] | null }[] | null;
@@ -229,6 +233,7 @@ export default function AdmissaoDigitalPage() {
           phone: candidate.phone,
           vaga: vaga?.position_title || vaga?.requested_role || null,
           obra: workplace?.name ?? null,
+          aso_scheduled_at: row.aso_scheduled_at,
           documents: candidate.candidate_documents ?? [],
         };
       }));
@@ -251,6 +256,31 @@ export default function AdmissaoDigitalPage() {
   const completos = items.filter((item) =>
     requiredDocuments.every((rd) => item.documents.some((d) => d.document_type === rd && d.status === "entregue"))
   ).length;
+  const atrasados = items.filter((item) => asoAtrasado(item)).length;
+
+  // Os três grupos da Admissão, na ordem em que ela acontece. Grupo vazio não vira seção —
+  // mesma regra das Etapas no funil (`stagesPresent`): cabeçalho sem ninguém só ocupa tela.
+  const porGrupo = GRUPOS
+    .map((grupo: string) => ({ grupo, linhas: filteredItems.filter((item) => grupoDaAdmissao(item) === grupo) }))
+    .filter(({ linhas }) => linhas.length > 0);
+
+  const marcarAso = async (item: Admission, data: string) => {
+    setSavingId(item.applicationId);
+    setError("");
+    const supabase = createClient();
+    // Campo vazio desmarca o exame — é como se corrige data digitada errada.
+    const valor = data || null;
+    const { error } = await supabase
+      .from("job_applications")
+      .update({ aso_scheduled_at: valor })
+      .eq("id", item.applicationId);
+    setSavingId(null);
+    if (error) {
+      setError("Não foi possível salvar a data do ASO.");
+      return;
+    }
+    setItems((prev) => prev.map((c) => c.applicationId === item.applicationId ? { ...c, aso_scheduled_at: valor } : c));
+  };
 
   const hireCandidate = async (item: Admission) => {
     setSavingId(item.applicationId);
@@ -288,9 +318,10 @@ export default function AdmissaoDigitalPage() {
 
         {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           <Metric title="Em admissão" value={items.length} />
           <Metric title="Documentação completa" value={completos} />
+          <Metric title="ASO atrasado" value={atrasados} />
         </div>
 
         <div className="relative max-w-md">
@@ -301,12 +332,18 @@ export default function AdmissaoDigitalPage() {
         {loading && <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando candidatos...</CardContent></Card>}
         {!loading && filteredItems.length === 0 && <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhum candidato em admissão.</CardContent></Card>}
 
-        <div className="grid gap-4">
-          {filteredItems.map((item) => {
+        {porGrupo.map(({ grupo, linhas }) => (
+        <section key={grupo} className="grid gap-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">{grupo}</h2>
+            <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">{linhas.length}</span>
+          </div>
+          {linhas.map((item) => {
             const docsCount = requiredDocuments.filter((rd) =>
               item.documents.some((d) => d.document_type === rd && d.status === "entregue")
             ).length;
             const percent = Math.round((docsCount / requiredDocuments.length) * 100);
+            const atrasado = asoAtrasado(item);
 
             return (
               <Card key={item.applicationId}>
@@ -327,6 +364,32 @@ export default function AdmissaoDigitalPage() {
                     <p className="mt-1 text-sm text-muted-foreground">{item.stage}</p>
                     <p className="mt-3 text-sm text-muted-foreground">{item.email || "E-mail não informado"}</p>
                     <p className="text-sm text-muted-foreground">{item.phone || "Telefone não informado"}</p>
+
+                    {/* A data do exame é o único dado digitado aqui: "marcado" e "recebido"
+                        saem dela e do documento, nunca de um campo à parte (ADR 0011). */}
+                    <label className="mt-4 block text-xs font-medium text-muted-foreground" htmlFor={`aso-${item.applicationId}`}>
+                      Data do ASO
+                    </label>
+                    <Input
+                      id={`aso-${item.applicationId}`}
+                      type="date"
+                      className="mt-1 h-8"
+                      defaultValue={item.aso_scheduled_at ?? ""}
+                      disabled={savingId === item.applicationId}
+                      // `onBlur` e não `onChange`: o input de data dispara change no meio da
+                      // digitação, com valor vazio enquanto a data está incompleta — salvar
+                      // ali apagaria a data marcada a cada tecla.
+                      onBlur={(event) => {
+                        if (event.target.value === (item.aso_scheduled_at ?? "")) return;
+                        marcarAso(item, event.target.value);
+                      }}
+                    />
+                    {atrasado && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-destructive">
+                        <AlertTriangle className="h-3 w-3" />
+                        Exame passou e o ASO não chegou
+                      </p>
+                    )}
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
                     {requiredDocuments.map((doc) => (
@@ -356,7 +419,8 @@ export default function AdmissaoDigitalPage() {
               </Card>
             );
           })}
-        </div>
+        </section>
+        ))}
       </div>
     </div>
   );
