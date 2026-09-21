@@ -143,6 +143,11 @@ Para descobrir o schema, ler `supabase/migrations/`. O project ref é
 A ferramenta Agent falha com "issue with the selected model (auto/best-free)",
 independente do override de modelo. Fazer as verificações direto, sem delegar.
 
+**A ferramenta Bash é Git Bash, não PowerShell.**
+Here-string do PowerShell (`@'...'@`) passa em silêncio: o `git commit -m` aceita, e o
+assunto do commit vira literalmente `@`. Para mensagem multi-linha na ferramenta Bash,
+usar heredoc (`git commit -F - <<'EOF'`).
+
 **`node --test` não aceita diretório.**
 `node --test src/app/dashboard/colaboradores/` dá MODULE_NOT_FOUND.
 Usar o glob: `node --test "src/app/dashboard/colaboradores/**/*.test.mjs"`.
@@ -169,6 +174,13 @@ ver `INACTIVE_STATUSES` / `HIDDEN_STATUSES` em `dashboard/colaboradores/page.tsx
 As abas Aniversariantes e Fim de Experiência calculam a partir do array carregado.
 Reduzir o `pageSize` global quebra essas abas silenciosamente — por isso o tamanho
 é por aba (`LIST_PAGE_SIZE` vs `AGGREGATE_PAGE_SIZE`).
+
+**O vocabulário de Etapa mudou e sobrou grafia velha em tela.**
+Depois do eixo único (ADR 0006), `job_applications.status` é a Etapa e o histórico em
+`candidate_interviews` sai de trigger com a grafia canônica. Tela que filtra por grafia
+antiga (`'Coleta de Documentos & Exames'`) ou que insere histórico na mão fica muda sem
+erro nenhum — foi o caso da Admissão. Ao mexer em tela de funil, conferir se ela lê
+`status` e se o filtro está em `src/lib/stages.ts`.
 
 **Tema: a classe `.dark` no `<html>` é o gatilho.**
 O Tailwind v4 usa `@custom-variant dark (&:is(.dark *))` em `globals.css`, e a paleta
