@@ -20,6 +20,11 @@ A versão local do npm remove blocos `"libc": ["glibc"]` de binários opcionais 
 gerando ~130 linhas de diff sem efeito funcional. Reverter com
 `git checkout -- package-lock.json` para não poluir o commit.
 
+**`$TMPDIR` é vazio no Git Bash deste Windows.**
+Escrever arquivo temporário em `"$TMPDIR/x.md"` vira `/x.md` e falha com
+"Permission denied". Usar o caminho completo do scratchpad da sessão, ou o
+próprio `--body-file` apontando para um arquivo dentro do repo e apagá-lo depois.
+
 **Identidade do git não configurada no repo.**
 `git commit` falha com "Author identity unknown". A identidade usada nos commits
 anteriores é `Bruno Souza <130676240+psibrunosg@users.noreply.github.com>`.
