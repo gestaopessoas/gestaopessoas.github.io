@@ -1,10 +1,11 @@
 "use client";
 
 import { createClient } from "@/utils/supabase/client";
-import { useEffect, useState } from "react";
-import { Search, CheckCircle2, UserPlus, Info } from "lucide-react";
+import { useContext, useEffect, useState } from "react";
+import { Search, CheckCircle2, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { PermissionsContext } from "@/contexts/PermissionsContext";
 import { diasDeCasa, marcoAtingido, progresso, tarefaAtrasada } from "./lib/onboarding.mjs";
 import { hojeISO } from "@/lib/datas.mjs";
 
@@ -31,7 +32,11 @@ type Employee = {
   role: string | null;
   admission_date: string | null;
   employee_onboarding_tasks?: EmployeeTask[];
-  employee_onboarding?: { closed_at: string | null; close_reason: string | null } | null;
+  employee_onboarding?: {
+    closed_at: string | null;
+    close_reason: string | null;
+    pending_at_close: { task_code: string; label: string; due_date: string | null }[] | null;
+  } | null;
 };
 
 export default function OnboardingPage() {
@@ -39,6 +44,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [tasks, setTasks] = useState<TaskType[]>([]);
+  const [aba, setAba] = useState<"ativos" | "encerrados">("ativos");
 
   const load = async () => {
     const supabase = createClient();
@@ -55,7 +61,7 @@ export default function OnboardingPage() {
       // Uma string literal só: concatenar com "+" faz o TS enxergar `string` genérico e o
       // select tipado do Supabase cai no fallback de erro (GenericStringError[]).
       .select(
-        "id, name, role, admission_date, employee_onboarding_tasks(task_code, completed, due_date, completed_at, completed_by), employee_onboarding(closed_at, close_reason)",
+        "id, name, role, admission_date, employee_onboarding_tasks(task_code, completed, due_date, completed_at, completed_by), employee_onboarding(closed_at, close_reason, pending_at_close)",
       )
       .eq("status", "Ativo")
       .order("admission_date", { ascending: false, nullsFirst: false });
@@ -68,10 +74,26 @@ export default function OnboardingPage() {
     setLoading(false);
   };
 
+  const { can, loading: permissoesCarregando } = useContext(PermissionsContext);
+  const podeEncerrar = can("colaboradores", "edit");
+
   useEffect(() => {
-    const run = async () => { await load(); };
+    // Espera as permissões terminarem de carregar: o contexto começa com `loading: true` e
+    // permissões vazias, então rodar antes disso leria `podeEncerrar` como falso e nunca
+    // tentaria de novo.
+    if (permissoesCarregando) return;
+
+    const run = async () => {
+      const supabase = createClient();
+      // Não há agendador nesta fase (o Next é estático, e o n8n é a Fase 2): quem dispara o
+      // corte dos 90 dias é esta tela, ao abrir. A função é idempotente. Quem só lê não
+      // dispara o corte -- e isso é correto: o corte é escrita, e a RPC explode para quem
+      // não tem `colaboradores/edit`.
+      if (podeEncerrar) await supabase.rpc("onboarding_encerrar_vencidos");
+      await load();
+    };
     run();
-  }, []);
+  }, [permissoesCarregando, podeEncerrar]);
 
   const toggleTask = async (employeeId: string, task: string, currentValue: boolean) => {
     const anterior = employees;
@@ -112,19 +134,12 @@ export default function OnboardingPage() {
     return e.name?.toLowerCase().includes(term) || e.role?.toLowerCase().includes(term);
   });
 
-  // Mostra apenas quem tem menos de 60 dias de empresa OU não completou o onboarding ainda
-  const today = new Date();
-  const visibleEmployees = filtered.filter(e => {
-    if (query) return true; // se tá buscando, mostra tudo
-    if (!e.admission_date) return false;
-    
-    const admission = new Date(`${e.admission_date}T12:00:00`);
-    const diffDays = Math.floor((today.getTime() - admission.getTime()) / (1000 * 60 * 60 * 24));
-    
-    const status = Object.fromEntries((e.employee_onboarding_tasks ?? []).map((item) => [item.task_code, item.completed])) as Record<string, boolean>;
-    const isCompleted = tasks.every(t => status[t.code]);
-    
-    return diffDays <= 60 || !isCompleted;
+  const visibleEmployees = filtered.filter((e) => {
+    // Quem não tem cabeçalho nenhum é Colaborador sem data de admissão: não está em
+    // Onboarding, e não é caso de aparecer em nenhuma das duas abas.
+    if (!e.employee_onboarding) return false;
+    const encerrado = !!e.employee_onboarding.closed_at;
+    return aba === "ativos" ? !encerrado : encerrado;
   });
 
   // Uma data só para a tela toda: calcular por linha faria a virada da meia-noite pintar
@@ -139,10 +154,19 @@ export default function OnboardingPage() {
             <h1 className="text-2xl font-semibold tracking-tight">Onboarding de Colaboradores</h1>
             <p className="text-sm text-muted-foreground mt-1">Acompanhe a jornada de integração e as tarefas pendentes de cada setor para os novos talentos.</p>
           </div>
-          <div className="flex items-center gap-2">
-             <div className="rounded-md bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground flex items-center gap-2">
-               <Info className="h-4 w-4" /> Mostrando admissões recentes (até 60 dias) ou integrações pendentes.
-             </div>
+          <div className="flex items-center gap-1 rounded-lg bg-muted/50 p-1">
+            {(["ativos", "encerrados"] as const).map((chave) => (
+              <button
+                key={chave}
+                type="button"
+                onClick={() => setAba(chave)}
+                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                  aba === chave ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {chave === "ativos" ? "Ativos" : "Encerrados"}
+              </button>
+            ))}
           </div>
         </header>
 
@@ -189,8 +213,33 @@ export default function OnboardingPage() {
                 return (
                   <tr key={employee.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-5 py-4">
-                      <div className="font-medium text-foreground">{employee.name}</div>
+                      <div className="font-medium text-foreground">
+                        {employee.name}
+                        {(() => {
+                          const dias = diasDeCasa(employee.admission_date, hoje);
+                          const marco = marcoAtingido(dias);
+                          if (!marco) return null;
+                          return (
+                            <span
+                              className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400"
+                              title={
+                                marco === 45
+                                  ? "Passou dos 45 dias: é a metade do contrato de experiência."
+                                  : "Passou dos 90 dias: o Onboarding encerra."
+                              }
+                            >
+                              {marco} dias
+                            </span>
+                          );
+                        })()}
+                      </div>
                       <div className="text-xs text-muted-foreground mt-0.5">{employee.role || "Cargo não informado"} &middot; Admissão: {employee.admission_date ? new Date(employee.admission_date + "T12:00:00").toLocaleDateString('pt-BR') : "-"}</div>
+                      {employee.employee_onboarding?.close_reason === "prazo" &&
+                        (employee.employee_onboarding?.pending_at_close?.length ?? 0) > 0 && (
+                          <div className="text-[11px] text-destructive mt-1">
+                            Encerrado por prazo com pendência
+                          </div>
+                        )}
                     </td>
                     
                     {tasks.map((task) => {
@@ -231,9 +280,9 @@ export default function OnboardingPage() {
                     
                     <td className="px-5 py-4 text-right">
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`text-xs font-medium ${progress === 100 ? 'text-green-600' : 'text-muted-foreground'}`}>{progress}%</span>
+                        <span className={`text-xs font-medium ${progress === 100 ? 'text-success' : 'text-muted-foreground'}`}>{progress}%</span>
                         <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div className={`h-full ${progress === 100 ? 'bg-green-500' : 'bg-primary'}`} style={{ width: `${progress}%` }} />
+                          <div className={`h-full ${progress === 100 ? 'bg-success' : 'bg-primary'}`} style={{ width: `${progress}%` }} />
                         </div>
                       </div>
                     </td>
