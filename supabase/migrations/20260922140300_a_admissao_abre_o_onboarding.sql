@@ -9,7 +9,8 @@
 -- porque o Colaborador mudou de obra -- some da tela e ninguém sabe se foi feita.
 --
 -- ROLLBACK:
---   DROP TRIGGER employees_abre_onboarding ON public.employees;
+--   DROP TRIGGER employees_abre_onboarding_insert ON public.employees;
+--   DROP TRIGGER employees_abre_onboarding_update ON public.employees;
 --   DROP FUNCTION public.onboarding_abre_na_admissao();
 --   DROP FUNCTION public.onboarding_materializar(uuid);
 
@@ -30,6 +31,15 @@ BEGIN
     RETURN 0;
   END IF;
 
+  -- Onboarding já encerrado não reabre. Sem esta guarda, corrigir a data de admissão (ou a
+  -- obra/setor) de quem já fechou o Onboarding pendura tarefa aberta num cabeçalho fechado:
+  -- invisível na tela de ativos (que filtra por closed_at nulo) e inalcançável pela rotina de
+  -- encerramento, que já rodou e não roda de novo sozinha.
+  IF EXISTS (SELECT 1 FROM public.employee_onboarding
+             WHERE employee_id = v_emp.id AND closed_at IS NOT NULL) THEN
+    RETURN 0;
+  END IF;
+
   INSERT INTO public.employee_onboarding (employee_id, started_at)
   VALUES (v_emp.id, v_emp.admission_date)
   ON CONFLICT (employee_id) DO NOTHING;
@@ -46,11 +56,11 @@ BEGIN
     SET due_date = EXCLUDED.due_date
     WHERE public.employee_onboarding_tasks.due_date IS NULL;
 
-  -- ROW_COUNT aqui conta tanto o INSERT quanto o UPDATE do ON CONFLICT (a cláusula WHERE só
-  -- filtra QUAIS linhas em conflito são tocadas, não some da contagem). Não é, portanto,
-  -- "quantas tarefas criou" em sentido estrito -- é "quantas linhas o materializar tocou nesta
-  -- chamada". O nome e o retorno ficam como o desenho pede; quem precisar da distinção exata
-  -- entre criadas e atualizadas terá que comparar o catálogo antes/depois.
+  -- ROW_COUNT aqui só conta linha em conflito que o WHERE aprovou (o UPDATE realmente
+  -- executou nela): quem cai em conflito e é rejeitado pelo WHERE (devido já tinha prazo) não
+  -- entra na conta. Então o retorno é "linhas inseridas mais linhas que tiveram o prazo
+  -- preenchido nesta chamada" -- criação real de tarefa nova ou primeiro prazo de uma tarefa
+  -- que já existia sem due_date. Não é só INSERT, mas também não conta re-toques inertes.
   GET DIAGNOSTICS v_criadas = ROW_COUNT;
   RETURN v_criadas;
 END;
@@ -59,11 +69,18 @@ $$;
 COMMENT ON FUNCTION public.onboarding_materializar(uuid) IS
   'Abre o cabeçalho e cria as tarefas do catálogo que casam com a obra e o setor do '
   'Colaborador. Idempotente: rodar de novo não duplica nem remarca nada. O retorno conta '
-  'linhas tocadas (inserção + atualização de prazo), não só inserções.';
+  'linhas inseridas mais linhas que tiveram o prazo preenchido, não visitas inertes ao '
+  'conflito.';
 
+-- SECURITY DEFINER porque quem chama esta função é o gatilho de INSERT/UPDATE em
+-- public.employees, não a aplicação: um usuário autenticado comum não tem GRANT direto em
+-- employee_onboarding_tasks para a obra/setor de outro Colaborador, e é exatamente isso que a
+-- policy de employees já filtrou antes do gatilho disparar. SET search_path fixo evita que uma
+-- função homônima em outro schema seja resolvida no lugar desta.
 CREATE OR REPLACE FUNCTION public.onboarding_abre_na_admissao()
 RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
 AS $$
 BEGIN
@@ -72,13 +89,42 @@ BEGIN
 END;
 $$;
 
+-- Duas tabelas, uma por operação, porque TG_OP não é testável em WHEN de gatilho -- só dá
+-- para escolher a operação no próprio CREATE TRIGGER. E o UPDATE exige o IS DISTINCT FROM
+-- porque a tela de Colaboradores salva pela view employees_todos, cujo INSTEAD OF reescreve
+-- as ~50 colunas a cada save (inclusive as três daqui) mesmo quando o valor não mudou. Sem o
+-- IS DISTINCT FROM, editar o telefone de alguém admitido em 2019 dispararia o materializar e
+-- abriria (ou tocaria) um Onboarding com started_at de 2019 e tarefas com prazo vencido há
+-- anos -- exatamente o que a janela de 90 dias do backfill existe para evitar. Não "simplificar"
+-- de volta para um gatilho só nem tirar o IS DISTINCT FROM.
 DROP TRIGGER IF EXISTS employees_abre_onboarding ON public.employees;
-CREATE TRIGGER employees_abre_onboarding
-  AFTER INSERT OR UPDATE OF admission_date, workplace_id, department_id
-  ON public.employees
+
+CREATE TRIGGER employees_abre_onboarding_insert
+  AFTER INSERT ON public.employees
   FOR EACH ROW
-  WHEN (NEW.admission_date IS NOT NULL)
+  WHEN (NEW.admission_date IS NOT NULL AND NEW.status = 'Ativo')
   EXECUTE FUNCTION public.onboarding_abre_na_admissao();
+
+CREATE TRIGGER employees_abre_onboarding_update
+  AFTER UPDATE OF admission_date, workplace_id, department_id ON public.employees
+  FOR EACH ROW
+  WHEN (
+    NEW.admission_date IS NOT NULL
+    AND NEW.status = 'Ativo'
+    AND (   OLD.admission_date IS DISTINCT FROM NEW.admission_date
+         OR OLD.workplace_id   IS DISTINCT FROM NEW.workplace_id
+         OR OLD.department_id  IS DISTINCT FROM NEW.department_id)
+  )
+  EXECUTE FUNCTION public.onboarding_abre_na_admissao();
+
+-- Nenhum código de aplicação chama onboarding_materializar nem onboarding_abre_na_admissao
+-- direto -- só o gatilho acima e o backfill abaixo. Mas toda função em public é exposta pelo
+-- PostgREST como /rest/v1/rpc/<nome>, e o baseline concede EXECUTE em funções novas a PUBLIC,
+-- anon e authenticated por default. Sem revogar, qualquer chamador autenticado (ou anônimo)
+-- materializaria cabeçalho e tarefas para um employee_id arbitrário, sem passar pelo
+-- can_access que protege employees e employee_onboarding.
+REVOKE EXECUTE ON FUNCTION public.onboarding_materializar(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.onboarding_abre_na_admissao() FROM PUBLIC, anon, authenticated;
 
 -- Backfill. Cabeçalho para todo Ativo com data de admissão -- inclusive quem já passou dos 90
 -- dias, porque é o cabeçalho que a próxima migration vai encerrar com o retrato da pendência.

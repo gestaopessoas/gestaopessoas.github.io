@@ -39,6 +39,24 @@ BEGIN
     RAISE EXCEPTION 'esperava as 5 tarefas gerais, achei %', v_tem;
   END IF;
 
+  -- Caso positivo: colaborador da obra A recebe a tarefa da obra A JUNTO com as cinco gerais.
+  -- Sem este caso, um materializador que descartasse toda tarefa com escopo passaria pelo
+  -- teste igual -- a asserção acima só prova ausência, nunca presença.
+  INSERT INTO public.employees (name, admission_date, status, workplace_id)
+  VALUES ('ZZ TESTE ESCOPO OBRA A', current_date, 'Ativo', v_obra_a)
+  RETURNING id INTO v_emp;
+
+  SELECT count(*) INTO v_tem FROM public.employee_onboarding_tasks
+  WHERE employee_id = v_emp AND task_code = 'zz_so_da_obra_a';
+  IF v_tem <> 1 THEN
+    RAISE EXCEPTION 'colaborador da obra A deveria receber a tarefa da obra A, achei %', v_tem;
+  END IF;
+
+  SELECT count(*) INTO v_tem FROM public.employee_onboarding_tasks WHERE employee_id = v_emp;
+  IF v_tem <> 6 THEN
+    RAISE EXCEPTION 'esperava as 5 gerais + 1 da obra A = 6, achei %', v_tem;
+  END IF;
+
   -- O prazo nasce da admissao mais o due_days do catalogo.
   SELECT due_date INTO v_due FROM public.employee_onboarding_tasks
   WHERE employee_id = v_emp AND task_code = 'email_ti';

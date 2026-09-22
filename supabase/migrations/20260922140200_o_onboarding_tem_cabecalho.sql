@@ -42,13 +42,15 @@ CREATE INDEX IF NOT EXISTS employee_onboarding_ativos
 ALTER TABLE public.employee_onboarding ENABLE ROW LEVEL SECURITY;
 
 -- Sem DELETE: Onboarding encerrado é histórico. Apagar o Colaborador leva o cabeçalho junto
--- pelo ON DELETE CASCADE, e é o único caminho. O REVOKE é necessário porque o baseline
--- (00000000000000) dá ALTER DEFAULT PRIVILEGES ... GRANT ALL ON TABLES a authenticated: toda
--- tabela nova já nasce com DELETE concedido, antes até deste GRANT rodar. Sem revogar, a
--- policy FOR ALL abaixo deixaria vazar DELETE para quem só tem `colaboradores/view`, porque em
--- DELETE o Postgres só consulta USING, nunca WITH CHECK.
+-- pelo ON DELETE CASCADE, e é o único caminho. O REVOKE ALL (antes do GRANT, não depois) é
+-- necessário porque o baseline (00000000000000) dá ALTER DEFAULT PRIVILEGES ... GRANT ALL ON
+-- TABLES a authenticated: toda tabela nova já nasce com TODOS os privilégios concedidos --
+-- não só DELETE, também TRUNCATE, REFERENCES e TRIGGER -- antes até deste GRANT rodar. Revogar
+-- só DELETE deixaria esses outros de pé; REVOKE ALL fecha tudo e o GRANT seguinte reabre
+-- exatamente o que se usa. Sem isso, a policy FOR ALL abaixo deixaria vazar DELETE para quem só
+-- tem `colaboradores/view`, porque em DELETE o Postgres só consulta USING, nunca WITH CHECK.
+REVOKE ALL ON public.employee_onboarding FROM authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.employee_onboarding TO authenticated;
-REVOKE DELETE ON public.employee_onboarding FROM authenticated;
 
 DROP POLICY IF EXISTS employee_onboarding_access ON public.employee_onboarding;
 
