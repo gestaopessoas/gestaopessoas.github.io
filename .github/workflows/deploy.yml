@@ -15,8 +15,89 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+env:
+  # Não é segredo: já está em DESAFIOS.md e aparece na URL pública do projeto.
+  SUPABASE_PROJECT_REF: bnwwdseczwrmmuvallml
+
 jobs:
+  # O deploy publica um site que fala com o banco de PRODUÇÃO. Código que lê coluna nova
+  # antes da migration ser aplicada não degrada: o PostgREST recusa o select e a tela morre
+  # inteira. Por isso a migration vai antes, e o deploy só acontece se ela passar.
+  detecta-migration:
+    runs-on: ubuntu-latest
+    outputs:
+      tem: ${{ steps.check.outputs.tem }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Há migration nova neste push?
+        id: check
+        run: |
+          set -euo pipefail
+          base="${{ github.event.before }}"
+          # `before` não existe em workflow_dispatch, e vem zerado no primeiro push de uma
+          # branch ou depois de force-push. Nesses casos vale o commit anterior.
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)"
+          fi
+          if git diff --name-only "$base" "${{ github.sha }}" | grep -q '^supabase/migrations/'; then
+            echo "tem=true" >> "$GITHUB_OUTPUT"
+            echo "Migration nova encontrada — o job de banco vai rodar."
+          else
+            echo "tem=false" >> "$GITHUB_OUTPUT"
+            echo "Nenhuma migration neste push — direto para o build."
+          fi
+
+  migrate:
+    needs: detecta-migration
+    if: needs.detecta-migration.outputs.tem == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # O freio. Exige aprovação humana antes de tocar no banco, e é onde os dois segredos
+    # ficam guardados — fora do alcance de qualquer outro workflow do repositório.
+    #
+    # ATENÇÃO: um `environment` que não existe é criado na hora pelo GitHub, SEM proteção
+    # nenhuma. Enquanto `banco-producao` não tiver "Required reviewers" configurado em
+    # Settings → Environments, este job aplica migration em produção sozinho.
+    environment: banco-producao
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.115.0
+
+      - name: Conectar ao projeto
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: O que vai ser aplicado
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase db push --dry-run
+
+      - name: Aplicar em produção
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase db push
+
   deploy:
+    needs: [detecta-migration, migrate]
+    # `needs` de um job pulado pula o dependente também — e a maioria dos pushes não tem
+    # migration. `always()` mantém o deploy vivo quando `migrate` é pulado, e o teste
+    # explícito o impede de publicar quando a migration falhou ou foi cancelada.
+    if: always() && needs.migrate.result != 'failure' && needs.migrate.result != 'cancelled'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

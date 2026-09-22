@@ -1,0 +1,47 @@
+name: Migration (dry-run)
+
+# O ensaio. Roda no PR que mexe em `supabase/migrations/` e diz o que o `db push` faria em
+# produção, sem aplicar nada. É onde migration quebrada aparece — no `main` ela já estaria
+# na frente de um deploy esperando aprovação.
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+
+permissions:
+  contents: read
+
+env:
+  SUPABASE_PROJECT_REF: bnwwdseczwrmmuvallml
+
+jobs:
+  dry-run:
+    # PR vindo de fork não recebe os segredos do repositório (o GitHub não os expõe, e é
+    # exatamente essa proteção que impede um PR de terceiro ler a senha do banco). Sem
+    # segredo o job só falharia com ruído, então nem começa. Ver docs/agents/issue-tracker.md:
+    # PR externo não faz parte da fila de triagem deste repositório.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.115.0
+
+      - name: Conectar ao projeto
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: O que este PR aplicaria em produção
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        # Só leitura: compara o histórico local com o remoto e lista o que falta. Nada é
+        # aplicado, e é de propósito que este workflow não tenha `environment` — ele não
+        # precisa de aprovação porque não muda nada.
+        run: supabase db push --dry-run
