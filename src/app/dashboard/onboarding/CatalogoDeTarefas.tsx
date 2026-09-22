@@ -67,6 +67,9 @@ export default function CatalogoDeTarefas() {
   // de outras linhas que ainda não foram salvas, porque cada linha tem seu próprio botão.
   const salvar = async (linha: TaskType) => {
     setErro(null);
+    // O banco já tem CHECK (btrim(label) <> ''): esta checagem não impede dado ruim, o
+    // Postgres já faz isso. O que ela evita é jogar a mensagem crua do erro de constraint
+    // na cara de quem só apagou o nome sem querer.
     if (!linha.label.trim()) {
       setErro("Código e nome são obrigatórios.");
       return;
@@ -92,6 +95,14 @@ export default function CatalogoDeTarefas() {
       setErro("Código e nome são obrigatórios.");
       return;
     }
+    // `upsert` grava por chave primária: sem esta checagem, digitar um `code` que já existe
+    // não cria nada, substitui a linha de quem já estava lá -- inclusive uma tarefa inativa,
+    // que some da tabela e por isso ninguém percebe que o código já estava em uso.
+    const codigo = nova.code.trim();
+    if (linhas.some((l) => l.code === codigo)) {
+      setErro(`Já existe uma tarefa com o código "${codigo}" (pode estar inativa).`);
+      return;
+    }
     // Um a mais que o maior sort_order já usado, não `linhas.length + 1`: `length` conta
     // tarefa inativa também, e uma reordenação manual anterior pode ter deixado buracos --
     // ambos fariam a tarefa nova colidir com uma posição que já existe.
@@ -99,7 +110,7 @@ export default function CatalogoDeTarefas() {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("onboarding_task_types")
-      .upsert({ ...nova, code: nova.code.trim(), sort_order: proximaOrdem })
+      .upsert({ ...nova, code: codigo, sort_order: proximaOrdem })
       .select()
       .single();
     if (error) {
