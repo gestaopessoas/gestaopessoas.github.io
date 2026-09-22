@@ -50,7 +50,14 @@ CREATE INDEX IF NOT EXISTS onboarding_task_types_ordem
 
 ALTER TABLE public.onboarding_task_types ENABLE ROW LEVEL SECURITY;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.onboarding_task_types TO authenticated;
+-- Sem DELETE: tarefa não se apaga, se desativa (coluna `active`) -- é assim que a tela de
+-- configuração deste catálogo trata o botão, e é o que preserva o histórico de quem já
+-- cumpriu a tarefa. O REVOKE é necessário porque o baseline (00000000000000) dá
+-- ALTER DEFAULT PRIVILEGES ... GRANT ALL ON TABLES a authenticated: toda tabela nova já
+-- nasce com DELETE concedido, antes até deste GRANT rodar. Sem revogar, o `WITH CHECK` da
+-- policy (que o Postgres não consulta em DELETE) nunca chega a ser testado pelo PostgREST.
+GRANT SELECT, INSERT, UPDATE ON public.onboarding_task_types TO authenticated;
+REVOKE DELETE ON public.onboarding_task_types FROM authenticated;
 
 DROP POLICY IF EXISTS onboarding_task_types_access ON public.onboarding_task_types;
 

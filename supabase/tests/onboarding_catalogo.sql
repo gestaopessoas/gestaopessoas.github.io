@@ -39,6 +39,12 @@ BEGIN
     NULL;
   END;
 
+  -- Tarefa nao se apaga, se desativa. Com DELETE revogado, a policy FOR ALL (cujo WITH CHECK
+  -- nao vale para DELETE) nunca chega a ser consultada pelo PostgREST -- fecha o buraco na raiz.
+  IF has_table_privilege('authenticated', 'public.onboarding_task_types', 'DELETE') THEN
+    RAISE EXCEPTION 'authenticated tem privilegio de DELETE no catalogo';
+  END IF;
+
   RAISE NOTICE 'CATALOGO OK';
 END
 $check$;
