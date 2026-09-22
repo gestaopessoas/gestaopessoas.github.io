@@ -4,6 +4,13 @@ Pontos de fricção encontrados em sessões anteriores. Ler no início de cada s
 
 ## Ambiente
 
+**Outra sessão pode estar editando a mesma árvore — nunca `git add -A`.**
+Acontece: em 22/09 um `git add -A` varreu para dentro de um commit de CI a Fase 0 da caixa
+de sugestões (migration + componente + `layout.tsx`), que outra sessão estava escrevendo
+naquele momento. Só foi percebido pela lista de arquivos staged. Citar os caminhos no
+`git add`, e ler o `git status --short` antes de commitar — arquivo desconhecido na árvore
+é trabalho de alguém, não sujeira.
+
 **`.env.local` não existe por padrão e o build quebra sem ele.**
 Sem as variáveis, `next build` falha no prerender de `/clube-descontos` com
 "Supabase URL/key missing". O arquivo é ignorado pelo git (`.gitignore: .env*`),
