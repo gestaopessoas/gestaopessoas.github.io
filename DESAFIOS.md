@@ -112,11 +112,17 @@ Vale rodar uma varredura estática nas migrations (tabelas referenciadas e nunca
 criadas; `CREATE POLICY` repetido sem `DROP` anterior) — é muito mais rápido que
 descobrir de migration em migration a cada `supabase start`.
 
-**Push na `main` já é deploy — migration primeiro, código depois.**
-`.github/workflows/deploy.yml` publica no GitHub Pages a cada push na `main`, e o site
-fala com o banco de PRODUÇÃO. Commit que seleciona coluna nova quebra a tela inteira
-(PostgREST recusa o select) até a migration ser aplicada. Segurar o push até o
-`db push` ter rodado, ou subir os dois na mesma janela.
+**Push na `main` aplica a migration e publica o site — por dois caminhos separados.**
+A migration é aplicada pela **integração do Supabase com o repositório**, configurada no
+painel do Supabase, não por nenhum passo do `.github/workflows/deploy.yml`. O workflow só
+constrói e publica no GitHub Pages. Não montar job de CI para isso: já existe, e um
+`db push` no workflow seria a segunda ferramenta aplicando o mesmo arquivo.
+
+O que sobra saber é que são **dois pipelines independentes**, sem ordem garantida entre
+si: código que lê coluna nova pode chegar ao Pages antes de o Supabase aplicar a coluna, e
+nessa janela o PostgREST recusa o select e a tela morre inteira, não degrada. A janela é
+curta e se resolve sozinha; se a tela reclamar logo depois de um deploy com migration,
+recarregar um minuto depois é o primeiro teste antes de sair investigando.
 
 **`supabase db dump --linked` é bloqueado por ser leitura em produção.**
 Precisa de autorização explícita do usuário nomeando produção como alvo.
@@ -163,8 +169,9 @@ massa. Também: inserir import "depois do último `import`" quebra quando o últ
 `execute_sql`, `list_tables`, `apply_migration`, `get_project_url` e
 `get_publishable_keys` retornam "You do not have permission to perform this action".
 Para descobrir o schema, ler `supabase/migrations/`. O project ref é
-`bnwwdseczwrmmuvallml`. Migrations precisam ser aplicadas manualmente via
-`npx supabase db push`.
+`bnwwdseczwrmmuvallml`. Migration nova não precisa ser aplicada na mão: a integração do
+Supabase com o repositório aplica no push para `main`. `npx supabase db push` continua
+servindo para aplicar fora dessa janela, e aí exige `supabase link` antes.
 
 **Subagentes não sobem nesta configuração.**
 A ferramenta Agent falha com "issue with the selected model (auto/best-free)",
