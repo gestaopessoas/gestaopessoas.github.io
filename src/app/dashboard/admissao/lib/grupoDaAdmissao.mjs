@@ -9,8 +9,12 @@
  * que é o que aconteceria com `ASO Recebido` como Etapa, convivendo com o documento.
  */
 
+import { hojeISO } from "../../../../lib/datas.mjs";
+
 /** O `document_type` que representa o exame, igual ao que a tela sobe. */
 export const ASO_DOCUMENT = "ASO admissional";
+
+export { hojeISO };
 
 /** Ordem de exibição — é a ordem em que a admissão acontece. */
 export const GRUPOS = ["Coleta de documentação", "ASO marcado", "ASO recebido"];
@@ -36,18 +40,6 @@ export function grupoDaAdmissao(admission) {
   return admission?.aso_scheduled_at ? "ASO marcado" : "Coleta de documentação";
 }
 
-/**
- * A data de hoje no formato de `date` do Postgres, pelo relógio local.
- *
- * `new Date().toISOString()` daria o dia em UTC — no fuso do Brasil, exame marcado para hoje
- * apareceria como atrasado depois das 21h.
- *
- * @param {Date} [agora]
- */
-export function hojeISO(agora = new Date()) {
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}-${pad(agora.getDate())}`;
-}
 
 /**
  * Exame cuja data já passou e o documento não chegou — é quem o RH precisa cobrar.
