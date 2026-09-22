@@ -179,7 +179,12 @@ export default function OnboardingPage() {
               {loading && <tr><td colSpan={tasks.length + 2} className="p-8 text-center text-muted-foreground">Carregando integrações...</td></tr>}
               {!loading && visibleEmployees.length === 0 && <tr><td colSpan={tasks.length + 2} className="p-8 text-center text-muted-foreground">Nenhuma integração pendente.</td></tr>}
               {!loading && visibleEmployees.map(employee => {
-                const { pct: progress } = progresso(employee.employee_onboarding_tasks ?? []);
+                // O percentual conta o que está na tela: tarefa desativada no catálogo some da
+                // coluna, e a linha velha dela no banco não pode continuar pesando no progresso.
+                const tarefasVisiveis = tasks
+                  .map((t) => (employee.employee_onboarding_tasks ?? []).find((x) => x.task_code === t.code))
+                  .filter((t): t is EmployeeTask => t !== undefined);
+                const { pct: progress } = progresso(tarefasVisiveis);
 
                 return (
                   <tr key={employee.id} className="hover:bg-muted/20 transition-colors">
