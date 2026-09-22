@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { Search, CheckCircle2, UserPlus, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { diasDeCasa, marcoAtingido, progresso, tarefaAtrasada } from "./lib/onboarding.mjs";
+import { hojeISO } from "@/lib/datas.mjs";
 
 type TaskType = {
   code: string;
@@ -125,6 +127,10 @@ export default function OnboardingPage() {
     return diffDays <= 60 || !isCompleted;
   });
 
+  // Uma data só para a tela toda: calcular por linha faria a virada da meia-noite pintar
+  // metade da tabela de vermelho e a outra metade não.
+  const hoje = hojeISO();
+
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex-1 p-8 space-y-6 max-w-7xl mx-auto w-full">
@@ -150,11 +156,19 @@ export default function OnboardingPage() {
             <thead className="bg-muted/30 border-b border-border">
               <tr>
                 <th className="px-5 py-4 font-medium text-muted-foreground w-1/4">Colaborador</th>
-                {tasks.map(task => (
-                  <th key={task.code} className="px-2 py-4 font-medium text-center text-muted-foreground">
+                {tasks.map((task) => (
+                  <th
+                    key={task.code}
+                    className="px-2 py-4 font-medium text-center text-muted-foreground"
+                    title={
+                      task.responsible_email
+                        ? `Responsável: ${task.responsible_email} · prazo de ${task.due_days} dias`
+                        : `Sem responsável definido · prazo de ${task.due_days} dias`
+                    }
+                  >
                     <div className="flex flex-col items-center">
                       <span className="text-foreground">{task.label}</span>
-                      <span className="text-[10px] uppercase tracking-wider">{task.sector}</span>
+                      <span className="text-[10px] uppercase tracking-wider">{task.sector ?? "—"}</span>
                     </div>
                   </th>
                 ))}
@@ -165,10 +179,8 @@ export default function OnboardingPage() {
               {loading && <tr><td colSpan={tasks.length + 2} className="p-8 text-center text-muted-foreground">Carregando integrações...</td></tr>}
               {!loading && visibleEmployees.length === 0 && <tr><td colSpan={tasks.length + 2} className="p-8 text-center text-muted-foreground">Nenhuma integração pendente.</td></tr>}
               {!loading && visibleEmployees.map(employee => {
-                const status = Object.fromEntries((employee.employee_onboarding_tasks ?? []).map((item) => [item.task_code, item.completed])) as Record<string, boolean>;
-                const completedCount = tasks.filter(t => status[t.code]).length;
-                const progress = Math.round((completedCount / tasks.length) * 100);
-                
+                const { pct: progress } = progresso(employee.employee_onboarding_tasks ?? []);
+
                 return (
                   <tr key={employee.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-5 py-4">
@@ -176,17 +188,38 @@ export default function OnboardingPage() {
                       <div className="text-xs text-muted-foreground mt-0.5">{employee.role || "Cargo não informado"} &middot; Admissão: {employee.admission_date ? new Date(employee.admission_date + "T12:00:00").toLocaleDateString('pt-BR') : "-"}</div>
                     </td>
                     
-                    {tasks.map(task => {
-                      const isChecked = !!status[task.code];
+                    {tasks.map((task) => {
+                      const tarefa = (employee.employee_onboarding_tasks ?? []).find((t) => t.task_code === task.code);
+                      const isChecked = !!tarefa?.completed;
+                      const atrasada = tarefaAtrasada(tarefa ?? {}, hoje);
+
+                      const legenda = isChecked
+                        ? `Concluída em ${tarefa?.completed_at ? new Date(tarefa.completed_at).toLocaleDateString("pt-BR") : "—"}`
+                        : tarefa?.due_date
+                          ? `${atrasada ? "Venceu" : "Vence"} em ${new Date(`${tarefa.due_date}T12:00:00`).toLocaleDateString("pt-BR")}`
+                          : "Sem prazo definido";
+
                       return (
                         <td key={task.code} className="px-2 py-4 text-center">
                           <button
                             type="button"
+                            title={legenda}
                             onClick={() => toggleTask(employee.id, task.code, isChecked)}
-                            className={`inline-flex items-center justify-center w-6 h-6 rounded-md transition-colors ${isChecked ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'bg-muted hover:bg-muted/80 text-muted-foreground'}`}
+                            className={`inline-flex items-center justify-center w-6 h-6 rounded-md transition-colors ${
+                              isChecked
+                                ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                : atrasada
+                                  ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
+                                  : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                            }`}
                           >
-                            {isChecked ? <CheckCircle2 className="w-4 h-4" /> : <div className="w-3 h-3 rounded-sm border-2 border-current opacity-50" />}
+                            {isChecked ? (
+                              <CheckCircle2 className="w-4 h-4" />
+                            ) : (
+                              <div className="w-3 h-3 rounded-sm border-2 border-current opacity-50" />
+                            )}
                           </button>
+                          {atrasada && <div className="text-[10px] text-destructive mt-0.5">atrasada</div>}
                         </td>
                       );
                     })}
