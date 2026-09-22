@@ -40,7 +40,6 @@ export function grupoDaAdmissao(admission) {
   return admission?.aso_scheduled_at ? "ASO marcado" : "Coleta de documentação";
 }
 
-
 /**
  * Exame cuja data já passou e o documento não chegou — é quem o RH precisa cobrar.
  *

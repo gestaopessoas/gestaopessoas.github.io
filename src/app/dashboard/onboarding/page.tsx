@@ -2,9 +2,8 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { useContext, useEffect, useState } from "react";
-import { Search, CheckCircle2, UserPlus } from "lucide-react";
+import { Search, CheckCircle2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { PermissionsContext } from "@/contexts/PermissionsContext";
 import { diasDeCasa, marcoAtingido, progresso, tarefaAtrasada } from "./lib/onboarding.mjs";
 import { hojeISO } from "@/lib/datas.mjs";
