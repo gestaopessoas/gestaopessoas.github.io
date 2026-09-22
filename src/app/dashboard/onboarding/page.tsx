@@ -186,10 +186,13 @@ export default function OnboardingPage() {
           </div>
         </header>
 
-        <div className="relative w-full max-w-md">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} type="search" placeholder="Buscar colaborador..." className="pl-9 bg-muted/30 border-border/50 h-9 text-sm rounded-md" />
-        </div>
+        {/* A busca filtra colaborador, e não faz sentido nenhum na aba de catálogo. */}
+        {aba !== "catalogo" && (
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} type="search" placeholder="Buscar colaborador..." className="pl-9 bg-muted/30 border-border/50 h-9 text-sm rounded-md" />
+          </div>
+        )}
 
         {aba === "catalogo" ? (
           <CatalogoDeTarefas />

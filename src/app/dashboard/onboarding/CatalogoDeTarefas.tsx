@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // É esta tela que tira as cinco tarefas fixas do código: mudar um prazo ou um responsável
 // deixa de exigir deploy.
@@ -39,6 +40,10 @@ export default function CatalogoDeTarefas() {
   const [setores, setSetores] = useState<Opcao[]>([]);
   const [nova, setNova] = useState<TaskType>(vazia);
   const [erro, setErro] = useState<string | null>(null);
+  // Diferencia "ainda não carreguei" de "carreguei e voltou vazio": só assim dá para avisar
+  // que a lista de obras/setores pode estar vazia por falta de permissão, sem piscar o aviso
+  // durante o primeiro instante da tela.
+  const [carregado, setCarregado] = useState(false);
 
   const load = async () => {
     const supabase = createClient();
@@ -50,6 +55,7 @@ export default function CatalogoDeTarefas() {
     setLinhas((catalogo.data ?? []) as TaskType[]);
     setObras((w.data ?? []) as Opcao[]);
     setSetores((d.data ?? []) as Opcao[]);
+    setCarregado(true);
   };
 
   useEffect(() => {
@@ -57,25 +63,52 @@ export default function CatalogoDeTarefas() {
     run();
   }, []);
 
+  // Só a linha que respondeu troca de estado: recarregar tudo apagaria a edição em andamento
+  // de outras linhas que ainda não foram salvas, porque cada linha tem seu próprio botão.
   const salvar = async (linha: TaskType) => {
     setErro(null);
+    if (!linha.label.trim()) {
+      setErro("Código e nome são obrigatórios.");
+      return;
+    }
     const supabase = createClient();
-    const { error } = await supabase.from("onboarding_task_types").upsert(linha);
+    const { data, error } = await supabase
+      .from("onboarding_task_types")
+      .upsert(linha)
+      .select()
+      .single();
     if (error) {
       setErro(error.message);
       return;
     }
-    await load();
+    setLinhas((p) => p.map((l) => (l.code === data.code ? (data as TaskType) : l)));
   };
 
   const criar = async () => {
+    setErro(null);
     // `code` é a chave primária e vira o `task_code` de toda tarefa materializada: sem ele a
     // linha não tem identidade.
     if (!nova.code.trim() || !nova.label.trim()) {
       setErro("Código e nome são obrigatórios.");
       return;
     }
-    await salvar({ ...nova, code: nova.code.trim(), sort_order: linhas.length + 1 });
+    // Um a mais que o maior sort_order já usado, não `linhas.length + 1`: `length` conta
+    // tarefa inativa também, e uma reordenação manual anterior pode ter deixado buracos --
+    // ambos fariam a tarefa nova colidir com uma posição que já existe.
+    const proximaOrdem = linhas.reduce((max, l) => Math.max(max, l.sort_order), 0) + 1;
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("onboarding_task_types")
+      .upsert({ ...nova, code: nova.code.trim(), sort_order: proximaOrdem })
+      .select()
+      .single();
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    // Acrescenta ao estado em vez de recarregar: um `load()` aqui reintroduziria o mesmo
+    // problema do `salvar()`, apagando edição em andamento de outra linha ainda não salva.
+    setLinhas((p) => [...p, data as TaskType]);
     setNova(vazia);
   };
 
@@ -160,7 +193,7 @@ export default function CatalogoDeTarefas() {
                         p.map((l, j) => (i === j ? { ...l, workplace_id: e.target.value || null } : l)),
                       )
                     }
-                    className="h-8 text-sm rounded-md border border-border bg-background px-2"
+                    className="h-8 text-sm rounded-lg border border-input bg-transparent px-2 dark:bg-input/30"
                   >
                     <option value="">Todas</option>
                     {obras.map((o) => (
@@ -176,7 +209,7 @@ export default function CatalogoDeTarefas() {
                         p.map((l, j) => (i === j ? { ...l, department_id: e.target.value || null } : l)),
                       )
                     }
-                    className="h-8 text-sm rounded-md border border-border bg-background px-2"
+                    className="h-8 text-sm rounded-lg border border-input bg-transparent px-2 dark:bg-input/30"
                   >
                     <option value="">Todos</option>
                     {setores.map((s) => (
@@ -185,11 +218,10 @@ export default function CatalogoDeTarefas() {
                   </select>
                 </td>
                 <td className="py-2 pr-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={linha.active}
-                    onChange={(e) =>
-                      setLinhas((p) => p.map((l, j) => (i === j ? { ...l, active: e.target.checked } : l)))
+                    onCheckedChange={(checked) =>
+                      setLinhas((p) => p.map((l, j) => (i === j ? { ...l, active: checked === true } : l)))
                     }
                   />
                 </td>
@@ -226,6 +258,16 @@ export default function CatalogoDeTarefas() {
         />
         <Button size="sm" onClick={criar}>Adicionar tarefa</Button>
       </div>
+
+      {carregado && (obras.length === 0 || setores.length === 0) && (
+        <p className="text-xs text-muted-foreground">
+          {obras.length === 0 && setores.length === 0
+            ? "As listas de obra e de setor vieram vazias. Isso pode ser falta de permissão nos módulos correspondentes (Obras e Departamentos), não ausência de cadastro."
+            : obras.length === 0
+              ? "A lista de obra veio vazia. Isso pode ser falta de permissão no módulo Obras, não ausência de cadastro."
+              : "A lista de setor veio vazia. Isso pode ser falta de permissão no módulo Departamentos, não ausência de cadastro."}
+        </p>
+      )}
 
       <p className="text-xs text-muted-foreground">
         Tarefa não se apaga: desmarque <strong>Ativa</strong>. O histórico de quem já a cumpriu
