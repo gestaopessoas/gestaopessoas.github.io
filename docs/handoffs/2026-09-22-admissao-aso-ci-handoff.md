@@ -40,14 +40,18 @@ produção** (manualmente, antes do CI existir) e o deploy correspondente saiu.
 Nenhuma delas é executável por um agente — as duas primeiras exigem permissão de admin no
 repositório ou acesso à conta, e a terceira envolve valores de credencial.
 
-1. **Incidente de 05/09 (aberto).** Um workflow criado por token de terceiro mandava
+1. **Incidente de 05/09 (encerrado em 22/09).** Um workflow criado por token de terceiro mandava
    `NEXT_PUBLIC_GEMINI_API_KEY`, `VITE_SUPABASE_ANON_KEY` e `VITE_SUPABASE_URL` para
    `http://193.32.204.199` a cada push. Commits `e3f4213` e `f358847`. O arquivo foi
    removido e as 75 execuções ficaram todas em estado terminal — pelo que a API expõe, o
-   `curl` nunca rodou. **Falta revogar** os PATs e OAuth apps que permitiram o push
-   (Settings → Developer settings → Personal access tokens, e Settings → Applications).
-   O `Security log` da conta, filtrado em 05/09/2026, diz de qual token/IP veio.
+   `curl` nunca rodou. Os PATs e OAuth apps foram revogados pelo dono em 22/09/2026 —
+   é o que fecha a porta, já que apagar o arquivo tira o que estava lá e não quem pôs.
    Rotação da chave do Gemini: o dono decidiu não rotacionar.
+
+   **Efeito colateral a vigiar:** se a autorização do app do Supabase tiver entrado na
+   revogação, a integração para de aplicar migration no push — e falha calada, com o site
+   publicando código que lê coluna que não existe. Conferir em Supabase → Project Settings
+   → Integrations → GitHub, ou observar o primeiro push com migration.
 2. **Environment `banco-producao` (não existe ainda).** Sem ele, o job `migrate` do
    `deploy.yml` falha no `link`. E atenção: environment inexistente é criado pelo GitHub
    **sem proteção**, então criar sem *Required reviewers* remove o freio em vez de
