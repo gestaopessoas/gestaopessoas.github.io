@@ -193,6 +193,20 @@ usar heredoc (`git commit -F - <<'EOF'`).
 `node --test src/app/dashboard/colaboradores/` dá MODULE_NOT_FOUND.
 Usar o glob: `node --test "src/app/dashboard/colaboradores/**/*.test.mjs"`.
 
+**Qualquer comando do Playwright reescreve `playwright-report/index.html`, que é versionado.**
+Até `--list`, que não roda teste nenhum, deixa o arquivo modificado na árvore. Aparece no
+`git status` como se fosse trabalho, e entra por engano em quem commita sem ler a lista.
+Depois de mexer no Playwright, `git checkout -- playwright-report/`. A correção de raiz
+seria tirar o diretório do versionamento.
+
+**Coletar os specs sem ambiente falha antes de qualquer teste.**
+`npx playwright test --list` quebra em `rotina-arquivamento.spec.ts` e `auditoria-banco.spec.ts`,
+que fazem `readFileSync('.env')` no topo do módulo — sem `.env`, a coleta inteira morre e o
+total sai `0 tests in 0 files`. O `--config=playwright.local.config.ts` também não serve: o
+`globalSetup` exige o container do Supabase local. Para só provar que os arquivos parseiam,
+listar passando os caminhos e excluindo esses dois, e rodar `tsc --noEmit --skipLibCheck`
+nos `_local-*`.
+
 ## Verificação visual
 
 **O dashboard exige login — o agente não consegue autenticar.**
