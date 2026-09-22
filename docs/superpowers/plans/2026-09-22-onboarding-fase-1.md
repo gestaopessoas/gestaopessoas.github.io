@@ -330,6 +330,15 @@ Esperado: FALHA com `column "completed_at" does not exist`.
 
 Criar `supabase/migrations/20260922140100_a_tarefa_do_onboarding_tem_prazo_e_assinatura.sql`:
 
+> **Nota (achado no per-task review):** o `onboarding_assina_tarefa()` abaixo, com apenas
+> dois ramos (`IF ... ELSIF NOT NEW.completed`), tinha um bug: não cobria o UPDATE de
+> "já estava concluída e continua concluída", então um cliente podia mandar
+> `completed_at`/`completed_by` forjados nesse caminho e o gatilho deixava passar. Foi
+> corrigido para três ramos antes do commit — ver a versão de verdade em
+> `supabase/migrations/20260922140100_a_tarefa_do_onboarding_tem_prazo_e_assinatura.sql`.
+> Este bloco de código fica como estava no plano original de propósito: não copie esta
+> versão.
+
 ```sql
 -- A tarefa de Onboarding passa a ter prazo e a dizer quem a concluiu.
 --
