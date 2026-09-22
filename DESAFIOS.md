@@ -41,6 +41,13 @@ Escrever arquivo temporário em `"$TMPDIR/x.md"` vira `/x.md` e falha com
 "Permission denied". Usar o caminho completo do scratchpad da sessão, ou o
 próprio `--body-file` apontando para um arquivo dentro do repo e apagá-lo depois.
 
+**Heredoc longo quebra no Bash desta sessão — usar a ferramenta Write.**
+`cat > arquivo.md <<'EOF'` com um markdown grande falhou com
+"unexpected EOF while looking for matching `''", mesmo com o delimitador entre aspas
+simples (que deveria tornar o conteúdo literal). Escrever o arquivo com a ferramenta
+`Write` resolveu de primeira. Não vale gastar tentativa escapando o conteúdo.
+Para mensagem de commit multi-linha, `-m` repetido funciona bem e evita o problema.
+
 **Identidade do git não configurada no repo.**
 `git commit` falha com "Author identity unknown". A identidade usada nos commits
 anteriores é `Bruno Souza <130676240+psibrunosg@users.noreply.github.com>`.
