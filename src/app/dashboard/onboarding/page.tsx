@@ -6,41 +6,63 @@ import { Search, CheckCircle2, UserPlus, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-type OnboardingTask = "email_ti" | "kit_onboarding" | "cadastro_ponto" | "cadastro_solides" | "treinamento_inicial";
+type TaskType = {
+  code: string;
+  label: string;
+  sector: string | null;
+  responsible_email: string | null;
+  due_days: number;
+  sort_order: number;
+};
 
-const TASKS = [
-  { id: "email_ti" as OnboardingTask, label: "E-mail TI", sector: "TI" },
-  { id: "kit_onboarding" as OnboardingTask, label: "Kit Integração", sector: "MKT / RH" },
-  { id: "cadastro_ponto" as OnboardingTask, label: "Ponto", sector: "RH" },
-  { id: "cadastro_solides" as OnboardingTask, label: "Sólides", sector: "RH" },
-  { id: "treinamento_inicial" as OnboardingTask, label: "1º Treinamento", sector: "T&D" },
-];
+type EmployeeTask = {
+  task_code: string;
+  completed: boolean;
+  due_date: string | null;
+  completed_at: string | null;
+  completed_by: string | null;
+};
 
 type Employee = {
   id: string;
   name: string;
   role: string | null;
   admission_date: string | null;
-  employee_onboarding_tasks?: { task_code: OnboardingTask; completed: boolean }[];
+  employee_onboarding_tasks?: EmployeeTask[];
+  employee_onboarding?: { closed_at: string | null; close_reason: string | null } | null;
 };
 
 export default function OnboardingPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [tasks, setTasks] = useState<TaskType[]>([]);
 
   const load = async () => {
     const supabase = createClient();
-    // Puxa colaboradores ativos, ordenados pelos mais recentes primeiro
+
+    // O catálogo primeiro: são as colunas da tabela, e sem ele não há o que desenhar.
+    const { data: catalogo } = await supabase
+      .from("onboarding_task_types")
+      .select("code, label, sector, responsible_email, due_days, sort_order")
+      .eq("active", true)
+      .order("sort_order");
+
     const { data, error } = await supabase
       .from("employees")
-      .select("id, name, role, admission_date, employee_onboarding_tasks(task_code,completed)")
+      // Uma string literal só: concatenar com "+" faz o TS enxergar `string` genérico e o
+      // select tipado do Supabase cai no fallback de erro (GenericStringError[]).
+      .select(
+        "id, name, role, admission_date, employee_onboarding_tasks(task_code, completed, due_date, completed_at, completed_by), employee_onboarding(closed_at, close_reason)",
+      )
       .eq("status", "Ativo")
       .order("admission_date", { ascending: false, nullsFirst: false });
-    
-    if (!error) {
-      setEmployees((data ?? []) as Employee[]);
-    }
+
+    setTasks((catalogo ?? []) as TaskType[]);
+    // `as unknown as`: sem o generic Database no client, o Supabase tipa toda relação
+    // embutida como array — inclusive `employee_onboarding`, que na prática vem objeto
+    // porque a FK é a própria PK da tabela (relação um-para-um reconhecida pelo PostgREST).
+    if (!error) setEmployees((data ?? []) as unknown as Employee[]);
     setLoading(false);
   };
 
@@ -49,18 +71,37 @@ export default function OnboardingPage() {
     run();
   }, []);
 
-  const toggleTask = async (employeeId: string, task: OnboardingTask, currentValue: boolean) => {
-    const employee = employees.find(e => e.id === employeeId);
-    if (!employee) return;
+  const toggleTask = async (employeeId: string, task: string, currentValue: boolean) => {
+    const anterior = employees;
 
-    const currentStatus = Object.fromEntries((employee.employee_onboarding_tasks ?? []).map((item) => [item.task_code, item.completed]));
-    const newStatus = { ...currentStatus, [task]: !currentValue };
-
-    // Update optimistic UI
-    setEmployees(prev => prev.map(e => e.id === employeeId ? { ...e, employee_onboarding_tasks: Object.entries(newStatus).map(([task_code, completed]) => ({ task_code: task_code as OnboardingTask, completed })) } : e));
+    // Mexe só na tarefa clicada: reconstruir o array a partir de um Record apagaria o prazo
+    // e a assinatura das outras.
+    setEmployees((prev) =>
+      prev.map((e) =>
+        e.id !== employeeId
+          ? e
+          : {
+              ...e,
+              employee_onboarding_tasks: (e.employee_onboarding_tasks ?? []).map((t) =>
+                t.task_code === task ? { ...t, completed: !currentValue } : t,
+              ),
+            },
+      ),
+    );
 
     const supabase = createClient();
-    await supabase.from("employee_onboarding_tasks").upsert({ employee_id: employeeId, task_code: task, completed: !currentValue, updated_at: new Date().toISOString() });
+    const { error } = await supabase
+      .from("employee_onboarding_tasks")
+      .update({ completed: !currentValue })
+      .eq("employee_id", employeeId)
+      .eq("task_code", task);
+
+    // Sem isto, um erro de permissão deixa a caixinha marcada na tela e aberta no banco.
+    if (error) {
+      setEmployees(anterior);
+      return;
+    }
+    await load();
   };
 
   const filtered = employees.filter(e => {
@@ -78,8 +119,8 @@ export default function OnboardingPage() {
     const admission = new Date(`${e.admission_date}T12:00:00`);
     const diffDays = Math.floor((today.getTime() - admission.getTime()) / (1000 * 60 * 60 * 24));
     
-    const status = Object.fromEntries((e.employee_onboarding_tasks ?? []).map((item) => [item.task_code, item.completed])) as Record<OnboardingTask, boolean>;
-    const isCompleted = TASKS.every(t => status[t.id]);
+    const status = Object.fromEntries((e.employee_onboarding_tasks ?? []).map((item) => [item.task_code, item.completed])) as Record<string, boolean>;
+    const isCompleted = tasks.every(t => status[t.code]);
     
     return diffDays <= 60 || !isCompleted;
   });
@@ -109,8 +150,8 @@ export default function OnboardingPage() {
             <thead className="bg-muted/30 border-b border-border">
               <tr>
                 <th className="px-5 py-4 font-medium text-muted-foreground w-1/4">Colaborador</th>
-                {TASKS.map(task => (
-                  <th key={task.id} className="px-2 py-4 font-medium text-center text-muted-foreground">
+                {tasks.map(task => (
+                  <th key={task.code} className="px-2 py-4 font-medium text-center text-muted-foreground">
                     <div className="flex flex-col items-center">
                       <span className="text-foreground">{task.label}</span>
                       <span className="text-[10px] uppercase tracking-wider">{task.sector}</span>
@@ -121,12 +162,12 @@ export default function OnboardingPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {loading && <tr><td colSpan={TASKS.length + 2} className="p-8 text-center text-muted-foreground">Carregando integrações...</td></tr>}
-              {!loading && visibleEmployees.length === 0 && <tr><td colSpan={TASKS.length + 2} className="p-8 text-center text-muted-foreground">Nenhuma integração pendente.</td></tr>}
+              {loading && <tr><td colSpan={tasks.length + 2} className="p-8 text-center text-muted-foreground">Carregando integrações...</td></tr>}
+              {!loading && visibleEmployees.length === 0 && <tr><td colSpan={tasks.length + 2} className="p-8 text-center text-muted-foreground">Nenhuma integração pendente.</td></tr>}
               {!loading && visibleEmployees.map(employee => {
-                const status = Object.fromEntries((employee.employee_onboarding_tasks ?? []).map((item) => [item.task_code, item.completed])) as Record<OnboardingTask, boolean>;
-                const completedCount = TASKS.filter(t => status[t.id]).length;
-                const progress = Math.round((completedCount / TASKS.length) * 100);
+                const status = Object.fromEntries((employee.employee_onboarding_tasks ?? []).map((item) => [item.task_code, item.completed])) as Record<string, boolean>;
+                const completedCount = tasks.filter(t => status[t.code]).length;
+                const progress = Math.round((completedCount / tasks.length) * 100);
                 
                 return (
                   <tr key={employee.id} className="hover:bg-muted/20 transition-colors">
@@ -135,13 +176,13 @@ export default function OnboardingPage() {
                       <div className="text-xs text-muted-foreground mt-0.5">{employee.role || "Cargo não informado"} &middot; Admissão: {employee.admission_date ? new Date(employee.admission_date + "T12:00:00").toLocaleDateString('pt-BR') : "-"}</div>
                     </td>
                     
-                    {TASKS.map(task => {
-                      const isChecked = !!status[task.id];
+                    {tasks.map(task => {
+                      const isChecked = !!status[task.code];
                       return (
-                        <td key={task.id} className="px-2 py-4 text-center">
-                          <button 
+                        <td key={task.code} className="px-2 py-4 text-center">
+                          <button
                             type="button"
-                            onClick={() => toggleTask(employee.id, task.id, isChecked)}
+                            onClick={() => toggleTask(employee.id, task.code, isChecked)}
                             className={`inline-flex items-center justify-center w-6 h-6 rounded-md transition-colors ${isChecked ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'bg-muted hover:bg-muted/80 text-muted-foreground'}`}
                           >
                             {isChecked ? <CheckCircle2 className="w-4 h-4" /> : <div className="w-3 h-3 rounded-sm border-2 border-current opacity-50" />}
