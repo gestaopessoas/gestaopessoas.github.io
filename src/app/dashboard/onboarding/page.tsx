@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { PermissionsContext } from "@/contexts/PermissionsContext";
 import { diasDeCasa, marcoAtingido, progresso, tarefaAtrasada } from "./lib/onboarding.mjs";
 import { hojeISO } from "@/lib/datas.mjs";
+import CatalogoDeTarefas from "./CatalogoDeTarefas";
 
 type TaskType = {
   code: string;
@@ -44,7 +45,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [tasks, setTasks] = useState<TaskType[]>([]);
-  const [aba, setAba] = useState<"ativos" | "encerrados">("ativos");
+  const [aba, setAba] = useState<"ativos" | "encerrados" | "catalogo">("ativos");
 
   const load = async () => {
     const supabase = createClient();
@@ -75,11 +76,13 @@ export default function OnboardingPage() {
   };
 
   const { can, loading: permissoesCarregando } = useContext(PermissionsContext);
-  const podeEncerrar = can("colaboradores", "edit");
+  // Mesma permissão gate o corte automático dos 90 dias e a aba de configuração do catálogo:
+  // quem edita Colaboradores é quem decide prazo e responsável de cada tarefa.
+  const podeEditarColaboradores = can("colaboradores", "edit");
 
   useEffect(() => {
     // Espera as permissões terminarem de carregar: o contexto começa com `loading: true` e
-    // permissões vazias, então rodar antes disso leria `podeEncerrar` como falso e nunca
+    // permissões vazias, então rodar antes disso leria `podeEditarColaboradores` como falso e nunca
     // tentaria de novo.
     if (permissoesCarregando) return;
 
@@ -89,11 +92,11 @@ export default function OnboardingPage() {
       // corte dos 90 dias é esta tela, ao abrir. A função é idempotente. Quem só lê não
       // dispara o corte -- e isso é correto: o corte é escrita, e a RPC explode para quem
       // não tem `colaboradores/edit`.
-      if (podeEncerrar) await supabase.rpc("onboarding_encerrar_vencidos");
+      if (podeEditarColaboradores) await supabase.rpc("onboarding_encerrar_vencidos");
       await load();
     };
     run();
-  }, [permissoesCarregando, podeEncerrar]);
+  }, [permissoesCarregando, podeEditarColaboradores]);
 
   const toggleTask = async (employeeId: string, task: string, currentValue: boolean) => {
     const anterior = employees;
@@ -167,6 +170,19 @@ export default function OnboardingPage() {
                 {chave === "ativos" ? "Ativos" : "Encerrados"}
               </button>
             ))}
+            {/* Só quem edita Colaboradores vê a aba: mostrar um botão que leva a uma tela onde
+                todo upsert seria recusado pelo RLS é anunciar uma capacidade que não existe. */}
+            {podeEditarColaboradores && (
+              <button
+                type="button"
+                onClick={() => setAba("catalogo")}
+                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                  aba === "catalogo" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Configurar
+              </button>
+            )}
           </div>
         </header>
 
@@ -175,6 +191,9 @@ export default function OnboardingPage() {
           <Input value={query} onChange={(e) => setQuery(e.target.value)} type="search" placeholder="Buscar colaborador..." className="pl-9 bg-muted/30 border-border/50 h-9 text-sm rounded-md" />
         </div>
 
+        {aba === "catalogo" ? (
+          <CatalogoDeTarefas />
+        ) : (
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted/30 border-b border-border">
@@ -292,7 +311,8 @@ export default function OnboardingPage() {
             </tbody>
           </table>
         </div>
-        
+        )}
+
       </div>
     </div>
   );
