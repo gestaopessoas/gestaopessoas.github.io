@@ -16,6 +16,8 @@ DECLARE
   v_tem int;
   v_due date;
   v_inicio date;
+  v_antigo uuid;
+  v_encerrado uuid;
 BEGIN
   INSERT INTO public.workplaces (name) VALUES ('ZZ OBRA A') RETURNING id INTO v_obra_a;
   INSERT INTO public.workplaces (name) VALUES ('ZZ OBRA B') RETURNING id INTO v_obra_b;
@@ -83,6 +85,70 @@ BEGIN
   -- FOR ALL so tem USING de 'colaboradores/view', e em DELETE o Postgres nao consulta WITH CHECK.
   IF has_table_privilege('authenticated', 'public.employee_onboarding', 'DELETE') THEN
     RAISE EXCEPTION 'authenticated nao deveria ter DELETE em employee_onboarding';
+  END IF;
+
+  -- (a) Update inocuo nao materializa. Simula um colaborador antigo que o backfill nao
+  -- alcancou (cabecalho e tarefas apagados a mao, como se nunca tivessem existido) e depois
+  -- um save vindo da view employees_todos, que reescreve as tres colunas do gatilho com os
+  -- MESMOS valores. Sem o IS DISTINCT FROM na condicao do gatilho de UPDATE, isso
+  -- materializaria de novo -- e e exatamente isso que este teste pega.
+  INSERT INTO public.employees (name, admission_date, status)
+  VALUES ('ZZ COLABORADOR ANTIGO', current_date - 400, 'Ativo')
+  RETURNING id INTO v_antigo;
+
+  DELETE FROM public.employee_onboarding_tasks WHERE employee_id = v_antigo;
+  DELETE FROM public.employee_onboarding WHERE employee_id = v_antigo;
+
+  UPDATE public.employees
+  SET phone = 'zz', admission_date = admission_date, workplace_id = workplace_id, department_id = department_id
+  WHERE id = v_antigo;
+
+  SELECT count(*) INTO v_tem FROM public.employee_onboarding WHERE employee_id = v_antigo;
+  IF v_tem <> 0 THEN
+    RAISE EXCEPTION 'update inocuo (colunas reescritas com o mesmo valor) materializou cabecalho';
+  END IF;
+
+  SELECT count(*) INTO v_tem FROM public.employee_onboarding_tasks WHERE employee_id = v_antigo;
+  IF v_tem <> 0 THEN
+    RAISE EXCEPTION 'update inocuo (colunas reescritas com o mesmo valor) materializou tarefa';
+  END IF;
+
+  -- (b) Mudanca real, no mesmo colaborador, ainda materializa -- a correcao do (a) nao pode
+  -- ter matado o caso legitimo junto com o inocuo.
+  UPDATE public.employees SET workplace_id = v_obra_a WHERE id = v_antigo;
+
+  SELECT count(*) INTO v_tem FROM public.employee_onboarding WHERE employee_id = v_antigo;
+  IF v_tem <> 1 THEN
+    RAISE EXCEPTION 'mudanca real de obra deveria abrir o cabecalho, achei %', v_tem;
+  END IF;
+
+  SELECT count(*) INTO v_tem FROM public.employee_onboarding_tasks WHERE employee_id = v_antigo;
+  IF v_tem <> 6 THEN
+    RAISE EXCEPTION 'mudanca real de obra deveria materializar as 5 gerais + 1 da obra A, achei %', v_tem;
+  END IF;
+
+  -- (c) Onboarding encerrado nao recebe tarefa nova. Fecha o cabecalho a mao e muda a obra
+  -- para uma com tarefa de escopo -- o gatilho ainda dispara (a mudanca e real), mas
+  -- onboarding_materializar tem que devolver sem tocar em nada porque closed_at IS NOT NULL.
+  INSERT INTO public.employees (name, admission_date, status, workplace_id)
+  VALUES ('ZZ ENCERRADO', current_date, 'Ativo', v_obra_b)
+  RETURNING id INTO v_encerrado;
+
+  UPDATE public.employee_onboarding
+  SET closed_at = now(), close_reason = 'prazo', pending_at_close = '[]'::jsonb
+  WHERE employee_id = v_encerrado;
+
+  UPDATE public.employees SET workplace_id = v_obra_a WHERE id = v_encerrado;
+
+  SELECT count(*) INTO v_tem FROM public.employee_onboarding_tasks
+  WHERE employee_id = v_encerrado AND task_code = 'zz_so_da_obra_a';
+  IF v_tem <> 0 THEN
+    RAISE EXCEPTION 'onboarding encerrado recebeu tarefa nova apos mudar de obra';
+  END IF;
+
+  SELECT count(*) INTO v_tem FROM public.employee_onboarding_tasks WHERE employee_id = v_encerrado;
+  IF v_tem <> 5 THEN
+    RAISE EXCEPTION 'onboarding encerrado deveria continuar com as 5 tarefas originais, achei %', v_tem;
   END IF;
 
   RAISE NOTICE 'ESCOPO OK';

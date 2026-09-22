@@ -4,9 +4,22 @@
 -- Materializar em vez de derivar na consulta: `due_date` é um combinado, e combinado não muda
 -- quando alguém edita o catálogo seis meses depois.
 --
--- O gatilho também dispara quando a obra ou o setor mudam, e aí só ACRESCENTA a tarefa que
--- passou a valer. Nunca remove: tarefa que já foi combinada com um responsável não desaparece
--- porque o Colaborador mudou de obra -- some da tela e ninguém sabe se foi feita.
+-- O gatilho também dispara quando a obra ou o setor mudam, e aí, enquanto o Onboarding está
+-- aberto, só ACRESCENTA a tarefa que passou a valer. Nunca remove: tarefa que já foi combinada
+-- com um responsável não desaparece porque o Colaborador mudou de obra -- some da tela e
+-- ninguém sabe se foi feita. Depois de encerrado, o gatilho continua disparando, mas
+-- onboarding_materializar devolve sem tocar em nada -- ver a guarda de closed_at mais abaixo.
+--
+-- Buraco conhecido e não corrigido nesta fase: readmissão. reativar_colaborador
+-- (20260909100400_reativar_traz_as_netas.sql) insere a linha já com o status antigo e só
+-- depois vira o status para 'Ativo' -- e esse UPDATE de status não está no `UPDATE OF` do
+-- gatilho, então a readmissão nunca materializa Onboarding novo. Mesmo se materializasse,
+-- `employee_onboarding` tem `employee_id` como chave primária: é uma linha por pessoa, e o
+-- backfill fecha (Task 5) quem passou dos 90 dias. Quem já foi Colaborador e volta fica preso
+-- pela guarda de "Onboarding encerrado não reabre" para sempre. Resolver direito pede
+-- `employee_onboarding` deixar de ser uma linha por pessoa e virar um ciclo (uma linha por
+-- admissão/readmissão) -- mudança de schema fora do escopo desta Fase 1. Documentado aqui para
+-- não virar surpresa: readmissão de Colaborador não abre Onboarding.
 --
 -- ROLLBACK:
 --   DROP TRIGGER employees_abre_onboarding_insert ON public.employees;
@@ -99,12 +112,14 @@ $$;
 -- de volta para um gatilho só nem tirar o IS DISTINCT FROM.
 DROP TRIGGER IF EXISTS employees_abre_onboarding ON public.employees;
 
+DROP TRIGGER IF EXISTS employees_abre_onboarding_insert ON public.employees;
 CREATE TRIGGER employees_abre_onboarding_insert
   AFTER INSERT ON public.employees
   FOR EACH ROW
   WHEN (NEW.admission_date IS NOT NULL AND NEW.status = 'Ativo')
   EXECUTE FUNCTION public.onboarding_abre_na_admissao();
 
+DROP TRIGGER IF EXISTS employees_abre_onboarding_update ON public.employees;
 CREATE TRIGGER employees_abre_onboarding_update
   AFTER UPDATE OF admission_date, workplace_id, department_id ON public.employees
   FOR EACH ROW
