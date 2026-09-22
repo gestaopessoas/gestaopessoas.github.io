@@ -48,6 +48,20 @@ simples (que deveria tornar o conteúdo literal). Escrever o arquivo com a ferra
 `Write` resolveu de primeira. Não vale gastar tentativa escapando o conteúdo.
 Para mensagem de commit multi-linha, `-m` repetido funciona bem e evita o problema.
 
+**`getByLabel('Senha')` quebra o login em 19 specs do `e2e/`.**
+O campo de senha ganhou um botão "Mostrar senha", cujo `aria-label` também contém
+"senha" — então o seletor casa com dois elementos e o Playwright falha com
+"strict mode violation" antes de qualquer asserção. Quem copiar o helper `login()`
+de um spec existente herda a quebra. A forma correta é
+`page.getByRole('textbox', { name: 'Senha' })`. Verificado em 22/09/2026:
+`_local-sugestoes.spec.ts` passa com ela, e os outros 19 ainda usam a forma ambígua.
+
+**O Docker Desktop não sobe sozinho, e o `supabase start` depende dele.**
+Instalado em `C:\Users\bruno\AppData\Local\Programs\DockerDesktop\Docker Desktop.exe`,
+fora dos caminhos padrão do `Program Files`. Iniciar com `Start-Process` e esperar o
+daemon responder (`docker info`) leva cerca de 20 segundos. Depois disso o
+`npx supabase start` aplica todas as migrations e roda o seed.
+
 **Identidade do git não configurada no repo.**
 `git commit` falha com "Author identity unknown". A identidade usada nos commits
 anteriores é `Bruno Souza <130676240+psibrunosg@users.noreply.github.com>`.
