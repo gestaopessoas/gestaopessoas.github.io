@@ -44,7 +44,13 @@ BEGIN
   IF NEW.completed AND (TG_OP = 'INSERT' OR NOT COALESCE(OLD.completed, false)) THEN
     NEW.completed_at := now();
     NEW.completed_by := auth.uid();
-  ELSIF NOT NEW.completed THEN
+  ELSIF NEW.completed THEN
+    -- Ja estava concluida e continua: a assinatura e a de quem marcou, nao a que o cliente
+    -- mandou agora. Preservar OLD e o que torna o gatilho autoritativo em todo caminho --
+    -- sem este ramo, editar `notes` seria uma porta para reescrever quem concluiu.
+    NEW.completed_at := OLD.completed_at;
+    NEW.completed_by := OLD.completed_by;
+  ELSE
     -- Desmarcar volta a tarefa ao estado aberto de verdade, sem assinatura pendurada.
     NEW.completed_at := NULL;
     NEW.completed_by := NULL;
