@@ -6,8 +6,9 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { UserProfile } from "@/components/layout/UserProfile";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { SuggestionBox } from "@/components/layout/SuggestionBox";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { Search, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import { ToastProvider } from "@/contexts/ToastContext";
@@ -160,6 +161,10 @@ export default function DashboardLayout({
             </div>
           </main>
         </div>
+
+        {/* Fora do <main> de propósito: é flutuante e precisa seguir o viewport, não o scroll
+            da página. Dentro do ToastProvider porque o envio confirma por toast. */}
+        <SuggestionBox />
       </div>
       </ToastProvider>
     </PermissionsProvider>
