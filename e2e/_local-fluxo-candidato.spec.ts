@@ -143,7 +143,7 @@ async function acaoDaLinha(page: Page, linha: ReturnType<Page['getByRole']>, aca
 async function login(page: Page) {
   await page.goto('/login');
   await page.getByLabel('E-mail').fill('admin@local.dev');
-  await page.getByLabel('Senha').fill('admin123');
+  await page.getByRole('textbox', { name: 'Senha' }).fill('admin123');
   await page.getByRole('button', { name: /entrar/i }).click();
   await page.waitForURL('**/dashboard**', { timeout: 30000 });
 }

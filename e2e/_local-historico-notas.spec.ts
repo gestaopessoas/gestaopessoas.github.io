@@ -43,7 +43,7 @@ let contratadoId: string | null = null;
 async function entrar(page: Page) {
   await page.goto('/login');
   await page.getByLabel('E-mail').fill('admin@local.dev');
-  await page.getByLabel('Senha').fill('admin123');
+  await page.getByRole('textbox', { name: 'Senha' }).fill('admin123');
   await page.getByRole('button', { name: /entrar/i }).click();
   await page.waitForURL('**/dashboard**', { timeout: 30000 });
 }
@@ -84,7 +84,7 @@ test.describe('Histórico da Etapa campo a campo (banco local)', () => {
   test('cada rótulo das notas vira um campo próprio na linha do tempo', async ({ page }) => {
     await page.goto('/login');
     await page.getByLabel('E-mail').fill('admin@local.dev');
-    await page.getByLabel('Senha').fill('admin123');
+    await page.getByRole('textbox', { name: 'Senha' }).fill('admin123');
     await page.getByRole('button', { name: /entrar/i }).click();
     await page.waitForURL('**/dashboard**', { timeout: 30000 });
 

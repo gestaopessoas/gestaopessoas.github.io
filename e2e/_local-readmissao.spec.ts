@@ -79,7 +79,7 @@ test.describe('Readmissão: uma caixa por passagem (banco local)', () => {
 
     await page.goto('/login');
     await page.getByLabel('E-mail').fill('admin@local.dev');
-    await page.getByLabel('Senha').fill('admin123');
+    await page.getByRole('textbox', { name: 'Senha' }).fill('admin123');
     await page.getByRole('button', { name: /entrar/i }).click();
     await page.waitForURL('**/dashboard**', { timeout: 30000 });
     expect(token, `login pela API falhou: ${JSON.stringify(sessao).slice(0, 200)}`).toBeTruthy();

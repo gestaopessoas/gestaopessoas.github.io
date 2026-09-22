@@ -80,7 +80,7 @@ const TOKEN_DO_USUARIO = `() => {
 async function entrar(page: Page) {
   await page.goto('/login');
   await page.getByLabel('E-mail').fill(EMAIL);
-  await page.getByLabel('Senha').fill(SENHA);
+  await page.getByRole('textbox', { name: 'Senha' }).fill(SENHA);
   await page.getByRole('button', { name: /entrar/i }).click();
   await page.waitForURL('**/dashboard**', { timeout: 30000 });
 }

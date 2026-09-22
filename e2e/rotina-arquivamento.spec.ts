@@ -32,7 +32,7 @@ test.describe('Rotina de arquivamento', () => {
 
     await page.goto('/login');
     await page.getByLabel('E-mail').fill(process.env.LOGIN_BRUNO || '');
-    await page.getByLabel('Senha').fill(process.env.PASS_BRUNO || '');
+    await page.getByRole('textbox', { name: 'Senha' }).fill(process.env.PASS_BRUNO || '');
     await page.getByRole('button', { name: /entrar/i }).click();
     await page.waitForURL('**/dashboard**', { timeout: 20000 });
     await page.waitForTimeout(4000); // o dashboard consulta o banco ao abrir

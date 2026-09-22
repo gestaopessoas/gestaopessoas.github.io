@@ -55,13 +55,13 @@ simples (que deveria tornar o conteúdo literal). Escrever o arquivo com a ferra
 `Write` resolveu de primeira. Não vale gastar tentativa escapando o conteúdo.
 Para mensagem de commit multi-linha, `-m` repetido funciona bem e evita o problema.
 
-**`getByLabel('Senha')` quebra o login em 19 specs do `e2e/`.**
-O campo de senha ganhou um botão "Mostrar senha", cujo `aria-label` também contém
-"senha" — então o seletor casa com dois elementos e o Playwright falha com
-"strict mode violation" antes de qualquer asserção. Quem copiar o helper `login()`
-de um spec existente herda a quebra. A forma correta é
-`page.getByRole('textbox', { name: 'Senha' })`. Verificado em 22/09/2026:
-`_local-sugestoes.spec.ts` passa com ela, e os outros 19 ainda usam a forma ambígua.
+**No login do `e2e/`, o campo de senha se pega por `getByRole`, nunca por `getByLabel`.**
+O campo ganhou um botão "Mostrar senha", cujo `aria-label` também contém "senha" — então
+`getByLabel('Senha')` casa com dois elementos e o Playwright falha com "strict mode
+violation" antes de qualquer asserção. A forma correta é
+`page.getByRole('textbox', { name: 'Senha' })`. Os 19 specs que herdaram a forma ambígua
+foram corrigidos em 22/09/2026; ao copiar o `login()` de um spec existente, conferir que
+veio a forma nova.
 
 **O Docker Desktop não sobe sozinho, e o `supabase start` depende dele.**
 Instalado em `C:\Users\bruno\AppData\Local\Programs\DockerDesktop\Docker Desktop.exe`,

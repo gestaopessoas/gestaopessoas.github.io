@@ -5,7 +5,7 @@ test.describe('Dashboard - Cargos', () => {
     // Fazer login
     await page.goto('/login');
     await page.getByLabel('E-mail').fill(process.env.LOGIN_BRUNO || '');
-    await page.getByLabel('Senha').fill(process.env.PASS_BRUNO || '');
+    await page.getByRole('textbox', { name: 'Senha' }).fill(process.env.PASS_BRUNO || '');
     await page.getByRole('button', { name: /entrar/i }).click();
     
     // Aguarda carregar o dashboard para confirmar o login

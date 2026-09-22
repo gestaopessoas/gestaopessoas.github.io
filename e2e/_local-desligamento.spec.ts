@@ -78,7 +78,7 @@ test.describe('Ciclo desligar / reativar (banco local)', () => {
     id = await criarColaborador();
     await page.goto('/login');
     await page.getByLabel('E-mail').fill('admin@local.dev');
-    await page.getByLabel('Senha').fill('admin123');
+    await page.getByRole('textbox', { name: 'Senha' }).fill('admin123');
     await page.getByRole('button', { name: /entrar/i }).click();
     await page.waitForURL('**/dashboard**', { timeout: 20000 });
   });
