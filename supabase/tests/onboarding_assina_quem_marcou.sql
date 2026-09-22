@@ -108,6 +108,12 @@ BEGIN
     RAISE EXCEPTION 'INSERT com completed=true deixou completed_at forjado passar: %', v_at2;
   END IF;
 
+  -- Fechamento (20260922150000): a tabela virou trilha de auditoria (completed_at/
+  -- completed_by), e o REVOKE ALL / GRANT sem DELETE tem que se manter de pé.
+  IF has_table_privilege('authenticated', 'public.employee_onboarding_tasks', 'DELETE') THEN
+    RAISE EXCEPTION 'authenticated ainda tem DELETE em employee_onboarding_tasks';
+  END IF;
+
   RAISE NOTICE 'ASSINATURA OK';
 END
 $check$;
