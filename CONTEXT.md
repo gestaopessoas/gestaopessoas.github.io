@@ -121,7 +121,13 @@ _Avoid_: funcionário, empregado, employee
 **Admissão**:
 O processo entre aceitar a proposta e virar Colaborador: coleta de documentos, ASO e
 assinatura de contrato.
-_Avoid_: onboarding, integração, contratação
+_Avoid_: integração, contratação
+
+**Onboarding**:
+A integração do Colaborador nos seus primeiros 90 dias. Começa na data de admissão e
+termina quando o checklist fecha ou quando os 90 dias vencem — o que vier primeiro. Não
+confundir com **Admissão**, que termina quando o Candidato vira Colaborador.
+_Avoid_: integração, ambientação, período de experiência
 
 **ASO**:
 Atestado de Saúde Ocupacional — o exame médico admissional. Tem dois momentos distintos na
