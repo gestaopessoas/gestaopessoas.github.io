@@ -74,6 +74,15 @@ LANGUAGE plpgsql
 SET search_path TO 'public', 'pg_temp'
 AS $$
 BEGIN
+  -- Trava o cabeçalho antes de olhar as tarefas. Sem isto, duas transações marcando as duas
+  -- últimas tarefas diferentes e concorrentes, sob READ COMMITTED, cada uma enxerga a tarefa
+  -- da outra como ainda aberta pelo NOT EXISTS abaixo (write skew): nenhuma fecha, e o
+  -- cabeçalho fica aberto com o checklist 100% completo até vencer o prazo. O FOR UPDATE
+  -- serializa as duas na linha em disputa -- o cabeçalho, não a tarefa.
+  PERFORM 1 FROM public.employee_onboarding
+  WHERE employee_id = NEW.employee_id AND closed_at IS NULL
+  FOR UPDATE;
+
   -- Fechar por completude é o caminho feliz, e acontece no instante da última marcação --
   -- não faria sentido esperar alguém abrir a tela amanhã para o Colaborador sair da lista.
   UPDATE public.employee_onboarding o
@@ -132,3 +141,21 @@ CREATE TRIGGER employee_onboarding_nao_reabre
 -- auth.uid() também é NULL, então a checagem de permissão acima deixa passar (ver Ruling 1).
 -- Sem isto a lista continuaria com o acúmulo inteiro no primeiro dia.
 SELECT public.onboarding_encerrar_vencidos();
+
+-- Backfill do outro motivo de fecho: `employee_onboarding_tasks` existe desde 14/08, então há
+-- gente admitida há menos de 90 dias que já tinha as cinco tarefas marcadas antes desta
+-- migration existir -- o gatilho `..._fecha_completo` não vai disparar para elas porque nenhuma
+-- tarefa vai ser (re)marcada agora. Sem este UPDATE o cabeçalho delas abre no deploy sem
+-- pendência nenhuma e fica preso na lista de Ativos até vencer o prazo por conta própria --
+-- exatamente o sintoma que esta fase existe para curar.
+--
+-- O EXISTS (tem ao menos uma tarefa) é obrigatório, não decorativo: sem ele, todo cabeçalho
+-- sem tarefa nenhuma -- e o backfill da Task 4 criou muitos, para quem passou dos 90 dias e
+-- nunca teve tarefa materializada -- fecharia como "completo" sem nunca ter tido checklist.
+-- Esses ficam de fora daqui e são fechados por prazo pela chamada acima.
+UPDATE public.employee_onboarding o
+SET closed_at = now(), close_reason = 'completo', pending_at_close = '[]'::jsonb
+WHERE o.closed_at IS NULL
+  AND EXISTS (SELECT 1 FROM public.employee_onboarding_tasks t WHERE t.employee_id = o.employee_id)
+  AND NOT EXISTS (SELECT 1 FROM public.employee_onboarding_tasks t
+                  WHERE t.employee_id = o.employee_id AND NOT t.completed);
