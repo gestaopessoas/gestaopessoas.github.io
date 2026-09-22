@@ -25,7 +25,9 @@
 
 ## 3. Infraestrutura/config descoberta (importante)
 
-- **Proxy 9Router** (`http://127.0.0.1:20128/v1`) com auth token `sk-ca437...`. Modelo do Claude: `oc/big-pickle`.
+- **Proxy 9Router** (`http://127.0.0.1:20128/v1`), autenticado por token. O token mora na
+  config local do proxy, fora do repositório — credencial não entra em documento de handoff,
+  nem truncada (o prefixo já entrega formato e origem). Modelo do Claude: `oc/big-pickle`.
 - **Fix do auto-approve:** `ANTHROPIC_SMALL_FAST_MODEL=oc/big-pickle` adicionado em `~/.claude/settings.json` — o default sonnet (`cl/anthropic/claude-sonnet-4.6`) não existe no proxy e travava todo comando.
 - **Supabase CLI v2.110** logado, projeto `gestao_pessoas` (`bnwwdseczwrmmuvallml`) linkado no repo. `supabase db push` funciona sem Docker.
 - **Plugin Codex** instalado oficialmente (`/plugin install codex@openai-codex`), `codex:setup` = `ready: true` com 9router. Codex CLI `~/.codex/config.toml` modelo ajustado para `kimchi/deepseek-v4-flash` (rota no 9router; `nvidia/nemotron...` dava 404).
