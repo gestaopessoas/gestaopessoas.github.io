@@ -193,11 +193,12 @@ usar heredoc (`git commit -F - <<'EOF'`).
 `node --test src/app/dashboard/colaboradores/` dá MODULE_NOT_FOUND.
 Usar o glob: `node --test "src/app/dashboard/colaboradores/**/*.test.mjs"`.
 
-**Qualquer comando do Playwright reescreve `playwright-report/index.html`, que é versionado.**
-Até `--list`, que não roda teste nenhum, deixa o arquivo modificado na árvore. Aparece no
-`git status` como se fosse trabalho, e entra por engano em quem commita sem ler a lista.
-Depois de mexer no Playwright, `git checkout -- playwright-report/`. A correção de raiz
-seria tirar o diretório do versionamento.
+**`playwright-report/` e `test-results/` são saída de ferramenta e não se versionam.**
+Qualquer comando do Playwright reescreve `playwright-report/index.html` — até `--list`, que
+não roda teste nenhum. Enquanto o arquivo esteve versionado, ele aparecia no `git status`
+como se fosse trabalho e entrava por engano em commit alheio. Saiu do índice em 22/09/2026
+(o `.gitignore` já ignorava os dois diretórios; o arquivo é que estava rastreado de antes,
+e arquivo rastreado ignora o `.gitignore`). Se reaparecer no `git status`, alguém o re-adicionou.
 
 **Coletar os specs sem ambiente falha antes de qualquer teste.**
 `npx playwright test --list` quebra em `rotina-arquivamento.spec.ts` e `auditoria-banco.spec.ts`,
