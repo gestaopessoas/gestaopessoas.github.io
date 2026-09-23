@@ -184,10 +184,17 @@ O projeto já tem Playwright em `e2e/`. Cobrir:
 |---|---|---|
 | **0** | Caixa de sugestões flutuante | nada |
 | **1** | Catálogo, responsável, prazo, auditoria, encerramento aos 90, badges, tela de configuração | banco + app |
-| **2** | n8n: abertura, cobrança e pré-encerramento por e-mail | Fase 1 |
+| **2** | ~~n8n: abertura, cobrança e pré-encerramento por e-mail~~ — **suspensa** | Fase 1 |
 | **3** | Kit por WhatsApp, com pré-seleção aprendida do uso | Fase 2 |
 
 A Fase 1 entrega sozinha a maior parte do valor, sem tocar em n8n.
+
+**Fase 2 suspensa (2026-09-23), por decisão do dono do produto:** por enquanto, nada de n8n e
+nada de e-mail. O Onboarding fica só na tela: o encerramento por prazo continua sendo disparado
+pela tela ao abrir ([ADR 0012](../../adr/0012-o-onboarding-encerra-pela-tela-nao-por-agendador.md)).
+Nada da Fase 2 foi construído — nem `onboarding_notifications`, nem as RPCs
+`onboarding_pendencias_para_avisar()` / `onboarding_marcar_enviado()` — e não deve ser construído
+até a decisão ser revista. A Fase 3 depende da Fase 2 e fica suspensa junto.
 
 ## Riscos aceitos
 
