@@ -155,6 +155,14 @@ fisicamente no schema `arquivo`, fora de `public.employees`. Quem precisa da bas
 arquivo lê `arquivo_morto`, que devolve uma linha por dossiê.
 _Avoid_: inativos, desligados, ex-funcionários, arquivo
 
+**Passagem**:
+Um período do Colaborador na empresa, da admissão ao desligamento. A ficha (`employees`)
+guarda só a passagem **atual**; as encerradas ficam em `employee_passages`, pelo CPF só
+com dígitos — por isso valem para quem está em `public` ou no `arquivo`. Admissão
+desconhecida é `NULL`, para o RH completar. Saída e volta em poucos dias são duas passagens
+(costuma ser troca de empresa ou de contrato).
+_Avoid_: vínculo, contrato, período
+
 **Dossiê**:
 Os papéis de **uma passagem** do Colaborador pela empresa, guardados numa Caixa. Quem foi
 readmitido, ou saiu de CLT e voltou como PJ, tem mais de um — e eles podem estar em caixas
