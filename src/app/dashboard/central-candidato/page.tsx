@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import { CandidateProfileModal, candidateProfileColumns } from "@/components/CandidateProfileModal";
 import AdvanceStageModal from "./components/AdvanceStageModal";
 import DesfechoModal from "./components/DesfechoModal";
 import { useRouter } from "next/navigation";
@@ -636,13 +636,7 @@ export default function CentralCandidatoPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 font-medium text-foreground relative">
-                      {candidate.is_new && (
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-red-500 shadow-sm" title="Nova Inscrição Não Lida" />
-                      )}
                       {candidate.full_name}
-                      {candidate.is_new && (
-                        <span className="ml-2 inline-flex items-center rounded-md bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-600 ring-1 ring-inset ring-red-500/20">Novo</span>
-                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
@@ -859,7 +853,21 @@ export default function CentralCandidatoPage() {
           onClose={() => {
             setSelectedCandidateId(null);
             fetchCandidates();
-          }} 
+          }}
+          onSave={async (data) => {
+            // .select("id"): update barrado por RLS volta 0 linhas sem erro.
+            const { data: updated, error } = await supabase.from("candidates")
+              .update(candidateProfileColumns(data)).eq("id", selectedCandidateId).select("id");
+            if (error) {
+              if (error.code === '23505') alert("Já existe um candidato com este e-mail.");
+              else alert("Erro ao salvar: " + error.message);
+              throw error;
+            }
+            if (!updated?.length) {
+              alert("Sem permissão para editar este candidato.");
+              throw new Error("RLS");
+            }
+          }}
         />
       )}
 
@@ -878,16 +886,8 @@ export default function CentralCandidatoPage() {
               alert("E-mail é obrigatório.");
               throw new Error("Validation");
             }
-            const { data: insertedData, error } = await supabase.from("candidates").insert({
-              full_name: data.full_name || data.name,
-              first_name: (data.full_name || data.name || "").split(" ")[0],
-              last_name: (data.full_name || data.name || "").split(" ").slice(1).join(" "),
-              email: data.email,
-              phone: data.phone || null,
-              city: data.city || null,
-              state: data.state || null,
-              role_interest: data.role_interest || data.role || null,
-            }).select("id").single();
+            const { data: insertedData, error } = await supabase.from("candidates")
+              .insert(candidateProfileColumns(data)).select("id").single();
             if (error) {
               if (error.code === '23505') alert("Já existe um candidato com este e-mail.");
               else alert("Erro ao salvar: " + error.message);

@@ -99,6 +99,7 @@ type ProfileEducation = {
   status?: string | null;
   start_date?: string | null;
   end_date?: string | null;
+  is_extension?: boolean;
   __persisted?: boolean;
 };
 
@@ -125,6 +126,7 @@ function mapEducationRow(row: any): ProfileEducation {
     status: row.end_date ? "Concluído" : "Em andamento",
     start_date: row.start_date ?? null,
     end_date: row.end_date ?? null,
+    is_extension: row.is_extension ?? false,
   };
 }
 
@@ -133,6 +135,7 @@ function educationToRow(item: ProfileEducation, candidateId: string) {
     candidate_id: candidateId,
     institution_name: item.institution?.trim() || "Não informada",
     degree: (item.degree || item.course)?.trim() || "Não informado",
+    is_extension: item.is_extension ?? false,
     start_date: item.start_date || null,
     end_date: item.status === "Em andamento" ? null : item.end_date || null,
   };
@@ -212,6 +215,47 @@ type ProfileInterview = {
     final_observations?: string | null;
   } | null;
 };
+
+/** Colunas de `candidates` que a ficha edita. Cada tela montava o próprio payload e
+ *  esquecia metade (CPF, nascimento, CNH, contato de emergência...): a ficha mostrava o
+ *  campo, o RH preenchia e o Salvar descartava calado. Tela que grava candidato usa isto. */
+export function candidateProfileColumns(data: ProfilePerson) {
+  const fullName = (data.full_name || data.name || "").trim();
+  const cnh = Array.isArray(data.cnh_categories)
+    ? data.cnh_categories
+    : String(data.cnh_categories || "").split(",").map((c) => c.trim()).filter(Boolean);
+  return {
+    full_name: fullName,
+    first_name: fullName.split(" ")[0],
+    last_name: fullName.split(" ").slice(1).join(" "),
+    email: data.email,
+    phone: data.phone || null,
+    city: data.city || null,
+    state: data.state || null,
+    address: data.address || null,
+    role_interest: data.role_interest || data.role || null,
+    cpf: data.cpf || null,
+    birth_date: data.birth_date || null,
+    birthplace: data.birthplace || null,
+    marital_status: data.marital_status || null,
+    gender: data.gender || null,
+    secondary_phone: data.secondary_phone || null,
+    secondary_email: data.secondary_email || null,
+    has_cnh: data.has_cnh ?? null,
+    cnh_categories: data.has_cnh ? cnh : [],
+    emergency_contact_name: data.emergency_contact_name || null,
+    emergency_contact_phone: data.emergency_contact_phone || null,
+    gender_identity: data.gender_identity || null,
+    sexual_orientation: data.sexual_orientation || null,
+    race_declaration: data.race_declaration || null,
+    salary_expectation: data.salary_expectation || null,
+    languages: data.languages || null,
+    uniform_size: data.uniform_size || null,
+    boot_size: data.boot_size || null,
+    has_dependents: data.has_dependents ?? null,
+    dependents_notes: data.dependents_notes || null,
+  };
+}
 
 type CandidateProfileModalProps = {
   candidateId?: string | null;
@@ -1434,8 +1478,9 @@ export function CandidateProfileModal({
                         {/* Issue #144: a Obra da Candidatura Espontânea vinha do parecer, que
                             não existe no cadastro de candidato novo (issue #141). Aqui é onde
                             quem cadastra sabendo a Obra consegue dizer isso. Opcional: sem Obra
-                            a candidatura continua caindo no pool geral. */}
-                        <div className="space-y-1.5">
+                            a candidatura continua caindo no pool geral. Só a tela de
+                            entrevistas grava Obra; nas outras o campo sumia no Salvar. */}
+                        {canSaveAssessment && <div className="space-y-1.5">
                           <span className="text-xs text-muted-foreground block font-medium">Obra</span>
                           {isEditing ? (
                             <select
@@ -1449,7 +1494,7 @@ export function CandidateProfileModal({
                           ) : (
                             <span className="font-semibold">{formData.workplace || "-"}</span>
                           )}
-                        </div>
+                        </div>}
                         <div className="space-y-1.5">
                           <span className="text-xs text-muted-foreground block font-medium">Gênero</span>
                           {isEditing ? (
@@ -1629,7 +1674,10 @@ export function CandidateProfileModal({
                             {educations.map((edu, i) => (
                               <div key={edu.id || i} className="p-4 rounded-xl border bg-muted/30 text-sm space-y-1">
                                 <div className="flex items-start justify-between gap-2">
-                                  <p className="font-bold text-foreground">{edu.degree || edu.course || "Formação Acadêmica"}</p>
+                                  <p className="font-bold text-foreground">
+                                    {edu.degree || edu.course || "Formação Acadêmica"}
+                                    {edu.is_extension && <span className="ml-2 inline-flex items-center rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary align-middle">Extensão</span>}
+                                  </p>
                                   {canEditEntries && (
                                     <div className="flex items-center gap-1 shrink-0">
                                       <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" title="Editar" onClick={() => { setEntryError(""); setExpDraft(null); setEduDraft(edu); }}>
@@ -1675,6 +1723,14 @@ export function CandidateProfileModal({
                                 onChange={(e) => setEduDraft({ ...eduDraft, status: e.target.checked ? "Em andamento" : "Concluído", end_date: e.target.checked ? "" : eduDraft.end_date })}
                               />
                               Em andamento
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={!!eduDraft.is_extension}
+                                onChange={(e) => setEduDraft({ ...eduDraft, is_extension: e.target.checked })}
+                              />
+                              Curso de extensão
                             </label>
                             {entryError && <p className="text-xs text-destructive">{entryError}</p>}
                             <div className="flex gap-2">

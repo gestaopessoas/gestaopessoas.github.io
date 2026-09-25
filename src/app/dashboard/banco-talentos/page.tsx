@@ -13,7 +13,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import { CandidateProfileModal, candidateProfileColumns } from "@/components/CandidateProfileModal";
 import { ApplicationDialog } from "@/components/careers/ApplicationDialog";
 import { fetchTalentPoolJob } from "@/components/careers/talentPool";
 import type { Career } from "@/components/careers/types";
@@ -438,16 +438,8 @@ export default function BancoTalentosPage() {
           isEditable={true}
           onClose={() => setSelectedCandidateId(null)}
           onSave={async (data) => {
-            const { error } = await supabase.from("candidates").update({
-              full_name: data.full_name || data.name,
-              first_name: (data.full_name || data.name || "").split(" ")[0],
-              last_name: (data.full_name || data.name || "").split(" ").slice(1).join(" "),
-              email: data.email,
-              phone: data.phone || null,
-              city: data.city || null,
-              state: data.state || null,
-              role_interest: data.role_interest || data.role || null,
-            }).eq("id", selectedCandidateId);
+            const { error } = await supabase.from("candidates")
+              .update(candidateProfileColumns(data)).eq("id", selectedCandidateId);
             if (error) {
               alert("Erro ao salvar: " + error.message);
               throw error;

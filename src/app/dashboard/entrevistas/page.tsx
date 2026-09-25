@@ -627,7 +627,12 @@ export default function EntrevistasPage() {
         dependents_count: formData.dependents_count ?? null,
         dependents_notes: formData.dependents_notes || null,
         uniform_size: formData.uniform_size || null,
-        boot_size: formData.boot_size || null
+        boot_size: formData.boot_size || null,
+        gender: formData.gender || null,
+        secondary_phone: formData.secondary_phone || null,
+        secondary_email: formData.secondary_email || null,
+        emergency_contact_name: formData.emergency_contact_name || null,
+        emergency_contact_phone: formData.emergency_contact_phone || null
       };
       // `email` é NOT NULL UNIQUE: quem não informou ganha uma chave própria, nunca
       // uma derivada do nome. Num cadastro que já existe, o e-mail atual é preservado.
