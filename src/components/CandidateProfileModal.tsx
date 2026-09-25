@@ -27,6 +27,7 @@ import { LIMITED_STAGE_OPTIONS, candidateStatusFromApplications } from "@/app/da
 import { STAGES, isTerminal } from "@/lib/stages";
 import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
+import { hasRealEmail } from "@/lib/candidateIdentity.mjs";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -228,7 +229,9 @@ export function candidateProfileColumns(data: ProfilePerson) {
     full_name: fullName,
     first_name: fullName.split(" ")[0],
     last_name: fullName.split(" ").slice(1).join(" "),
-    email: data.email,
+    // E-mail é opcional. Sem e-mail real vira undefined: no update a coluna fica como está;
+    // no insert quem chama põe placeholderEmail(), porque a coluna é NOT NULL UNIQUE.
+    email: hasRealEmail(data.email) ? data.email!.trim() : undefined,
     phone: data.phone || null,
     city: data.city || null,
     state: data.state || null,
@@ -1304,13 +1307,13 @@ export function CandidateProfileModal({
                         <Mail className="h-4 w-4 text-primary shrink-0" />
                         {isEditing ? (
                           <Input 
-                            value={formData.email || formData.email_personal || ""} 
+                            value={(hasRealEmail(formData.email) ? formData.email : "") || formData.email_personal || ""} 
                             onChange={(e) => handleChange('email', e.target.value)}
-                            placeholder="E-mail"
+                            placeholder="E-mail (opcional)"
                             className="h-7 text-xs"
                           />
                         ) : (
-                          formData.email || formData.email_corporate || formData.email_personal || "Sem e-mail"
+                          (hasRealEmail(formData.email) ? formData.email : "") || formData.email_corporate || formData.email_personal || "Sem e-mail"
                         )}
                       </div>
                       <div className="flex items-center gap-2.5">

@@ -20,6 +20,7 @@ import { CandidateProfileModal, candidateProfileColumns } from "@/components/Can
 import AdvanceStageModal from "./components/AdvanceStageModal";
 import DesfechoModal from "./components/DesfechoModal";
 import { useRouter } from "next/navigation";
+import { hasRealEmail, placeholderEmail } from "@/lib/candidateIdentity.mjs";
 import { OUTCOME_STYLE, isOutcome, type Outcome } from "@/lib/outcomes";
 import {
   candidateStatusFromApplications,
@@ -641,7 +642,7 @@ export default function CentralCandidatoPage() {
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span>{candidate.phone}</span>
-                        <span className="text-xs text-muted-foreground">{candidate.email}</span>
+                        <span className="text-xs text-muted-foreground">{hasRealEmail(candidate.email) ? candidate.email : "Sem e-mail"}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">{candidate.escolaridade}</td>
@@ -882,12 +883,9 @@ export default function CentralCandidatoPage() {
               alert("Nome é obrigatório.");
               throw new Error("Validation");
             }
-            if (!data.email) {
-              alert("E-mail é obrigatório.");
-              throw new Error("Validation");
-            }
+            const row = candidateProfileColumns(data);
             const { data: insertedData, error } = await supabase.from("candidates")
-              .insert(candidateProfileColumns(data)).select("id").single();
+              .insert({ ...row, email: row.email ?? placeholderEmail(row.full_name) }).select("id").single();
             if (error) {
               if (error.code === '23505') alert("Já existe um candidato com este e-mail.");
               else alert("Erro ao salvar: " + error.message);
