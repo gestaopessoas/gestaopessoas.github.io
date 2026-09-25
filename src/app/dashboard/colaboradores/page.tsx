@@ -16,6 +16,7 @@ import cboData from "@/data/cbo.json";
 import { ARCHIVE_STATUSES } from "@/lib/archiveBox";
 import { ArchiveBoxModal, type ArchiveTarget } from "./components/ArchiveBoxModal";
 import { RelatedRecords } from "./components/RelatedRecords";
+import { Passages } from "./components/Passages";
 import { Section, Field, Select } from "./components/FormHelpers";
 import { StatsCards } from "./components/StatsCards";
 import { DocumentsCell, EmployeeTable, Pagination, SearchBar } from "./components/EmployeeTable";
@@ -1271,6 +1272,8 @@ function ColaboradoresPageInner() {
               <Field label="Código do RHID"><Input value={form.rhid_code} onChange={(e) => update("rhid_code", e.target.value)} /></Field>
               <Field label="Observações" span><textarea value={form.observation} onChange={(e) => update("observation", e.target.value)} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm" /></Field>
             </Section>
+
+            {editingId && <Passages cpf={form.cpf} companies={companies} canEdit={can("colaboradores", "edit")} />}
 
             {editingId && <RelatedRecords employeeId={editingId} />}
 
