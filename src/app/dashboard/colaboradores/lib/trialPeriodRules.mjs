@@ -40,3 +40,31 @@ export const openTrialPeriods = (employees, completedEmployeeIds = new Set(), to
       }];
     })
     .sort((a, b) => a.daysRemaining - b.daysRemaining);
+
+// Estágio e Jovem Aprendiz têm contrato com prazo: a data de fim é obrigatória no cadastro
+// e o RH é avisado em três degraus (30, 20 e 10 dias). `stage` é o degrau atingido — 0 quando
+// ainda falta mais de 30 dias. Sem data cadastrada entra na lista mesmo assim, para o RH
+// preencher: é o caso de quem foi cadastrado antes do campo existir.
+export const FIXED_TERM_CONTRACTS = ['Estágio', 'Jovem Aprendiz'];
+const ALERT_STAGES = [10, 20, 30];
+
+export const openContractEnds = (employees, today = new Date()) =>
+  (employees ?? [])
+    .flatMap((employee) => {
+      if (!employee?.id || !FIXED_TERM_CONTRACTS.includes(employee.contract_type)) return [];
+      if (!['Ativo', 'Férias', 'Afastado'].includes(employee.status)) return [];
+
+      const end = parseDateOnly(employee.contract_end_date);
+      const reference = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+      const daysRemaining = end ? Math.round((end.getTime() - reference) / DAY_MS) : null;
+
+      return [{
+        id: employee.id,
+        endDate: end ? toDateOnly(end) : null,
+        daysRemaining,
+        stage: daysRemaining === null ? 0 : ALERT_STAGES.find((limit) => daysRemaining <= limit) ?? 0,
+        isOverdue: daysRemaining !== null && daysRemaining < 0,
+      }];
+    })
+    // Sem data primeiro: é pendência de cadastro, e não tem prazo para ordenar.
+    .sort((a, b) => (a.daysRemaining ?? -Infinity) - (b.daysRemaining ?? -Infinity));

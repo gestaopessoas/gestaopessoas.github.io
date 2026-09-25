@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History, Package, Send } from "lucide-react";
+import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History, Package, Send, GraduationCap } from "lucide-react";
 import { useEffect, useState, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
@@ -22,7 +22,7 @@ import { DocumentsCell, EmployeeTable, Pagination, SearchBar } from "./component
 import { MONTHS, type Employee, type Entity } from "./components/types";
 import { normalizeRole } from "./lib/normalizeRole.mjs";
 import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, isValidCpf, levelFieldOptions, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput, SENIORITY_OPTIONS, seniorityForLevel, seniorityOptionsFromRules } from "./lib/employeeFormRules.mjs";
-import { openTrialPeriods } from "./lib/trialPeriodRules.mjs";
+import { FIXED_TERM_CONTRACTS, openContractEnds, openTrialPeriods } from "./lib/trialPeriodRules.mjs";
 import { exportBirthdaysPdf } from "./birthdaysPdf";
 import { listWorkAnniversaries } from "./lib/anniversaryCounter";
 import { buscarTudo } from "@/lib/paginacao";
@@ -32,11 +32,12 @@ import { birthdayPhotoMessage, whatsappLink } from "@/lib/birthdayInvite.mjs";
 
 type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; seniority: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
 type TrialPeriod = { id: string; name: string; daysRemaining: number; endDate: string; isWarning: boolean; isOverdue: boolean };
+type ContractEnd = { id: string; endDate: string | null; daysRemaining: number | null; stage: number; isOverdue: boolean };
 
 // Abas de lista paginam no banco. As abas de agregação (aniversários / experiência) calculam
 // no cliente a partir do array carregado, então precisam do conjunto completo de ativos.
 const AGGREGATE_PAGE_SIZE = 1000;
-const AGGREGATE_TABS = ["aniversarios", "experiencia"];
+const AGGREGATE_TABS = ["aniversarios", "experiencia", "contrato"];
 
 type AdvancedFilters = {
   gender: string;
@@ -109,13 +110,13 @@ const embedBeneficio = (filtros: AdvancedFilters) =>
   filtros.benefit ? ", employee_benefits!inner(benefit_name, active)" : "";
 
 const fields = [
-  "id", "name", "registered_name", "pharmacy_card", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "company_anniversary", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission", "photo_path", "photo_crop"
+  "id", "name", "registered_name", "pharmacy_card", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "contract_end_date", "company_anniversary", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission", "photo_path", "photo_crop"
 ].join(", ");
 
 const emptyForm = {
   name: "", registered_name: "", registration_number: "", ficha: "", profile_code: "", department_id: "", department: "", sector_id: "",
   rhid_code: "", birthday: "", status: "Ativo", dismissed_at: "", role: "", senioridade: "", level: "", phone: "",
-  email_personal: "", email_corporate: "", contract_type: "", admission_date: "", company_anniversary: "", shirt_size: "", boot_size: "",
+  email_personal: "", email_corporate: "", contract_type: "", admission_date: "", contract_end_date: "", company_anniversary: "", shirt_size: "", boot_size: "",
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", pharmacy_card: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
   work_schedule_start_1: "", work_schedule_end_1: "", work_schedule_start_2: "", work_schedule_end_2: "", weekly_hours: "", work_days: "",
@@ -223,7 +224,7 @@ function ColaboradoresPageInner() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(FILTROS_VAZIOS);
   
-  const [activeTab, setActiveTab] = useState<"todos" | "aniversarios" | "experiencia" | "inativos">("todos");
+  const [activeTab, setActiveTab] = useState<"todos" | "aniversarios" | "experiencia" | "contrato" | "inativos">("todos");
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [listPageSize, setListPageSize] = useState(25);
   const [birthdayMode, setBirthdayMode] = useState<"atual" | "seguinte">("atual");
@@ -654,7 +655,7 @@ function ColaboradoresPageInner() {
       }
       setBirthdayError("");
     }
-    const nullableDates = new Set(["birthday", "dismissed_at", "admission_date", "company_anniversary", "aso_date"]);
+    const nullableDates = new Set(["birthday", "dismissed_at", "admission_date", "contract_end_date", "company_anniversary", "aso_date"]);
     const nullableUuids = new Set(["department_id", "sector_id", "company_id", "cost_center_id", "workplace_id"]);
     const payload: Record<string, string | number | null> = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, nullableDates.has(key) || nullableUuids.has(key) ? value || null : (value as string).trim() || null]));
     payload.name = form.name.trim();
@@ -663,6 +664,9 @@ function ColaboradoresPageInner() {
     payload.status = canonicalizeOption(form.status, statusOptions);
     for (const field of ["base_salary", "variable_salary", "commission"]) payload[field] = parseCurrencyInput(form[field as keyof EmployeeForm]);
     
+    // Efetivado (estágio → CLT) não carrega a data do contrato antigo.
+    if (!FIXED_TERM_CONTRACTS.includes(form.contract_type)) payload.contract_end_date = null;
+
     if (!payload.company_anniversary && payload.admission_date) {
       payload.company_anniversary = payload.admission_date;
     }
@@ -767,6 +771,11 @@ function ColaboradoresPageInner() {
   const inProbation = (openTrialPeriods(employees, completedTrialIds) as TrialPeriod[]).map((trialInfo) => ({
     employee: employees.find((employee) => employee.id === trialInfo.id)!,
     trialInfo,
+  }));
+
+  const contractEnds = (openContractEnds(employees) as ContractEnd[]).map((info) => ({
+    employee: employees.find((employee) => employee.id === info.id)!,
+    info,
   }));
 
   const markTrialAsCompleted = async (employeeId: string, cartao?: string) => {
@@ -1059,6 +1068,9 @@ function ColaboradoresPageInner() {
         <Button variant={activeTab === "experiencia" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => changeTab("experiencia")}>
           <CalendarDays className="mr-2 h-4 w-4" /> Fim de Experiência (90d)
         </Button>
+        <Button variant={activeTab === "contrato" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => changeTab("contrato")}>
+          <GraduationCap className="mr-2 h-4 w-4" /> Fim de Contrato (Estágio/Aprendiz)
+        </Button>
         <Button variant={activeTab === "inativos" ? "default" : "ghost"} className="flex-1 sm:flex-none" onClick={() => changeTab("inativos")}>
           <AlertCircle className="mr-2 h-4 w-4" /> Inativos
         </Button>
@@ -1208,6 +1220,9 @@ function ColaboradoresPageInner() {
               <Field label="Setor"><select value={form.sector_id} onChange={(e) => update("sector_id", e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Não informado</option>{sectors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
               <Field label="Tipo de contrato"><Select value={form.contract_type} onChange={(value) => update("contract_type", value)} options={["", "CLT", "MEI", "PJ", "Pró-labore", "Estágio", "Jovem Aprendiz"]} /></Field>
               <Field label="Data de admissão"><Input type="date" value={form.admission_date} onChange={(e) => update("admission_date", e.target.value)} /></Field>
+              {FIXED_TERM_CONTRACTS.includes(form.contract_type) && (
+                <Field label="Fim do contrato *"><Input type="date" required min={form.admission_date || undefined} value={form.contract_end_date} onChange={(e) => update("contract_end_date", e.target.value)} /></Field>
+              )}
               <Field label="Aniversário de empresa"><Input type="date" value={form.company_anniversary} onChange={(e) => update("company_anniversary", e.target.value)} /></Field>
               <Field label="Data de desligamento"><Input type="date" value={form.dismissed_at} onChange={(e) => update("dismissed_at", e.target.value)} /></Field>
               <Field label="CBO"><Input value={form.cbo} onChange={(e) => update("cbo", e.target.value)} onKeyDown={(e) => handleCodeLookup(e, "cbo")} placeholder="Ctrl+Enter para buscar" /></Field>
@@ -1554,6 +1569,50 @@ function ColaboradoresPageInner() {
                 </Button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "contrato" && (
+        <div className="rounded-lg border bg-card p-6">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+            <div>
+              <h2 className="text-lg font-semibold flex items-center gap-2"><GraduationCap className="h-5 w-5 text-primary" /> Fim de Contrato</h2>
+              <p className="text-sm text-muted-foreground">Estagiários e jovens aprendizes. Aviso aos 30, 20 e 10 dias do fim do termo.</p>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium text-primary">{contractEnds.filter(({ info }) => info.stage > 0 || info.daysRemaining === null).length}</span> exigem atenção
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {contractEnds.length === 0 ? (
+              <p className="text-sm text-muted-foreground col-span-full">Nenhum estagiário ou jovem aprendiz ativo.</p>
+            ) : contractEnds.map(({ employee: e, info }) => {
+              const tone = info.daysRemaining === null ? "gray" : info.stage === 10 ? "red" : info.stage === 20 ? "orange" : info.stage === 30 ? "amber" : "green";
+              const card = { gray: "bg-muted/40", red: "bg-red-50/50 border-red-200 dark:bg-red-950/30 dark:border-red-900", orange: "bg-orange-50/50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-900", amber: "bg-amber-50/50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900", green: "bg-background" }[tone];
+              const badge = { gray: "bg-muted text-muted-foreground", red: "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300", orange: "bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300", amber: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300", green: "bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-300" }[tone];
+              const days = Math.abs(info.daysRemaining ?? 0);
+              return (
+                <div key={e.id} className={`flex flex-col justify-between rounded-md border p-4 shadow-sm ${card}`}>
+                  <div className="mb-3">
+                    <div className="font-semibold text-base">{e.name}</div>
+                    <div className="text-xs text-muted-foreground">{String(e.contract_type)} · {info.endDate ? `Fim do contrato: ${new Date(`${info.endDate}T12:00:00`).toLocaleDateString("pt-BR")}` : "Fim do contrato não cadastrado"}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{String(e.role ?? "-")}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Centro de custo: {e.cost_centers?.name || "Não informado"}</div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-3 border-t">
+                    <div className="text-xs font-medium text-muted-foreground">{info.stage > 0 && !info.isOverdue ? `Aviso de ${info.stage} dias` : info.isOverdue ? "Prazo vencido:" : info.daysRemaining === null ? "Pendente:" : "Tempo restante:"}</div>
+                    <div className={`rounded-full px-2.5 py-1 text-xs font-bold ${badge}`}>
+                      {info.daysRemaining === null ? "sem data" : info.isOverdue ? `${days} ${days === 1 ? "dia" : "dias"} em atraso` : `${days} ${days === 1 ? "dia" : "dias"}`}
+                    </div>
+                  </div>
+                  <Button className="mt-3 w-full" size="sm" variant="outline" onClick={() => startEdit(e)}>
+                    {info.daysRemaining === null ? "Cadastrar data" : "Abrir ficha"}
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
