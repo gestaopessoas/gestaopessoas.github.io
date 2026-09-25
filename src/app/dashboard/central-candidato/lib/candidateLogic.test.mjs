@@ -126,6 +126,15 @@ test("latestEducationDegree: último por data; fallback sem datas", () => {
   );
   assert.equal(latestEducationDegree([{ degree: "Médio" }]), "Médio");
   assert.equal(latestEducationDegree([]), null);
+  // Extensão mais recente não vira a escolaridade da linha.
+  assert.equal(
+    latestEducationDegree([
+      { degree: "Extensão em NR-35", end_date: "2025-01-01", is_extension: true },
+      { degree: "Médio", end_date: "2019-01-01" },
+    ]),
+    "Médio"
+  );
+  assert.equal(latestEducationDegree([{ degree: "NR-35", is_extension: true }]), null);
 });
 
 // Issue #72

@@ -18,6 +18,7 @@ export interface EducationLike {
   degree?: string | null;
   start_date?: string | null;
   end_date?: string | null;
+  is_extension?: boolean | null;
 }
 
 export function latestInterview(interviews?: InterviewLike[] | null): InterviewLike | null;

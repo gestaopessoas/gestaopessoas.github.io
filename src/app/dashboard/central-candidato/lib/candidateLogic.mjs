@@ -269,8 +269,10 @@ export function latestEducationDegree(educations = [], assessment = null) {
   return assessment.education || null;
 }
 
-function degreeFromEducations(educations) {
-  if (!Array.isArray(educations) || educations.length === 0) return null;
+function degreeFromEducations(all) {
+  // Curso de extensão não é escolaridade: não entra na coluna da Central.
+  const educations = Array.isArray(all) ? all.filter((e) => e && !e.is_extension) : [];
+  if (educations.length === 0) return null;
   const byDate = educations
     .filter((e) => e && (e.end_date || e.start_date))
     .sort(

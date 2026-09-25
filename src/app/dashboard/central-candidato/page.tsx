@@ -228,7 +228,7 @@ export default function CentralCandidatoPage() {
           search_tags,
           available_worksites,
           candidate_interviews(candidate_id, stage, workplace_name, interviewer_name, candidate_future, created_at),
-          candidate_educations(candidate_id, degree, start_date, end_date),
+          candidate_educations(candidate_id, degree, start_date, end_date, is_extension),
           job_applications(id, status, created_at, outcome_reason, outcome_details, job_requests(position_title, requested_role), job_openings(workplace_id, workplaces(name)))
         `)
         .order('created_at', { ascending: false });
