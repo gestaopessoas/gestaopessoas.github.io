@@ -2314,7 +2314,7 @@ export function CandidateProfileModal({
                                       </p>
                                     )}
                                     {ci.candidate_future && (
-                                      <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Futuro do candidato:</span> {ci.candidate_future}</p>
+                                      <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Percepções da entrevista:</span> {ci.candidate_future}</p>
                                     )}
                                     {/* As notas vieram concatenadas num bloco só ("[Motivo]
 texto"):
@@ -2323,7 +2323,8 @@ texto"):
                                       // O "Futuro do Candidato" já tem linha própria acima: o AddInterviewModal
                                       // grava o mesmo valor na coluna e dentro das notas. Antes a repetição ficava
                                       // escondida no bloco de texto; agora seria um card duplicado.
-                                      .filter((section) => !(section.label === "Futuro do Candidato" && section.value === (ci.candidate_future || "").trim()))
+                                      // O avanço grava o mesmo valor como "Percepções da Entrevista" (nome novo).
+                                      .filter((section) => !((section.label === "Futuro do Candidato" || section.label === "Percepções da Entrevista") && section.value === (ci.candidate_future || "").trim()))
                                       .map((section, index) => (
                                       <div key={`${ci.id}-nota-${index}`} className="mt-2 text-sm bg-muted/40 p-3 rounded-lg border">
                                         <span className="font-semibold block mb-1">{section.label ?? "Observações"}:</span>

@@ -12,8 +12,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -34,6 +32,7 @@ import {
 import { fetchInterviewProgress } from "@/lib/candidateHistory.mjs";
 import { errorMessage } from "@/lib/utils";
 import { fetchInterviewers, type Interviewer } from "@/lib/interviewers";
+import PerceptionChecklist, { PERCEPTION_NOTES_LABEL } from "./PerceptionChecklist";
 
 /** Publicacao aberta que pode receber o candidato. A Obra e a Vaga vem dela, nao do usuario. */
 type Publicacao = {
@@ -222,17 +221,6 @@ export default function AdvanceStageModal({
 
   const [candidateFuture, setCandidateFuture] = useState<string[]>([]);
 
-  // "Aprovado para Banco de Talentos" saiu: Banco de Talentos virou consulta derivada
-  // (ADR 0006), e uma marcação de texto livre com esse nome só confundia com a Etapa real.
-  const futureOptions = [
-    "Potencial para Liderança",
-    "Recomendado para Promoção Futura",
-    "Perfil Técnico Forte",
-    "Requer Treinamento Específico",
-    "Pode assumir cargo de confiança",
-    "Transferência entre Obras"
-  ];
-
   // O balde atual e o seguinte, sem desfecho: contratar, mandar para o banco, reprovar e
   // registrar desistência são decisão da entrevista, não do funil (issue #84).
   const validNextStages = useMemo(
@@ -256,7 +244,9 @@ export default function AdvanceStageModal({
       // O parecer da entrevista mora na ficha da entrevista, não aqui: esta tela registra
       // a etapa. Só o que é do avanço fica nas notas.
       let finalNotes = "";
-      if (candidateFuture.length > 0) finalNotes += `[Futuro do Candidato]\n${candidateFuture.join(", ")}\n\n`;
+      // Chamar não mostra percepções; marcação que sobrou de outra abertura não pode viajar.
+      const percepcoes = precisaDeVaga ? [] : candidateFuture;
+      if (percepcoes.length > 0) finalNotes += `[${PERCEPTION_NOTES_LABEL}]\n${percepcoes.join(", ")}\n\n`;
       if (notes) finalNotes += `[Observações Gerais]\n${notes}\n\n`;
 
       const marcaEntrevista = isInterviewStage(selectedStage);
@@ -407,7 +397,7 @@ export default function AdvanceStageModal({
             [notaEntrevista, quando ? `[Entrevista marcada]\n${quando}` : "", finalNotes.trim()]
               .filter(Boolean)
               .join("\n\n") || null,
-          advance_candidate_future: candidateFuture.join(", ") || null,
+          advance_candidate_future: percepcoes.join(", ") || null,
           advance_interview_id: entrevistaNova,
         })
         .eq("id", alvo);
@@ -678,35 +668,11 @@ export default function AdvanceStageModal({
           )}
 
           <div className="space-y-4 pt-2 border-t mt-4">
-            <div className="space-y-3 pt-2">
-              <Label>Futuro do Candidato</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border p-3 rounded-md bg-muted/20">
-                {futureOptions.map((option) => (
-                  <div key={option} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`future-${option}`}
-                      checked={candidateFuture.includes(option)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setCandidateFuture([...candidateFuture, option]);
-                        } else {
-                          setCandidateFuture(candidateFuture.filter((item) => item !== option));
-                        }
-                      }}
-                    />
-                    <Label
-                      htmlFor={`future-${option}`}
-                      className="text-sm font-normal cursor-pointer leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {option}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Chamar do Banco de Talentos ainda não teve entrevista: não há o que perceber. */}
+            {!precisaDeVaga && <PerceptionChecklist value={candidateFuture} onChange={setCandidateFuture} />}
 
             <div className="grid gap-2 pt-2">
-              <label className="text-sm font-medium">Observações Gerais</label>
+              <label className="text-sm font-medium">{precisaDeVaga ? "Observação" : "Observações Gerais"}</label>
               <Textarea
                 placeholder="Detalhes adicionais sobre este avanço"
                 value={notes}

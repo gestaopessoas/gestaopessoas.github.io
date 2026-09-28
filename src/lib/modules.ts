@@ -16,7 +16,6 @@ export const MODULES = [
   "vagas",
   "central_candidato",
   "entrevistas",
-  "formularios",
   "recrutamento",
   "armarios",
   "uniformes",

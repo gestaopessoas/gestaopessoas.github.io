@@ -18,7 +18,6 @@ const sidebarGroups: NavGroup[] = [
     name: "Geral",
     items: [
       { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
-      { name: "Formulários", href: "/dashboard/formularios", icon: FileText, module: "formularios" },
     ]
   },
   {
@@ -44,7 +43,7 @@ const sidebarGroups: NavGroup[] = [
     ]
   },
   {
-    name: "Gestão & Desenvolvimento",
+    name: "Gestão & Talentos",
     items: [
       { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users, module: "colaboradores" },
       { name: "Integração (Onboarding)", href: "/dashboard/onboarding", icon: CheckSquare, module: "onboarding" },

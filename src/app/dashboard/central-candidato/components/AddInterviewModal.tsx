@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2 } from "lucide-react";
 import {
@@ -31,6 +30,7 @@ const STAGE_LABELS: Record<string, string> = {
   Proposta: "Proposta / Aguardando Contratação",
 };
 import { errorMessage } from "@/lib/utils";
+import PerceptionChecklist, { PERCEPTION_NOTES_LABEL } from "./PerceptionChecklist";
 
 type AddInterviewModalProps = {
   isOpen: boolean;
@@ -74,16 +74,6 @@ export default function AddInterviewModal({
   const [weaknesses, setWeaknesses] = useState("");
   const [candidateFuture, setCandidateFuture] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
-
-  const futureOptions = [
-    "Aprovado para Banco de Talentos",
-    "Potencial para Liderança",
-    "Recomendado para Promoção Futura",
-    "Perfil Técnico Forte",
-    "Requer Treinamento Específico",
-    "Pode assumir cargo de confiança",
-    "Transferência entre Obras"
-  ];
 
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [interviewers, setInterviewers] = useState<Interviewer[]>([]);
@@ -208,7 +198,7 @@ export default function AddInterviewModal({
       if (culturalFit) finalNotes += `[Fit Cultural]\n${culturalFit}\n\n`;
       if (strengths) finalNotes += `[Pontos Fortes]\n${strengths}\n\n`;
       if (weaknesses) finalNotes += `[Pontos a Desenvolver]\n${weaknesses}\n\n`;
-      if (candidateFuture.length > 0) finalNotes += `[Futuro do Candidato]\n${candidateFuture.join(", ")}\n\n`;
+      if (candidateFuture.length > 0) finalNotes += `[${PERCEPTION_NOTES_LABEL}]\n${candidateFuture.join(", ")}\n\n`;
       if (notes) finalNotes += `[Observações Gerais]\n${notes}\n\n`;
 
       const { error } = await supabase.from("candidate_interviews").insert([
@@ -440,32 +430,7 @@ export default function AddInterviewModal({
                 </div>
               </div>
 
-              <div className="space-y-3 pt-2">
-                <Label>Futuro do Candidato</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border p-3 rounded-md bg-muted/20">
-                  {futureOptions.map((option) => (
-                    <div key={option} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`future-${option}`}
-                        checked={candidateFuture.includes(option)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setCandidateFuture([...candidateFuture, option]);
-                          } else {
-                            setCandidateFuture(candidateFuture.filter((item) => item !== option));
-                          }
-                        }}
-                      />
-                      <Label
-                        htmlFor={`future-${option}`}
-                        className="text-sm font-normal cursor-pointer leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {option}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <PerceptionChecklist value={candidateFuture} onChange={setCandidateFuture} />
 
               <div className="space-y-2 pt-2">
                 <Label htmlFor="notes">Observações Gerais</Label>

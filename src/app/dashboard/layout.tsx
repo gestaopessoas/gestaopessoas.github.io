@@ -16,7 +16,6 @@ import { cn } from "@/lib/utils";
 
 const breadcrumbMap: Record<string, string> = {
   "/dashboard": "Visão Geral",
-  "/dashboard/formularios": "Formulários",
   "/dashboard/vagas": "Vagas",
   "/dashboard/entrevistas": "Entrevistas",
   "/dashboard/central-candidato": "Central do Candidato",
