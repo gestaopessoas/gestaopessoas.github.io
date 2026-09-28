@@ -260,6 +260,7 @@ export function candidateProfileColumns(data: ProfilePerson) {
     boot_size: data.boot_size || null,
     has_dependents: data.has_dependents ?? null,
     dependents_notes: data.dependents_notes || null,
+    professional_summary: data.professional_summary || null,
   };
 }
 
@@ -1409,26 +1410,31 @@ export function CandidateProfileModal({
                         <FileText className="h-5 w-5 text-primary" />
                         Resumo do Currículo
                       </div>
-                      {formData.professional_summary || formData.experience_summary ? (
-                        <div className="space-y-4 text-sm">
-                          {formData.professional_summary && (
-                            <div className="space-y-1.5">
-                              <span className="text-xs text-muted-foreground block font-medium">Resumo profissional</span>
-                              <p className="whitespace-pre-line text-foreground">{formData.professional_summary}</p>
-                            </div>
-                          )}
-                          {formData.experience_summary && (
-                            <div className="space-y-1.5">
-                              <span className="text-xs text-muted-foreground block font-medium">Experiência profissional</span>
-                              <p className="whitespace-pre-line text-foreground">{formData.experience_summary}</p>
-                            </div>
+                      <div className="space-y-4 text-sm">
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-muted-foreground block font-medium">Resumo profissional/Observação</span>
+                          {isEditing ? (
+                            <Textarea
+                              rows={4}
+                              value={formData.professional_summary || ""}
+                              onChange={(e) => handleChange('professional_summary', e.target.value)}
+                              placeholder="Resumo extraído do currículo, ou observação livre do RH"
+                            />
+                          ) : formData.professional_summary ? (
+                            <p className="whitespace-pre-line text-foreground">{formData.professional_summary}</p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              Sem resumo extraído. {person.resume_url ? "Use o botão “Ver Currículo PDF” para abrir o arquivo original." : "Nenhum currículo foi anexado a esta candidatura."}
+                            </p>
                           )}
                         </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">
-                          Sem resumo extraído. {person.resume_url ? "Use o botão “Ver Currículo PDF” para abrir o arquivo original." : "Nenhum currículo foi anexado a esta candidatura."}
-                        </p>
-                      )}
+                        {formData.experience_summary && (
+                          <div className="space-y-1.5">
+                            <span className="text-xs text-muted-foreground block font-medium">Experiência profissional</span>
+                            <p className="whitespace-pre-line text-foreground">{formData.experience_summary}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Dados Pessoais & Contato (Accordion) */}
