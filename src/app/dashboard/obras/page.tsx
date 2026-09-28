@@ -10,6 +10,10 @@ import { useEffect, useMemo, useState } from "react";
 
 type Person = { id: string; name: string };
 
+type CostCenter = { id: string; code: string | null; name: string };
+
+const workplaceSelect = "id, company_id, name, type, address, coordinator_id, responsible_director_id, cost_center_id, status, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name), cost_center:cost_centers(code, name)";
+
 type Company = {
   id: string;
   name: string;
@@ -24,13 +28,15 @@ type Workplace = {
   address: string | null;
   coordinator_id?: string | null;
   responsible_director_id?: string | null;
+  cost_center_id?: string | null;
   status?: string | null;
   companies?: { name: string | null; trading_name?: string | null } | { name: string | null; trading_name?: string | null }[] | null;
   coordinator?: { name: string | null } | null;
   responsible_director?: { name: string | null } | null;
+  cost_center?: { code: string | null; name: string | null } | null;
 };
 
-const emptyForm = { name: "", type: "OBRA", address: "", company_id: "", coordinator_id: "", responsible_director_id: "" };
+const emptyForm = { name: "", type: "OBRA", address: "", company_id: "", coordinator_id: "", responsible_director_id: "", cost_center_id: "" };
 
 const typeStyle: Record<string, string> = {
   OBRA: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
@@ -44,6 +50,7 @@ export default function ObrasPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [coordinatorsList, setCoordinatorsList] = useState<Person[]>([]);
   const [directorsList, setDirectorsList] = useState<Person[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -59,11 +66,12 @@ export default function ObrasPage() {
     async function loadWorkplaces() {
       const supabase = createClient();
       // ponytail: ilike para pegar "Diretor", "Diretor Comercial", "Diretor de Engenharia", etc. — exclui "Direto" pq não termina com "diretor"
-      const [companyResult, workplaceResult, coordResult, dirResult] = await Promise.all([
+      const [companyResult, workplaceResult, coordResult, dirResult, ccResult] = await Promise.all([
         supabase.from("companies").select("id, name, trading_name").order("name"),
-        supabase.from("workplaces").select("id, company_id, name, type, address, coordinator_id, responsible_director_id, status, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").eq("status", "Ativo").order("name"),
+        supabase.from("workplaces").select(workplaceSelect).eq("status", "Ativo").order("name"),
         supabase.from("employees").select("id, name").eq("status", "Ativo").ilike("role", "%coordenador%").order("name"),
         supabase.from("employees").select("id, name").eq("status", "Ativo").ilike("role", "%diretor%").order("name"),
+        supabase.from("cost_centers").select("id, code, name").order("name"),
       ]);
 
       if (!active) return;
@@ -76,6 +84,7 @@ export default function ObrasPage() {
       setWorkplaces((workplaceResult.data ?? []) as unknown as Workplace[]);
       setCoordinatorsList((coordResult.data ?? []) as unknown as Person[]);
       setDirectorsList((dirResult.data ?? []) as unknown as Person[]);
+      setCostCenters((ccResult.data ?? []) as CostCenter[]);
     }
 
     loadWorkplaces();
@@ -128,6 +137,7 @@ export default function ObrasPage() {
       company_id: workplace.company_id ?? "",
       coordinator_id: workplace.coordinator_id ?? "",
       responsible_director_id: workplace.responsible_director_id ?? "",
+      cost_center_id: workplace.cost_center_id ?? "",
     });
     setError("");
     setIsModalOpen(true);
@@ -145,12 +155,13 @@ export default function ObrasPage() {
       company_id: form.company_id || null,
       coordinator_id: form.coordinator_id || null,
       responsible_director_id: form.responsible_director_id || null,
+      cost_center_id: form.cost_center_id || null,
     };
 
     const supabase = createClient();
     const result = editingId
-      ? await supabase.from("workplaces").update(payload).eq("id", editingId).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, status, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single()
-      : await supabase.from("workplaces").insert(payload).select("id, company_id, name, type, address, coordinator_id, responsible_director_id, status, companies(name, trading_name), coordinator:employees!coordinator_id(name), responsible_director:employees!responsible_director_id(name)").single();
+      ? await supabase.from("workplaces").update(payload).eq("id", editingId).select(workplaceSelect).single()
+      : await supabase.from("workplaces").insert(payload).select(workplaceSelect).single();
 
     setSaving(false);
     if (result.error) {
@@ -264,6 +275,12 @@ export default function ObrasPage() {
                     {directorsList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </Field>
+                <Field label="Centro de custo">
+                  <select value={form.cost_center_id} onChange={(event) => setForm({ ...form, cost_center_id: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Sem centro de custo</option>
+                    {costCenters.map((c) => <option key={c.id} value={c.id}>{costCenterLabel(c)}</option>)}
+                  </select>
+                </Field>
                 <Field label="Localização"><Input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>
               </div>
               <div className="mt-4 flex justify-end">
@@ -300,14 +317,15 @@ export default function ObrasPage() {
                 <tr className="text-muted-foreground font-medium">
                   <th className="px-4 py-3">Unidade</th>
                   <th className="px-4 py-3">Tipo</th>
+                  <th className="px-4 py-3">Centro de custo</th>
                   <th className="px-4 py-3">Responsáveis</th>
                   <th className="px-4 py-3">Localização</th>
                   <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {loading && <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={5}>Carregando unidades...</td></tr>}
-                {!loading && filtered.length === 0 && <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={5}>Nenhuma unidade encontrada.</td></tr>}
+                {loading && <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>Carregando unidades...</td></tr>}
+                {!loading && filtered.length === 0 && <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>Nenhuma unidade encontrada.</td></tr>}
                 {!loading && filtered.map((workplace) => (
                   <tr key={workplace.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 font-medium text-foreground">{workplace.name}</td>
@@ -316,6 +334,7 @@ export default function ObrasPage() {
                         {workplace.type || "OBRA"}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">{workplace.cost_center ? costCenterLabel(workplace.cost_center) : "-"}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs whitespace-normal min-w-[150px]">
                       {workplace.coordinator?.name && <div className="mb-0.5"><span className="font-medium text-foreground">Coord:</span> {workplace.coordinator.name}</div>}
                       {workplace.responsible_director?.name && <div><span className="font-medium text-foreground">Dir:</span> {workplace.responsible_director.name}</div>}
@@ -365,4 +384,8 @@ function Metric({ label, value }: { label: string; value: number }) {
 function companyName(workplace: Workplace) {
   const company = (Array.isArray(workplace.companies) ? workplace.companies[0] : workplace.companies) as { trading_name?: string; name?: string } | undefined;
   return company?.trading_name || company?.name || "";
+}
+
+function costCenterLabel(c: { code: string | null; name: string | null }) {
+  return [c.code, c.name].filter(Boolean).join(" - ");
 }

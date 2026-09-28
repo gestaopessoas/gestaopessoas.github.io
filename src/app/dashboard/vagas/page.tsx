@@ -18,8 +18,7 @@ type JobRequest = {
   requester_whatsapp: string | null;
   position_title: string | null;
   unit: string | null;
-  workplace_id: string | null;
-  workplace: { name: string } | null;
+  workplace_ids: string[];
   quantity: number | null;
   contract_type: string | null;
   urgency: string | null;
@@ -47,12 +46,13 @@ type JobRequest = {
   level_min: string | null;
   level_max: string | null;
   seniority: string | null;
+  seniority_max: string | null;
   notes: string | null;
 };
 
-// Mesma projecao na leitura e na gravacao: sem isso o join da Obra some depois de salvar.
+// Mesma projecao na leitura e na gravacao.
 const JOB_REQUEST_SELECT =
-  "id, requester_name, requester_area, requester_whatsapp, position_title, unit, workplace_id, workplace:workplaces(name), quantity, contract_type, urgency, status, created_at, behavioral_tags, search_tags, required_requirements, desired_requirements, manager_expectations, profile_id, department_id, target_date, salary_min, salary_max, salary_notes, work_schedule, work_mode, is_pcd_eligible, affirmative_tags, benefits, reason, level_min, level_max, seniority, notes, stages, hide_salary";
+  "id, requester_name, requester_area, requester_whatsapp, position_title, unit, workplace_ids, quantity, contract_type, urgency, status, created_at, behavioral_tags, search_tags, required_requirements, desired_requirements, manager_expectations, profile_id, department_id, target_date, salary_min, salary_max, salary_notes, work_schedule, work_mode, is_pcd_eligible, affirmative_tags, benefits, reason, level_min, level_max, seniority, seniority_max, notes, stages, hide_salary";
 
 const statusStyle: Record<string, string> = {
   Nova: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
@@ -82,18 +82,22 @@ export default function VagasAdminPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editError, setEditError] = useState("");
+  // Array nao tem join no PostgREST: nomes das obras buscados a parte.
+  const [workplaceNames, setWorkplaceNames] = useState<Record<string, string>>({});
+  const obras = (request: JobRequest) => (request.workplace_ids ?? []).map((id) => workplaceNames[id]).filter(Boolean).join(", ");
 
   useEffect(() => {
     let active = true;
 
     const loadInitialRequests = async () => {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("job_requests")
-        .select(JOB_REQUEST_SELECT)
-        .order("created_at", { ascending: false });
+      const [{ data, error }, workplacesResult] = await Promise.all([
+        supabase.from("job_requests").select(JOB_REQUEST_SELECT).order("created_at", { ascending: false }),
+        supabase.from("workplaces").select("id, name"),
+      ]);
 
       if (!active) return;
+      setWorkplaceNames(Object.fromEntries((workplacesResult.data ?? []).map((w) => [w.id, w.name])));
       setLoading(false);
       if (error) {
         setError("Não foi possível carregar as solicitações. Confira login, permissões e migração do Supabase.");
@@ -156,7 +160,7 @@ export default function VagasAdminPage() {
   
   const handleSaveEdit = async (
     values: VagaFormValues,
-    meta: { selectedLevelMin: string; selectedLevelMax: string; selectedSeniority: string; salaryMin: number | null; salaryMax: number | null }
+    meta: { selectedLevelMin: string; selectedLevelMax: string; selectedSeniority: string; selectedSeniorityMax: string; salaryMin: number | null; salaryMax: number | null; requesterName: string; requesterContact: string }
   ) => {
     if (!selectedJob) return;
     setEditError("");
@@ -164,12 +168,14 @@ export default function VagasAdminPage() {
 
     const supabase = createClient();
     const updatePayload = {
+      requester_name: meta.requesterName || null,
+      requester_whatsapp: meta.requesterContact || null,
       profile_id: values.profile_id || null,
       department_id: values.sector_id || null,
       position_title: values.position_title,
       requested_role: values.position_title,
       unit: values.unit || null,
-      workplace_id: values.workplace_id || null,
+      workplace_ids: values.workplace_ids,
       quantity: Number(values.quantity) || 1,
       contract_type: values.contract_type,
       reason: values.reason,
@@ -194,6 +200,7 @@ export default function VagasAdminPage() {
       level_min: meta.selectedLevelMin || null,
       level_max: meta.selectedLevelMax || null,
       seniority: meta.selectedSeniority || null,
+      seniority_max: meta.selectedSeniorityMax || null,
     };
 
     const { data: saved, error } = await supabase
@@ -306,7 +313,7 @@ export default function VagasAdminPage() {
                   <div>
                     <h3 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors">{request.position_title || "Sem título"}</h3>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {request.workplace?.name || request.unit || "Obra não informada"} • {request.quantity ?? 1} vaga(s)
+                      {obras(request) || request.unit || "Obra não informada"} • {request.quantity ?? 1} vaga(s)
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -403,9 +410,16 @@ export default function VagasAdminPage() {
                             <p className="font-medium text-foreground">{selectedJob.requester_name || "Não informado"}</p>
                             <p className="text-muted-foreground mt-0.5">{selectedJob.requester_area || "Área não informada"}</p>
                             {selectedJob.requester_whatsapp && (
-                              <a href={selectedJob.requester_whatsapp} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 font-medium text-emerald-600 hover:text-emerald-700 transition-colors">
-                                <MessageCircle className="h-4 w-4" /> WhatsApp
-                              </a>
+                              // Vaga aberta pelo formulário público grava um link wa.me; a vaga
+                              // criada/editada pelo RH grava o contato como texto livre (issue
+                              // #160) -- só um dos dois é de fato uma URL clicável.
+                              selectedJob.requester_whatsapp.startsWith("http") ? (
+                                <a href={selectedJob.requester_whatsapp} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 font-medium text-emerald-600 hover:text-emerald-700 transition-colors">
+                                  <MessageCircle className="h-4 w-4" /> WhatsApp
+                                </a>
+                              ) : (
+                                <p className="mt-2 text-muted-foreground">{selectedJob.requester_whatsapp}</p>
+                              )
                             )}
                           </div>
                         </div>
@@ -415,7 +429,7 @@ export default function VagasAdminPage() {
                             <MapPin className="h-4 w-4 text-primary" /> Obra
                           </h4>
                           <div className="rounded-md border bg-muted/20 p-3 text-sm text-foreground">
-                            {selectedJob.workplace?.name || "Não informada"}
+                            {obras(selectedJob) || "Não informada"}
                           </div>
                         </div>
 
@@ -467,7 +481,7 @@ export default function VagasAdminPage() {
                       sector_id: selectedJob.department_id || "",
                       position_title: selectedJob.position_title || "",
                       unit: selectedJob.unit || "",
-                      workplace_id: selectedJob.workplace_id || "",
+                      workplace_ids: selectedJob.workplace_ids ?? [],
                       quantity: String(selectedJob.quantity ?? 1),
                       contract_type: selectedJob.contract_type || "CLT",
                       reason: selectedJob.reason || "Substituição",
@@ -494,6 +508,7 @@ export default function VagasAdminPage() {
                       levelMin: selectedJob.level_min || "",
                       levelMax: selectedJob.level_max || "",
                       seniority: selectedJob.seniority || "",
+                      seniorityMax: selectedJob.seniority_max || "",
                     }}
                     requesterName={selectedJob.requester_name || ""}
                     requesterContact={selectedJob.requester_whatsapp || ""}

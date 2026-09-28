@@ -35,7 +35,7 @@ export default function NovaVagaPage() {
 
   const handlePublish = async (
     form: VagaFormValues,
-    meta: { selectedLevelMin: string; selectedLevelMax: string; selectedSeniority: string; salaryMin: number | null; salaryMax: number | null }
+    meta: { selectedLevelMin: string; selectedLevelMax: string; selectedSeniority: string; selectedSeniorityMax: string; salaryMin: number | null; salaryMax: number | null; requesterName: string; requesterContact: string }
   ) => {
     setError("");
     setSaving(true);
@@ -43,22 +43,10 @@ export default function NovaVagaPage() {
     try {
       const supabase = createClient();
 
-      const { data: authData } = await supabase.auth.getUser();
-      let requesterName = "RH (Via Dashboard)";
-      let requesterContact = authData.user?.email || "-";
-
-      if (authData.user) {
-        const userEmail = authData.user.email || "";
-        const { data: prof } = await supabase.from('profiles').select('name').eq('id', authData.user.id).maybeSingle();
-        if (prof?.name) requesterName = prof.name;
-
-        const { data: emp } = await supabase.from('employees').select('name, email, phone').eq('email', userEmail).maybeSingle();
-        if (emp) {
-          if (emp.name) requesterName = emp.name;
-          if (emp.phone) requesterContact = `${userEmail} ${emp.phone ? `(${emp.phone})` : ""}`.trim();
-          else requesterContact = userEmail;
-        }
-      }
+      // Nome e contato agora vêm do form (editáveis lá, pré-preenchidos com o usuário logado) --
+      // não recalcular aqui por baixo, ou a edição do RH no campo seria descartada (issue #160).
+      const requesterName = meta.requesterName || "RH (Via Dashboard)";
+      const requesterContact = meta.requesterContact || "-";
 
       const expandedBehavioralTags = Array.from(new Set(
         form.behavioral_tags.flatMap(tag => [tag, ...(competenciesToBigFive[tag] || [])])
@@ -70,12 +58,13 @@ export default function NovaVagaPage() {
           requester_name: requesterName,
           requester_area: "Recursos Humanos",
           requester_phone: requesterContact,
+          requester_whatsapp: requesterContact,
           profile_id: form.profile_id || null,
           department_id: form.sector_id || null,
           position_title: form.position_title,
           requested_role: form.position_title,
           unit: form.unit || null,
-          workplace_id: form.workplace_id || null,
+          workplace_ids: form.workplace_ids,
           quantity: Number(form.quantity) || 1,
           contract_type: form.contract_type,
           reason: form.reason,
@@ -100,6 +89,7 @@ export default function NovaVagaPage() {
           level_min: meta.selectedLevelMin || null,
           level_max: meta.selectedLevelMax || null,
           seniority: meta.selectedSeniority || null,
+          seniority_max: meta.selectedSeniorityMax || null,
           // A Vaga nasce em "Nova" e alguém aprova depois, em Gestão de Vagas. Criar já
           // como "Aprovada" disparava o gatilho que abre a publicação no portal, então
           // quem tinha acesso à tela publicava vaga com faixa salarial e centro de custo

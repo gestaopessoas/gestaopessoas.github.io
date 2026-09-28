@@ -6,7 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
 import { CheckCircle2, MessageCircle, Send, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { formatBRL, roundCents } from "@/lib/currency.mjs";
+import { groupSearchTags } from "@/lib/searchTags.mjs";
+import { rangeOptions } from "@/lib/salaryRange.mjs";
 
 type JobProfile = {
   id: string;
@@ -30,6 +33,9 @@ type SalaryRow = {
   modality: string;
   salary: number;
 };
+
+// rangeOptions (salaryRange.mjs, sem tipos) devolve a linha da tabela salarial + label.
+type RangeOption = SalaryRow & { label: string };
 
 type Department = { id: string; name: string };
 type Workplace = { id: string; name: string; type: string };
@@ -55,24 +61,6 @@ const behavioralTags = [
   "Postura profissional", "Potencial de desenvolvimento", "Qualidade",
   "Qualidade das atividades", "Relacionamento interpessoal", "Resolução de problemas",
   "Trabalho em equipe"
-];
-
-const searchTags = [
-  "Experiência comprovada", "Disponibilidade imediata", "Estabilidade", "Potencial de crescimento",
-  "Júnior", "Pleno", "Sênior", "Primeiro emprego", "Atendimento ao cliente", "Rotina administrativa",
-  "Obra/campo", "Operacional", "Técnico especializado", "Gestão de equipe", "CNH obrigatória",
-  "CNH B", "CNH C", "CNH D", "Excel", "Excel avançado", "Sistema ERP", "Boa escrita",
-  "Boa comunicação verbal", "Pontualidade", "Comprometimento", "Aprende processo rápido",
-  "Normas de segurança", "NR-10", "NR-12", "NR-18", "NR-35", "Experiência no segmento",
-  "Horas extras", "Viagem", "Mora próximo", "Baixa rotatividade", "Alta produtividade",
-  "Relacionamento interpessoal", "Perfil comercial", "Perfil financeiro", "Construção civil",
-  "Manutenção", "Almoxarifado", "Departamento pessoal", "Recrutamento", "Fiscalização de obra",
-  "Orçamentos", "Compras", "Logística", "Estoque", "Medição", "Leitura de projeto",
-  "AutoCAD", "MS Project", "Power BI", "Folha de pagamento", "Ponto eletrônico", "Admissão",
-  "Rescisão", "Benefícios", "Contas a pagar", "Contas a receber", "Faturamento", "Cobrança",
-  "B2B", "Prospecção", "Pós-venda", "Suporte interno", "Limpeza", "Portaria", "Zeladoria",
-  "Pedreiro", "Servente", "Carpinteiro", "Eletricista", "Encanador", "Soldador", "Motorista",
-  "Operador de máquina", "Auxiliar administrativo", "Assistente", "Analista", "Coordenador",
 ];
 
 const initialForm = {
@@ -109,12 +97,10 @@ export default function SolicitarVagaPage() {
   const [salaryTable, setSalaryTable] = useState<SalaryRow[]>([]);
   const [workSchedules, setWorkSchedules] = useState<string[]>([]);
   const [companyBenefits, setCompanyBenefits] = useState<{name: string}[]>([]);
+  const [searchTagGroups, setSearchTagGroups] = useState<{ category: string; tags: string[] }[]>([]);
   
-  const [availableLevels, setAvailableLevels] = useState<string[]>([]);
-  const [availableSeniorities, setAvailableSeniorities] = useState<string[]>([]);
-  const [selectedLevelMin, setSelectedLevelMin] = useState("");
-  const [selectedLevelMax, setSelectedLevelMax] = useState("");
-  const [selectedSeniority, setSelectedSeniority] = useState("");
+  const [rangeMinId, setRangeMinId] = useState("");
+  const [rangeMaxId, setRangeMaxId] = useState("");
 
   const [form, setForm] = useState(initialForm);
   const [accessCode, setAccessCode] = useState("");
@@ -155,6 +141,7 @@ export default function SolicitarVagaPage() {
       setWorkplaces((data?.workplaces ?? []) as Workplace[]);
       setRequesters((data?.employees ?? []) as Employee[]);
       setCompanyBenefits((data?.benefits ?? []) as {name: string}[]);
+      setSearchTagGroups(groupSearchTags(data?.search_tags ?? []));
       const scheds = (data?.work_schedules ?? []) as string[];
       setWorkSchedules(scheds.length > 0 ? scheds : [
         "Administrativo (Seg-Sex 08:00-17:48)",
@@ -194,17 +181,10 @@ export default function SolicitarVagaPage() {
 
   const handleProfileChange = (profileId: string) => {
     const profile = profiles.find((item) => item.id === profileId);
-    
-    const options = salaryTable.filter(s => s.role_name === profile?.title);
-    const levels = Array.from(new Set(options.map(o => o.level).filter(Boolean)));
-    const seniorities = Array.from(new Set(options.map(o => o.seniority).filter(Boolean))) as string[];
-    
-    setAvailableLevels(levels);
-    setAvailableSeniorities(seniorities);
-    setSelectedLevelMin("");
-    setSelectedLevelMax("");
-    setSelectedSeniority("");
-    
+
+    setRangeMinId("");
+    setRangeMaxId("");
+
     const suggestedTags = profile?.competencies 
       ? behavioralTags.filter(tag => 
           profile.competencies?.toLowerCase().includes(tag.toLowerCase()) ||
@@ -231,34 +211,40 @@ export default function SolicitarVagaPage() {
     }));
   };
 
+  // Opções "De/Até": cada uma é uma linha da tabela salarial do cargo escolhido, na
+  // modalidade da vaga (com fallback para todas as linhas do cargo).
+  const selectedProfile = profiles.find((item) => item.id === form.profile_id);
+  const rangeOpts: RangeOption[] = useMemo(
+    () => rangeOptions(salaryTable, selectedProfile?.title ?? "", form.contract_type),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [salaryTable, selectedProfile?.title, form.contract_type]
+  );
+  const minOption = rangeOpts.find((o) => o.id === rangeMinId);
+  const maxOption = rangeOpts.find((o) => o.id === rangeMaxId);
+
   // Faixa salarial derivada do cargo/nível escolhido. Ajuste durante o render
   // (padrão do React para estado derivado), sem o render extra de um efeito.
-  const salaryKey = `${selectedLevelMin}|${selectedLevelMax}|${selectedSeniority}|${form.profile_id}|${salaryTable.length}|${profiles.length}|${availableSeniorities.length}`;
+  const salaryKey = `${rangeMinId}|${rangeMaxId}|${form.profile_id}|${form.contract_type}|${salaryTable.length}|${profiles.length}`;
   const [lastSalaryKey, setLastSalaryKey] = useState(salaryKey);
   if (lastSalaryKey !== salaryKey) {
     setLastSalaryKey(salaryKey);
-    if (form.profile_id && (selectedLevelMin || selectedLevelMax)) {
-      const profile = profiles.find((item) => item.id === form.profile_id);
-      
-      let matchMin = salaryTable.find(s => s.role_name === profile?.title && s.level === selectedLevelMin && s.seniority === selectedSeniority);
-      let matchMax = salaryTable.find(s => s.role_name === profile?.title && s.level === selectedLevelMax && s.seniority === selectedSeniority);
-      
-      if (!matchMin && availableSeniorities.length === 0) {
-        matchMin = salaryTable.find(s => s.role_name === profile?.title && s.level === selectedLevelMin);
-      }
-      if (!matchMax && availableSeniorities.length === 0) {
-        matchMax = salaryTable.find(s => s.role_name === profile?.title && s.level === selectedLevelMax);
-      }
-      
-      const modalityMatch = matchMin || matchMax;
-      
+    if (minOption) {
+      const maxRow = maxOption ?? minOption;
+      const modalityMatch = maxOption ?? minOption;
+
       setForm(prev => ({
         ...prev,
-        salary_min: matchMin?.salary ? String(matchMin.salary) : prev.salary_min,
-        salary_max: matchMax?.salary ? String(matchMax.salary) : (matchMin?.salary ? String(matchMin.salary) : prev.salary_max),
+        salary_min: String(roundCents(minOption.salary)),
+        salary_max: String(roundCents(maxRow.salary)),
         contract_type: modalityMatch?.modality === "Estágio" ? "Estágio" : modalityMatch?.modality === "Jovem Aprendiz" ? "Jovem Aprendiz" : "CLT"
       }));
     }
+  }
+
+  // "Até" só pode subir na faixa: se o "De" muda para um salário maior que o "Até"
+  // escolhido, a opção ficou inválida e é limpa.
+  if (maxOption && minOption && maxOption.salary < minOption.salary) {
+    setRangeMaxId("");
   }
 
   const handleUnitChange = (unit: string) => {
@@ -317,9 +303,10 @@ export default function SolicitarVagaPage() {
       salary_max: form.salary_max ? Number(form.salary_max) : null,
       target_date: form.target_date || null,
       behavioral_tags: expandedBehavioralTags,
-      level_min: selectedLevelMin || null,
-      level_max: selectedLevelMax || null,
-      seniority: selectedSeniority || null,
+      level_min: minOption?.level || null,
+      level_max: maxOption?.level || null,
+      seniority: minOption?.seniority || null,
+      seniority_max: maxOption?.seniority || null,
     };
 
     const { error } = await supabase.rpc("submit_job_request", {
@@ -347,7 +334,12 @@ export default function SolicitarVagaPage() {
   const tagBox = (field: "behavioral_tags" | "search_tags" | "benefits", tags: string[]) => (
     <div className="max-h-80 overflow-y-auto rounded-lg border bg-muted/20 p-3">
       <div className="mb-3 text-xs font-medium text-muted-foreground">{form[field].length} selecionada(s)</div>
-      <div className="flex flex-wrap gap-2">
+      {tagChips(field, tags)}
+    </div>
+  );
+
+  const tagChips = (field: "behavioral_tags" | "search_tags" | "benefits", tags: string[]) => (
+    <div className="flex flex-wrap gap-2">
         {tags.map((tag) => {
           const selected = form[field].includes(tag);
           return (
@@ -361,7 +353,6 @@ export default function SolicitarVagaPage() {
             </button>
           );
         })}
-      </div>
     </div>
   );
 
@@ -484,22 +475,31 @@ export default function SolicitarVagaPage() {
               </Field>
               <Field label="Data limite"><Input type="date" value={form.target_date} onChange={(event) => set("target_date", event.target.value)} /></Field>
               
-              <Field label="Nível mínimo">
-                <select value={selectedLevelMin} onChange={(e) => setSelectedLevelMin(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                  <option value="">{availableLevels.length > 0 ? "Selecione..." : "Selecione um cargo primeiro"}</option>
-                  {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+              <Field label="De (nível/senioridade)">
+                <select
+                  required={rangeOpts.length > 0}
+                  value={rangeMinId}
+                  onChange={(e) => setRangeMinId(e.target.value)}
+                  disabled={!form.profile_id || rangeOpts.length === 0}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">
+                    {!form.profile_id ? "Selecione o perfil acima para liberar..." : rangeOpts.length === 0 ? "Sem níveis na tabela salarial para este cargo" : "Selecione..."}
+                  </option>
+                  {rangeOpts.map(opt => <option key={opt.id} value={opt.id}>{opt.label}</option>)}
                 </select>
               </Field>
-              <Field label="Nível máximo">
-                <select value={selectedLevelMax} onChange={(e) => setSelectedLevelMax(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                  <option value="">{availableLevels.length > 0 ? "Selecione (Opcional)..." : "Selecione um cargo primeiro"}</option>
-                  {availableLevels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
-                </select>
-              </Field>
-              <Field label="Senioridade">
-                <select value={selectedSeniority} onChange={(e) => setSelectedSeniority(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                  <option value="">{availableSeniorities.length > 0 ? "Selecione..." : "Selecione um cargo primeiro"}</option>
-                  {availableSeniorities.map(sen => <option key={sen} value={sen}>{sen}</option>)}
+              <Field label="Até (opcional)">
+                <select
+                  value={rangeMaxId}
+                  onChange={(e) => setRangeMaxId(e.target.value)}
+                  disabled={!form.profile_id || rangeOpts.length === 0}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">
+                    {!form.profile_id ? "Selecione o perfil acima para liberar..." : rangeOpts.length === 0 ? "Sem níveis na tabela salarial para este cargo" : "Selecione (Opcional)..."}
+                  </option>
+                  {rangeOpts.filter(opt => !minOption || opt.salary >= minOption.salary).map(opt => <option key={opt.id} value={opt.id}>{opt.label}</option>)}
                 </select>
               </Field>
             </div>
@@ -519,8 +519,8 @@ export default function SolicitarVagaPage() {
         <section className="rounded-lg border bg-card p-5">
           <h2 className="mb-4 text-lg font-semibold">Salário e horário</h2>
           <div className="grid gap-4 md:grid-cols-4">
-            <Field label="Salário mínimo"><Input type="number" min="0" step="0.01" value={form.salary_min} readOnly className="bg-muted text-muted-foreground" title="Salário preenchido automaticamente pela tabela" /></Field>
-            <Field label="Salário máximo"><Input type="number" min="0" step="0.01" value={form.salary_max} readOnly className="bg-muted text-muted-foreground" title="Salário preenchido automaticamente pela tabela" /></Field>
+            <Field label="Salário mínimo"><Input type="text" value={formatBRL(form.salary_min)} readOnly className="bg-muted text-muted-foreground" title="Salário preenchido automaticamente pela tabela" /></Field>
+            <Field label="Salário máximo"><Input type="text" value={formatBRL(form.salary_max)} readOnly className="bg-muted text-muted-foreground" title="Salário preenchido automaticamente pela tabela" /></Field>
             <Field label="Horário / escala" className="md:col-span-2">
               <select value={form.work_schedule} onChange={(event) => set("work_schedule", event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
                 <option value="">Selecione o horário...</option>
@@ -552,7 +552,15 @@ export default function SolicitarVagaPage() {
         <section className="rounded-lg border bg-card p-5">
           <h2 className="text-lg font-semibold">Tags de busca</h2>
           <p className="mb-3 mt-1 text-sm text-muted-foreground">Essas tags ajudam o RH a comparar vagas e candidatos.</p>
-          {tagBox("search_tags", searchTags)}
+          <div className="max-h-[28rem] space-y-3 overflow-y-auto rounded-lg border bg-muted/20 p-3">
+            <div className="text-xs font-medium text-muted-foreground">{form.search_tags.length} selecionada(s)</div>
+            {searchTagGroups.map((group) => (
+              <div key={group.category}>
+                <div className="mb-1.5 text-xs font-semibold text-muted-foreground">{group.category}</div>
+                {tagChips("search_tags", group.tags)}
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="rounded-lg border bg-card p-5">
