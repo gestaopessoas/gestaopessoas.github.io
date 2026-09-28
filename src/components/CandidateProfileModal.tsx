@@ -29,7 +29,7 @@ import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 import { hasRealEmail } from "@/lib/candidateIdentity.mjs";
 import { EDUCATION_LEVEL_OPTIONS } from "@/lib/educationLevels.mjs";
-import { InstitutionSelect } from "@/components/InstitutionSelect";
+import { CatalogSelect } from "@/components/CatalogSelect";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -168,6 +168,47 @@ function experienceToRow(item: ProfileExperience, candidateId: string) {
     is_current: Boolean(item.current),
     description: item.activities?.trim() || "",
   };
+}
+
+// Meses inteiros entre início e fim (ou hoje, se ainda é o emprego atual). `null` quando não
+// dá pra calcular -- sem início não tem duração, e nada mostra "0 meses" pra quem não
+// preencheu data nenhuma.
+function monthsBetween(start?: string | null, end?: string | null, current?: boolean): number | null {
+  if (!start) return null;
+  // "YYYY-MM-DD" vira meia-noite UTC no parse do Date -- ler com getMonth()/getDate() (hora
+  // local) desloca um dia inteiro em fuso atrás de UTC (Brasil é UTC-3) e pode contar um mês
+  // a menos. Ler com getUTCMonth()/getUTCDate() evita o deslocamento; "hoje" entra pelos
+  // mesmos métodos construindo a data via Date.UTC com os componentes locais de agora.
+  const startDate = new Date(start);
+  let endDate: Date;
+  if (current || !end) {
+    const now = new Date();
+    endDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  } else {
+    endDate = new Date(end);
+  }
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
+  let months = (endDate.getUTCFullYear() - startDate.getUTCFullYear()) * 12 + (endDate.getUTCMonth() - startDate.getUTCMonth());
+  if (endDate.getUTCDate() < startDate.getUTCDate()) months--;
+  return Math.max(0, months);
+}
+
+function formatMonths(totalMonths: number): string {
+  const years = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} ${years > 1 ? "anos" : "ano"}`);
+  if (months > 0 || years === 0) parts.push(`${months} ${months === 1 ? "mês" : "meses"}`);
+  return parts.join(" e ");
+}
+
+// Emprego atual primeiro, depois mais recente para mais antigo -- ordem de currículo, em
+// vez da ordem em que cada experiência foi cadastrada.
+function sortExperiencesByRecency(a: ProfileExperience, b: ProfileExperience) {
+  if (Boolean(a.current) !== Boolean(b.current)) return a.current ? -1 : 1;
+  const aKey = a.end_date || a.start_date || "";
+  const bKey = b.end_date || b.start_date || "";
+  return bKey.localeCompare(aKey);
 }
 
 type AssessmentAcademic = ProfileEducation & { start_year?: string | null; end_year?: string | null };
@@ -791,8 +832,17 @@ export function CandidateProfileModal({
 
   const saveExperience = async () => {
     if (!expDraft) return;
-    if (!expDraft.role?.trim() && !expDraft.company?.trim()) {
-      setEntryError("Informe ao menos o cargo ou a empresa.");
+    if (!expDraft.role?.trim() || !expDraft.company?.trim()) {
+      setEntryError("Informe cargo e empresa.");
+      return;
+    }
+    if (expDraft.start_date && expDraft.end_date && !expDraft.current && expDraft.end_date < expDraft.start_date) {
+      setEntryError("A data de saída não pode ser antes da de início.");
+      return;
+    }
+    const otherCurrent = experiences.find((item) => item.current && item.id !== expDraft.id);
+    if (expDraft.current && otherCurrent) {
+      setEntryError(`"${otherCurrent.role || otherCurrent.company}" já está marcado como emprego atual. Desmarque-o antes.`);
       return;
     }
     setEntryError("");
@@ -1596,9 +1646,17 @@ export function CandidateProfileModal({
                       <div className="p-5 space-y-4">
                         {experiences.length === 0 && !expDraft ? (
                           <p className="text-sm text-muted-foreground italic">Nenhuma experiência profissional registrada.</p>
-                        ) : (
+                        ) : (() => {
+                          const totalMonths = experiences.reduce((sum, exp) => sum + (monthsBetween(exp.start_date, exp.end_date, exp.current) ?? 0), 0);
+                          const sorted = [...experiences].sort(sortExperiencesByRecency);
+                          return (
                           <div className="space-y-4">
-                            {experiences.map((exp, i) => (
+                            {totalMonths > 0 && (
+                              <p className="text-xs font-semibold text-muted-foreground">Tempo total de experiência: {formatMonths(totalMonths)}</p>
+                            )}
+                            {sorted.map((exp, i) => {
+                              const months = monthsBetween(exp.start_date, exp.end_date, exp.current);
+                              return (
                               <div key={exp.id || i} className="p-4 rounded-xl border bg-muted/30 text-sm space-y-2">
                                 <div className="flex items-start justify-between gap-2">
                                   <p className="font-bold text-foreground text-base">{exp.role || "Cargo / Função"}</p>
@@ -1619,29 +1677,32 @@ export function CandidateProfileModal({
                                   </div>
                                 </div>
                                 <p className="text-xs font-semibold text-primary">{exp.company || "Empresa"}</p>
+                                {months !== null && <p className="text-[11px] text-muted-foreground">{formatMonths(months)}</p>}
                                 {exp.activities && (
                                   <p className="text-xs text-muted-foreground whitespace-pre-wrap">{exp.activities}</p>
                                 )}
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
-                        )}
+                          );
+                        })()}
 
                         {expDraft && (
                           <div className="p-4 rounded-xl border border-primary/40 bg-primary/5 space-y-3">
                             <p className="text-sm font-bold">{expDraft.__persisted ? "Editar experiência" : "Nova experiência"}</p>
                             <div className="grid gap-3 sm:grid-cols-2">
                               <EntryField label="Cargo / Função">
-                                <Input value={expDraft.role || ""} onChange={(e) => setExpDraft({ ...expDraft, role: e.target.value })} placeholder="Ex: Auxiliar de Almoxarifado" />
+                                <CatalogSelect table="job_titles" addLabel="Novo cargo" placeholder="Nome do cargo" value={expDraft.role || ""} onChange={(name) => setExpDraft({ ...expDraft, role: name })} />
                               </EntryField>
                               <EntryField label="Empresa">
-                                <Input value={expDraft.company || ""} onChange={(e) => setExpDraft({ ...expDraft, company: e.target.value })} placeholder="Ex: Construtora ACPO" />
+                                <CatalogSelect table="previous_employers" addLabel="Nova empresa" placeholder="Nome da empresa" value={expDraft.company || ""} onChange={(name) => setExpDraft({ ...expDraft, company: name })} />
                               </EntryField>
                               <EntryField label="Início">
                                 <Input type="date" value={expDraft.start_date || ""} onChange={(e) => setExpDraft({ ...expDraft, start_date: e.target.value })} />
                               </EntryField>
                               <EntryField label="Saída">
-                                <Input type="date" disabled={expDraft.current} value={expDraft.end_date || ""} onChange={(e) => setExpDraft({ ...expDraft, end_date: e.target.value })} />
+                                <Input type="date" min={expDraft.start_date || undefined} disabled={expDraft.current} value={expDraft.end_date || ""} onChange={(e) => setExpDraft({ ...expDraft, end_date: e.target.value })} />
                               </EntryField>
                             </div>
                             <label className="flex items-center gap-2 text-sm">
@@ -1733,7 +1794,7 @@ export function CandidateProfileModal({
                                 <Input value={eduDraft.course || ""} onChange={(e) => setEduDraft({ ...eduDraft, course: e.target.value })} placeholder="Ex: Edificações" />
                               </EntryField>
                               <EntryField label="Instituição">
-                                <InstitutionSelect value={eduDraft.institution || ""} onChange={(name) => setEduDraft({ ...eduDraft, institution: name })} />
+                                <CatalogSelect table="institutions" addLabel="Nova instituição" placeholder="Nome da instituição" value={eduDraft.institution || ""} onChange={(name) => setEduDraft({ ...eduDraft, institution: name })} />
                               </EntryField>
                               <EntryField label="Início">
                                 <Input type="date" value={eduDraft.start_date || ""} onChange={(e) => setEduDraft({ ...eduDraft, start_date: e.target.value })} />

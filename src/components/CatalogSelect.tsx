@@ -6,36 +6,48 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, X } from "lucide-react";
 
-type Institution = { id: string; name: string };
+type CatalogItem = { id: string; name: string };
 
-// Dropdown alimentado pelo catálogo public.institutions, com "+ Nova instituição" para
-// cadastrar uma que ainda não existe. Usado tanto na ficha interna (autenticado) quanto no
-// formulário público de candidatura (anon) — a tabela tem RLS de leitura/inserção para os dois.
-export function InstitutionSelect({ value, onChange }: { value: string; onChange: (name: string) => void }) {
-  const [options, setOptions] = useState<Institution[]>([]);
+// Dropdown alimentado por um catálogo (institutions, companies, job_titles), com "+ Novo"
+// para cadastrar o que ainda não existe. Usado tanto na ficha interna (autenticado) quanto
+// no formulário público de candidatura (anon) — cada tabela tem RLS de leitura/inserção
+// para os dois, mesmo padrão.
+export function CatalogSelect({
+  table,
+  value,
+  onChange,
+  addLabel = "Novo",
+  placeholder = "Nome",
+}: {
+  table: string;
+  value: string;
+  onChange: (name: string) => void;
+  addLabel?: string;
+  placeholder?: string;
+}) {
+  const [options, setOptions] = useState<CatalogItem[]>([]);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     createClient()
-      .from("institutions")
+      .from(table)
       .select("id,name")
       .order("name")
       .then(({ data }) => { if (data) setOptions(data); });
-  }, []);
+  }, [table]);
 
   const saveNew = async () => {
     const name = newName.trim();
     if (!name) return;
     setSaving(true);
-    const { data, error } = await createClient().from("institutions").insert({ name }).select("id,name").single();
+    const { data, error } = await createClient().from(table).insert({ name }).select("id,name").single();
     setSaving(false);
     if (error) {
-      // Nome já existe (índice único por nome normalizado): usa a que já está cadastrada.
+      // Nome já existe (índice único por nome normalizado): usa o que já está cadastrado.
       const existing = options.find((o) => o.name.trim().toLowerCase() === name.toLowerCase());
-      if (existing) onChange(existing.name);
-      else onChange(name);
+      onChange(existing ? existing.name : name);
       setAdding(false);
       setNewName("");
       return;
@@ -53,7 +65,7 @@ export function InstitutionSelect({ value, onChange }: { value: string; onChange
       <div className="flex gap-2">
         <Input
           autoFocus
-          placeholder="Nome da instituição"
+          placeholder={placeholder}
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveNew(); } }}
@@ -79,7 +91,7 @@ export function InstitutionSelect({ value, onChange }: { value: string; onChange
         {value && !options.some((o) => o.name === value) && <option value={value}>{value}</option>}
         {options.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
       </select>
-      <Button type="button" variant="outline" size="icon" title="Nova instituição" onClick={() => setAdding(true)}>
+      <Button type="button" variant="outline" size="icon" title={addLabel} onClick={() => setAdding(true)}>
         <Plus className="h-4 w-4" />
       </Button>
     </div>

@@ -16,7 +16,7 @@ import { formatCurrencyInput, isValidCpf, parseCurrencyInput } from "@/app/dashb
 import { CONSENT_VERSION } from "./consent";
 import { monthEndDate, normalizeResumeDate } from "@/lib/resumeDate";
 import { BfiLinkField } from "./BfiLinkField";
-import { InstitutionSelect } from "@/components/InstitutionSelect";
+import { CatalogSelect } from "@/components/CatalogSelect";
 import { EDUCATION_LEVEL_OPTIONS } from "@/lib/educationLevels.mjs";
 import type { Career } from "./types";
 
@@ -270,7 +270,12 @@ export function ApplicationDialog({ job, open, onOpenChange, internal = false }:
   const addExperienceRow = () => setExperiences((prev) => [...prev, { ...emptyExperienceRow }]);
   const removeExperienceRow = (index: number) => setExperiences((prev) => prev.filter((_, i) => i !== index));
   const updateExperienceRow = <K extends keyof ExperienceRow>(index: number, field: K, value: ExperienceRow[K]) => {
-    setExperiences((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+    setExperiences((prev) => prev.map((row, i) => {
+      if (i === index) return { ...row, [field]: value };
+      // Só um emprego atual por vez: marcar aqui desmarca os outros.
+      if (field === "isCurrent" && value === true && row.isCurrent) return { ...row, isCurrent: false };
+      return row;
+    }));
   };
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -766,7 +771,7 @@ export function ApplicationDialog({ job, open, onOpenChange, internal = false }:
                         <option value="">Selecione...</option>
                         {EDUCATION_LEVEL_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
                       </select>
-                      <div className="flex-1"><InstitutionSelect value={row.institution} onChange={(name) => updateEducationRow(index, "institution", name)} /></div>
+                      <div className="flex-1"><CatalogSelect table="institutions" addLabel="Nova instituição" placeholder="Nome da instituição" value={row.institution} onChange={(name) => updateEducationRow(index, "institution", name)} /></div>
                       {educations.length > 1 && (
                         <Button type="button" variant="outline" size="icon" onClick={() => removeEducationRow(index)}><X className="h-4 w-4" /></Button>
                       )}
@@ -780,8 +785,8 @@ export function ApplicationDialog({ job, open, onOpenChange, internal = false }:
                   {experiences.map((row, index) => (
                     <div key={index} className="space-y-2 rounded-md border border-input p-3">
                       <div className="flex gap-2">
-                        <Input placeholder="Empresa" value={row.company} onChange={(event) => updateExperienceRow(index, "company", event.target.value)} />
-                        <Input placeholder="Cargo" value={row.role} onChange={(event) => updateExperienceRow(index, "role", event.target.value)} />
+                        <div className="flex-1"><CatalogSelect table="previous_employers" addLabel="Nova empresa" placeholder="Nome da empresa" value={row.company} onChange={(name) => updateExperienceRow(index, "company", name)} /></div>
+                        <div className="flex-1"><CatalogSelect table="job_titles" addLabel="Novo cargo" placeholder="Nome do cargo" value={row.role} onChange={(name) => updateExperienceRow(index, "role", name)} /></div>
                         {experiences.length > 1 && (
                           <Button type="button" variant="outline" size="icon" onClick={() => removeExperienceRow(index)}><X className="h-4 w-4" /></Button>
                         )}
