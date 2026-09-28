@@ -16,15 +16,11 @@ import { formatCurrencyInput, isValidCpf, parseCurrencyInput } from "@/app/dashb
 import { CONSENT_VERSION } from "./consent";
 import { monthEndDate, normalizeResumeDate } from "@/lib/resumeDate";
 import { BfiLinkField } from "./BfiLinkField";
+import { InstitutionSelect } from "@/components/InstitutionSelect";
+import { EDUCATION_LEVEL_OPTIONS } from "@/lib/educationLevels.mjs";
 import type { Career } from "./types";
 
 const MARITAL_STATUS_OPTIONS = ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"];
-const EDUCATION_OPTIONS = [
-  "Fundamental Incompleto", "Fundamental Completo",
-  "Médio Incompleto", "Médio Completo",
-  "Técnico", "Superior Incompleto", "Superior Completo",
-  "Pós-graduação", "Mestrado", "Doutorado",
-];
 const LANGUAGE_LEVELS = ["Básico", "Intermediário", "Avançado", "Fluente", "Nativo"];
 
 // Dado sensível do art. 11 da LGPD. Texto livre travava o candidato ("escrevo o
@@ -768,9 +764,9 @@ export function ApplicationDialog({ job, open, onOpenChange, internal = false }:
                     <div key={index} className="flex gap-2">
                       <select className="flex h-10 w-48 shrink-0 rounded-md border border-input bg-background px-3 text-sm" value={row.level} onChange={(event) => updateEducationRow(index, "level", event.target.value)}>
                         <option value="">Selecione...</option>
-                        {EDUCATION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                        {EDUCATION_LEVEL_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
                       </select>
-                      <Input placeholder="Instituição" value={row.institution} onChange={(event) => updateEducationRow(index, "institution", event.target.value)} />
+                      <div className="flex-1"><InstitutionSelect value={row.institution} onChange={(name) => updateEducationRow(index, "institution", name)} /></div>
                       {educations.length > 1 && (
                         <Button type="button" variant="outline" size="icon" onClick={() => removeEducationRow(index)}><X className="h-4 w-4" /></Button>
                       )}

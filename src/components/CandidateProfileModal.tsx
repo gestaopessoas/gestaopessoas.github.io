@@ -28,6 +28,8 @@ import { STAGES, isTerminal } from "@/lib/stages";
 import { normalizeInterviewProgress } from "@/lib/interviewProgress.mjs";
 import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 import { hasRealEmail } from "@/lib/candidateIdentity.mjs";
+import { EDUCATION_LEVEL_OPTIONS } from "@/lib/educationLevels.mjs";
+import { InstitutionSelect } from "@/components/InstitutionSelect";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -122,7 +124,7 @@ function mapEducationRow(row: any): ProfileEducation {
     __persisted: true,
     id: row.id,
     degree: row.degree ?? null,
-    course: row.degree ?? null,
+    course: row.field_of_study ?? null,
     institution: row.institution_name ?? null,
     status: row.end_date ? "Concluído" : "Em andamento",
     start_date: row.start_date ?? null,
@@ -135,7 +137,8 @@ function educationToRow(item: ProfileEducation, candidateId: string) {
   return {
     candidate_id: candidateId,
     institution_name: item.institution?.trim() || "Não informada",
-    degree: (item.degree || item.course)?.trim() || "Não informado",
+    degree: item.degree?.trim() || "Não informado",
+    field_of_study: item.course?.trim() || null,
     is_extension: item.is_extension ?? false,
     start_date: item.start_date || null,
     end_date: item.status === "Em andamento" ? null : item.end_date || null,
@@ -603,7 +606,10 @@ export function CandidateProfileModal({
             setAssessmentData((prev: any) => ({ ...prev, academic_list: parsed.academic_list }));
             setEducations(parsed.academic_list.map((item: any, index: number) => ({
               id: `import-edu-${Date.now()}-${index}`,
-              degree: item.course || item.degree || "",
+              // Currículo só traz o nome do curso, não o nível fechado do dropdown -- fica
+              // em branco para o RH escolher ao editar, em vez de mostrar um valor que não
+              // bate com nenhuma opção da lista.
+              degree: "",
               course: item.course || item.degree || "",
               institution: item.institution || "",
               status: item.in_progress ? "Em andamento" : "Concluído",
@@ -1113,7 +1119,7 @@ export function CandidateProfileModal({
               if (!extractedEdu.some(existing => (existing.course || existing.degree || "").toLowerCase() === (ac.course || "").toLowerCase() && (existing.institution || "").toLowerCase() === (ac.institution || "").toLowerCase())) {
                 extractedEdu.push({
                   id: ac.id || Math.random().toString(),
-                  degree: ac.course || "Curso Superior / Técnico",
+                  degree: "",
                   course: ac.course,
                   institution: ac.institution,
                   status: ac.status || "Concluído",
@@ -1678,7 +1684,8 @@ export function CandidateProfileModal({
                               <div key={edu.id || i} className="p-4 rounded-xl border bg-muted/30 text-sm space-y-1">
                                 <div className="flex items-start justify-between gap-2">
                                   <p className="font-bold text-foreground">
-                                    {edu.degree || edu.course || "Formação Acadêmica"}
+                                    {edu.course || edu.degree || "Formação Acadêmica"}
+                                    {edu.degree && <span className="ml-2 inline-flex items-center rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground align-middle">{edu.degree}</span>}
                                     {edu.is_extension && <span className="ml-2 inline-flex items-center rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary align-middle">Extensão</span>}
                                   </p>
                                   {canEditEntries && (
@@ -1706,11 +1713,21 @@ export function CandidateProfileModal({
                           <div className="p-4 rounded-xl border border-primary/40 bg-primary/5 space-y-3">
                             <p className="text-sm font-bold">{eduDraft.__persisted ? "Editar formação" : "Nova formação"}</p>
                             <div className="grid gap-3 sm:grid-cols-2">
-                              <EntryField label="Curso / Grau">
-                                <Input value={eduDraft.degree || eduDraft.course || ""} onChange={(e) => setEduDraft({ ...eduDraft, degree: e.target.value, course: e.target.value })} placeholder="Ex: Técnico em Edificações" />
+                              <EntryField label="Nível de formação">
+                                <select
+                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                  value={eduDraft.degree || ""}
+                                  onChange={(e) => setEduDraft({ ...eduDraft, degree: e.target.value })}
+                                >
+                                  <option value="">Selecione...</option>
+                                  {EDUCATION_LEVEL_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                                </select>
+                              </EntryField>
+                              <EntryField label="Curso">
+                                <Input value={eduDraft.course || ""} onChange={(e) => setEduDraft({ ...eduDraft, course: e.target.value })} placeholder="Ex: Edificações" />
                               </EntryField>
                               <EntryField label="Instituição">
-                                <Input value={eduDraft.institution || ""} onChange={(e) => setEduDraft({ ...eduDraft, institution: e.target.value })} placeholder="Ex: IFSul" />
+                                <InstitutionSelect value={eduDraft.institution || ""} onChange={(name) => setEduDraft({ ...eduDraft, institution: name })} />
                               </EntryField>
                               <EntryField label="Início">
                                 <Input type="date" value={eduDraft.start_date || ""} onChange={(e) => setEduDraft({ ...eduDraft, start_date: e.target.value })} />
