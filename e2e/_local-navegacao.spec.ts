@@ -708,8 +708,6 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
       '/dashboard/beneficios',
       '/dashboard/ponto',
       '/dashboard/mps',
-      '/dashboard/holerites',
-      '/dashboard/ferias',
       '/dashboard/rgs',
       '/dashboard/onboarding',
       '/dashboard/parceiros',

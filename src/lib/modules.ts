@@ -31,8 +31,6 @@ export const MODULES = [
   "obras",
   "beneficios",
   "treinamentos",
-  "ferias",
-  "holerites",
   "avaliacoes",
   "clima",
   "metas",

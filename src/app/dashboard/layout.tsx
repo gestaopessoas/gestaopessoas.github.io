@@ -22,8 +22,6 @@ const breadcrumbMap: Record<string, string> = {
   "/dashboard/banco-talentos": "Banco de Talentos",
   "/dashboard/admissao": "Admissão",
   "/dashboard/ponto": "Ponto",
-  "/dashboard/ferias": "Férias",
-  "/dashboard/holerites": "Holerites",
   "/dashboard/arquivo-morto": "Arquivo Morto",
   "/dashboard/rgs": "Controle RGS",
   "/dashboard/colaboradores": "Colaboradores",
