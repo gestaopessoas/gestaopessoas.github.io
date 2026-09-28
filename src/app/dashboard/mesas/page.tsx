@@ -117,7 +117,7 @@ export default function MesasPage() {
            {/* Screen */}
            <div className="absolute top-1/2 -mt-1 h-2 w-16 -translate-y-1/2 rounded-sm bg-zinc-700 shadow-sm"></div>
            {/* Name tag */}
-           <div className="z-10 mt-16 rounded bg-white/90 px-2 py-0.5 text-[10px] font-bold shadow-sm">
+           <div className="z-10 mt-16 rounded bg-white/90 text-zinc-900 px-2 py-0.5 text-[10px] font-bold shadow-sm">
              {employeeName}
            </div>
         </button>
@@ -132,7 +132,7 @@ export default function MesasPage() {
            {/* Screen */}
            <div className="absolute bottom-6 left-1/2 h-2 w-20 -translate-x-1/2 rounded-sm bg-zinc-800 shadow-sm"></div>
            {/* Name tag */}
-           <div className="z-10 mt-8 rounded bg-white/90 px-2 py-0.5 text-[10px] font-bold shadow-sm">
+           <div className="z-10 mt-8 rounded bg-white/90 text-zinc-900 px-2 py-0.5 text-[10px] font-bold shadow-sm">
              {employeeName}
            </div>
         </button>
@@ -143,7 +143,7 @@ export default function MesasPage() {
       return (
         <button key={index} onClick={() => open(sectorName, index, pos)} className="relative flex h-20 w-32 flex-col items-center justify-center border-r border-zinc-400 bg-[#e2e8f0] shadow-sm transition-transform hover:scale-105">
            <div className={`absolute -top-6 left-1/2 h-8 w-8 -translate-x-1/2 rounded-full border-2 border-zinc-300 shadow-sm ${isOccupied ? 'bg-primary' : 'bg-white'}`}></div>
-           <div className="z-10 mt-4 rounded bg-white/90 px-2 py-0.5 text-[9px] font-bold shadow-sm">
+           <div className="z-10 mt-4 rounded bg-white/90 text-zinc-900 px-2 py-0.5 text-[9px] font-bold shadow-sm">
              {employeeName}
            </div>
         </button>
@@ -157,7 +157,7 @@ export default function MesasPage() {
         {index <= (Math.ceil(10 / 2)) ? ( // simple logic: first half top, second half bottom. But we pass index. Actually, let's use flex grid.
           <div className="flex h-full w-full flex-col items-center justify-between p-2">
             <div className="h-1 w-12 rounded-sm bg-zinc-700/50 shadow-sm"></div>
-            <div className="rounded bg-white/80 px-1 py-0.5 text-[9px] font-bold leading-tight shadow-sm max-w-[90%] truncate text-center">
+            <div className="rounded bg-white/80 text-zinc-900 px-1 py-0.5 text-[9px] font-bold leading-tight shadow-sm max-w-[90%] truncate text-center">
               {employeeName}
             </div>
             <div className={`absolute -bottom-3 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full border border-zinc-300 shadow-sm transition-transform group-hover:scale-110 ${isOccupied ? 'bg-primary' : 'bg-white'}`}></div>
@@ -235,7 +235,7 @@ export default function MesasPage() {
                           )}
                           
                           <div className="h-1 w-12 rounded-sm bg-zinc-700/40 shadow-sm mt-1"></div>
-                          <div className="mt-2 rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight shadow-sm max-w-[85%] truncate text-center">
+                          <div className="mt-2 rounded bg-white/90 text-zinc-900 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight shadow-sm max-w-[85%] truncate text-center">
                             {employeeName}
                           </div>
 
