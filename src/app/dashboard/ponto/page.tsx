@@ -21,13 +21,10 @@ import { DiarioPontoTab } from "@/components/ponto/DiarioPontoTab";
 
 const REFERENCE_MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-/** "Agosto / 2026" -> "2026-08-01". Retorna null se não reconhecer o formato. */
-function parseReferenceMonthToDate(referenceMonth: string): string | null {
-  const match = referenceMonth.match(/([A-Za-zçÇ]+)\s*\/\s*(\d{4})/);
-  if (!match) return null;
-  const monthIndex = REFERENCE_MONTH_NAMES.findIndex(m => m.toLowerCase() === match[1].toLowerCase());
-  if (monthIndex < 0) return null;
-  return `${match[2]}-${String(monthIndex + 1).padStart(2, "0")}-01`;
+/** "2026-08" (valor do <input type="month">) -> "Agosto / 2026", texto gravado no histórico. */
+function formatReferenceMonthLabel(referenceMonthValue: string): string {
+  const [year, month] = referenceMonthValue.split("-");
+  return `${REFERENCE_MONTH_NAMES[Number(month) - 1]} / ${year}`;
 }
 
 /** Minutos (podem ser negativos) -> "H:MM" com sinal. */
@@ -71,13 +68,12 @@ export default function PontoPage() {
   const [selectedTimeBankEmployee, setSelectedTimeBankEmployee] = useState<TimeBankEmployee | null>(null);
 
   // RHID Import state
-  const [referenceMonth, setReferenceMonth] = useState<string>(() => {
+  // "AAAA-MM", formato do <input type="month">. Mês anterior como padrão típico de fechamento.
+  const [referenceMonthValue, setReferenceMonthValue] = useState<string>(() => {
     const now = new Date();
-    // Mês anterior como padrão típico de fechamento
-    const prevMonthIndex = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
-    const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-    return `${REFERENCE_MONTH_NAMES[prevMonthIndex]} / ${year}`;
+    return format(new Date(now.getFullYear(), now.getMonth() - 1, 1), "yyyy-MM");
   });
+  const referenceMonth = referenceMonthValue ? formatReferenceMonthLabel(referenceMonthValue) : "";
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [processedResult, setProcessedResult] = useState<ProcessedRhidResult | null>(null);
   const [processingError, setProcessingError] = useState<string>("");
@@ -196,6 +192,10 @@ export default function PontoPage() {
 
   const handleConfirmAndSaveHistory = async () => {
     if (!processedResult || processedResult.matchedEmployeesList.length === 0) return;
+    if (!referenceMonthValue) {
+      setDbError("Selecione o Mês de Referência antes de salvar.");
+      return;
+    }
     setSavingHistory(true);
     setSaveSuccessMessage("");
 
@@ -252,22 +252,19 @@ export default function PontoPage() {
       // 3. Gravar o banco de horas do mês (extraído do arquivo: códigos 150/175/200
       // creditam, 211/212 debitam — ver rhidProcessor.ts). Reimportar o mesmo mês
       // sobrescreve o total anterior (upsert por employee_id + reference_month).
-      const referenceMonthDate = parseReferenceMonthToDate(referenceMonth);
-      if (referenceMonthDate) {
-        const timeBankPayload = Object.entries(processedResult.timeBankByEmployee).map(([employeeId, totals]) => ({
-          employee_id: employeeId,
-          reference_month: referenceMonthDate,
-          positive_minutes: totals.positiveMinutes,
-          negative_minutes: totals.negativeMinutes,
-          source_file: processedResult.fileName,
-        }));
-        if (timeBankPayload.length) {
-          const { error: timeBankError } = await supabase
-            .from("employee_time_bank_entries")
-            .upsert(timeBankPayload, { onConflict: "employee_id,reference_month" });
-          if (timeBankError) throw timeBankError;
-          await loadTimeBank();
-        }
+      const timeBankPayload = Object.entries(processedResult.timeBankByEmployee).map(([employeeId, totals]) => ({
+        employee_id: employeeId,
+        reference_month: `${referenceMonthValue}-01`,
+        positive_minutes: totals.positiveMinutes,
+        negative_minutes: totals.negativeMinutes,
+        source_file: processedResult.fileName,
+      }));
+      if (timeBankPayload.length) {
+        const { error: timeBankError } = await supabase
+          .from("employee_time_bank_entries")
+          .upsert(timeBankPayload, { onConflict: "employee_id,reference_month" });
+        if (timeBankError) throw timeBankError;
+        await loadTimeBank();
       }
 
       setSaveSuccessMessage(
@@ -356,10 +353,10 @@ export default function PontoPage() {
                       Mês de Referência (Fechamento)
                     </label>
                     <input
-                      type="text"
-                      value={referenceMonth}
-                      onChange={(e) => setReferenceMonth(e.target.value)}
-                      placeholder="Ex: Julho / 2026"
+                      type="month"
+                      value={referenceMonthValue}
+                      onChange={(e) => setReferenceMonthValue(e.target.value)}
+                      onClick={(e) => e.currentTarget.showPicker?.()}
                       className="w-full h-11 px-3.5 rounded-lg border bg-background font-medium shadow-sm text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
                     />
                   </div>
