@@ -563,69 +563,100 @@ export default function SalaryTablePage() {
       </Dialog>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:w-fit sm:min-w-[34rem] sm:max-w-[min(94vw,1200px)]">
           <DialogHeader>
-            <DialogTitle>{editingRole ? `Níveis: ${editingRole}` : "Nova Faixa Salarial"}</DialogTitle>
+            <DialogTitle>{editingRole ? `Faixas salariais: ${editingRole}` : "Nova Faixa Salarial"}</DialogTitle>
           </DialogHeader>
           {editingRole ? (
             <div className="space-y-6">
               {(() => {
                 const grouped = groupByRegimeAndLevel(roleVariants) as Record<string, Record<string, Record<string, SalaryRow>>>;
                 const levels = levelsInUse(roleVariants) as string[];
-                return ["CLT", "PJ"].map((modality) => {
-                  const seniorityGroups = grouped[modality];
-                  if (!seniorityGroups) return null;
-                  const seniorityKeys = Object.keys(seniorityGroups);
-                  if (seniorityKeys.length === 0) return null;
-                  return (
-                    <div key={modality} className="space-y-4">
-                      <h3 className="font-medium text-center border-b pb-2">{modality}</h3>
-                      {seniorityKeys.map((seniorityKey) => {
-                        const levelsForSeniority = seniorityGroups[seniorityKey];
-                        return (
-                          <div key={seniorityKey} className="space-y-2">
-                            {seniorityKey !== NO_SENIORITY_KEY && (
-                              <h4 className="text-sm font-medium text-muted-foreground text-center">{seniorityKey}</h4>
-                            )}
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-sm text-center">
-                                <thead>
-                                  <tr>
-                                    {levels.map(lvl => <th key={lvl} className="py-2 border-b whitespace-nowrap px-2">{lvl}</th>)}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  <tr>
-                                    {levels.map(lvl => {
-                                      const row = levelsForSeniority[lvl];
-                                      return (
-                                        <td key={lvl} className="py-2 px-2">
-                                          {row ? (
-                                            <div className="flex flex-col items-center gap-1">
-                                              <span className="whitespace-nowrap">{formatCurrency(row.salary || 0)}</span>
-                                              <div className="flex gap-1">
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingRow(row); setEditingRole(""); }}><Edit3 className="h-3 w-3"/></Button>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDelete(row.id)}><Trash2 className="h-3 w-3"/></Button>
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <span className="text-muted-foreground">—</span>
-                                          )}
-                                        </td>
-                                      );
-                                    })}
-                                  </tr>
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                });
+                // Uma linha por regime + senioridade, uma coluna por nível: o cargo inteiro
+                // numa grade só, em vez de uma tabelinha por combinação.
+                // Escada de carreira: Sênior em cima, Pleno no meio, Júnior embaixo. Estagiário
+                // segue a mesma lógica pela escolaridade (Superior > Técnico > Médio).
+                const ordem = ["sênior", "pleno", "júnior", "superior", "técnico", "médio"];
+                const posicao = (chave: string) => {
+                  const i = ordem.findIndex((o) => chave.toLowerCase().includes(o));
+                  return i === -1 ? ordem.length : i;
+                };
+                const linhas = ["CLT", "PJ"].flatMap((modality) =>
+                  Object.entries(grouped[modality] ?? {})
+                    .sort(([a], [b]) => posicao(a) - posicao(b))
+                    .map(([seniorityKey, porNivel]) => ({ modality, seniorityKey, porNivel })));
+                const semNivel = roleVariants.filter((r) => r.uses_level === false);
+                const acoes = (row: SalaryRow) => (
+                  <div className="flex justify-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingRow(row); setEditingRole(""); }}><Edit3 className="h-3 w-3"/></Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDelete(row.id)}><Trash2 className="h-3 w-3"/></Button>
+                  </div>
+                );
+                return (
+                  <>
+                    {linhas.length > 0 && (
+                      <div className="overflow-x-auto rounded-md border">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="sticky left-0 z-10 bg-muted px-3 py-2 text-left font-medium">Regime / Senioridade</th>
+                              {levels.map((lvl) => <th key={lvl} className="whitespace-nowrap border-l px-3 py-2 text-center font-medium">{lvl}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {linhas.map(({ modality, seniorityKey, porNivel }) => (
+                              <tr key={`${modality}|${seniorityKey}`} className="border-t">
+                                <th className="sticky left-0 z-10 whitespace-nowrap bg-popover px-3 py-2 text-left font-medium">
+                                  {modality}
+                                  {seniorityKey !== NO_SENIORITY_KEY && <span className="ml-2 font-normal text-muted-foreground">{seniorityKey}</span>}
+                                </th>
+                                {levels.map((lvl) => {
+                                  const row = porNivel[lvl];
+                                  return (
+                                    <td key={lvl} className="border-l px-3 py-2 text-center">
+                                      {row ? (
+                                        <div className="flex flex-col items-center gap-1">
+                                          <span className="whitespace-nowrap tabular-nums">{formatCurrency(row.salary || 0)}</span>
+                                          {acoes(row)}
+                                        </div>
+                                      ) : <span className="text-muted-foreground">—</span>}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    {semNivel.length > 0 && (
+                      <div className="overflow-x-auto rounded-md border">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-medium">Regime</th>
+                              <th className="px-3 py-2 text-center font-medium">Experiência</th>
+                              <th className="px-3 py-2 text-center font-medium">Após 90 dias</th>
+                              <th className="px-3 py-2 text-center font-medium">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {semNivel.map((row) => (
+                              <tr key={row.id} className="border-t">
+                                <td className="px-3 py-2 font-medium">{row.modality}</td>
+                                <td className="px-3 py-2 text-center tabular-nums">{formatCurrency(row.salary_experience || 0)}</td>
+                                <td className="px-3 py-2 text-center tabular-nums">{formatCurrency(row.salary_after_probation || 0)}</td>
+                                <td className="px-3 py-2">{acoes(row)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                );
               })()}
-              <Button onClick={() => setEditingRow({ role_name: editingRole, level: "Nível I", seniority: "", modality: "CLT", salary: 0, role_code: roleVariants[0]?.role_code || "", uses_level: true, salary_experience: null, salary_after_probation: null })}>Adicionar faixa</Button>
+              <Button onClick={() => { setEditingRow({ role_name: editingRole, level: "Nível I", seniority: "", modality: "CLT", salary: 0, role_code: roleVariants[0]?.role_code || "", uses_level: true, salary_experience: null, salary_after_probation: null }); setEditingRole(""); }}>Adicionar faixa</Button>
             </div>
           ) : (
             <div className="space-y-4 py-4">
