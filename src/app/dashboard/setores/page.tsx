@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Users, Plus, Search, X, Download } from "lucide-react";
+import { Edit3, Trash2, Users, Plus, Search, X, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEffect, useMemo, useState } from "react";
 
@@ -92,6 +92,22 @@ export default function SetoresPage() {
     setsectors((prev) => editingId ? prev.map((item) => item.id === editingId ? saved : item) : [...prev, saved].sort((a, b) => a.name.localeCompare(b.name)));
     setIsModalOpen(false);
     startNew();
+  };
+
+  const remove = async (dept: Department) => {
+    if (!confirm(`Excluir o setor "${dept.name}"?`)) return;
+    setError("");
+    // .select("id"): RLS que barra devolve 0 linhas sem erro
+    const { data, error: deleteError } = await createClient().from("sectors").delete().eq("id", dept.id).select("id");
+    if (deleteError) {
+      setError(`Não foi possível excluir o setor: ${deleteError.message}`);
+      return;
+    }
+    if (!data?.length) {
+      setError("Sem permissão para excluir este setor.");
+      return;
+    }
+    setsectors((prev) => prev.filter((item) => item.id !== dept.id));
   };
 
   const exportToCsv = () => {
@@ -182,6 +198,9 @@ export default function SetoresPage() {
                     <td className="px-4 py-3 text-right">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(dept)}>
                         <Edit3 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(dept)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </td>
                   </tr>

@@ -1,10 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { Building2, Edit3, Plus, Search, X, Download } from "lucide-react";
+import { Building2, Edit3, Plus, Search, Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type Company = {
@@ -28,6 +29,7 @@ export default function EmpresasPage() {
   const [filterStatus, setFilterStatus] = useState("Ativos");
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -69,6 +71,7 @@ export default function EmpresasPage() {
     setEditingId(null);
     setForm(emptyForm);
     setError("");
+    setOpen(true);
   };
 
   const startEdit = (company: Company) => {
@@ -85,6 +88,7 @@ export default function EmpresasPage() {
       status: company.status || "Ativo"
     });
     setError("");
+    setOpen(true);
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -117,7 +121,9 @@ export default function EmpresasPage() {
 
     const saved = result.data as Company;
     setCompanies((prev) => editingId ? prev.map((item) => item.id === editingId ? saved : item) : [...prev, saved].sort((a, b) => a.name.localeCompare(b.name)));
-    startNew();
+    setEditingId(null);
+    setForm(emptyForm);
+    setOpen(false);
   };
 
   const exportToCsv = () => {
@@ -159,7 +165,7 @@ export default function EmpresasPage() {
           </div>
         </header>
 
-        {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
+        {error && !open && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Metric label="Total de CNPJs" value={companies.length} />
@@ -167,12 +173,12 @@ export default function EmpresasPage() {
           <Metric label="Ativos" value={companies.filter((company) => company.status === "Ativo" || !company.status).length} />
         </div>
 
-        <form onSubmit={save} className="rounded-lg border bg-card p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold">{editingId ? "Editar empresa" : "Adicionar empresa"}</h2>
-            {editingId && <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={startNew}><X className="h-4 w-4" /></Button>}
-          </div>
-          <div className="grid gap-3 md:grid-cols-5 mb-4">
+        <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-2xl">
+        <DialogHeader><DialogTitle>{editingId ? "Editar empresa" : "Adicionar empresa"}</DialogTitle></DialogHeader>
+        <form onSubmit={save}>
+          {error && <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+          <div className="grid gap-3 md:grid-cols-2 mb-4">
             <Field label="CNPJ *"><Input required value={form.cnpj} onChange={(event) => setForm({ ...form, cnpj: event.target.value })} /></Field>
             <Field label="Razão social *"><Input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
             <Field label="Nome fantasia"><Input value={form.trading_name} onChange={(event) => setForm({ ...form, trading_name: event.target.value })} /></Field>
@@ -184,7 +190,7 @@ export default function EmpresasPage() {
               </select>
             </Field>
           </div>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2">
             <Field label="Encargos CLT (%)"><Input type="number" step="0.01" value={form.encargos_clt} onChange={(event) => setForm({ ...form, encargos_clt: event.target.value })} /></Field>
             <Field label="Encargos PJ (%)"><Input type="number" step="0.01" value={form.encargos_pj} onChange={(event) => setForm({ ...form, encargos_pj: event.target.value })} /></Field>
             <Field label="Encargos MEI (%)"><Input type="number" step="0.01" value={form.encargos_mei} onChange={(event) => setForm({ ...form, encargos_mei: event.target.value })} /></Field>
@@ -194,6 +200,8 @@ export default function EmpresasPage() {
             <Button type="submit" disabled={saving}>{saving ? "Salvando..." : editingId ? "Salvar edição" : "Adicionar"}</Button>
           </div>
         </form>
+        </DialogContent>
+        </Dialog>
 
         <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between mb-4">
           <div className="relative w-full max-w-sm">

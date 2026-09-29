@@ -312,7 +312,7 @@ export default function ObrasPage() {
 
         <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left whitespace-nowrap">
+            <table className="w-full text-sm text-left">
               <thead className="bg-muted/50 border-b border-border">
                 <tr className="text-muted-foreground font-medium">
                   <th className="px-4 py-3">Unidade</th>
@@ -330,7 +330,7 @@ export default function ObrasPage() {
                   <tr key={workplace.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 font-medium text-foreground">{workplace.name}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase ${typeStyle[workplace.type || "OBRA"] ?? ""}`}>
+                      <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase ${typeStyle[workplace.type || "OBRA"] ?? ""}`}>
                         {workplace.type || "OBRA"}
                       </span>
                     </td>
@@ -341,11 +341,11 @@ export default function ObrasPage() {
                       {!workplace.coordinator?.name && !workplace.responsible_director?.name && "-"}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="h-3 w-3 shrink-0" /> {workplace.address || "-"}
+                      <span className="inline-flex items-start gap-1.5">
+                        <MapPin className="h-3 w-3 shrink-0 mt-0.5" /> {workplace.address || "-"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
                       <Button variant="ghost" size="icon" className="h-7 w-7 mr-1" onClick={() => setArchiveId(workplace.id)} title="Arquivar">
                         <Archive className="h-4 w-4 text-muted-foreground" />
                       </Button>
