@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Save, Loader2, DownloadCloud, ShieldAlert, CalendarDays, Link as LinkIcon, Eye, EyeOff, X, Plus, Trash2 } from "lucide-react"
+import { Save, Loader2, DownloadCloud, ShieldAlert, CalendarDays, Link as LinkIcon, Eye, EyeOff } from "lucide-react"
+import { TagGroupsEditor, type TagGroup } from "@/components/configuracoes/TagGroupsEditor"
 import { createClient } from "@/utils/supabase/client"
 import { usePermissions } from "@/hooks/usePermissions"
 import { GlobalHistoryTab } from "@/components/configuracoes/GlobalHistoryTab"
@@ -22,7 +23,6 @@ const ACTIONS = ["view", "create", "edit", "delete"] as const
 type UserPerms = Record<string, Record<string, boolean>>
 type ProfileRow = { id: string; name: string | null; level: number; permissions: UserPerms }
 type SettingEntry = { path: string[]; value_text: string | null; value_boolean: boolean | null }
-type TagGroup = { category: string; tags: string[] }
 
 function readSettingFlags(entries: SettingEntry[]) {
   return Object.fromEntries(entries.filter((entry) => entry.path.length === 1).map((entry) => [entry.path[0], entry.value_boolean === true]));
@@ -41,8 +41,7 @@ export default function ConfiguracoesPage() {
   ])
   // null = ainda não carregou; salvar nesse estado apagaria todas as tags
   const [searchTags, setSearchTags] = useState<TagGroup[] | null>(null)
-  const [newTag, setNewTag] = useState<Record<string, string>>({})
-  const [newCategory, setNewCategory] = useState("")
+  const [assessmentOptions, setAssessmentOptions] = useState<TagGroup[] | null>(null)
   const [pauseHistory, setPauseHistory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -93,9 +92,10 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('system_settings').select('key, pause_history_tracking, system_setting_entries(path, value_text, value_boolean)').in('key', ['modules', 'permissions', 'work_schedules', 'monthly_benefits', 'colaboradores', 'search_tags'])
+      const { data } = await supabase.from('system_settings').select('key, pause_history_tracking, system_setting_entries(path, value_text, value_boolean)').in('key', ['modules', 'permissions', 'work_schedules', 'monthly_benefits', 'colaboradores', 'search_tags', 'assessment_options'])
       if (data) {
         setSearchTags(groupSearchTags((data.find(row => row.key === 'search_tags')?.system_setting_entries ?? []) as SettingEntry[]))
+        setAssessmentOptions(groupSearchTags((data.find(row => row.key === 'assessment_options')?.system_setting_entries ?? []) as SettingEntry[]))
         data.forEach(row => {
           const entries = (row.system_setting_entries ?? []) as SettingEntry[];
           if (row.key === 'modules') {
@@ -122,42 +122,6 @@ export default function ConfiguracoesPage() {
     load()
   }, [supabase])
 
-  function updateTagGroup(category: string, change: (group: TagGroup) => TagGroup | null) {
-    setSearchTags(prev => (prev ?? []).flatMap(group => {
-      if (group.category !== category) return [group]
-      const next = change(group)
-      return next ? [next] : []
-    }))
-  }
-
-  function addTag(category: string) {
-    const tag = (newTag[category] ?? "").trim()
-    if (!tag) return
-    if (searchTags?.some(group => group.tags.includes(tag))) return alert(`A tag "${tag}" já existe.`)
-    updateTagGroup(category, group => ({ ...group, tags: [...group.tags, tag] }))
-    setNewTag(prev => ({ ...prev, [category]: "" }))
-  }
-
-  function renameCategory(category: string) {
-    const name = prompt("Novo nome da categoria:", category)?.trim()
-    if (!name || name === category) return
-    if (searchTags?.some(group => group.category === name)) return alert(`A categoria "${name}" já existe.`)
-    updateTagGroup(category, group => ({ ...group, category: name }))
-  }
-
-  function removeCategory(group: TagGroup) {
-    if (!confirm(`Apagar a categoria "${group.category}" e suas ${group.tags.length} tags?`)) return
-    updateTagGroup(group.category, () => null)
-  }
-
-  function addCategory() {
-    const name = newCategory.trim()
-    if (!name) return
-    if (searchTags?.some(group => group.category === name)) return alert(`A categoria "${name}" já existe.`)
-    setSearchTags(prev => [...(prev ?? []), { category: name, tags: [] }])
-    setNewCategory("")
-  }
-
   async function handleSave() {
     setSaving(true)
     try {
@@ -167,7 +131,8 @@ export default function ConfiguracoesPage() {
         { key: 'work_schedules', pause_history_tracking: pauseHistory },
         { key: 'monthly_benefits', pause_history_tracking: false },
           { key: 'colaboradores', pause_history_tracking: false },
-        ...(searchTags ? [{ key: 'search_tags', pause_history_tracking: false }] : [])
+        ...(searchTags ? [{ key: 'search_tags', pause_history_tracking: false }] : []),
+        ...(assessmentOptions ? [{ key: 'assessment_options', pause_history_tracking: false }] : [])
       ], { onConflict: 'key' });
       
       if (settingsError) throw new Error(settingsError.message);
@@ -178,7 +143,7 @@ export default function ConfiguracoesPage() {
       );
       if (publicFormError) throw new Error(publicFormError.message);
 
-      const { error: entriesError } = await supabase.from('system_setting_entries').delete().in('setting_key', ['modules', 'permissions', 'work_schedules', 'monthly_benefits', 'colaboradores', ...(searchTags ? ['search_tags'] : [])]);
+      const { error: entriesError } = await supabase.from('system_setting_entries').delete().in('setting_key', ['modules', 'permissions', 'work_schedules', 'monthly_benefits', 'colaboradores', ...(searchTags ? ['search_tags'] : []), ...(assessmentOptions ? ['assessment_options'] : [])]);
       if (entriesError) throw new Error(entriesError.message);
       const entries = [
         ...Object.entries(modules).map(([key, value]) => ({ setting_key: 'modules', path: [key], value_type: 'boolean', value_boolean: value })),
@@ -187,6 +152,7 @@ export default function ConfiguracoesPage() {
         { setting_key: 'monthly_benefits', path: ['reminder_day'], value_type: 'string', value_text: String(reminderDay) },
           { setting_key: 'colaboradores', path: ['birthday_mode'], value_type: 'string', value_text: birthdayMode },
         ...(searchTags ? searchTagEntries(searchTags) : []),
+        ...(assessmentOptions ? searchTagEntries(assessmentOptions, 'assessment_options') : []),
       ];
       if (entries.length) {
         const { error } = await supabase.from('system_setting_entries').insert(entries);
@@ -454,48 +420,26 @@ export default function ConfiguracoesPage() {
                 <CardDescription>Tags que aparecem na solicitação de vaga, agrupadas por categoria. Apagar uma tag não a remove de vagas já criadas.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
-                {searchTags === null ? (
-                  <p className="text-sm text-muted-foreground">Carregando tags...</p>
-                ) : searchTags.map(group => (
-                  <div key={group.category} className="space-y-2 border-b border-border/40 pb-4">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm font-semibold">{group.category}</Label>
-                      <span className="text-xs text-muted-foreground">{group.tags.length}</span>
-                      <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 text-xs" onClick={() => renameCategory(group.category)}>Renomear</Button>
-                      <Button type="button" variant="ghost" size="icon-sm" title="Apagar categoria" aria-label={`Apagar categoria ${group.category}`} onClick={() => removeCategory(group)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {group.tags.map(tag => (
-                        <span key={tag} className="inline-flex items-center gap-1 rounded-full border bg-muted/40 py-1 pl-3 pr-1 text-xs">
-                          {tag}
-                          <button type="button" className="rounded-full p-0.5 hover:bg-muted" title={`Remover ${tag}`} aria-label={`Remover ${tag}`}
-                            onClick={() => updateTagGroup(group.category, g => ({ ...g, tags: g.tags.filter(t => t !== tag) }))}>
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex max-w-sm gap-2">
-                      <Input className="h-8 text-sm" placeholder="Nova tag" maxLength={80} value={newTag[group.category] ?? ""}
-                        onChange={e => setNewTag(prev => ({ ...prev, [group.category]: e.target.value }))}
-                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addTag(group.category) } }} />
-                      <Button type="button" variant="outline" size="sm" className="h-8" aria-label={`Adicionar tag em ${group.category}`} onClick={() => addTag(group.category)}><Plus className="h-4 w-4" /></Button>
-                    </div>
-                  </div>
-                ))}
-                {searchTags !== null && (
-                  <div className="flex max-w-sm gap-2">
-                    <Input className="h-8 text-sm" placeholder="Nova categoria" maxLength={60} value={newCategory}
-                      onChange={e => setNewCategory(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCategory() } }} />
-                    <Button type="button" variant="outline" size="sm" className="h-8" onClick={addCategory}><Plus className="h-4 w-4 mr-1" />Categoria</Button>
-                  </div>
-                )}
+                <TagGroupsEditor groups={searchTags} onChange={setSearchTags} />
               </CardContent>
               <CardFooter className="bg-muted/20 border-t border-border/40 pt-4 flex justify-end">
                 <Button size="sm" onClick={handleSave} disabled={saving || searchTags === null}>
+                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                  Salvar Alterações
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card className="border-border/60 shadow-sm">
+              <CardHeader className="pb-4 border-b border-border/40 mb-4">
+                <CardTitle className="text-lg">Opções do parecer de entrevista</CardTitle>
+                <CardDescription>Pontos fortes, pontos a desenvolver e recomendação que o entrevistador escolhe no parecer. Apagar uma opção não a remove de pareceres já salvos.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <TagGroupsEditor groups={assessmentOptions} onChange={setAssessmentOptions} itemLabel="opção" />
+              </CardContent>
+              <CardFooter className="bg-muted/20 border-t border-border/40 pt-4 flex justify-end">
+                <Button size="sm" onClick={handleSave} disabled={saving || assessmentOptions === null}>
                   {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                   Salvar Alterações
                 </Button>

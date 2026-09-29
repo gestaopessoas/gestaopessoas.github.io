@@ -191,7 +191,7 @@ export default function AdvanceStageModal({
     let atual = true;
     // Sem catch, um erro da consulta virava unhandled rejection: o entrevistador e opcional,
     // entao a lista fica vazia e o avanco continua.
-    fetchInterviewers(createClient(), obraId)
+    fetchInterviewers(createClient())
       .then((lista) => {
         if (atual) setInterviewers(lista);
       })

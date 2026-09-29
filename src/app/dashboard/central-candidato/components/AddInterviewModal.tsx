@@ -127,7 +127,7 @@ export default function AddInterviewModal({
       setLoadingInterviewers(true);
       setInterviewersError(false);
       try {
-        const lista = await fetchInterviewers(supabase, workplaceId);
+        const lista = await fetchInterviewers(supabase);
         if (!atual) return;
         setInterviewers(lista);
       } catch (err) {

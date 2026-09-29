@@ -36,9 +36,10 @@ export function withOrphanTags(groups, selected) {
 /**
  * Converte os grupos de volta para linhas de system_setting_entries.
  * @param {{ category: string, tags: string[] }[]} groups
+ * @param {string} settingKey
  */
-export function searchTagEntries(groups) {
+export function searchTagEntries(groups, settingKey = "search_tags") {
   return groups.flatMap((group) => group.tags.map((tag, index) => ({
-    setting_key: "search_tags", path: [group.category, String(index)], value_type: "string", value_text: tag,
+    setting_key: settingKey, path: [group.category, String(index)], value_type: "string", value_text: tag,
   })));
 }

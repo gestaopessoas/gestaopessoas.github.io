@@ -4,7 +4,7 @@ export type Interviewer = {
   id: string;
   name: string;
   role: string | null;
-  /** "obra" = liderança lotada na obra escolhida; "rh" = Gestão de Pessoas/RH, entrevista para qualquer obra. */
+  /** "obra" = coordenador/supervisor/diretor; "rh" = Gestão de Pessoas/RH. */
   origem: "obra" | "rh";
 };
 
@@ -20,52 +20,28 @@ export const hrRoles = [
 
 // Roles that can conduct interviews in obras
 export const interviewRoles = [
-  "coordenador de obras",
-  "mestre de obras",
-  "analista técnico",
-  "analista técnico(a) - obras",
-  "encarregado",
-  "supervisor(a) administrativo(a)",
-  "diretor operacional",
-  "gestor",
-  "gerente",
   "coordenador",
-  "administrativo de obras",
+  "supervisor",
+  "diretor",
 ];
 
-/** Busca lideranças lotadas na obra + toda a Gestão de Pessoas / RH, deduplicadas por id. */
+/** Busca coordenadores, supervisores, diretores, RH e Gestão de Pessoas de todas as obras. */
 export async function fetchInterviewers(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any, any, any>,
-  workplaceId: string
+  supabase: SupabaseClient<any, any, any>
 ): Promise<Interviewer[]> {
   // Match flexible: tolera variação de grafia/acento no texto livre de employees.role
-  const leadershipFilters = interviewRoles.map((r) => `role.ilike.%${r}%`).join(",");
-  const hrFilters = hrRoles.map((r) => `role.ilike.%${r}%`).join(",");
+  const filters = [...interviewRoles, ...hrRoles].map((r) => `role.ilike.%${r}%`).join(",");
 
-  // Duas consultas: lideranças são restritas à obra, RH não é.
-  const [obraRes, hrRes] = await Promise.all([
-    supabase
-      .from("employees")
-      .select("id, name, role")
-      .eq("status", "Ativo")
-      .eq("workplace_id", workplaceId)
-      .or(leadershipFilters),
-    supabase
-      .from("employees")
-      .select("id, name, role")
-      .eq("status", "Ativo")
-      .or(hrFilters),
-  ]);
-  if (obraRes.error) throw obraRes.error;
-  if (hrRes.error) throw hrRes.error;
+  const { data, error } = await supabase
+    .from("employees")
+    .select("id, name, role")
+    .eq("status", "Ativo")
+    .or(filters);
+  if (error) throw error;
 
-  // RH depois da obra: se a pessoa é das duas, prevalece "obra" (está lotada ali).
-  const porId = new Map<string, Interviewer>();
-  for (const e of hrRes.data ?? []) porId.set(e.id, { ...e, origem: "rh" });
-  for (const e of obraRes.data ?? []) porId.set(e.id, { ...e, origem: "obra" });
-
-  return [...porId.values()].sort(
-    (a, b) => a.origem.localeCompare(b.origem) || a.name.localeCompare(b.name, "pt-BR")
-  );
+  const isHr = (role: string | null) => hrRoles.some((r) => (role ?? "").toLowerCase().includes(r));
+  return (data ?? [])
+    .map((e): Interviewer => ({ ...e, origem: isHr(e.role) ? "rh" : "obra" }))
+    .sort((a, b) => a.origem.localeCompare(b.origem) || a.name.localeCompare(b.name, "pt-BR"));
 }

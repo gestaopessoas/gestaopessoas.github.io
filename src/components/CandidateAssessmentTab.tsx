@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from "recharts";
 import { Check, X, AlertTriangle, AlertCircle, CheckCircle2, BookOpen } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { SENIORITY_OPTIONS } from "@/app/dashboard/colaboradores/lib/employeeFormRules.mjs";
 import GuiaAvaliadorButton from "@/components/GuiaAvaliadorButton";
+import { createClient } from "@/utils/supabase/client";
+import { groupSearchTags } from "@/lib/searchTags.mjs";
 
 type AssessmentData = any;
 
@@ -37,17 +39,30 @@ const SOFT_SKILLS = [
   { id: "teamwork", label: "Trabalho em Equipe" },
 ];
 
-const STRENGTHS_LIST = [
-  "Autonomia", "Trabalho em Equipe", "Foco em Resultados", "Proatividade", 
-  "Organização", "Comunicação Clara", "Liderança", "Resiliência"
-];
+// Opções editáveis em Configurações (system_setting_entries, key 'assessment_options').
+// Esta lista só vale se a consulta falhar.
+const FALLBACK_OPTIONS: Record<string, string[]> = {
+  "Pontos fortes": ["Autonomia", "Trabalho em Equipe", "Foco em Resultados", "Proatividade", "Organização", "Comunicação Clara", "Liderança", "Resiliência"],
+  "Pontos a desenvolver": ["Ansiedade", "Dificuldade em Delegar", "Desorganização", "Comunicação Fechada", "Falta de Foco", "Impaciência", "Baixa Flexibilidade", "Gestão de Tempo"],
+  "Recomendação": ["Aprovar", "Aprovar com ressalvas", "Reprovar"],
+};
 
-const IMPROVEMENTS_LIST = [
-  "Ansiedade", "Dificuldade em Delegar", "Desorganização", "Comunicação Fechada", 
-  "Falta de Foco", "Impaciência", "Baixa Flexibilidade", "Gestão de Tempo"
-];
+const FIELD_CLASS = "flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 export function CandidateAssessmentTab({ assessmentData, candidateId, isEditing, onChange }: CandidateAssessmentTabProps) {
+  const [options, setOptions] = useState(FALLBACK_OPTIONS);
+  useEffect(() => {
+    let atual = true;
+    createClient()
+      .from("system_setting_entries")
+      .select("path, value_text")
+      .eq("setting_key", "assessment_options")
+      .then(({ data }) => {
+        if (!atual || !data?.length) return;
+        setOptions(Object.fromEntries(groupSearchTags(data).map((g: { category: string; tags: string[] }) => [g.category, g.tags])));
+      });
+    return () => { atual = false; };
+  }, []);
   // Radar Data
   const hardSkillsData = HARD_SKILLS.map(skill => ({
     subject: skill.label,
@@ -96,6 +111,11 @@ export function CandidateAssessmentTab({ assessmentData, candidateId, isEditing,
 
   const strengthsArray = getArrayValue('strengths');
   const improvementsArray = getArrayValue('improvement_points');
+  // Opção marcada no parecer que saiu da lista em Configurações continua aparecendo.
+  const withSelected = (list: string[] = [], selected: string[]) => [...list, ...selected.filter((v) => !list.includes(v))];
+  const strengthsOptions = withSelected(options["Pontos fortes"], strengthsArray);
+  const improvementsOptions = withSelected(options["Pontos a desenvolver"], improvementsArray);
+  const recommendationOptions = withSelected(options["Recomendação"], assessmentData.recommendation ? [assessmentData.recommendation] : []);
 
   return (
     <div className="space-y-6">
@@ -309,7 +329,7 @@ export function CandidateAssessmentTab({ assessmentData, candidateId, isEditing,
           </h3>
           {isEditing ? (
             <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))]">
-              {STRENGTHS_LIST.map(item => (
+              {strengthsOptions.map(item => (
                 <div key={item} className="flex items-start gap-2">
                   <Checkbox 
                     id={`s_${item}`} 
@@ -339,7 +359,7 @@ export function CandidateAssessmentTab({ assessmentData, candidateId, isEditing,
           </h3>
           {isEditing ? (
             <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))]">
-              {IMPROVEMENTS_LIST.map(item => (
+              {improvementsOptions.map(item => (
                 <div key={item} className="flex items-start gap-2">
                   <Checkbox 
                     id={`i_${item}`} 
@@ -360,6 +380,47 @@ export function CandidateAssessmentTab({ assessmentData, candidateId, isEditing,
                 </span>
               )) : <span className="text-sm text-muted-foreground">Nenhum ponto registrado</span>}
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* 5. RECOMENDAÇÃO E OBSERVAÇÕES */}
+      <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4">
+        <div>
+          <h3 className="font-bold text-lg">Recomendação e Observações</h3>
+          <p className="text-sm text-muted-foreground">Feche o parecer: sua recomendação e o que mais o RH precisa saber.</p>
+        </div>
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(16rem,1fr))]">
+          <div>
+            <label htmlFor="assessment-recommendation" className="text-xs text-muted-foreground block mb-1">Recomendação do avaliador</label>
+            {isEditing ? (
+              <select
+                id="assessment-recommendation"
+                className={`${FIELD_CLASS} h-10`}
+                value={assessmentData.recommendation || ""}
+                onChange={(e) => onChange('recommendation', e.target.value)}
+              >
+                <option value="">Selecione</option>
+                {recommendationOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            ) : (
+              <span className="font-semibold">{assessmentData.recommendation || "-"}</span>
+            )}
+          </div>
+        </div>
+        <div>
+          <label htmlFor="assessment-observations" className="text-xs text-muted-foreground block mb-1">Observações gerais</label>
+          {isEditing ? (
+            <textarea
+              id="assessment-observations"
+              rows={4}
+              className={FIELD_CLASS}
+              placeholder="Impressões da conversa, exemplos citados pelo candidato, pontos a checar com referências..."
+              value={assessmentData.observations || ""}
+              onChange={(e) => onChange('observations', e.target.value)}
+            />
+          ) : (
+            <p className="text-sm whitespace-pre-wrap">{assessmentData.observations || "Sem observações"}</p>
           )}
         </div>
       </div>
