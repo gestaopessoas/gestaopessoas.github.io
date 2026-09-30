@@ -24,7 +24,7 @@ import { MONTHS, type Employee, type Entity } from "./components/types";
 import { normalizeRole } from "./lib/normalizeRole.mjs";
 import { canonicalizeOption, criticalFieldsMatch, formatCurrencyInput, getScheduleForWorkplaceType, isValidCpf, levelFieldOptions, maskCurrencyInput, parseCurrencyInput, salaryChangeDue, sanitizeRgInput, SENIORITY_OPTIONS, seniorityForLevel, seniorityOptionsFromRules } from "./lib/employeeFormRules.mjs";
 import { FIXED_TERM_CONTRACTS, openContractEnds, openTrialPeriods } from "./lib/trialPeriodRules.mjs";
-import { exportBirthdaysPdf } from "./birthdaysPdf";
+import { exportBirthdaysPdf, exportWorkAnniversariesPdf } from "./birthdaysPdf";
 import { listWorkAnniversaries } from "./lib/anniversaryCounter";
 import { buscarTudo } from "@/lib/paginacao";
 import { EmployeeAvatar, signedPhotoUrl } from "@/components/EmployeeAvatar";
@@ -1028,6 +1028,30 @@ function ColaboradoresPageInner() {
     URL.revokeObjectURL(url);
   };
 
+  const exportWorkAnniversariesCsv = () => {
+    if (workAnniversariesThisMonth.length === 0) return;
+    const headers = ["Colaborador", "Cargo", "Departamento", "Dia do Aniversário de Casa", "Anos de Casa", "Na Empresa Desde"];
+    const csvCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const rows = workAnniversariesThisMonth.map(({ employee, info }) => [
+      csvCell(employee.name),
+      csvCell(employee.role),
+      csvCell(employee.departments?.name || employee.unit || employee.workplace),
+      csvCell(info.day.toString().padStart(2, "0")),
+      csvCell(info.years),
+      csvCell(info.date.toLocaleDateString("pt-BR")),
+    ].join(","));
+
+    const blob = new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `tempo_de_casa_${MONTHS[selectedMonth]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const roleSalaryEntries = salaryRules.filter(
     (rule) => normalizeRole(rule.role_name) === cargoDaFaixa(form.role) &&
               form.contract_type && rule.modality.toUpperCase() === form.contract_type.toUpperCase()
@@ -1423,23 +1447,7 @@ function ColaboradoresPageInner() {
               <p className="text-sm text-muted-foreground">Celebre as datas especiais da sua equipe.</p>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button variant="outline" onClick={exportBirthdaysCsv} disabled={birthdaysThisMonth.length === 0}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Exportar Excel
-                </Button>
-                <Button variant="default" onClick={() => exportBirthdaysPdf(MONTHS[selectedMonth], birthdaysThisMonth.map(b => ({
-                  name: b.employee.name,
-                  role: String(b.employee.role || "-"),
-                  day: b.info.day,
-                  age: differenceInYears(new Date(), b.info.date),
-                  birthDateStr: b.info.date.toLocaleDateString("pt-BR", { timeZone: "UTC" })
-                })))} disabled={birthdaysThisMonth.length === 0}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Exportar PDF
-                </Button>
-              </div>
-              <Label className="text-nowrap ml-2">Mês:</Label>
+              <Label className="text-nowrap">Mês:</Label>
               <select 
                 value={selectedMonth} 
                 onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -1454,7 +1462,25 @@ function ColaboradoresPageInner() {
 
           <div className="grid gap-8 lg:grid-cols-2">
             <div>
-              <h3 className="mb-4 text-base font-semibold flex items-center gap-2"><Cake className="h-4 w-4 text-pink-500" /> Aniversário de Vida</h3>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-base font-semibold flex items-center gap-2"><Cake className="h-4 w-4 text-pink-500" /> Aniversário de Vida</h3>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={exportBirthdaysCsv} disabled={birthdaysThisMonth.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Excel
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => exportBirthdaysPdf(MONTHS[selectedMonth], birthdaysThisMonth.map(b => ({
+                    name: b.employee.name,
+                    role: String(b.employee.role || "-"),
+                    day: b.info.day,
+                    age: differenceInYears(new Date(), b.info.date),
+                    birthDateStr: b.info.date.toLocaleDateString("pt-BR", { timeZone: "UTC" })
+                  })))} disabled={birthdaysThisMonth.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    PDF
+                  </Button>
+                </div>
+              </div>
               <div className="space-y-3">
                 {birthdaysThisMonth.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum aniversariante neste mês.</p>
@@ -1498,7 +1524,25 @@ function ColaboradoresPageInner() {
             </div>
 
             <div>
-              <h3 className="mb-4 text-base font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-blue-500" /> Tempo de Casa</h3>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-base font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-blue-500" /> Tempo de Casa</h3>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={exportWorkAnniversariesCsv} disabled={workAnniversariesThisMonth.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Excel
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => exportWorkAnniversariesPdf(MONTHS[selectedMonth], workAnniversariesThisMonth.map(({ employee, info }) => ({
+                    name: employee.name,
+                    role: String(employee.role || "-"),
+                    day: info.day,
+                    years: info.years,
+                    sinceDateStr: info.date.toLocaleDateString("pt-BR")
+                  })))} disabled={workAnniversariesThisMonth.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    PDF
+                  </Button>
+                </div>
+              </div>
               <div className="space-y-3">
                 {workAnniversariesThisMonth.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum aniversário de casa neste mês.</p>
