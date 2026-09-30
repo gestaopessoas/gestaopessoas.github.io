@@ -88,6 +88,18 @@ daemon responder (`docker info`) leva cerca de 20 segundos. Depois disso o
 `git commit` falha com "Author identity unknown". A identidade usada nos commits
 anteriores é `Bruno Souza <130676240+psibrunosg@users.noreply.github.com>`.
 
+**`tsc --noEmit` acusa `Cannot find module` em `.next/dev/types/validator.ts` depois que uma página é removida.**
+Os tipos gerados pelo `next dev` continuam apontando para rotas que já foram apagadas (em
+30/09/2026 eram férias, formulários e holerites). O erro não está no código-fonte. Para
+conferir, rodar `npx tsc --noEmit 2>&1 | grep -v '^\.next/'`; para corrigir, apagar
+`.next/dev/types`, que é regenerado e fica fora do git.
+
+**Sessão remota (cloud) entrega em branch `claude/*` + PR draft, nunca no `main`.**
+Em 30/09/2026 a exportação de tempo de casa ficou pronta no PR 165 (draft) e o usuário achou
+que tinha falhado, porque a função não aparecia no site. Quando alguém disser que "a sessão
+remota não fez", conferir primeiro `git branch -r` e `gh pr list --state open` antes de
+refazer o trabalho.
+
 ## Banco / migrations
 
 **Mexer numa tabela filha de `employees` (`ON DELETE CASCADE`) exige mexer no espelho em
