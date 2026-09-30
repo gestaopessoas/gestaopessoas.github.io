@@ -1,5 +1,5 @@
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable, { type Styles } from "jspdf-autotable";
 
 export type BirthdayData = {
   name: string;
@@ -7,6 +7,14 @@ export type BirthdayData = {
   day: number;
   age: number;
   birthDateStr: string;
+};
+
+export type WorkAnniversaryData = {
+  name: string;
+  role: string;
+  day: number;
+  years: number;
+  sinceDateStr: string;
 };
 
 const getBase64ImageFromUrl = async (imageUrl: string): Promise<string> => {
@@ -20,12 +28,21 @@ const getBase64ImageFromUrl = async (imageUrl: string): Promise<string> => {
   });
 };
 
-export const exportBirthdaysPdf = async (monthName: string, birthdays: BirthdayData[]) => {
+const GOLD: [number, number, number] = [222, 170, 48];
+const TITLE_TEXT: [number, number, number] = [43, 47, 51];
+const LABEL_TEXT: [number, number, number] = [75, 80, 87];
+
+// Mesmo papel timbrado para as duas listas do mês (vida e tempo de casa): só muda o
+// título, as colunas e o nome do arquivo.
+const exportMonthListPdf = async ({ title, listTitle, head, body, columnStyles, fileName }: {
+  title: string;
+  listTitle: string;
+  head: string[];
+  body: string[][];
+  columnStyles: Record<number, Partial<Styles>>;
+  fileName: string;
+}) => {
   const doc = new jsPDF("portrait");
-  
-  const GOLD: [number, number, number] = [222, 170, 48];
-  const TITLE_TEXT: [number, number, number] = [43, 47, 51];
-  const LABEL_TEXT: [number, number, number] = [75, 80, 87];
 
   try {
     const logoBase64 = await getBase64ImageFromUrl("/logos/SEDE.png");
@@ -46,8 +63,8 @@ export const exportBirthdaysPdf = async (monthName: string, birthdays: BirthdayD
   doc.setFont("helvetica", "bold");
   doc.setTextColor(TITLE_TEXT[0], TITLE_TEXT[1], TITLE_TEXT[2]);
   doc.setFontSize(16);
-  doc.text(`ANIVERSARIANTES DE ${monthName.toUpperCase()}`, 196, 16, { align: "right" });
-  
+  doc.text(title, 196, 16, { align: "right" });
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(LABEL_TEXT[0], LABEL_TEXT[1], LABEL_TEXT[2]);
@@ -60,19 +77,12 @@ export const exportBirthdaysPdf = async (monthName: string, birthdays: BirthdayD
   doc.setFont("helvetica", "bold");
   doc.setTextColor(TITLE_TEXT[0], TITLE_TEXT[1], TITLE_TEXT[2]);
   doc.setFontSize(14);
-  doc.text("LISTA DE ANIVERSARIANTES", 105, 38, { align: "center" });
-
-  const tableData = birthdays.map(b => [
-    b.day.toString().padStart(2, "0"),
-    b.name,
-    b.role,
-    b.age.toString(),
-  ]);
+  doc.text(listTitle, 105, 38, { align: "center" });
 
   autoTable(doc, {
     startY: 45,
-    head: [["Dia", "Colaborador", "Cargo", "Idade"]],
-    body: tableData,
+    head: [head],
+    body,
     theme: "plain",
     styles: {
       font: "helvetica",
@@ -90,22 +100,59 @@ export const exportBirthdaysPdf = async (monthName: string, birthdays: BirthdayD
       fillColor: [250, 250, 250],
     },
     margin: { left: 14, right: 14 },
+    columnStyles,
+    didDrawPage: function (data) {
+      const str = "Página " + doc.getCurrentPageInfo().pageNumber;
+      doc.setFontSize(8);
+      doc.setTextColor(LABEL_TEXT[0], LABEL_TEXT[1], LABEL_TEXT[2]);
+      doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
+
+      doc.setTextColor(GOLD[0], GOLD[1], GOLD[2]);
+      doc.text("ACPO-RH", 196, doc.internal.pageSize.height - 10, { align: "right" });
+    },
+  });
+
+  doc.save(fileName);
+};
+
+export const exportBirthdaysPdf = (monthName: string, birthdays: BirthdayData[]) =>
+  exportMonthListPdf({
+    title: `ANIVERSARIANTES DE ${monthName.toUpperCase()}`,
+    listTitle: "LISTA DE ANIVERSARIANTES",
+    head: ["Dia", "Colaborador", "Cargo", "Idade"],
+    body: birthdays.map((b) => [
+      b.day.toString().padStart(2, "0"),
+      b.name,
+      b.role,
+      b.age.toString(),
+    ]),
     columnStyles: {
       0: { cellWidth: 15, halign: "center" }, // Dia
       1: { cellWidth: 70 }, // Colaborador
       2: { cellWidth: 77 }, // Cargo
       3: { cellWidth: 15, halign: "center" }, // Idade
     },
-    didDrawPage: function (data) {
-      const str = "Página " + doc.getCurrentPageInfo().pageNumber;
-      doc.setFontSize(8);
-      doc.setTextColor(LABEL_TEXT[0], LABEL_TEXT[1], LABEL_TEXT[2]);
-      doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
-      
-      doc.setTextColor(GOLD[0], GOLD[1], GOLD[2]);
-      doc.text("ACPO-RH", 196, doc.internal.pageSize.height - 10, { align: "right" });
-    },
+    fileName: `aniversariantes_${monthName}.pdf`,
   });
 
-  doc.save(`aniversariantes_${monthName}.pdf`);
-};
+export const exportWorkAnniversariesPdf = (monthName: string, anniversaries: WorkAnniversaryData[]) =>
+  exportMonthListPdf({
+    title: `TEMPO DE CASA DE ${monthName.toUpperCase()}`,
+    listTitle: "ANIVERSARIANTES DE TEMPO DE CASA",
+    head: ["Dia", "Colaborador", "Cargo", "Desde", "Anos"],
+    body: anniversaries.map((a) => [
+      a.day.toString().padStart(2, "0"),
+      a.name,
+      a.role,
+      a.sinceDateStr,
+      a.years.toString(),
+    ]),
+    columnStyles: {
+      0: { cellWidth: 15, halign: "center" }, // Dia
+      1: { cellWidth: 65 }, // Colaborador
+      2: { cellWidth: 57 }, // Cargo
+      3: { cellWidth: 25, halign: "center" }, // Desde
+      4: { cellWidth: 20, halign: "center" }, // Anos
+    },
+    fileName: `tempo_de_casa_${monthName}.pdf`,
+  });
