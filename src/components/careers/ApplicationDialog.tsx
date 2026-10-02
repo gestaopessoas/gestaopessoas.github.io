@@ -640,7 +640,7 @@ export function ApplicationDialog({ job, open, onOpenChange, internal = false }:
             {isTalentPool && <Field label="Cargo de interesse"><Input disabled={!job} value={candidate.role_interest} onChange={(event) => update("role_interest", event.target.value)} placeholder="Ex.: Pedreiro, Auxiliar administrativo" /></Field>}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Telefone *">
-                <Input ref={phoneRef} required disabled={!job} inputMode="numeric" placeholder="(00) 00000-0000" value={candidate.phone} onChange={(event) => { setPhoneError(""); update("phone", maskPhone(event.target.value)); }} aria-invalid={!!phoneError} />
+                <Input ref={phoneRef} required disabled={!job} inputMode="numeric" placeholder="(00) 9 0000-0000" value={candidate.phone} onChange={(event) => { setPhoneError(""); update("phone", maskPhone(event.target.value)); }} aria-invalid={!!phoneError} />
                 {phoneError && <p role="alert" className="text-xs text-destructive">{phoneError}</p>}
               </Field>
               <Field label="E-mail"><Input disabled={!job} type="email" value={candidate.email} onChange={(event) => update("email", event.target.value)} /></Field>
@@ -718,7 +718,7 @@ export function ApplicationDialog({ job, open, onOpenChange, internal = false }:
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="E-mail secundário"><Input disabled={!job} type="email" onInvalid={revealOnInvalid} value={candidate.secondary_email} onChange={(event) => update("secondary_email", event.target.value)} /></Field>
-                  <Field label="Telefone secundário"><Input disabled={!job} inputMode="numeric" placeholder="(00) 00000-0000" value={candidate.secondary_phone} onChange={(event) => { setPhoneError(""); update("secondary_phone", maskPhone(event.target.value)); }} /></Field>
+                  <Field label="Telefone secundário"><Input disabled={!job} inputMode="numeric" placeholder="(00) 9 0000-0000" value={candidate.secondary_phone} onChange={(event) => { setPhoneError(""); update("secondary_phone", maskPhone(event.target.value)); }} /></Field>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Naturalidade"><Input value={candidate.birthplace} onChange={(event) => update("birthplace", event.target.value)} /></Field>
