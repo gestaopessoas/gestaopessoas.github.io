@@ -33,6 +33,7 @@ import { fetchInterviewProgress } from "@/lib/candidateHistory.mjs";
 import { errorMessage } from "@/lib/utils";
 import { fetchInterviewers, type Interviewer } from "@/lib/interviewers";
 import PerceptionChecklist, { PERCEPTION_NOTES_LABEL } from "./PerceptionChecklist";
+import { NO_SHOW_REASON, OUTCOME_OTHER, outcomeReasonError, outcomeReasons, type Outcome } from "@/lib/outcomes";
 
 /** Publicacao aberta que pode receber o candidato. A Obra e a Vaga vem dela, nao do usuario. */
 type Publicacao = {
@@ -109,9 +110,14 @@ export default function AdvanceStageModal({
   const [selectedPublicacaoId, setSelectedPublicacaoId] = useState("");
   // Entrevista marcada para hoje ou depois: avançar por cima dela sem dizer o que houve a
   // deixava marcada na Agenda e invisível na Central (issue #75).
-  const [entrevistaMarcada, setEntrevistaMarcada] = useState<EntrevistaMarcada | null>(null);
+  // `undefined` = ainda consultando: o avanço não aparece antes de saber se há o que registrar.
+  const [entrevistaMarcada, setEntrevistaMarcada] = useState<EntrevistaMarcada | null | undefined>(undefined);
   const [situacaoEntrevista, setSituacaoEntrevista] = useState("");
   const [resultadoEntrevista, setResultadoEntrevista] = useState("");
+  const [motivoDesfecho, setMotivoDesfecho] = useState("");
+  const [detalheDesfecho, setDetalheDesfecho] = useState("");
+  // A situação registrada viaja na nota do avanço que vem depois do registro.
+  const [notaEntrevista, setNotaEntrevista] = useState("");
   const router = useRouter();
 
   // So quem esta livre escolhe vaga: quem ja esta em processo tem Candidatura, e trocar a
@@ -120,9 +126,17 @@ export default function AdvanceStageModal({
   // abriria uma segunda Candidatura para a mesma pessoa.
   const precisaDeVaga = currentBucket === "livre" && !sameStage(currentStage, "Nova") && !forcedStage;
 
-  const registroEntrevistaCompleto =
-    !entrevistaMarcada ||
-    interviewOutcomeComplete({ status: situacaoEntrevista, result: resultadoEntrevista });
+  // Reprovado e Desistente encerram a Candidatura no próprio registro: não há etapa seguinte
+  // para escolher, e o banco exige o motivo do desfecho (20260916140000_desfecho_com_motivo).
+  // Faltar à entrevista conta como reprovação, e a falta já é o motivo: não há o que perguntar.
+  const faltou = situacaoEntrevista === "Não compareceu";
+  const desfechoDoRegistro: Outcome | null =
+    situacaoEntrevista === "Desistente"
+      ? "Desistente"
+      : faltou || (situacaoEntrevista === "Compareceu" && resultadoEntrevista === "Reprovado")
+        ? "Reprovado"
+        : null;
+  const motivoDoRegistro = faltou ? NO_SHOW_REASON : motivoDesfecho;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -214,6 +228,8 @@ export default function AdvanceStageModal({
       setEntrevistaMarcada(marcada);
       setSituacaoEntrevista("");
       setResultadoEntrevista("");
+      setMotivoDesfecho("");
+      setDetalheDesfecho("");
     };
     carregarEntrevista();
     return () => { ativo = false; };
@@ -266,16 +282,6 @@ export default function AdvanceStageModal({
         setSaving(false);
         return;
       }
-      if (!registroEntrevistaCompleto) {
-        setError(
-          situacaoEntrevista === "Compareceu"
-            ? "Informe se o candidato foi aprovado ou reprovado na entrevista."
-            : "Registre o que ocorreu na entrevista marcada antes de avançar a etapa."
-        );
-        setSaving(false);
-        return;
-      }
-
       // A Candidatura nasce antes de tudo: e ela que tira a pessoa do Banco de Talentos, e
       // sem ela o resto viraria historico de um processo que nao existe.
       //
@@ -317,31 +323,7 @@ export default function AdvanceStageModal({
         return;
       }
 
-      // A entrevista é gravada antes do avanço: se o registro do encontro falhar, a etapa
-      // não anda — é isso que impede a entrevista de continuar marcada sem ninguém saber.
       let entrevistaParaParecer: string | undefined;
-      let notaEntrevista = "";
-      if (entrevistaMarcada) {
-        const situacao = normalizeInterviewProgress({
-          status: situacaoEntrevista,
-          result: resultadoEntrevista,
-          destination: entrevistaMarcada.destination,
-          interview_date: entrevistaMarcada.interview_date,
-          interview_time: entrevistaMarcada.interview_time,
-        });
-        const { error: entrevistaError } = await supabase
-          .from("interviews")
-          .update({ status: situacao.status, result: situacao.result, destination: situacao.destination })
-          .eq("id", entrevistaMarcada.id);
-        if (entrevistaError) {
-          setError(`A etapa não avançou: a entrevista marcada não pôde ser atualizada (${entrevistaError.message}).`);
-          setSaving(false);
-          return;
-        }
-        // Uma linha de histórico só: a situação da entrevista vai na nota do avanço, para o
-        // registro não contradizer a etapa nova (um "Desistente" seguido de "Em Obra").
-        notaEntrevista = `[Entrevista] ${entrevistaMarcada.role || "Vaga não informada"} — ${formatInterviewSchedule(entrevistaMarcada.interview_date, entrevistaMarcada.interview_time)} · Situação: ${situacao.status} · Resultado: ${situacao.result}`;
-      }
 
       const quando = marcaEntrevista ? formatInterviewSchedule(stageDate, stageTime) : "";
 
@@ -439,12 +421,93 @@ export default function AdvanceStageModal({
       setSelectedPublicacaoId("");
       setNotes("");
       setCandidateFuture([]);
-      setEntrevistaMarcada(null);
-      setSituacaoEntrevista("");
-      setResultadoEntrevista("");
+      setNotaEntrevista("");
     } catch (err) {
       console.error(err);
       setError(errorMessage(err, "Ocorreu um erro ao avançar o candidato."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /**
+   * Registra o que ocorreu na entrevista marcada. É um passo separado do avanço: reprovado
+   * ou desistente não tem próxima etapa, e o modal antigo obrigava a escolher uma (issue #75).
+   */
+  const registrarEntrevista = async () => {
+    if (!entrevistaMarcada) return;
+    if (!interviewOutcomeComplete({ status: situacaoEntrevista, result: resultadoEntrevista })) {
+      setError(
+        situacaoEntrevista === "Compareceu"
+          ? "Informe se o candidato foi aprovado ou reprovado na entrevista."
+          : "Informe o que ocorreu na entrevista."
+      );
+      return;
+    }
+    if (desfechoDoRegistro && applicationId && !faltou) {
+      const motivoError = outcomeReasonError(motivoDesfecho, detalheDesfecho);
+      if (motivoError) {
+        setError(motivoError);
+        return;
+      }
+    }
+
+    setSaving(true);
+    setError("");
+    const supabase = createClient();
+    try {
+      const situacao = normalizeInterviewProgress({
+        status: situacaoEntrevista,
+        result: resultadoEntrevista,
+        destination: entrevistaMarcada.destination,
+        interview_date: entrevistaMarcada.interview_date,
+        interview_time: entrevistaMarcada.interview_time,
+      });
+      const { error: entrevistaError } = await supabase
+        .from("interviews")
+        .update({ status: situacao.status, result: situacao.result, destination: situacao.destination })
+        .eq("id", entrevistaMarcada.id);
+      if (entrevistaError) {
+        setError(`A entrevista não pôde ser registrada (${entrevistaError.message}).`);
+        return;
+      }
+      // Uma linha de histórico só: a situação da entrevista vai na nota da mudança de Etapa,
+      // para o registro não contradizer a etapa nova (um "Desistente" seguido de "Em Obra").
+      const nota = `[Entrevista] ${entrevistaMarcada.role || "Vaga não informada"} — ${formatInterviewSchedule(entrevistaMarcada.interview_date, entrevistaMarcada.interview_time)} · Situação: ${situacao.status} · Resultado: ${situacao.result}`;
+
+      if (desfechoDoRegistro) {
+        // ponytail: entrevista e Candidatura em dois updates sem transação; se o segundo
+        // falhar, a entrevista fica registrada e o RH encerra pela Central.
+        if (applicationId) {
+          const { error: desfechoError } = await supabase
+            .from("job_applications")
+            .update({
+              status: desfechoDoRegistro,
+              outcome_reason: motivoDoRegistro,
+              outcome_details: detalheDesfecho.trim() || null,
+              advance_notes: nota,
+            })
+            .eq("id", applicationId);
+          if (desfechoError) {
+            const msg = desfechoError.message || "";
+            setError(
+              msg.includes("Etapa Terminal")
+                ? "Entrevista registrada. A candidatura já estava encerrada."
+                : `Entrevista registrada, mas a candidatura não foi encerrada: ${msg}`
+            );
+            return;
+          }
+        }
+        onSuccess();
+        return;
+      }
+
+      // Aprovado: agora sim o avanço aparece.
+      setNotaEntrevista(nota);
+      setEntrevistaMarcada(null);
+    } catch (err) {
+      console.error(err);
+      setError(errorMessage(err, "Ocorreu um erro ao registrar a entrevista."));
     } finally {
       setSaving(false);
     }
@@ -457,9 +520,11 @@ export default function AdvanceStageModal({
           {/* `forcedStage` nasceu como "Contratar"; hoje a tela da vaga também o usa para
               mandar direto para a entrevista, então o título sai da etapa, não do fato de
               ela estar fixada. */}
-          <DialogTitle>{forcedStage ? (forcedStage === "Contratado" ? "Contratar" : `Mover para ${forcedStage}`) : precisaDeVaga ? "Chamar para uma vaga" : "Avançar Etapa"}</DialogTitle>
+          <DialogTitle>{entrevistaMarcada ? "Registrar entrevista" : forcedStage ?(forcedStage === "Contratado" ? "Contratar" : `Mover para ${forcedStage}`) : precisaDeVaga ? "Chamar para uma vaga" : "Avançar Etapa"}</DialogTitle>
           <DialogDescription>
-            {forcedStage === "Contratado"
+            {entrevistaMarcada
+              ? <>Registrar o que ocorreu na entrevista de <strong>{candidateName}</strong>.</>
+              : forcedStage === "Contratado"
               ? <>Registrar a contratação de <strong>{candidateName}</strong>.</>
               : forcedStage
                 ? <>Registrar <strong>{candidateName}</strong> na etapa {forcedStage} — a pessoa passa a aparecer na Central do Candidato.</>
@@ -487,7 +552,7 @@ export default function AdvanceStageModal({
                     : "."}
                 </span>
               </p>
-              <p>Registre o que ocorreu nela para poder avançar a etapa.</p>
+              <p>Registre o que ocorreu nela. O avanço de etapa aparece depois do registro.</p>
               <div className="grid gap-2">
                 <label className="font-medium" htmlFor="avanco-situacao-entrevista">
                   O que ocorreu na entrevista *
@@ -498,6 +563,7 @@ export default function AdvanceStageModal({
                   onChange={(e) => {
                     setSituacaoEntrevista(e.target.value);
                     setResultadoEntrevista("");
+                    setMotivoDesfecho("");
                   }}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                 >
@@ -515,7 +581,10 @@ export default function AdvanceStageModal({
                   <select
                     id="avanco-resultado-entrevista"
                     value={resultadoEntrevista}
-                    onChange={(e) => setResultadoEntrevista(e.target.value)}
+                    onChange={(e) => {
+                      setResultadoEntrevista(e.target.value);
+                      setMotivoDesfecho("");
+                    }}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                   >
                     <option value="">Selecione...</option>
@@ -524,8 +593,44 @@ export default function AdvanceStageModal({
                   </select>
                 </div>
               )}
+              {/* Sem Candidatura não há o que encerrar, então não há motivo a pedir. */}
+              {desfechoDoRegistro && applicationId && faltou && (
+                <p>Falta à entrevista conta como reprovação: a candidatura é encerrada com o motivo &quot;{NO_SHOW_REASON}&quot; e o candidato volta ao Banco de Talentos.</p>
+              )}
+              {desfechoDoRegistro && applicationId && !faltou && (
+                <>
+                  <div className="grid gap-2">
+                    <label className="font-medium" htmlFor="avanco-motivo-desfecho">
+                      Motivo {desfechoDoRegistro === "Reprovado" ? "da reprovação" : "da desistência"} *
+                    </label>
+                    <select
+                      id="avanco-motivo-desfecho"
+                      value={motivoDesfecho}
+                      onChange={(e) => setMotivoDesfecho(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                    >
+                      <option value="">Selecione...</option>
+                      {outcomeReasons(desfechoDoRegistro).map((motivo) => (
+                        <option key={motivo} value={motivo}>{motivo}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {motivoDesfecho === OUTCOME_OTHER && (
+                    <Textarea
+                      placeholder="Descreva o motivo"
+                      value={detalheDesfecho}
+                      onChange={(e) => setDetalheDesfecho(e.target.value)}
+                      className="min-h-[60px] bg-background text-foreground"
+                    />
+                  )}
+                  <p>Isto encerra a candidatura: o candidato volta ao Banco de Talentos.</p>
+                </>
+              )}
             </div>
           )}
+
+          {entrevistaMarcada === null && (
+          <>
 
           <div className="grid gap-2">
             <label className="text-sm font-medium">Etapa Atual</label>
@@ -681,22 +786,33 @@ export default function AdvanceStageModal({
               />
             </div>
           </div>
+          </>
+          )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          {isInterviewStage(selectedStage) && (
-            <Button variant="secondary" onClick={() => handleSave(true)} disabled={saving || !registroEntrevistaCompleto} className="gap-2">
-              <FileText className="h-4 w-4" />
-              Avançar e preencher parecer
+          {entrevistaMarcada ? (
+            <Button onClick={registrarEntrevista} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Registrar entrevista
             </Button>
+          ) : (
+            <>
+              {isInterviewStage(selectedStage) && (
+                <Button variant="secondary" onClick={() => handleSave(true)} disabled={saving || entrevistaMarcada === undefined} className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Avançar e preencher parecer
+                </Button>
+              )}
+              <Button onClick={() => handleSave()} disabled={saving || entrevistaMarcada === undefined}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Confirmar Avanço
+              </Button>
+            </>
           )}
-          <Button onClick={() => handleSave()} disabled={saving || !registroEntrevistaCompleto}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Confirmar Avanço
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

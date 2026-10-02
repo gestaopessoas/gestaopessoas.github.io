@@ -12,7 +12,7 @@ import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { errorMessage } from "@/lib/utils";
 import { useToast } from "@/contexts/ToastContext";
 import { DEFAULT_RESUME_MODEL } from "@/lib/resumeModelSettings";
-import { roleChangedOnSavedInterview } from "@/lib/interviewProgress.mjs";
+import { PENDING_INTERVIEW_STATUSES, roleChangedOnSavedInterview } from "@/lib/interviewProgress.mjs";
 import { findExistingCandidateId, hasRealEmail, placeholderEmail } from "@/lib/candidateIdentity.mjs";
 import { assessmentToRows, rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 import { TERMINAL_STAGES, type Stage } from "@/lib/stages";
@@ -142,24 +142,6 @@ const stageStyle: Record<string, string> = {
   Descartado: "bg-red-500/10 text-red-700 dark:text-red-300",
   Desistente: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-300",
 };
-
-/**
- * A Etapa que a Candidatura (`job_applications.status`) recebe ao salvar a entrevista (ADR
- * 0006, Fase 2 — issue #57). Destino escolhido manda; sem destino, a entrevista em si já é
- * "Entrevista RH". Banco de Talentos deixou de ser Etapa — aqui ele só encerra a Candidatura,
- * e vira Reprovado apenas quando a tela já apontou reprovação; senão é "não seguir agora"
- * (Desistente).
- */
-function stageFromInterviewProgress({ result, destination }: { result?: string | null; destination?: string | null }): Stage {
-  const dest = String(destination || "").trim();
-  if (dest === "Contratado") return "Contratado";
-  // "Descartado" é o nome antigo de "Reprovado" (issue #88).
-  if (dest === "Reprovado" || dest === "Descartado") return "Reprovado";
-  if (dest === "Desistente") return "Desistente";
-  if (dest === "Banco de Talentos") return result === "Reprovado" ? "Reprovado" : "Desistente";
-  if (result === "Reprovado") return "Reprovado";
-  return "Entrevista RH";
-}
 
 const defaultAssessment: Assessment = {
   psychological_test: "Não",
@@ -548,10 +530,6 @@ export default function EntrevistasPage() {
     // uma sem data (o campo saiu da ficha) e outra com.
     const novoCandidato = !editingId;
 
-    // O Destino escolhido decide a Etapa da Candidatura (abaixo), mas não é mais gravado em
-    // `interviews`: a Etapa Terminal mora só na Candidatura (ADR 0006, Fase 2).
-    const destinoEscolhido = interviewProgress?.destination || form.destination || null;
-
     const payload = {
       ...Object.fromEntries(
         Object.entries(form)
@@ -673,13 +651,12 @@ export default function EntrevistasPage() {
     //     e deixava a Candidatura da Vaga parada na etapa anterior — vaga com zero contratados
     //     e candidato eternamente em "Processo de MP". A Candidatura em andamento manda; a
     //     Espontânea só entra quando não existe nenhuma.
-    if (candidateId) {
-      // Sem a Situação da Entrevista, a ficha do candidato novo não tem o que dizer sobre a
-      // Etapa: ela nasce em "Nova", que é por onde o Avançar começa (`nextStageOptions`).
-      const etapaDaCandidatura = novoCandidato
-        ? ("Nova" as Stage)
-        : stageFromInterviewProgress({ result: payloadAny.result, destination: destinoEscolhido });
-
+    //
+    //     Ficha de entrevista que já existe não mexe na Etapa: quem move é o Registrar
+    //     entrevista e o Avançar. Recalcular a Etapa pelo resultado aqui fazia salvar o parecer
+    //     de um reprovado abrir uma Candidatura "Reprovado" sem motivo (o banco recusa), e
+    //     devolvia o aprovado para "Entrevista RH".
+    if (candidateId && novoCandidato) {
       const { data: emAndamento } = await supabase
         .from("job_applications")
         .select("id")
@@ -688,22 +665,9 @@ export default function EntrevistasPage() {
         .order("created_at", { ascending: false })
         .limit(1);
 
-      const candidaturaAtiva = emAndamento?.[0]?.id;
-      if (candidaturaAtiva) {
-        // Cadastrar a pessoa não mexe na Candidatura que já corre: reescrever a Etapa aqui
-        // jogava para trás quem já estava adiante (de "Processo de MP" para "Entrevista RH").
-        if (!novoCandidato) {
-          const { error: etapaError } = await supabase
-            .from("job_applications")
-            .update({ status: etapaDaCandidatura })
-            .eq("id", candidaturaAtiva);
-          if (etapaError) {
-            fail("Não foi possível gravar a Etapa da candidatura: " + etapaError.message);
-          }
-        }
-      } else {
-        await abrirCandidaturaEspontanea(candidateId, etapaDaCandidatura);
-      }
+      // Cadastrar a pessoa não mexe na Candidatura que já corre. Sem nenhuma em andamento,
+      // ela nasce em "Nova", que é por onde o Avançar começa (`nextStageOptions`).
+      if (!emAndamento?.[0]?.id) await abrirCandidaturaEspontanea(candidateId, "Nova");
     }
 
     // Candidatura Espontânea: o caminho de quem chegou sem Vaga (indicação, currículo na obra,
@@ -970,9 +934,11 @@ export default function EntrevistasPage() {
           onClick={() => abrirAvanco(interview)}
           disabled={!interview.candidate_id}
           className="mr-1 h-8"
-          title={interview.candidate_id ? "Avançar etapa deste candidato" : "Entrevista antiga, sem candidato vinculado"}
+          title={interview.candidate_id ? undefined : "Entrevista antiga, sem candidato vinculado"}
         >
-          Avançar
+          {/* Entrevista sem situação registrada: o mesmo modal abre só o registro, e o
+              avanço aparece depois dele. */}
+          {PENDING_INTERVIEW_STATUSES.includes(interview.status || "") ? "Registrar entrevista" : "Avançar"}
         </Button>
         <Button
           variant="ghost"
@@ -1167,7 +1133,11 @@ export default function EntrevistasPage() {
       {advanceData && (
         <AdvanceStageModal
           isOpen={!!advanceData}
-          onClose={() => setAdvanceData(null)}
+          onClose={() => {
+            setAdvanceData(null);
+            // Registrar a entrevista e cancelar o avanço ainda muda a linha.
+            loadInterviews();
+          }}
           onSuccess={(interviewIdParaParecer) => {
             setAdvanceData(null);
             setParecerPendente(interviewIdParaParecer ?? null);

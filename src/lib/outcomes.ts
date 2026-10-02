@@ -18,6 +18,9 @@ export type Outcome = Extract<Stage, "Reprovado" | "Desistente">;
 
 export const OUTCOME_OTHER = "Outro";
 
+/** Faltar à entrevista é reprovação, com este motivo gravado automaticamente. */
+export const NO_SHOW_REASON = "Não compareceu à entrevista";
+
 /**
  * "Recusado pela Obra" não é desfecho separado: recusar é reprovar, e o que diferencia é o
  * motivo — falta de experiência, expectativa salarial, restrição da obra.
@@ -29,6 +32,7 @@ export const REJECTION_REASONS = [
   "Reprovado em teste psicológico",
   "Restrição da obra",
   "Reprovado na documentação/MP",
+  NO_SHOW_REASON,
   OUTCOME_OTHER,
 ] as const;
 
