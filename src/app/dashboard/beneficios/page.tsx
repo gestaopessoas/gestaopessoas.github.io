@@ -96,8 +96,10 @@ export default function BeneficiosPage() {
     setLoading(true);
     // Fetch todos os funcionários para análise de ativos (inclusão) e desligados (corte)
     const { data: emps } = await supabase
-      // View do quadro atual. Em employees eram 4.773 linhas cortadas em 1.000.
-      .from("colaboradores")
+      // `employees`, não a view `colaboradores`: o corte é justamente de quem saiu, e a view
+      // esconde `Desligado`.
+      // ponytail: sem paginação; o PostgREST corta em 1.000 linhas. Passando disso, paginar.
+      .from("employees")
       .select(`id, name, status, admission_date, cost_center, sectors(name), workplaces!employees_workplace_id_fkey(type)`)
       .not("admission_date", "is", null);
 
