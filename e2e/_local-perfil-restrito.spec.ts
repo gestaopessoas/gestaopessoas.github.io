@@ -8,10 +8,6 @@ import { test, expect, type Page } from '@playwright/test';
 // perfil de nível < 50, porque administrador retorna `true` na linha anterior e nunca
 // chegava na consulta. Ninguém reproduzia.
 //
-// A partir da separação do arquivo morto isso pesou mais: as 70 policies do schema
-// `arquivo` são todas `USING (can_access(...))`. Para um não-admin elas não negavam nem
-// permitiam — elas erravam.
-//
 // O usuário é criado aqui e apagado no fim, então o spec roda quantas vezes quiser.
 // Só pelo config local: cria gente no Auth.
 
@@ -36,7 +32,7 @@ test.beforeAll(async () => {
   expect(userId, `não consegui criar o usuário de teste: ${JSON.stringify(corpo).slice(0, 200)}`).toBeTruthy();
 
   // Nível 1 = não-admin. Uma permissão só: ver Colaboradores. Nada de salários, ponto,
-  // benefícios, uniformes ou arquivo morto.
+  // benefícios ou uniformes.
   for (const [tabela, linha] of [
     ['profiles', { id: userId, name: 'ZZ PERFIL RESTRITO', level: 1 }],
     ['profile_permissions', { profile_id: userId, module_key: 'colaboradores', action_key: 'view', allowed: true }],
@@ -175,34 +171,12 @@ test.describe('O sistema visto por um perfil restrito (banco local)', () => {
     expect(erros, erros.join(' | ')).toHaveLength(0);
   });
 
-  test('3. o arquivo morto não vaza dado que a permissão dele não cobre', async ({ page }) => {
+  test('3. o que ele TEM permissão de ver continua chegando', async ({ page }) => {
     await entrar(page);
 
-    // Custo de pessoal exige `salarios`, dossiê exige `arquivo_morto`, auditoria de
-    // benefício exige `beneficios` — nenhum deles este perfil tem. Antes da
-    // 20260909110100 o espelho do arquivo pedia só `colaboradores.view`, e este usuário
-    // enxergaria os 4.505 dossiês e as 507 linhas de auditoria dos ex-colaboradores.
-    const dossies = await comoUsuario(page, 'employee_archives_todos?select=employee_id');
-    const beneficios = await comoUsuario(page, 'benefit_audit_log_entries_todos?select=audit_log_id');
-
-    // 206 e nao 200: com `Prefer: count=exact` + `Range`, o PostgREST responde
-    // "Partial Content". O que importa é que respondeu, em vez de estourar.
-    expect([200, 206], `a consulta de dossiês devia responder: ${dossies.corpo}`).toContain(dossies.status);
-    expect(dossies.total, `perfil sem "arquivo_morto" enxergou ${dossies.total} dossiê(s)`).toBe('0');
-
-    expect([200, 206], `a consulta de auditoria devia responder: ${beneficios.corpo}`).toContain(beneficios.status);
-    expect(
-      beneficios.total,
-      `perfil sem "beneficios" enxergou ${beneficios.total} linha(s) de auditoria`
-    ).toBe('0');
-  });
-
-  test('4. o que ele TEM permissão de ver continua chegando', async ({ page }) => {
-    await entrar(page);
-
-    // A contraprova do caso 3: apertar a regra não pode ter cegado o próprio módulo dele.
-    const pessoas = await comoUsuario(page, 'employees_todos?select=id');
-    expect([200, 206], `employees_todos respondeu ${pessoas.status}: ${pessoas.corpo}`).toContain(pessoas.status);
+    // Apertar a regra não pode ter cegado o próprio módulo dele.
+    const pessoas = await comoUsuario(page, 'employees?select=id');
+    expect([200, 206], `employees respondeu ${pessoas.status}: ${pessoas.corpo}`).toContain(pessoas.status);
     expect(Number(pessoas.total), 'perfil com colaboradores.view precisa enxergar a base').toBeGreaterThan(0);
   });
 });

@@ -103,7 +103,7 @@ const BUCKET_STYLE: Record<string, string> = {
 const OBRA_SEDE = "Sede";
 
 // O Select não aceita string vazia como valor de item; o sentinela representa "sem filtro".
-const SEM_FILTRO = "__todos";
+const SEM_FILTRO = "__all";
 
 // `created_at` é timestamp e o <input type="date"> devolve AAAA-MM-DD: comparar só o dia
 // evita que o fuso engula a candidatura feita no último dia do intervalo.

@@ -103,9 +103,6 @@ test.describe('Ciclo desligar / reativar (banco local)', () => {
     await expect(page.getByText(/O banco não confirmou/)).toHaveCount(0);
     await expect(campoData(page)).toBeHidden({ timeout: 30000 });
 
-    // Entrando no arquivo morto, a tela abre o modal de caixa física logo em seguida.
-    const modalCaixa = page.getByRole('button', { name: 'Fechar' });
-    if (await modalCaixa.isVisible().catch(() => false)) await modalCaixa.click();
   };
 
   test('desligar grava a data', async ({ page }) => {

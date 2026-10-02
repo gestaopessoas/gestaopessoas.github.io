@@ -39,11 +39,8 @@ test.describe('Filtros e Contadores Colaboradores (Issues #25, #26, #27, #28, #6
     // status e localizado pela propria label "Situacao".
     await page.getByTitle('Filtros avançados').click();
     await expect(page.getByText('Filtros Avançados')).toBeVisible();
-    // "Afastado" e nao "Desligado": desde 2026-09-10 o filtro so oferece situacoes de
-    // quem esta no quadro atual. Desligado/Inativo/Arquivo Morto sairam da lista porque
-    // essa gente mora no schema `arquivo` e a opcao devolvia SEMPRE zero — a tela dizia
-    // "nenhum resultado" para quem existe. O que este teste guarda continua igual: o
-    // filtro muda a TABELA e nao mexe nos cartoes.
+    // "Afastado" e nao "Desligado": o filtro so oferece situacoes de quem esta no quadro
+    // atual. O que este teste guarda: o filtro muda a TABELA e nao mexe nos cartoes.
     await page
       .locator('xpath=//label[normalize-space()="Situação"]/following::select[1]')
       .selectOption('Afastado');

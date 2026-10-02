@@ -1,11 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
-// QA de NAVEGAÇÃO depois da separação do arquivo morto (ADR 0009).
-//
-// `public.employees` deixou de ter 4.839 linhas e passou a ter só o quadro atual (296).
-// Quem saiu foi para o schema `arquivo`, e as telas que precisavam de ex-colaborador
-// tiveram que trocar de fonte. Este spec exercita essas telas pela INTERFACE e confere
-// cada número contra o banco — a classe de bug que o roteiro de QA chama de "responde
+// QA de NAVEGAÇÃO das telas que dependem de colaborador. Este spec exercita essas telas
+// pela INTERFACE e confere cada número contra o banco — a classe de bug que o roteiro de QA chama de "responde
 // 200 e mostra o número errado".
 //
 // Roda SÓ contra o Supabase local (playwright.local.config.ts). Tudo que ele cria é
@@ -17,14 +13,11 @@ const ANON = process.env.LOCAL_ANON_KEY as string;
 const H = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' };
 
 const PREFIXO = 'ZZ NAVEGACAO';
-const NOME_REATIVAR = `${PREFIXO} REATIVAR`;
 const NOME_CADASTRO = `${PREFIXO} CADASTRO`;
 const CARGO = 'ZZ CARGO NAVEGACAO';
-const CAIXA = 'ZZ-NAV';
 // Fora do PREFIXO de propósito: a busca global corta o termo em 12 caracteres e traz 5
 // resultados — com `ZZ NAVEGACAO ...` o piso de 30 colaboradores ocupava a lista inteira.
-const NOME_ARQUIVADO = 'ZZ ARQUIVADO NAVEGACAO';
-const CAIXA_SEED = 'ZZ-NAV-SEED';
+const NOME_DESLIGADO = 'ZZ DESLIGADO NAVEGACAO';
 
 let companyId: string, costCenterId: string, jobProfileId: string;
 
@@ -125,15 +118,15 @@ function vigia(page: Page) {
 }
 
 /**
- * Semeia UM arquivado completo (caixa + histórico com valores) quando o banco não tem
- * nenhum. Com `db reset` limpo o schema `arquivo` nasce vazio e metade deste spec ficava
- * sem alvo (issue #93); com o dump de produção restaurado nada aqui roda.
+ * Semeia UM desligado completo (com histórico e valores) quando o banco não tem nenhum.
+ * Com `db reset` limpo metade deste spec ficava sem alvo (issue #93); com o dump de
+ * produção restaurado nada aqui roda.
  */
-async function semearArquivado() {
-  if ((await contar('arquivo_morto?select=id&archive_id=not.is.null')) > 0) return;
+async function semearDesligado() {
+  if ((await contar('employees?select=id&status=eq.Desligado')) > 0) return;
 
   const id: string = (await rest('POST', 'employees', {
-    name: NOME_ARQUIVADO, status: 'Desligado',
+    name: NOME_DESLIGADO, status: 'Desligado',
     // Dentro do último ano: o histórico do turnover (teste 17) só enxerga esta janela.
     dismissed_at: '2026-03-10', admission_date: '2019-04-01',
     cpf: '00000000191', rg: 'ZZ0000001',
@@ -149,15 +142,9 @@ async function semearArquivado() {
     { history_id: historicoId, value_side: 'old', path: ['role'], value_type: 'string', value_text: 'ZZ CARGO ANTERIOR' },
     { history_id: historicoId, value_side: 'new', path: ['role'], value_type: 'string', value_text: CARGO },
   ]);
-
-  const caixaId: string = (await rest('POST', 'physical_boxes', { code: CAIXA_SEED, description: 'ZZ caixa semeada' }))[0].id;
-  await rest('POST', 'employee_archives', { employee_id: id, box_id: caixaId, label: 'ZZ dossiê semeado' });
-
-  // Mesmo caminho da rotina das 03:00: leva a pessoa e as filhas para o schema `arquivo`.
-  await rpcComoUsuario('arquivar_colaboradores', {});
 }
 
-test.describe('Navegação pós-separação do arquivo morto (banco local)', () => {
+test.describe('Navegação (banco local)', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.beforeAll(async () => {
@@ -169,7 +156,7 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
     // reset` está quebrado (issue #83), então o quadro atual pode vir vazio ou raso
     // demais para paginação/busca. Só completa até 30 se faltar — com dump de produção
     // restaurado o banco já tem gente e nada é criado aqui.
-    const ativos = await contar('employees?select=id&status=not.in.("Desligado","Arquivo Morto","Inativo")');
+    const ativos = await contar('employees?select=id&status=not.in.("Desligado","Inativo")');
     const faltam = 30 - ativos;
     if (faltam > 0) {
       const novos = Array.from({ length: faltam }, (_, i) => ({
@@ -183,22 +170,16 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
       await rest('POST', 'employees', novos);
     }
 
-    await semearArquivado();
+    await semearDesligado();
   });
 
   test.afterAll(async () => {
-    // employees_todos apaga em public e no arquivo — a pessoa pode ter sido movida.
-    for (const nome of [NOME_REATIVAR, NOME_CADASTRO, NOME_ARQUIVADO, `${PREFIXO} FICHA`]) {
-      for (const fonte of ['employees_todos', 'employees']) {
-        await fetch(`${API}/rest/v1/${fonte}?name=eq.${encodeURIComponent(nome)}`, { method: 'DELETE', headers: H });
-      }
+    for (const nome of [NOME_CADASTRO, NOME_DESLIGADO, `${PREFIXO} FICHA`]) {
+      await fetch(`${API}/rest/v1/employees?name=eq.${encodeURIComponent(nome)}`, { method: 'DELETE', headers: H });
     }
     // Piso de colaboradores criado no beforeAll (name=ZZ NAVEGACAO COLABORADOR NNN).
-    for (const fonte of ['employees_todos', 'employees']) {
-      await fetch(`${API}/rest/v1/${fonte}?name=like.${encodeURIComponent(`${PREFIXO} COLABORADOR`)}*`, { method: 'DELETE', headers: H });
-    }
+    await fetch(`${API}/rest/v1/employees?name=like.${encodeURIComponent(`${PREFIXO} COLABORADOR`)}*`, { method: 'DELETE', headers: H });
     await fetch(`${API}/rest/v1/rgs_processes?employee_name=like.ZZ*`, { method: 'DELETE', headers: H });
-    await fetch(`${API}/rest/v1/physical_boxes?code=in.(${CAIXA},${CAIXA_SEED})`, { method: 'DELETE', headers: H });
     for (const [t, v] of [['job_profiles', jobProfileId], ['cost_centers', costCenterId], ['companies', companyId]] as const) {
       if (v) await fetch(`${API}/rest/v1/${t}?id=eq.${v}`, { method: 'DELETE', headers: H });
     }
@@ -215,9 +196,9 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
     await page.goto('/dashboard/colaboradores');
     await expect(page.getByRole('heading', { name: 'Colaboradores' })).toBeVisible({ timeout: 30000 });
 
-    // A tela esconde Desligado / Arquivo Morto / Inativo.
+    // A tela esconde Desligado / Inativo.
     const esperado = await contar(
-      'employees?select=id&status=not.in.("Desligado","Arquivo Morto","Inativo")'
+      'employees?select=id&status=not.in.("Desligado","Inativo")'
     );
 
     const legenda = page.getByText(/registros ativos ou em movimenta/);
@@ -257,7 +238,7 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
     await expect(page.getByRole('cell', { name: new RegExp(primeiroNome, 'i') }).first()).toBeVisible({ timeout: 20000 });
 
     const esperado = await contar(
-      `employees?select=id&status=not.in.("Desligado","Arquivo Morto","Inativo")&name=ilike.*${encodeURIComponent(primeiroNome)}*`
+      `employees?select=id&status=not.in.("Desligado","Inativo")&name=ilike.*${encodeURIComponent(primeiroNome)}*`
     );
     const linhas = await page.locator('table tbody tr').count();
     expect(linhas, `banco tem ${esperado} com "${primeiroNome}" no quadro atual`).toBe(Math.min(esperado, 25));
@@ -279,13 +260,8 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
   });
 
   test('5. o filtro de situação não oferece quem saiu do quadro', async ({ page }) => {
-    // Este caso mudou de sentido em 2026-09-10. Antes provava que escolher "Desligado"
-    // devolvia zero — o que era verdade, mas a tela oferecer uma opção que SEMPRE
-    // devolve "nenhum resultado" é a própria falha: parecia que a pessoa não existia.
-    //
-    // Depois da separação, desligado / inativo / arquivo morto moram no schema
-    // `arquivo`. Quem está inativo aparece na aba "Inativos"; quem saiu, na tela de
-    // Arquivo Morto. O filtro só lista situações de quem está no quadro atual.
+    // Quem está inativo aparece na aba "Inativos". O filtro só lista situações de quem
+    // está no quadro atual.
     await page.goto('/dashboard/colaboradores');
     await expect(page.getByRole('heading', { name: 'Colaboradores' })).toBeVisible({ timeout: 30000 });
     await page.getByTitle('Filtros avançados').click();
@@ -300,12 +276,12 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
     expect(opcoes, 'o filtro de Situação sumiu da tela').not.toHaveLength(0);
     expect(opcoes).toEqual(['Todos', 'Ativo', 'Férias', 'Afastado']);
 
-    // A contraprova: essa gente continua existindo, só que no outro lado.
-    const noArquivo = await contar('employees_todos?select=id&status=in.("Desligado","Arquivo Morto","Inativo")');
-    expect(noArquivo, 'ninguém no arquivo? então a separação ou a rotina quebrou').toBeGreaterThan(0);
+    // A contraprova: essa gente continua existindo, só que fora da lista do quadro.
+    const fora = await contar('employees?select=id&status=in.("Desligado","Inativo")');
+    expect(fora, 'ninguém desligado/inativo? então a semeadura quebrou').toBeGreaterThan(0);
   });
 
-  test('6. aba Inativos mostra exatamente quem ainda não foi arquivado', async ({ page }) => {
+  test('6. aba Inativos mostra exatamente quem está Inativo', async ({ page }) => {
     const esperado = await contar('employees?select=id&status=eq.Inativo');
 
     await page.goto('/dashboard/colaboradores');
@@ -382,221 +358,27 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
     expect(erros, erros.join(' | ')).toHaveLength(0);
   });
 
-  test('8. ficha de quem está no ARQUIVO carrega pela employees_todos', async ({ page }) => {
-    const [alvo] = await rest('GET', 'arquivo_morto?select=id,name,status&archive_id=not.is.null&order=name&limit=1');
-    const erros = vigia(page);
-
-    await page.goto(`/dashboard/colaboradores?edit=${alvo.id}`);
-    await expect(page.getByRole('heading', { name: 'Registro completo do colaborador' })).toBeVisible({ timeout: 30000 });
-    // Carregou a pessoa certa? Quem está no arquivo não existe mais em `public`.
-    await expect(page.getByLabel('Nome completo *')).toHaveValue(String(alvo.name), { timeout: 20000 });
-    expect(await contar(`employees?select=id&id=eq.${alvo.id}`)).toBe(0);
-    expect(erros, erros.join(' | ')).toHaveLength(0);
-  });
-
-  test('8b. a ficha de um arquivado consegue ser SALVA como ela vem', async ({ page }) => {
-    // O ADR 0009 criou o gatilho INSTEAD OF justamente para o link `?edit=` das
-    // notificações, que aponta para quem já saiu. Mas o registro arquivado costuma vir
-    // sem cargo, empresa e centro de custo — e os três são `required` no formulário.
-    // A validação nativa do HTML barra o submit antes de qualquer requisição, sem
-    // escrever nada na tela: o usuário clica em Salvar e não acontece nada.
-    const [alvo] = await rest('GET', 'arquivo_morto?select=id,name&archive_id=not.is.null&order=name&limit=1');
-    const [original] = await rest('GET', `employees_todos?select=observation&id=eq.${alvo.id}`);
-    const marca = `ZZ OBS ARQUIVO ${Date.now()}`;
-
-    try {
-      await page.goto(`/dashboard/colaboradores?edit=${alvo.id}`);
-      await expect(page.getByRole('heading', { name: 'Registro completo do colaborador' })).toBeVisible({ timeout: 30000 });
-      await page.getByLabel('Observações').fill(marca);
-      await salvarFicha(page);
-
-      const [depois] = await rest('GET', `employees_todos?select=observation&id=eq.${alvo.id}`);
-      expect(depois.observation, 'o salvamento não chegou no schema arquivo').toBe(marca);
-    } finally {
-      await rest('PATCH', `employees_todos?id=eq.${alvo.id}`, { observation: original?.observation ?? null });
-    }
-  });
-
-  test('8c. com os obrigatórios preenchidos, o gatilho INSTEAD OF grava no arquivo', async ({ page }) => {
-    // Isola o gatilho da validação do formulário: preenche cargo, empresa e centro de
-    // custo com as fixtures ZZ e confere que a escrita cai no schema `arquivo`, e não
-    // ressuscita ninguém em `public`.
-    const [alvo] = await rest('GET', 'arquivo_morto?select=id,name&archive_id=not.is.null&order=name&limit=1');
-    const [original] = await rest('GET', `employees_todos?select=observation,role,company_id,cost_center_id&id=eq.${alvo.id}`);
-    const marca = `ZZ OBS ARQUIVO ${Date.now()}`;
-    const erros = vigia(page);
-
-    try {
-      await page.goto(`/dashboard/colaboradores?edit=${alvo.id}`);
-      await expect(page.getByRole('heading', { name: 'Registro completo do colaborador' })).toBeVisible({ timeout: 30000 });
-      await page.getByLabel('Cargo *').selectOption(CARGO);
-      await page.getByLabel('Empresa *').selectOption({ label: 'ZZ EMPRESA NAVEGACAO' });
-      await page.getByLabel('Centro de Custo *').selectOption({ label: 'ZZ03' });
-      await page.getByLabel('Observações').fill(marca);
-      await salvarFicha(page);
-
-      const [depois] = await rest('GET', `employees_todos?select=observation&id=eq.${alvo.id}`);
-      expect(depois.observation, 'o gatilho INSTEAD OF não gravou no arquivo').toBe(marca);
-
-      // A pessoa não pode ter sido ressuscitada para o quadro atual pelo salvamento.
-      const emPublic = await contar(`employees?select=id&id=eq.${alvo.id}`);
-      expect(emPublic, 'salvar a ficha de um arquivado o trouxe de volta para public').toBe(0);
-      expect(erros, erros.join(' | ')).toHaveLength(0);
-    } finally {
-      await rest('PATCH', `employees_todos?id=eq.${alvo.id}`, {
-        observation: original?.observation ?? null,
-        role: original?.role ?? null,
-        company_id: original?.company_id ?? null,
-        cost_center_id: original?.cost_center_id ?? null,
-      });
-    }
-  });
-
-  test('9. editar arquivado não pode inventar processo de RGS', async ({ page }) => {
-    // `original` é procurado na LISTA carregada, que só tem o quadro atual. Para quem
-    // está no arquivo ele vem undefined, e as regras `isDismissed` / `isPromoted` do
-    // formulário passam a comparar contra vazio.
-    const [alvo] = await rest('GET', 'arquivo_morto?select=id,name&archive_id=not.is.null&order=name&limit=1');
-    const [original] = await rest('GET', `employees_todos?select=observation,role,company_id,cost_center_id&id=eq.${alvo.id}`);
-    const antes = await contar(`rgs_processes?select=id&employee_name=eq.${encodeURIComponent(alvo.name)}`);
-
-    try {
-      await page.goto(`/dashboard/colaboradores?edit=${alvo.id}`);
-      await expect(page.getByRole('heading', { name: 'Registro completo do colaborador' })).toBeVisible({ timeout: 30000 });
-      // O modal aparece antes da consulta do `?edit=` voltar; sem esperar o nome chegar,
-      // o teste digita num formulário ainda vazio e o próprio "Nome completo *" barra o
-      // envio — reprovando a tela por uma corrida do teste.
-      await expect(page.getByLabel('Nome completo *')).toHaveValue(String(alvo.name), { timeout: 20000 });
-      // Só a observação: mexer em cargo/empresa/centro de custo abriria um RGS de
-      // "alteração de cargo/local" com razão, e o que se testa aqui é o RGS SEM razão.
-      // Antes esses três campos tinham que ser preenchidos para o `required` deixar
-      // salvar — o que embutia uma mudança de cargo em todo salvamento de arquivado.
-      await page.getByLabel('Observações').fill(`ZZ RGS ${Date.now()}`);
-      await salvarFicha(page);
-      await page.waitForTimeout(1500);
-
-      const depois = await contar(`rgs_processes?select=id&employee_name=eq.${encodeURIComponent(alvo.name)}`);
-      expect(depois, 'mexer na observação de um arquivado abriu processo de RGS do nada').toBe(antes);
-    } finally {
-      await rest('PATCH', `employees_todos?id=eq.${alvo.id}`, {
-        observation: original?.observation ?? null,
-        role: original?.role ?? null,
-        company_id: original?.company_id ?? null,
-        cost_center_id: original?.cost_center_id ?? null,
-      });
-      await fetch(`${API}/rest/v1/rgs_processes?employee_name=eq.${encodeURIComponent(alvo.name)}&created_at=gte.${new Date(Date.now() - 600000).toISOString()}`, { method: 'DELETE', headers: H });
-    }
-  });
-
-  // ---------------------------------------------------------------- arquivo morto
-
-  test('10. arquivo morto: as caixas e as contagens batem com o banco', async ({ page }) => {
-    const erros = vigia(page);
-    const caixas = await rest('GET', 'physical_boxes_contagem?select=id,code,dossies&order=code&limit=3');
-    const totalCaixas = await contar('physical_boxes_contagem?select=id');
-
-    await page.goto('/dashboard/arquivo-morto');
-    await expect(page.getByRole('heading', { name: 'Arquivo Morto' })).toBeVisible({ timeout: 30000 });
-
-    for (const c of caixas) {
-      await expect(
-        page.getByRole('button', { name: `${c.code} ${c.dossies} colaborador(es)` }),
-        `a caixa ${c.code} devia mostrar ${c.dossies} dossiê(s)`
-      ).toBeVisible({ timeout: 20000 });
-    }
-
-    // 629 caixas / 100 por página. Com uma página só a tela não desenha o controle.
-    const paginas = Math.ceil(totalCaixas / 100);
-    if (paginas > 1) {
-      await expect(page.getByRole('button', { name: String(paginas), exact: true })).toBeVisible();
-    }
-    expect(erros, erros.join(' | ')).toHaveLength(0);
-  });
-
-  test('11. arquivo morto: expandir a caixa mostra quem está nela', async ({ page }) => {
-    // A tela pagina de 100 em 100 por código: a caixa tem que estar na primeira página.
-    const primeiraPagina = await rest('GET', 'physical_boxes_contagem?select=id,code,dossies&order=code&limit=100');
-    const caixa = [...primeiraPagina].sort((a: { dossies: number }, b: { dossies: number }) => b.dossies - a.dossies)[0];
-    const dentro = await rest('GET', `arquivo_morto?select=name&box_id=eq.${caixa.id}&order=name`);
-
-    await page.goto('/dashboard/arquivo-morto');
-    await page.getByRole('heading', { name: caixa.code, exact: true }).click();
-
-    const tabela = page.locator('table').first();
-    await expect(tabela).toBeVisible({ timeout: 20000 });
-    await expect
-      .poll(async () => tabela.locator('tbody tr').count(), { timeout: 20000 })
-      .toBe(Number(caixa.dossies));
-    await expect(tabela.getByText(String(dentro[0].name), { exact: false }).first()).toBeVisible();
-  });
-
-  test('12. arquivo morto: a busca acha ex-colaborador que saiu de public', async ({ page }) => {
-    const [exColaborador] = await rest('GET', 'arquivo_morto?select=id,name&archive_id=not.is.null&order=name&limit=1');
-    const termo = String(exColaborador.name).split(' ')[0];
-
-    await page.goto('/dashboard/arquivo-morto');
-    await page.getByPlaceholder('Buscar por nome, CPF ou RG').fill(termo);
-    await expect(page.getByText(String(exColaborador.name)).first()).toBeVisible({ timeout: 20000 });
-
-    // A pessoa não está mais em public: se a tela achou, foi pela view certa.
-    expect(await contar(`employees?select=id&id=eq.${exColaborador.id}`)).toBe(0);
-  });
-
-  test('13. arquivo morto: o botão Reativar traz a pessoa de volta para o quadro atual', async ({ page }) => {
-    // Cobaia própria: reativar dado real mudaria a cópia de produção.
-    const id: string = (await rest('POST', 'employees', {
-      name: NOME_REATIVAR, status: 'Desligado', dismissed_at: '2026-01-31',
-      admission_date: '2020-02-01', role: CARGO, company_id: companyId, cost_center_id: costCenterId,
-    }))[0].id;
-    const caixaId: string = (await rest('POST', 'physical_boxes', { code: CAIXA }))[0].id;
-    await rest('POST', 'employee_archives', { employee_id: id, box_id: caixaId, label: 'ZZ passagem' });
-
-    // Manda para o arquivo, como a rotina das 03:00.
-    await rpcComoUsuario('arquivar_colaboradores', {});
-    expect(await contar(`employees?select=id&id=eq.${id}`), 'a rotina não arquivou a cobaia').toBe(0);
-
-    await page.goto('/dashboard/arquivo-morto');
-    await page.getByPlaceholder('Buscar por nome, CPF ou RG').fill(PREFIXO);
-    await expect(page.getByText(NOME_REATIVAR)).toBeVisible({ timeout: 20000 });
-
-    await page.getByRole('button', { name: /Reativar/ }).first().click();
-    await expect(page.getByText(/continuam nas caixas/)).toBeVisible();
-    await page.getByRole('dialog').getByRole('button', { name: /Reativar/ }).click();
-
-    await expect
-      .poll(async () => contar(`employees?select=id&id=eq.${id}`), { timeout: 30000 })
-      .toBe(1);
-
-    const [voltou] = await rest('GET', `employees?select=status,dismissed_at&id=eq.${id}`);
-    expect(voltou.status).toBe('Ativo');
-    expect(voltou.dismissed_at, 'a data da passagem anterior tem que sobreviver').toBe('2026-01-31');
-
-    // O dossiê continua na caixa (ADR 0008).
-    const dossies = await rest('GET', `arquivo_morto?select=archive_id&id=eq.${id}&archive_id=not.is.null`);
-    expect(dossies).toHaveLength(1);
-  });
-
   // ---------------------------------------------------------------- histórico / busca
 
-  test('14. histórico de ex-colaborador mostra as mudanças e os valores', async ({ page }) => {
+  test('14. histórico de desligado mostra as mudanças e os valores', async ({ page }) => {
     const erros = vigia(page);
     const [linha] = await rest(
       'GET',
-      'employee_history_todos?select=employee_id,change_type&order=change_date.desc&limit=1&employee_id=not.is.null'
+      'employee_history?select=employee_id,change_type&order=change_date.desc&limit=1&employee_id=not.is.null'
     );
-    // Alguém do arquivo, com histórico E com valores gravados.
-    const arquivados = await rest('GET', 'arquivo_morto?select=id,name&archive_id=not.is.null&order=name&limit=200');
+    // Alguém desligado, com histórico E com valores gravados.
+    const desligados = await rest('GET', 'employees?select=id,name&status=eq.Desligado&order=name&limit=200');
     let alvo: { id: string; name: string } | null = null;
-    for (const a of arquivados) {
-      const n = await contar(`employee_history_todos?select=id&employee_id=eq.${a.id}`);
+    for (const a of desligados) {
+      const n = await contar(`employee_history?select=id&employee_id=eq.${a.id}`);
       if (n > 0) { alvo = a; break; }
     }
-    expect(alvo, `nenhum arquivado com histórico (última mudança global: ${linha?.change_type})`).not.toBeNull();
+    expect(alvo, `nenhum desligado com histórico (última mudança global: ${linha?.change_type})`).not.toBeNull();
 
     await page.goto(`/dashboard/historico?id=${alvo!.id}`);
     await expect(page.getByText(String(alvo!.name)).first()).toBeVisible({ timeout: 30000 });
 
-    const esperado = await contar(`employee_history_todos?select=id&employee_id=eq.${alvo!.id}`);
+    const esperado = await contar(`employee_history?select=id&employee_id=eq.${alvo!.id}`);
     expect(esperado).toBeGreaterThan(0);
 
     // Cada mudança renderiza um par "Valor Anterior" / "Novo Valor".
@@ -615,14 +397,14 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
   });
 
   test('15. busca global acha ex-colaborador e abre a ficha dele', async ({ page }) => {
-    const [exColaborador] = await rest('GET', 'arquivo_morto?select=id,name&archive_id=not.is.null&order=name&limit=1');
+    const [exColaborador] = await rest('GET', 'employees?select=id,name&status=eq.Desligado&order=name&limit=1');
 
     await page.goto('/dashboard');
     await page.getByRole('button', { name: /Buscar/ }).first().click();
     await page.getByPlaceholder('Busque colaboradores ou páginas...').fill(String(exColaborador.name).slice(0, 12));
 
     const resultado = page.getByRole('button', { name: new RegExp(String(exColaborador.name), 'i') });
-    await expect(resultado, 'a busca global não achou quem está no arquivo').toBeVisible({ timeout: 20000 });
+    await expect(resultado, 'a busca global não achou o desligado').toBeVisible({ timeout: 20000 });
 
     await resultado.click();
     // Achar e não abrir é meio caminho: o resultado tem que levar à ficha.
@@ -650,12 +432,11 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
     await expect(page.getByText(/Não foi possível salvar|O banco não confirmou/)).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Novo colaborador' })).toBeHidden({ timeout: 30000 });
 
-    // Nasceu em public (quadro atual) e completo — o gatilho INSTEAD OF precisa aplicar
-    // os defaults da tabela.
+    // Nasceu completo, com os defaults da tabela.
     const criados = await rest('GET', `employees?select=id,status,created_at,role&name=eq.${encodeURIComponent(NOME_CADASTRO)}`);
-    expect(criados, 'o cadastro não chegou em public.employees').toHaveLength(1);
+    expect(criados, 'o cadastro não chegou em employees').toHaveLength(1);
     expect(criados[0].status).toBe('Ativo');
-    expect(criados[0].created_at, 'o gatilho INSTEAD OF não aplicou o default de created_at').toBeTruthy();
+    expect(criados[0].created_at, 'o default de created_at não foi aplicado').toBeTruthy();
 
     // E aparece na lista.
     await page.getByPlaceholder('Buscar por nome, CPF, RG ou cargo').fill(PREFIXO);
@@ -676,7 +457,6 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
     await expect(page.getByText(String(metricas.desligados), { exact: true }).first()).toBeVisible();
     await expect(page.getByText(`${metricas.turnover}%`).first()).toBeVisible();
 
-    // O histórico lista ex-colaborador: se a tela lesse `employees`, viria vazio.
     expect(metricas.history.length, 'a RPC não devolveu histórico').toBeGreaterThan(0);
     await expect(page.getByText(String(metricas.history[0].name)).first()).toBeVisible({ timeout: 20000 });
     expect(erros, erros.join(' | ')).toHaveLength(0);
@@ -684,7 +464,7 @@ test.describe('Navegação pós-separação do arquivo morto (banco local)', () 
 
   test('18. dashboard e analytics: ativos batem com o quadro atual', async ({ page }) => {
     const erros = vigia(page);
-    const ativos = await contar('employees?select=id&status=not.in.("Desligado","Arquivo Morto","Inativo")');
+    const ativos = await contar('employees?select=id&status=not.in.("Desligado","Inativo")');
 
     await page.goto('/dashboard/analytics');
     await page.waitForTimeout(4000);

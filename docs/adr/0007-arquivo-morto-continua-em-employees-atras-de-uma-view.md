@@ -4,6 +4,8 @@ Data: 2026-09-04
 
 ## Status
 
+**Revogado em 2026-10-02 quanto ao arquivo morto**, que foi removido por completo (migration `20261002150000_remove_arquivo_morto.sql`). A view `colaboradores` continua valendo.
+
 Aceito. A fronteira entre quadro atual e Arquivo Morto passa a ser a view
 `public.colaboradores`, não uma segunda tabela. O plano de fases para a separação física
 fica registrado abaixo, adormecido, junto com os gatilhos que justificariam acordá-lo.

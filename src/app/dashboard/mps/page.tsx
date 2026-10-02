@@ -294,7 +294,7 @@ export default function MPGeneratorPage() {
       const [empsRes, wpRes, ccRes, settingsRes, histRes, depRes, benefitsRes, companiesRes] = await Promise.all([
         supabase.from("employees")
           .select("id, name, registration_number, ficha, phone, email_corporate, unit, cost_center_id, sectors(name), cost_centers(code), company_id, companies(name, trading_name), role, level, senioridade, contract_type, base_salary, profile_code, status, employee_benefits(benefit_name, value)")
-          .eq("status", "Ativo") // Somente colaboradores ativos, exclui Arquivo Morto e Inativos
+          .eq("status", "Ativo") // Somente colaboradores ativos, exclui Inativos e Desligados
           .order("name"),
         supabase.from("workplaces").select("id, name").order("name"),
         supabase.from("cost_centers").select("id, code, name").order("code"),

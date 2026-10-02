@@ -14,7 +14,6 @@ const TELAS = [
   '/dashboard/admissao',
   '/dashboard/analytics',
   '/dashboard/armarios',
-  '/dashboard/arquivo-morto',
   '/dashboard/avaliacoes',
   '/dashboard/avaliacoes/templates',
   '/dashboard/banco-talentos',

@@ -4,6 +4,8 @@ Data: 2026-09-08
 
 ## Status
 
+**Revogado em 2026-10-02.** O schema `arquivo` e os desligados que ele guardava foram apagados (migration `20261002150000_remove_arquivo_morto.sql`); quem sai fica em `public.employees` com status `Desligado`.
+
 Aceito. **Substitui a decisão do ADR 0007**, que resolveu manter tudo em `public.employees`
 atrás de uma view. O ADR 0007 continua válido como registro do levantamento e do plano de
 fases; o que muda é a decisão final. O ADR 0008 (uma caixa por passagem, arquivo não depende

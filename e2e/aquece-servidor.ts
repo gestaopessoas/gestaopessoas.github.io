@@ -22,7 +22,6 @@ export default async function aqueceServidor(config: FullConfig) {
     '/login',
     '/dashboard',
     '/dashboard/colaboradores',
-    '/dashboard/arquivo-morto',
     '/dashboard/turnover',
     '/dashboard/analytics',
     '/dashboard/historico',

@@ -228,9 +228,7 @@ export function UserProfile() {
     const recados: string[] = [];
 
     if (employeeId) {
-      // Grava onde o dado mora de verdade. `employees_todos` porque o gatilho INSTEAD OF
-      // roteia para o quadro atual ou para o arquivo morto conforme onde a pessoa está.
-      const { error: empError } = await supabase.from("employees_todos")
+      const { error: empError } = await supabase.from("employees")
         .update({ name: name.trim(), role: customRole.trim() || null, phone: customPhone.trim() || null })
         .eq("id", employeeId);
       if (empError) {

@@ -56,9 +56,7 @@ export function GlobalSearch() {
 
       // Search employees
       const { data: employees } = await supabase
-        // employees_todos: a busca global tambem acha ex-colaborador. `employees`
-        // agora guarda so o quadro atual (separacao do arquivo morto).
-        .from('employees_todos')
+        .from('employees')
         .select('id, name, role')
         .ilike('name', `%${debouncedQuery}%`)
         .limit(5);

@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-// A view `colaboradores` é employees menos o arquivo morto (298 de 4.839 hoje).
-// As telas de operação leem dela justamente para não conseguirem trazer o arquivo por
-// acidente — antes desta troca, quatro telas pediam a tabela inteira e recebiam as
-// 1.000 primeiras linhas que o PostgREST devolve, sem erro e sem aviso.
+// As telas de operação leem da view `colaboradores`, não da tabela inteira — antes, quatro
+// telas pediam a tabela e recebiam só as 1.000 primeiras linhas que o PostgREST devolve,
+// sem erro e sem aviso.
 const TELAS = [
   { rota: '/dashboard/beneficios', titulo: /Benefícios/i },
   { rota: '/dashboard/parceiros', titulo: /Parceiros|Clube/i },

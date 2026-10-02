@@ -102,38 +102,6 @@ refazer o trabalho.
 
 ## Banco / migrations
 
-**Mexer numa tabela filha de `employees` (`ON DELETE CASCADE`) exige mexer no espelho em
-`arquivo` também, na mesma migration — senão o arquivamento diário quebra ou perde dado em
-silêncio.** O schema `arquivo` guarda um espelho estrutural de toda tabela nesse caso, porque
-`arquivo.mover_para_arquivo()` (pg_cron diário) e `public.reativar_colaborador()` copiam por
-posição (`SELECT x.*`), descobrindo as tabelas dinamicamente via `pg_constraint`. Os espelhos
-foram criados uma vez, em 08/09/2026 (`20260908120000_separa_arquivo_morto.sql`); nada os
-mantém sincronizados depois disso. Duas consequências, achadas só numa revisão de branch
-inteiro em 22/09/2026, porque nenhuma review de commit isolado enxerga o schema fora do diff:
-adicionar coluna a uma tabela existente sem adicionar em `arquivo` quebra o `INSERT` por
-contagem de coluna (erro visível no `reativar`, silencioso e gravado em
-`arquivo.arquivamentos.erro` na rotina diária); e criar tabela nova filha de `employees` sem
-criar o espelho em `arquivo` faz o arquivamento cascatear a exclusão do dado sem erro nenhum —
-perda permanente. Padrão de correção em
-`supabase/migrations/20260914170000_nome_de_registro.sql` (mexe nos dois schemas e valida
-paridade de nome de coluna por posição, não por `ordinal_position` bruto — coluna já apagada
-deixa buraco só num dos dois lados) e reaplicado em
-`supabase/migrations/20260922150000_o_onboarding_tambem_mora_no_arquivo.sql`.
-
-**Gatilho `BEFORE INSERT` que reescreve campo de auditoria dispara de novo quando
-`reativar_colaborador()` reinsere a linha arquivada — e reescreve um dado que já era
-verdadeiro.** Achado em 22/09/2026: um gatilho de assinatura (grava `completed_at`/
-`completed_by` para impedir que o cliente forje esses campos) tratava toda inserção com
-`completed = true` como suspeita, inclusive a reinserção de uma linha que já tinha assinatura
-legítima de antes do arquivamento. Resultado: reativar um colaborador reescrevia em silêncio
-quem completou cada tarefa e quando. Corrigido desligando o gatilho só naquela tabela, só
-durante aquela reinserção, dentro de `reativar_colaborador()` — `ALTER TABLE ... DISABLE
-TRIGGER` é DDL transacional, então uma falha no meio desfaz o desligamento junto (verificado
-inclusive dentro de um bloco `EXCEPTION WHEN OTHERS`). Ver
-`supabase/migrations/20260922150100_reativar_nao_reescreve_a_assinatura.sql`. Ao escrever
-qualquer gatilho de auditoria numa tabela filha de `employees`, perguntar: "o que acontece
-quando esta linha for reinserida pela reativação?"
-
 **O schema agora vem de `00000000000000_baseline_producao.sql`, não das migrations antigas.**
 As 86 migrations legadas estão em `supabase/migrations_legacy/` e não rodam mais
 — elas não reconstroem produção (11 tabelas referenciadas e nunca criadas, e um

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
-import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History, Package, Send, GraduationCap } from "lucide-react";
+import { Edit3, Plus, Trash2, Filter, AlertTriangle, Users, Cake, CalendarDays, Activity, Download, AlertCircle, X, History, Send, GraduationCap } from "lucide-react";
 import { useEffect, useState, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { differenceInDays, differenceInYears, isValid, parseISO } from "date-fns";
@@ -13,8 +13,6 @@ import { CandidateProfileModal } from "@/components/CandidateProfileModal";
 import { usePermissions } from "@/hooks/usePermissions";
 import { findCode } from "@/lib/codeLookup";
 import cboData from "@/data/cbo.json";
-import { ARCHIVE_STATUSES } from "@/lib/archiveBox";
-import { ArchiveBoxModal, type ArchiveTarget } from "./components/ArchiveBoxModal";
 import { RelatedRecords } from "./components/RelatedRecords";
 import { Passages } from "./components/Passages";
 import { Section, Field, Select } from "./components/FormHelpers";
@@ -156,7 +154,7 @@ const statusOptions = ["Ativo", "Férias", "Afastado", "Inativo", "Desligado"];
 // Registros legados gravaram o status em inglês; ambos convivem no banco.
 // "inactive" saiu daqui: normalizado para "Inativo" pela migration 20260904190000.
 const INACTIVE_STATUSES = ["Inativo"];
-const HIDDEN_STATUSES = ["Desligado", "Arquivo Morto", ...INACTIVE_STATUSES];
+const HIDDEN_STATUSES = ["Desligado", ...INACTIVE_STATUSES];
 
 const canonicalizeEmployeeForm = (employee: Employee) => {
   const next = { ...emptyForm };
@@ -196,12 +194,12 @@ function ColaboradoresPageInner() {
   //
   // Duas armadilhas, as duas abrindo processo de RGS fantasma a cada gravação:
   //
-  // 1. procurar em `employees` na hora de salvar. Depois da separação do arquivo morto
-  //    quem já saiu não está na lista carregada, `find` devolvia `undefined`, e daí
+  // 1. procurar em `employees` na hora de salvar. A lista carregada é só a página atual,
+  //    `find` devolvia `undefined` para quem está fora dela, e daí
   //    `isDismissed`/`isPromoted` comparavam contra vazio e davam verdadeiro.
   // 2. comparar o formulário contra o registro cru. `canonicalizeEmployeeForm` troca
   //    `null` por `""`, então um cargo vazio virava `"" !== null` — "mudou o cargo".
-  //    Essa vale para qualquer campo em branco, não só para arquivado.
+  //    Essa vale para qualquer campo em branco.
   const [editingOriginal, setEditingOriginal] = useState<EmployeeForm | null>(null);
   // Foto do colaborador aberto na ficha. Fora do `form` de propósito: o form é todo string
   // (`canonicalizeEmployeeForm` faz `String(...)` em tudo) e vai inteiro no payload do save,
@@ -218,8 +216,6 @@ function ColaboradoresPageInner() {
   const [cpfError, setCpfError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
   const [duplicateCpf, setDuplicateCpf] = useState<Employee | null>(null);
-  // Colaborador que acabou de ir para Inativo/Desligado e ainda precisa da caixa do arquivo morto.
-  const [archiveTarget, setArchiveTarget] = useState<ArchiveTarget | null>(null);
   const { can } = usePermissions();
   
   // Modals state
@@ -300,9 +296,7 @@ function ColaboradoresPageInner() {
     const supabase = createClient();
     const editId = searchParams.get("edit");
     if (editId) {
-      // employees_todos: o link "?edit=" das notificacoes tambem aponta para quem ja
-      // saiu, e essa pessoa mora no arquivo depois da separacao.
-      supabase.from("employees_todos").select("*").eq("id", editId).single().then(({ data }) => {
+      supabase.from("employees").select("*").eq("id", editId).single().then(({ data }) => {
         if (data) {
           const emp = data as Employee;
           setEditingId(emp.id);
@@ -321,9 +315,9 @@ function ColaboradoresPageInner() {
   //
   // O filtro de status é a exceção deliberada (issue #62): os cartões descrevem sempre
   // o quadro atual, que é o que cada rótulo significa — "Ativos", "Aniversariantes do
-  // mês", "ASO vencendo em 30d". Seguir o filtro para um status inativo pedia as 4.505
-  // linhas do arquivo, que o PostgREST corta em 1.000 (número errado, sem aviso) e que
-  // custavam 617 KB por tecla digitada na busca, já que este efeito não tem debounce.
+  // mês", "ASO vencendo em 30d". Seguir o filtro para um status inativo pedia todos os
+  // desligados, que o PostgREST corta em 1.000 (número errado, sem aviso) e que
+  // custavam centenas de KB por tecla digitada na busca, já que este efeito não tem debounce.
   useEffect(() => {
     const supabase = createClient();
     let request = supabase
@@ -534,10 +528,8 @@ function ColaboradoresPageInner() {
   const salvarRecorte = async () => {
     if (!editingId || !reenquadrando?.crop) return;
     setSalvandoRecorte(true);
-    // Grava por employees_todos, como o resto da ficha: o gatilho INSTEAD OF manda para
-    // `public` ou para o arquivo conforme onde a pessoa está.
     const { error: recorteError } = await createClient()
-      .from("employees_todos")
+      .from("employees")
       .update({ photo_crop: reenquadrando.crop })
       .eq("id", editingId);
     setSalvandoRecorte(false);
@@ -561,7 +553,7 @@ function ColaboradoresPageInner() {
     // Primeiro o cadastro: é o que a tela mostra. Se o arquivo sobreviver, vira lixo no
     // bucket; se fosse ao contrário, a ficha ficaria apontando para um caminho morto.
     const { error: cadastroError } = await supabase
-      .from("employees_todos")
+      .from("employees")
       .update({ photo_path: null, photo_crop: null })
       .eq("id", editingId);
     if (cadastroError) {
@@ -705,29 +697,25 @@ function ColaboradoresPageInner() {
     const isNew = !editingId;
     const original = editingId ? editingOriginal : null;
     const isDismissed = form.status === "Desligado" && original?.status !== "Desligado";
-    // Entrou no arquivo morto agora: só aí faz sentido perguntar a caixa.
-    const isArchived = ARCHIVE_STATUSES.includes(form.status) && !ARCHIVE_STATUSES.includes(original?.status ?? "");
     const isPromoted = !isNew && !isDismissed && (form.role !== original?.role || form.level !== original?.level || form.department_id !== original?.department_id || form.workplace_id !== original?.workplace_id);
 
     const result = editingId
-      // Grava por employees_todos: o trigger INSTEAD OF manda para public ou para o
-      // arquivo conforme onde a pessoa esta. Cadastro novo nasce sempre em public.
-      ? await supabase.from("employees_todos").update(payload).eq("id", editingId).select("id, ficha, rg, role, profile_code, level, company_id, workplace_id, marital_status, status, dismissed_at").single()
-      : await supabase.from("employees_todos").insert(payload).select("id, ficha, rg, role, profile_code, level, company_id, workplace_id, marital_status, status, dismissed_at").single();
+      ? await supabase.from("employees").update(payload).eq("id", editingId).select("id, ficha, rg, role, profile_code, level, company_id, workplace_id, marital_status, status, dismissed_at").single()
+      : await supabase.from("employees").insert(payload).select("id, ficha, rg, role, profile_code, level, company_id, workplace_id, marital_status, status, dismissed_at").single();
 
     if (result.error) {
       setSaving(false);
       if (result.error.code === "23505" && result.error.message?.includes("employees_cpf_unique")) {
-        // `employees` e so a pagina carregada (25 linhas) e nao inclui o arquivo morto.
-        // O dono do CPF quase sempre esta fora dela — e desde a separacao pode estar em
-        // `arquivo.employees`. Sem esta consulta a tela dizia "ja existe" sem dizer quem.
+        // `employees` (estado local) e so a pagina carregada (25 linhas).
+        // O dono do CPF quase sempre esta fora dela. Sem esta consulta a tela dizia
+        // "ja existe" sem dizer quem.
         // Os dois formatos: a base tem 243 CPFs com pontuacao e 79 so com digitos, e o
         // formulario sempre envia com mascara. Procurar so pelo formato enviado achava
         // o dono em uns casos e em outros nao — e ai a tela dizia "ja existe" sem dizer
         // de quem, justamente no caso do ex-colaborador, que e o mais confuso para o RH.
         const cpfDigitos = String(payload.cpf ?? "").replace(/\D/g, "");
         const { data: dono } = await supabase
-          .from("employees_todos")
+          .from("employees")
           .select("*")
           .or(`cpf.eq.${payload.cpf},cpf.eq.${cpfDigitos}`)
           .neq("id", editingId ?? "00000000-0000-0000-0000-000000000000")
@@ -743,7 +731,7 @@ function ColaboradoresPageInner() {
     }
 
     if (!criticalFieldsMatch(payload, result.data)) {
-      if (isNew) await supabase.from("employees_todos").delete().eq("id", result.data.id);
+      if (isNew) await supabase.from("employees").delete().eq("id", result.data.id);
       setSaving(false);
       setError("O banco não confirmou todos os campos alterados. Revise RG, Cargo, Código do Perfil, Nível, Empresa, Obra/Unidade, Estado civil e Status.");
       return;
@@ -773,20 +761,13 @@ function ColaboradoresPageInner() {
     setBirthdayError("");
     setConfirmDelete(null);
     setRefresh((value) => value + 1);
-
-    // Depois do save dar certo, e só para quem consegue gravar em arquivo morto (RLS).
-    // Abre sozinho só quando ele ACABOU de entrar no arquivo; nos demais casos o modal
-    // fica no botão da linha, porque arquivar não depende mais do status.
-    if (isArchived && can("arquivo_morto", "edit")) {
-      setArchiveTarget({ id: result.data.id, name: form.name.trim() });
-    }
   };
 
   const deleteEmployee = async (id: string) => {
     setSaving(true);
     setError("");
     const supabase = createClient();
-    const { error: deleteError } = await supabase.from("employees_todos").delete().eq("id", id);
+    const { error: deleteError } = await supabase.from("employees").delete().eq("id", id);
     setSaving(false);
     setConfirmDelete(null);
 
@@ -822,12 +803,9 @@ function ColaboradoresPageInner() {
       return;
     }
 
-    // O cartão vai por `employees_todos`: se a pessoa já tiver sido arquivada entre a
-    // abertura da tela e o clique, a escrita cai no schema certo em vez de não achar
-    // ninguém e não avisar nada.
     if (cartao && cartao.trim()) {
       const { error: cartaoError } = await supabase
-        .from("employees_todos")
+        .from("employees")
         .update({ pharmacy_card: cartao.trim() })
         .eq("id", employeeId)
         .select("id");
@@ -900,9 +878,7 @@ function ColaboradoresPageInner() {
   // institucional e fica como reserva de quem não mandou nada.
   //
   // Sai do bucket na hora em vez de virar coluna: assim é sempre a última enviada, sem um
-  // ponteiro no cadastro para manter em dia — e o gatilho INSTEAD OF de `employees_todos`
-  // lista as colunas uma a uma, então cada coluna nova ali é uma chance de gravar em silêncio
-  // pela metade.
+  // ponteiro no cadastro para manter em dia.
   // ponytail: uma listagem por aniversariante do mês, ~30 no pior caso, refeita ao trocar de
   // mês. Se virar peso, o caminho é uma coluna em employees escrita no upload.
   const [birthdayPhotos, setBirthdayPhotos] = useState<Record<string, string>>({});
@@ -1417,13 +1393,6 @@ function ColaboradoresPageInner() {
                       <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); window.location.href = `/dashboard/historico?id=${employee.id}`; }} title="Ver Histórico">
                         <History className="h-3.5 w-3.5 text-primary" />
                       </Button>
-                      {/* Disponível mesmo com o colaborador ativo: quem sai de CLT e volta
-                          como PJ tem o dossiê antigo arquivado enquanto segue na empresa. */}
-                      {can("arquivo_morto", "edit") && (
-                        <Button size="sm" variant="outline" onClick={() => setArchiveTarget({ id: employee.id, name: String(employee.name || "Sem Nome") })} title="Caixas do arquivo morto">
-                          <Package className="h-3.5 w-3.5 text-primary" />
-                        </Button>
-                      )}
                       <Button size="sm" variant="destructive" onClick={() => setConfirmDelete({ id: employee.id, name: String(employee.name || "Sem Nome") })} title="Excluir Colaborador">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -1442,7 +1411,7 @@ function ColaboradoresPageInner() {
         <>
           <div className="mb-4">
             <h2 className="text-lg font-semibold flex items-center gap-2"><AlertCircle className="h-5 w-5 text-primary" /> Colaboradores Inativos</h2>
-            <p className="text-sm text-muted-foreground">Estes colaboradores estão marcados como inativos, mas ainda não foram enviados para o Arquivo Morto. Revise e atualize o status quando necessário.</p>
+            <p className="text-sm text-muted-foreground">Estes colaboradores estão marcados como inativos. Revise e atualize o status quando necessário.</p>
           </div>
 
           <SearchBar value={query} onChange={(value) => { setQuery(value); setPage(0); }} />
@@ -1782,12 +1751,7 @@ function ColaboradoresPageInner() {
                 <div className="space-y-1.5">
                   <Label>Situação</Label>
                   <select value={advancedFilters.status} onChange={(e) => setAdvancedFilters(prev => ({ ...prev, status: e.target.value }))} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                    {/* Só situações de quem está no quadro atual. Desligado, Inativo e
-                        Arquivo Morto saíram daqui: essa gente mora no schema `arquivo`
-                        desde a separação, então escolher essas opções devolvia SEMPRE
-                        zero — a tela dizia "nenhum resultado" para quem existe. Quem
-                        está inativo aparece na aba "Inativos"; quem saiu, na tela de
-                        Arquivo Morto. */}
+                    {/* Só situações do quadro atual. Quem está inativo aparece na aba "Inativos". */}
                     <option value="">Todos</option>
                     <option value="Ativo">Ativo</option>
                     <option value="Férias">Férias</option>
@@ -1902,9 +1866,6 @@ function ColaboradoresPageInner() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* `key` remonta o modal a cada colaborador: o campo nasce vazio em vez de herdar a caixa do anterior. */}
-      <ArchiveBoxModal key={archiveTarget?.id} target={archiveTarget} onClose={() => setArchiveTarget(null)} />
 
       {selectedEmployeeId && (
         <CandidateProfileModal

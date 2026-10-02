@@ -89,7 +89,7 @@ BEGIN
 
   -- (a) Update inocuo nao materializa. Simula um colaborador antigo que o backfill nao
   -- alcancou (cabecalho e tarefas apagados a mao, como se nunca tivessem existido) e depois
-  -- um save vindo da view employees_todos, que reescreve as tres colunas do gatilho com os
+  -- um save que reescreve as tres colunas do gatilho com os
   -- MESMOS valores. Sem o IS DISTINCT FROM na condicao do gatilho de UPDATE, isso
   -- materializaria de novo -- e e exatamente isso que este teste pega.
   INSERT INTO public.employees (name, admission_date, status)

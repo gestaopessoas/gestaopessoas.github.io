@@ -35,13 +35,9 @@ export function GlobalHistoryTab() {
     setLoading(true)
     const supabase = createClient()
     
-    // `employee_history` sozinha so tem quem esta no quadro atual: depois da separacao
-    // do arquivo morto, o log dos 4.543 ex-colaboradores mora no schema `arquivo`. A
-    // view `_todos` costura os dois lados — mas o PostgREST NAO atravessa view com
-    // UNION para fazer join embutido (devolve 400), entao os nomes e os valores vem em
-    // consultas separadas e sao costurados aqui.
+    // Nomes e valores vem em consultas separadas e sao costurados aqui.
     const { data, error } = await supabase
-      .from('employee_history_todos')
+      .from('employee_history')
       .select('*')
       .order('change_date', { ascending: false })
       .limit(100)
@@ -53,10 +49,10 @@ export function GlobalHistoryTab() {
 
       const [valores, pessoas, autores] = await Promise.all([
         supabase
-          .from('employee_history_value_entries_todos')
+          .from('employee_history_value_entries')
           .select('history_id, value_side, path, value_text, value_number, value_boolean')
           .in('history_id', ids),
-        supabase.from('employees_todos').select('id, name').in('id', employeeIds),
+        supabase.from('employees').select('id, name').in('id', employeeIds),
         supabase.from('profiles').select('id, name').in('id', authorIds),
       ])
 
@@ -125,7 +121,7 @@ export function GlobalHistoryTab() {
       return;
     }
     const { data: revertidos, error: updateError } = await supabase
-      .from('employees_todos')
+      .from('employees')
       .update({ [revertItem.column_name]: value })
       .eq('id', revertItem.employee_id)
       .select('id')

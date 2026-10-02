@@ -147,33 +147,12 @@ eles que a operação diária do RH acontece. No banco é a view `colaboradores`
 operação lê de lá (ADR 0007).
 _Avoid_: ativos, headcount, quadro vivo
 
-**Arquivo Morto**:
-Quem tem dossiê guardado — porque saiu (status `Inativo`, `Desligado`, `Arquivo Morto`)
-**ou** porque tem caixa física, mesmo seguindo ativo (ADR 0008). Desde o ADR 0009 mora
-fisicamente no schema `arquivo`, fora de `public.employees`. Quem precisa da base inteira
-(Turnover, Histórico, auditoria de benefícios) lê a view `employees_todos`; a tela de
-arquivo lê `arquivo_morto`, que devolve uma linha por dossiê.
-_Avoid_: inativos, desligados, ex-funcionários, arquivo
-
 **Passagem**:
 Um período do Colaborador na empresa, da admissão ao desligamento. A ficha (`employees`)
 guarda só a passagem **atual**; as encerradas ficam em `employee_passages`, pelo CPF só
-com dígitos — por isso valem para quem está em `public` ou no `arquivo`. Admissão
-desconhecida é `NULL`, para o RH completar. Saída e volta em poucos dias são duas passagens
-(costuma ser troca de empresa ou de contrato).
+com dígitos. Admissão desconhecida é `NULL`, para o RH completar. Saída e volta em poucos
+dias são duas passagens (costuma ser troca de empresa ou de contrato).
 _Avoid_: vínculo, contrato, período
-
-**Dossiê**:
-Os papéis de **uma passagem** do Colaborador pela empresa, guardados numa Caixa. Quem foi
-readmitido, ou saiu de CLT e voltou como PJ, tem mais de um — e eles podem estar em caixas
-diferentes. Uma linha de `employee_archives` é um dossiê.
-_Avoid_: pasta, registro, arquivo do funcionário
-
-**Caixa**:
-A caixa física de papelão onde os Dossiês ficam, identificada por um código (`A39`, `C04`).
-É `physical_boxes`. Cuidado com o nome: `employee_archives` é o vínculo Dossiê↔Caixa, não
-um arquivo de dados.
-_Avoid_: pacote, box, container
 
 ## Termos pendentes
 

@@ -349,7 +349,7 @@ function EmployeePhotoLinks({ employeeId }: { employeeId: string }) {
       const novoCaminho = maisNova ? `${employeeId}/perfil/${maisNova.name}` : null;
       // O recorte é daquela foto: mantê-lo sobre outra imagem enquadraria o lugar errado.
       const { error: cadastroError } = await supabase
-        .from("employees_todos")
+        .from("employees")
         .update({ photo_path: novoCaminho, photo_crop: null })
         .eq("id", employeeId);
       if (cadastroError) alert("A foto foi apagada, mas o cadastro não foi atualizado: " + cadastroError.message);

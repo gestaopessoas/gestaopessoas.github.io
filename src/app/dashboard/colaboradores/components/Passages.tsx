@@ -6,8 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Select } from "./FormHelpers";
 
 // Passagens ENCERRADAS do colaborador (#156). A passagem atual continua na ficha; aqui
-// ficam as anteriores, achadas pelo CPF so com digitos -- por isso servem tanto para o
-// quadro atual quanto para o arquivo morto.
+// ficam as anteriores, achadas pelo CPF so com digitos.
 
 type Passage = {
   id: string | null; // null = linha nova, ainda nao gravada

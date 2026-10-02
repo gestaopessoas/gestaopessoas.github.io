@@ -34,7 +34,7 @@ const PG_ENV = {
   PGUSER: "postgres.bnwwdseczwrmmuvallml",
 };
 // Schemas nossos. auth/storage/cron são do Supabase: deles só vão os dados que importam.
-const SCHEMAS = ["public", "arquivo", "backup_20260805", "supabase_migrations"];
+const SCHEMAS = ["public", "backup_20260805", "supabase_migrations"];
 const EXTRA_TABLES = ["auth.users", "auth.identities", "storage.buckets", "storage.objects", "cron.job"];
 
 const today = new Date().toISOString().slice(0, 10);

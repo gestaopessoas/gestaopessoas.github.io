@@ -1,4 +1,4 @@
--- Cadastro de colaborador novo pela view `employees_todos` tinha que morrer em
+-- Cadastro de colaborador novo em `employees` tinha que morrer em
 -- "null value in column id". Roda em transacao e termina em ROLLBACK: nao suja o banco.
 --
 -- Como rodar, com o supabase local de pe:
@@ -16,7 +16,7 @@ DECLARE
   v_salario numeric;
 BEGIN
   -- O formulario manda so o que foi preenchido: id, created_at e companhia nao vao no corpo.
-  INSERT INTO public.employees_todos (name, role) VALUES ('ZZ TESTE DEFAULTS', 'Pedreiro');
+  INSERT INTO public.employees (name, role) VALUES ('ZZ TESTE DEFAULTS', 'Pedreiro');
 
   SELECT id, status, created_at, base_salary
     INTO v_id, v_status, v_criado, v_salario
@@ -24,8 +24,7 @@ BEGIN
 
   IF v_id IS NULL THEN RAISE EXCEPTION 'FALHOU: id nulo'; END IF;
   IF v_criado IS NULL THEN RAISE EXCEPTION 'FALHOU: created_at nulo'; END IF;
-  -- Os defaults da tabela precisam valer pela view tambem, senao a linha nasce diferente
-  -- dependendo de por onde entrou.
+  -- Os defaults da tabela precisam valer num INSERT que manda so o formulario.
   IF v_status <> 'Ativo' THEN RAISE EXCEPTION 'FALHOU: status %, esperado Ativo', v_status; END IF;
   IF v_salario <> 0 THEN RAISE EXCEPTION 'FALHOU: base_salary %, esperado 0', v_salario; END IF;
 

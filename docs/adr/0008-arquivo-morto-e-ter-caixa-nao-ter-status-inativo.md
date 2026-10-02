@@ -4,6 +4,8 @@ Data: 2026-09-04
 
 ## Status
 
+**Revogado em 2026-10-02.** O arquivo morto, as caixas e os dossiês foram removidos por completo (migration `20261002150000_remove_arquivo_morto.sql`).
+
 Aceito. Substitui a regra implícita anterior (uma caixa por pessoa, arquivo morto derivado
 do status) que nunca chegou a ser registrada em ADR. Complementa o ADR 0007, que decidiu
 manter tudo na tabela `employees`.

@@ -11,7 +11,6 @@
  */
 export const MODULES = [
   "colaboradores",
-  "arquivo_morto",
   "mp",
   "vagas",
   "central_candidato",

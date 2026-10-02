@@ -30,15 +30,10 @@ function TermoUniformeContent() {
     if (!employeeId) return;
     const load = async () => {
       const supabase = createClient();
-      // As duas consultas usam view `_todos`: o termo precisa ser reimpresso justamente
-      // para quem ja saiu (disputa trabalhista), e tanto a pessoa quanto as entregas de
-      // uniforme dela moram no schema `arquivo` depois do arquivamento.
-      //
-      // O nome/tamanho da peca vem numa consulta separada, e nao embutido: o PostgREST
-      // nao atravessa view com UNION para fazer join (devolve 400).
+      // O nome/tamanho da peca vem numa consulta separada, e nao embutido.
       const [emp, unis] = await Promise.all([
-        supabase.from("employees_todos").select("*").eq("id", employeeId).single(),
-        supabase.from("employee_uniforms_todos").select("*").eq("employee_id", employeeId).order("delivered_at", { ascending: false }),
+        supabase.from("employees").select("*").eq("id", employeeId).single(),
+        supabase.from("employee_uniforms").select("*").eq("employee_id", employeeId).order("delivered_at", { ascending: false }),
       ]);
 
       const itemIdsEntregues = [...new Set((unis.data ?? []).map((u) => u.uniform_item_id).filter(Boolean))];

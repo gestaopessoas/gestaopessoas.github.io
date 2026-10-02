@@ -64,20 +64,17 @@ export default function BeneficiosHistoricoPage() {
     if (auditError || !audits) {
       setAuditLogs([]);
     } else {
-      // A auditoria guarda linha de gente que ja saiu, e `colaboradores` e so o quadro
-      // atual (296 de 4.839). Procurar o nome so ali fazia quase toda linha do historico
-      // sair como "Colaborador (a3f19c2e)". Busca separada, por `employees_todos`, e so
-      // dos ids que aparecem na auditoria — a lista da tela continua sendo o quadro atual.
+      // A auditoria guarda linha de gente que ja saiu, e a lista da tela e so o quadro
+      // atual. Busca separada, por `employees`, so dos ids que aparecem na auditoria.
       const idsNaAuditoria = [...new Set(audits.map((a) => String(a.employee_id)).filter(Boolean))];
       const { data: donos } = idsNaAuditoria.length
-        ? await supabase.from("employees_todos").select("id, name").in("id", idsNaAuditoria)
+        ? await supabase.from("employees").select("id, name").in("id", idsNaAuditoria)
         : { data: [] as { id: string; name: string }[] };
       const nomePorId = new Map((donos ?? []).map((d) => [String(d.id), String(d.name)]));
 
       const enrichedAudits: AuditLog[] = audits.map((a: Record<string, unknown>) => {
         const nome = nomePorId.get(String(a.employee_id));
-        // Setor fica vazio para quem esta no arquivo: `employees_todos` e view com
-        // UNION, e o PostgREST nao atravessa isso para embutir `sectors(name)` (400).
+        // Setor fica vazio: a busca por nome acima nao traz `sectors(name)`.
         const emp = nome
           ? { id: String(a.employee_id), name: nome, department: undefined as string | undefined }
           : empsList.find((e) => e.id === String(a.employee_id));

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
-import { Archive, Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, Gift, Clock, Star, Smile, Target, TrendingUp, RefreshCcw, Package, CheckSquare, CircleDollarSign, FileOutput, Contact, BadgePercent, Database } from "lucide-react"
+import { Armchair, BarChart3, Briefcase, ClipboardList, FileText, LayoutDashboard, LockKeyhole, LogOut, Settings, Users, ChevronLeft, ChevronRight, ChevronDown, GraduationCap, Gift, Clock, Star, Smile, Target, TrendingUp, RefreshCcw, Package, CheckSquare, CircleDollarSign, FileOutput, Contact, BadgePercent, Database } from "lucide-react"
 import { usePermissions } from "@/hooks/usePermissions"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { createClient } from "@/utils/supabase/client"
@@ -35,7 +35,6 @@ const sidebarGroups: NavGroup[] = [
     items: [
       { name: "Admissão", href: "/dashboard/admissao", icon: FileText, module: "admissao" },
       { name: "Ponto", href: "/dashboard/ponto", icon: Clock, module: "ponto" },
-      { name: "Arquivo Morto", href: "/dashboard/arquivo-morto", icon: Archive, module: "arquivo_morto" },
       { name: "Controle RGS", href: "/dashboard/rgs", icon: ClipboardList, module: "rgs" },
       { name: "Movimentações (MP)", href: "/dashboard/mps", icon: FileOutput, module: "colaboradores" },
     ]
