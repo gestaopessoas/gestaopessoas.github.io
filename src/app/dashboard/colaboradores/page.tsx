@@ -1023,6 +1023,9 @@ function ColaboradoresPageInner() {
   };
 
   const obraOuSede = (employee: Employee) => String(employee.workplaces?.name || employee.unit || employee.workplace || "");
+  // Idade que a pessoa completa neste ano — a de hoje mostraria um a menos para quem ainda vai
+  // fazer aniversário no mês.
+  const idadeQueCompleta = (birth: Date) => new Date().getFullYear() - birth.getFullYear();
 
   const exportBirthdaysXlsx = () => {
     if (birthdaysThisMonth.length === 0) return;
@@ -1033,7 +1036,7 @@ function ColaboradoresPageInner() {
         "Cargo": employee.role || "",
         "Obra/Sede": obraOuSede(employee),
         "Departamento": employee.departments?.name || "",
-        "Idade": differenceInYears(new Date(), info.date),
+        "Idade": idadeQueCompleta(info.date),
         "Data de Nascimento": info.date.toLocaleDateString("pt-BR", { timeZone: "UTC" }),
       })));
   };
@@ -1483,7 +1486,7 @@ function ColaboradoresPageInner() {
                     role: String(b.employee.role || "-"),
                     workplace: obraOuSede(b.employee) || "-",
                     day: b.info.day,
-                    age: differenceInYears(new Date(), b.info.date),
+                    age: idadeQueCompleta(b.info.date),
                     birthDateStr: b.info.date.toLocaleDateString("pt-BR", { timeZone: "UTC" })
                   })))} disabled={birthdaysThisMonth.length === 0}>
                     <Download className="mr-2 h-4 w-4" />
@@ -1515,7 +1518,7 @@ function ColaboradoresPageInner() {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <div className="rounded-full bg-pink-100 px-2.5 py-1 text-xs font-semibold text-pink-700 dark:bg-pink-950/50 dark:text-pink-300">
-                        {differenceInYears(new Date(), info.date)} anos
+                        {idadeQueCompleta(info.date)} anos
                       </div>
                       <Button
                         type="button" size="sm" variant="outline" className="h-8 w-8 p-0"
