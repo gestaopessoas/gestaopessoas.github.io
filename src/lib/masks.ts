@@ -8,12 +8,23 @@ export const maskCpf = (value: string) => {
     .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
 };
 
+// Celular sai como "(DD) 9 XXXX-XXXX"; fixo (10 dígitos), como "(DD) XXXX-XXXX".
 export const maskPhone = (value: string) => {
   const digits = onlyDigits(value).slice(0, 11);
   if (digits.length <= 2) return digits;
   if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
   if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3, 7)}-${digits.slice(7)}`;
+};
+
+// Para exibir o que já está gravado, que chegou de vários jeitos ("53991812665",
+// "+55 53 99181-2665", "053 99181-2665"). Sem DDD + número reconhecível, devolve como está.
+export const formatPhone = (value: string) => {
+  const raw = (value || "").trim();
+  let digits = onlyDigits(raw);
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) digits = digits.slice(2);
+  else if ((digits.length === 11 || digits.length === 12) && digits.startsWith("0")) digits = digits.slice(1);
+  return digits.length === 10 || digits.length === 11 ? maskPhone(digits) : raw;
 };
 
 export const maskCep = (value: string) => {

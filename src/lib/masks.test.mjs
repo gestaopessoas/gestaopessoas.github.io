@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 // masks.ts é TypeScript sem tipos no corpo — remove as anotações e avalia.
 const src = readFileSync(new URL("./masks.ts", import.meta.url), "utf8").replace(/: string/g, "");
 const mod = await import("data:text/javascript," + encodeURIComponent(src));
-const { maskAddressNumber, maskUf, isValidPhone, maskCep, safeFileName } = mod;
+const { maskAddressNumber, maskUf, isValidPhone, maskCep, maskPhone, formatPhone, safeFileName } = mod;
 
 // Número de endereço: aceita o que existe na vida real, barra texto corrido.
 assert.equal(maskAddressNumber("355"), "355");
@@ -27,6 +27,19 @@ assert.equal(isValidPhone("(53) 9982"), false);
 assert.equal(isValidPhone(""), false);
 assert.equal(isValidPhone("(53) 99181-26650"), false);
 
+// Máscara de telefone: celular "(DD) 9 XXXX-XXXX", fixo "(DD) XXXX-XXXX".
+assert.equal(maskPhone("53991812665"), "(53) 9 9181-2665");
+assert.equal(maskPhone("5332221234"), "(53) 3222-1234");
+assert.equal(maskPhone("539918"), "(53) 9918");
+assert.equal(maskPhone("(53) 99181-26650"), "(53) 9 9181-2665");
+
+// Exibição do que já está no banco, em qualquer formato antigo.
+assert.equal(formatPhone("(53) 99181-2665"), "(53) 9 9181-2665");
+assert.equal(formatPhone("+55 53 99181-2665"), "(53) 9 9181-2665");
+assert.equal(formatPhone("053 99181-2665"), "(53) 9 9181-2665");
+assert.equal(formatPhone("99181-2665"), "99181-2665");
+assert.equal(formatPhone(""), "");
+
 // CEP mascarado chega em 8 dígitos — é o gatilho do onChange.
 assert.equal(maskCep("96200340"), "96200-340");
 assert.equal(maskCep("abc96200340xyz"), "96200-340");
@@ -39,4 +52,4 @@ assert.equal(safeFileName("../../etc/passwd"), "..-..-etc-passwd");
 assert.equal(safeFileName("Currículo simples preto e cinza.pdf"), "Curr-culo-simples-preto-e-cinza.pdf");
 assert.ok(safeFileName("a".repeat(200) + ".pdf").length <= 80);
 
-console.log("ok — 23 asserts");
+console.log("ok — 32 asserts");

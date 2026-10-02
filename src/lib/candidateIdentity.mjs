@@ -56,6 +56,13 @@ export function identityLookups({ email, cpf, phone } = {}) {
  */
 export async function findExistingCandidateId(supabase, identity) {
   for (const { column, value } of identityLookups(identity)) {
+    // Telefone compara só os dígitos (no banco): "(53) 99181-2665" e "(53) 9 9181-2665" são
+    // a mesma pessoa, e o ilike de texto exato não via isso.
+    if (column === "phone") {
+      const { data } = await supabase.rpc("find_candidate_id_by_phone", { p_phone: String(value).trim() });
+      if (data) return data;
+      continue;
+    }
     const { data } = await supabase
       .from("candidates")
       .select("id")

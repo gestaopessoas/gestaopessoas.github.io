@@ -30,6 +30,7 @@ import { rowsToAssessment } from "@/lib/interviewAssessment.mjs";
 import { hasRealEmail } from "@/lib/candidateIdentity.mjs";
 import { EDUCATION_LEVEL_OPTIONS } from "@/lib/educationLevels.mjs";
 import { CatalogSelect } from "@/components/CatalogSelect";
+import { formatPhone, maskAddressNumber, maskCep, maskPhone, maskUf, onlyDigits } from "@/lib/masks";
 
 if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -62,7 +63,11 @@ type ProfilePerson = {
   city?: string | null;
   state?: string | null;
   workplace?: string | null;
+  cep?: string | null;
   address?: string | null;
+  address_number?: string | null;
+  address_complement?: string | null;
+  neighborhood?: string | null;
   birth_date?: string | null;
   birthplace?: string | null;
   cpf?: string | null;
@@ -261,6 +266,29 @@ type ProfileInterview = {
   } | null;
 };
 
+/** Endereço estruturado, com os mesmos nomes de coluna em `candidates` e `employees`. CEP
+ *  vai só com dígitos, como a candidatura pública grava. */
+export function addressColumns(data: ProfilePerson) {
+  return {
+    cep: onlyDigits(data.cep || "") || null,
+    address: data.address?.trim() || null,
+    address_number: data.address_number?.trim() || null,
+    address_complement: data.address_complement?.trim() || null,
+    neighborhood: data.neighborhood?.trim() || null,
+    city: data.city?.trim() || null,
+    state: data.state?.trim() || null,
+  };
+}
+
+/** "Rua X, 123 - Ap 2, Bairro, Cidade/UF, CEP 00000-000" — só com as partes preenchidas. */
+function formatAddress(data: ProfilePerson) {
+  const street = [data.address, data.address_number].filter(Boolean).join(", ");
+  const line = [street, data.address_complement].filter(Boolean).join(" - ");
+  const place = [data.city, data.state].filter(Boolean).join("/");
+  const cep = onlyDigits(data.cep || "");
+  return [line, data.neighborhood, place, cep ? `CEP ${maskCep(cep)}` : ""].filter(Boolean).join(", ");
+}
+
 /** Colunas de `candidates` que a ficha edita. Cada tela montava o próprio payload e
  *  esquecia metade (CPF, nascimento, CNH, contato de emergência...): a ficha mostrava o
  *  campo, o RH preenchia e o Salvar descartava calado. Tela que grava candidato usa isto. */
@@ -277,9 +305,7 @@ export function candidateProfileColumns(data: ProfilePerson) {
     // no insert quem chama põe placeholderEmail(), porque a coluna é NOT NULL UNIQUE.
     email: hasRealEmail(data.email) ? data.email!.trim() : undefined,
     phone: data.phone || null,
-    city: data.city || null,
-    state: data.state || null,
-    address: data.address || null,
+    ...addressColumns(data),
     role_interest: data.role_interest || data.role || null,
     cpf: data.cpf || null,
     birth_date: data.birth_date || null,
@@ -612,15 +638,15 @@ export function CandidateProfileModal({
             ...prev,
             full_name: keep(parsed.name, prev.full_name),
             email: keep(parsed.email, prev.email),
-            phone: keep(parsed.phone, prev.phone),
+            phone: keep(parsed.phone && formatPhone(parsed.phone), prev.phone),
             // role/role_interest de propósito fora daqui: a vaga é escolhida no dropdown
             // de job_profiles, nunca inferida do currículo.
             city: keep(parsed.city || locCity, prev.city),
             state: keep(parsed.state || locState, prev.state),
-            secondary_phone: keep(parsed.secondary_phone, prev.secondary_phone),
+            secondary_phone: keep(parsed.secondary_phone && formatPhone(parsed.secondary_phone), prev.secondary_phone),
             secondary_email: keep(parsed.secondary_email, prev.secondary_email),
             emergency_contact_name: keep(parsed.emergency_contact_name, prev.emergency_contact_name),
-            emergency_contact_phone: keep(parsed.emergency_contact_phone, prev.emergency_contact_phone),
+            emergency_contact_phone: keep(parsed.emergency_contact_phone && formatPhone(parsed.emergency_contact_phone), prev.emergency_contact_phone),
             cpf: keep(parsed.cpf, prev.cpf),
             birth_date: keep(normalizeResumeDate(parsed.birth_date), prev.birth_date),
             birthplace: keep(parsed.birthplace, prev.birthplace),
@@ -770,6 +796,10 @@ export function CandidateProfileModal({
     }
     return "";
   }, [applications]);
+  // Sem Vaga e sem cargo de interesse (Candidatura Espontânea, cadastro antigo ou importado),
+  // o "Cargo Alvo" da entrevista mais recente ainda diz para que a pessoa veio.
+  const cargoDaEntrevista = interviews.find((int) => int.role?.trim())?.role?.trim() || "";
+  const cargoExibido = cargoDaVaga || currentCargo || cargoDaEntrevista;
   const cargoOptions = useMemo(
     () => Array.from(new Set([...jobProfileOptions, currentCargo].filter(Boolean))),
     [jobProfileOptions, currentCargo],
@@ -912,6 +942,36 @@ export function CandidateProfileModal({
 
   const handleChange = (field: keyof ProfilePerson, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // O aviso guarda de qual CEP ele é: trocar de CEP o esconde sem precisar limpar.
+  const [cepStatus, setCepStatus] = useState({ cep: "", msg: "" });
+  // Mesma consulta da candidatura pública e do cadastro de colaborador. Só preenche o que o
+  // ViaCEP devolveu; número e complemento ficam com quem digita.
+  const lookupCep = async (digits: string) => {
+    setCepStatus({ cep: digits, msg: "Buscando endereço..." });
+    try {
+      const data = await (await fetch(`https://viacep.com.br/ws/${digits}/json/`)).json();
+      if (data.erro) { setCepStatus({ cep: digits, msg: "CEP não encontrado. Preencha o endereço manualmente." }); return; }
+      setFormData((prev) => ({
+        ...prev,
+        address: data.logradouro || prev.address,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.localidade || prev.city,
+        state: data.uf || prev.state,
+      }));
+      setCepStatus({ cep: "", msg: "" });
+    } catch {
+      setCepStatus({ cep: digits, msg: "Não foi possível consultar o CEP. Preencha manualmente." });
+    }
+  };
+
+  const handleCepChange = (value: string) => {
+    const masked = maskCep(value);
+    const digits = onlyDigits(masked);
+    // A máscara trava em 8 dígitos: sem comparar com o anterior, cada tecla extra consultaria de novo.
+    if (digits.length === 8 && digits !== onlyDigits(formData.cep || "")) lookupCep(digits);
+    handleChange("cep", masked);
   };
 
   const handleAssessmentChange = (field: string, value: any) => {
@@ -1348,7 +1408,9 @@ export function CandidateProfileModal({
                             ))}
                           </select>
                         ) : (
-                          <span className="font-medium text-foreground">{cargoDaVaga || formData.role_interest || formData.role || "Cargo não informado"}</span>
+                          cargoExibido
+                            ? <span className="font-medium text-foreground">{cargoExibido}</span>
+                            : <span className="italic">Cargo não informado</span>
                         )}
                       </div>
                       {isEditing && cargoOptions.length === 0 && (
@@ -1377,13 +1439,14 @@ export function CandidateProfileModal({
                         <Phone className="h-4 w-4 text-primary shrink-0" />
                         {isEditing ? (
                           <Input 
-                            value={formData.phone || ""} 
-                            onChange={(e) => handleChange('phone', e.target.value)}
-                            placeholder="Telefone"
+                            inputMode="numeric"
+                            value={formatPhone(formData.phone || "")} 
+                            onChange={(e) => handleChange('phone', maskPhone(e.target.value))}
+                            placeholder="(00) 9 0000-0000"
                             className="h-7 text-xs"
                           />
                         ) : (
-                          formData.phone || "Sem telefone"
+                          formatPhone(formData.phone || "") || "Sem telefone"
                         )}
                       </div>
                     </div>
@@ -1568,24 +1631,31 @@ export function CandidateProfileModal({
                             <span className="font-semibold">{formData.gender || "-"}</span>
                           )}
                         </div>
-                        <div className="space-y-1.5 md:col-span-3">
-                          <span className="text-xs text-muted-foreground block font-medium">Endereço (Cidade, UF, Logradouro)</span>
+                        <div className="space-y-1.5 sm:col-span-2 md:col-span-3">
+                          <span className="text-xs text-muted-foreground block font-medium">Endereço</span>
                           {isEditing ? (
-                            <div className="grid grid-cols-3 gap-2">
-                              <Input placeholder="Cidade" value={formData.city || ""} onChange={(e) => handleChange('city', e.target.value)} />
-                              <Input placeholder="Estado" value={formData.state || ""} onChange={(e) => handleChange('state', e.target.value)} />
-                              <Input placeholder="Endereço Completo" value={formData.address || ""} onChange={(e) => handleChange('address', e.target.value)} className="col-span-3" />
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
+                              <div className="col-span-2 space-y-1 sm:col-span-2">
+                                <Input aria-label="CEP" inputMode="numeric" placeholder="CEP 00000-000" value={maskCep(formData.cep || "")} onChange={(e) => handleCepChange(e.target.value)} />
+                                {cepStatus.msg && cepStatus.cep === onlyDigits(formData.cep || "") && <p role="status" className="text-xs text-muted-foreground">{cepStatus.msg}</p>}
+                              </div>
+                              <Input aria-label="Logradouro" placeholder="Logradouro" value={formData.address || ""} onChange={(e) => handleChange('address', e.target.value)} className="col-span-2 sm:col-span-4" />
+                              <Input aria-label="Número" placeholder="Número (ou S/N)" value={formData.address_number || ""} onChange={(e) => handleChange('address_number', maskAddressNumber(e.target.value))} className="sm:col-span-2" />
+                              <Input aria-label="Complemento" placeholder="Complemento" value={formData.address_complement || ""} onChange={(e) => handleChange('address_complement', e.target.value)} className="sm:col-span-4" />
+                              <Input aria-label="Bairro" placeholder="Bairro" value={formData.neighborhood || ""} onChange={(e) => handleChange('neighborhood', e.target.value)} className="col-span-2 sm:col-span-2" />
+                              <Input aria-label="Cidade" placeholder="Cidade" value={formData.city || ""} onChange={(e) => handleChange('city', e.target.value)} className="sm:col-span-3" />
+                              <Input aria-label="UF" placeholder="UF" maxLength={2} value={formData.state || ""} onChange={(e) => handleChange('state', maskUf(e.target.value))} />
                             </div>
                           ) : (
-                            <span className="font-semibold">{[formData.city, formData.state, formData.address].filter(Boolean).join(", ") || "-"}</span>
+                            <span className="font-semibold">{formatAddress(formData) || "-"}</span>
                           )}
                         </div>
                         <div className="space-y-1.5">
                           <span className="text-xs text-muted-foreground block font-medium">Telefone Secundário</span>
                           {isEditing ? (
-                            <Input value={formData.secondary_phone || ""} onChange={(e) => handleChange('secondary_phone', e.target.value)} />
+                            <Input inputMode="numeric" placeholder="(00) 9 0000-0000" value={formatPhone(formData.secondary_phone || "")} onChange={(e) => handleChange('secondary_phone', maskPhone(e.target.value))} />
                           ) : (
-                            <span className="font-semibold">{formData.secondary_phone || "-"}</span>
+                            <span className="font-semibold">{formatPhone(formData.secondary_phone || "") || "-"}</span>
                           )}
                         </div>
                         <div className="space-y-1.5">
@@ -1621,12 +1691,12 @@ export function CandidateProfileModal({
                           {isEditing ? (
                             <div className="flex gap-2">
                               <Input placeholder="Nome" value={formData.emergency_contact_name || ""} onChange={(e) => handleChange('emergency_contact_name', e.target.value)} />
-                              <Input placeholder="Telefone" value={formData.emergency_contact_phone || ""} onChange={(e) => handleChange('emergency_contact_phone', e.target.value)} />
+                              <Input inputMode="numeric" placeholder="(00) 9 0000-0000" value={formatPhone(formData.emergency_contact_phone || "")} onChange={(e) => handleChange('emergency_contact_phone', maskPhone(e.target.value))} />
                             </div>
                           ) : (
                             <span className="font-semibold">
                               {formData.emergency_contact_name || formData.emergency_contact_phone ? 
-                                `${formData.emergency_contact_name || ''} ${formData.emergency_contact_phone ? `- ${formData.emergency_contact_phone}` : ''}` 
+                                `${formData.emergency_contact_name || ''} ${formData.emergency_contact_phone ? `- ${formatPhone(formData.emergency_contact_phone)}` : ''}` 
                                 : "-"}
                             </span>
                           )}

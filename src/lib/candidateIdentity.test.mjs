@@ -70,3 +70,19 @@ test("encontra pelo CPF quando o e-mail é placeholder", async () => {
   assert.equal(id, "cand-1");
   assert.deepEqual(consultas, [["cpf", "123.456.789-09"]]);
 });
+
+test("telefone casa pelos dígitos, não pelo formato", async () => {
+  const chamadas = [];
+  const supabase = {
+    from: () => {
+      throw new Error("telefone não pode ir por ilike de texto exato");
+    },
+    rpc: async (fn, args) => {
+      chamadas.push([fn, args]);
+      return { data: "cand-2" };
+    },
+  };
+  const id = await findExistingCandidateId(supabase, { phone: "(53) 9 8475-8582" });
+  assert.equal(id, "cand-2");
+  assert.deepEqual(chamadas, [["find_candidate_id_by_phone", { p_phone: "(53) 9 8475-8582" }]]);
+});

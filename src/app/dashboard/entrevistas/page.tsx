@@ -8,7 +8,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CandidateProfileModal } from "@/components/CandidateProfileModal";
+import { CandidateProfileModal, addressColumns } from "@/components/CandidateProfileModal";
 import { errorMessage } from "@/lib/utils";
 import { useToast } from "@/contexts/ToastContext";
 import { DEFAULT_RESUME_MODEL } from "@/lib/resumeModelSettings";
@@ -578,6 +578,11 @@ export default function EntrevistasPage() {
       // sem e-mail viravam o mesmo cadastro (issue #76).
       const identidade = { email: payloadAny.email, cpf: formData.cpf, phone: payloadAny.phone };
       const existente = await findExistingCandidateId(supabase, identidade);
+      // Endereço só vai quando a ficha carregou o cadastro (as chaves existem, mesmo nulas) ou o
+      // RH digitou algo. Entrevista nova parte de um formulário sem endereço, e gravar null ali
+      // apagaria o endereço de quem já estava cadastrado.
+      const enderecoNaFicha = (["cep", "address", "address_number", "address_complement", "neighborhood", "state"] as const)
+        .some((campo) => formData[campo] !== undefined);
       const dadosDoCandidato = {
         full_name: payloadAny.candidate_name,
         first_name: parts[0] || "",
@@ -586,6 +591,7 @@ export default function EntrevistasPage() {
         phone: payloadAny.phone,
         role_interest: payloadAny.role,
         city: assessmentData.worksite || "",
+        ...(enderecoNaFicha ? { ...addressColumns(formData), city: formData.city?.trim() || assessmentData.worksite || "" } : {}),
         // Só grava disponibilidade que alguém informou. O padrão do parecer marcava
         // "Todas as Obras" em todo candidato (QA B3) e, sem a chave condicional abaixo,
         // o salvamento passaria a apagar a disponibilidade real de quem já tinha uma.
