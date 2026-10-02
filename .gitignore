@@ -86,3 +86,5 @@ prints/
 /projects*.json
 /scratch_*.js
 /relatorio_*
+/*.xlsx
+/*.csv
