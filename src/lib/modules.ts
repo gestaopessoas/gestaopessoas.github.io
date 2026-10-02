@@ -28,6 +28,7 @@ export const MODULES = [
   "cargos",
   "empresas",
   "obras",
+  "mapa",
   "beneficios",
   "treinamentos",
   "avaliacoes",

@@ -1,0 +1,400 @@
+[
+  {
+    "id": "joy",
+    "name": "Joy",
+    "city": "Pelotas",
+    "status": "EM CONSTRUÇÃO",
+    "address": "Acesso Rua 01, 301, Cidade Alta, Pelotas, RS",
+    "coordinates": {
+      "lat": -31.6769337,
+      "lng": -52.346521
+    },
+    "image_url": "/empreendimentos/joy_image_url.webp",
+    "link": "https://acpo.com.br/empreendimentos/joy-residence",
+    "short_address": "Acesso Rua 01, 301",
+    "logo_url": "/map-logos/joy.png",
+    "logo_bg_color": "#f9b734"
+  },
+  {
+    "id": "joy-ii",
+    "name": "Joy II",
+    "city": "Pelotas",
+    "status": "EM CONSTRUÇÃO",
+    "address": "Acesso Rua 01, 301, Cidade Alta, Pelotas, RS",
+    "coordinates": {
+      "lat": -31.676,
+      "lng": -52.3455
+    },
+    "short_address": "Acesso Rua 01, 301",
+    "logo_url": "/map-logos/joy-2.png",
+    "link": "https://acpo.com.br/empreendimentos/joy-2",
+    "logo_bg_color": "#fef2d2",
+    "image_url": "/empreendimentos/joy-ii.webp"
+  },
+  {
+    "id": "moov",
+    "name": "Moov",
+    "city": "Pelotas",
+    "status": "EM CONSTRUÇÃO",
+    "address": "Moov, Cohab Fragata, Fragata, Sede, Pelotas, Rio Grande do Sul, Região Sul, Brasil",
+    "coordinates": {
+      "lat": -31.7418946,
+      "lng": -52.3799326
+    },
+    "image_url": "/empreendimentos/moov_image_url.webp",
+    "link": "https://acpo.com.br/empreendimentos/moov",
+    "short_address": "Moov, Cohab Fragata",
+    "logo_url": "/map-logos/moov.png",
+    "logo_bg_color": "#ffffff"
+  },
+  {
+    "id": "moov-ii",
+    "name": "Moov II",
+    "city": "Pelotas",
+    "status": "EM CONSTRUÇÃO",
+    "address": "Moov, Cohab Fragata, Fragata, Sede, Pelotas, Rio Grande do Sul, Região Sul, Brasil",
+    "coordinates": {
+      "lat": -31.741,
+      "lng": -52.379
+    },
+    "short_address": "Moov, Cohab Fragata",
+    "logo_url": "/map-logos/moov-2-ato.png",
+    "link": "https://acpo.com.br/empreendimentos/moov-2-ato",
+    "logo_bg_color": "#ffffff",
+    "image_url": "/empreendimentos/moov-ii.webp"
+  },
+  {
+    "id": "life-rg",
+    "name": "Life RG",
+    "city": "Rio Grande",
+    "status": "EM CONSTRUÇÃO",
+    "address": "Avenida das Figueiras, Parque São Pedro, Rio Grande, Rio Grande do Sul, Região Sul, 96216-210, Brasil",
+    "coordinates": {
+      "lat": -32.1126915,
+      "lng": -52.1773318
+    },
+    "short_address": "Avenida das Figueiras, Parque São Pedro",
+    "logo_url": "/map-logos/life-rg.png",
+    "link": "https://acpo.com.br/empreendimentos/life-rio-grande",
+    "logo_bg_color": "#3eacb1",
+    "image_url": "/empreendimentos/life-rg.webp"
+  },
+  {
+    "id": "solanas",
+    "name": "Solanas",
+    "city": "Rio Grande",
+    "status": "EM CONSTRUÇÃO",
+    "address": "Barra Mar Hotel, 620, Avenida Atlântica, Balneário Cassino, Rio Grande, Rio Grande do Sul, Região Sul, 96207-470, Brasil",
+    "coordinates": {
+      "lat": -32.1877808,
+      "lng": -52.1649437
+    },
+    "image_url": "/empreendimentos/solanas_image_url.webp",
+    "link": "https://acpo.com.br/empreendimentos/solanas",
+    "short_address": "Barra Mar Hotel, 620",
+    "logo_url": "/map-logos/solanas.png",
+    "logo_bg_color": "#fdf8f0"
+  },
+  {
+    "id": "connect-duque",
+    "name": "Connect Duque",
+    "city": "Pelotas",
+    "status": "EM CONSTRUÇÃO",
+    "address": "138, Avenida Duque de Caxias, Fragata, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96030-000, Brasil",
+    "coordinates": {
+      "lat": -31.7617839,
+      "lng": -52.3587113
+    },
+    "image_url": "/empreendimentos/connect-duque_image_url.webp",
+    "link": "https://acpo.com.br/empreendimentos/connect-duque",
+    "short_address": "Avenida Duque de Caxias, 138",
+    "logo_url": "/map-logos/connect-duque.png",
+    "logo_bg_color": "#ffffff"
+  },
+  {
+    "id": "reserva-areal",
+    "name": "Reserva Areal",
+    "city": "Pelotas",
+    "status": "LANÇAMENTO",
+    "address": "Rua Otacílio Fernandes Ratto, Areal, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96077-576, Brasil",
+    "coordinates": {
+      "lat": -31.7591061,
+      "lng": -52.323129
+    },
+    "image_url": "/empreendimentos/reserva-areal_image_url.webp",
+    "link": "https://acpo.com.br/empreendimentos/reserva-areal",
+    "short_address": "Rua Otacílio Fernandes Ratto, Areal",
+    "logo_url": "/map-logos/reserva-areal_logo_url.svg",
+    "logo_bg_color": "#455333"
+  },
+  {
+    "id": "direct",
+    "name": "Direct",
+    "city": "Pelotas",
+    "status": "EM CONSTRUÇÃO",
+    "address": "Rua Antônio Francisco dos Anjos, Fragata, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96020-330, Brasil",
+    "coordinates": {
+      "lat": -31.7539621,
+      "lng": -52.3435139
+    },
+    "image_url": "/empreendimentos/direct_image_url.webp",
+    "link": "https://acpo.com.br/empreendimentos/direct",
+    "short_address": "Rua Antônio Francisco dos Anjos, Fragata",
+    "logo_url": "/map-logos/direct.png",
+    "logo_bg_color": "#000000"
+  },
+  {
+    "id": "quinta-do-oleiro-i",
+    "name": "Quinta do Oleiro I",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Avenida Engenheiro Ildefonso Simões Lopes, Residencial Nova Tablada, Três Vendas, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96080-690, Brasil",
+    "coordinates": {
+      "lat": -31.7349259,
+      "lng": -52.3251203
+    },
+    "short_address": "Avenida Engenheiro Ildefonso Simões Lopes, Residencial Nova Tablada",
+    "logo_url": "/map-logos/quinta-do-oleiro-i_logo_url.png",
+    "link": "https://acpo.com.br/empreendimentos/quinta-do-oleiro",
+    "logo_bg_color": "#f0e2e7",
+    "image_url": "/empreendimentos/quinta-do-oleiro-i.webp"
+  },
+  {
+    "id": "quinta-do-oleiro-ii",
+    "name": "Quinta do Oleiro II",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Avenida Engenheiro Ildefonso Simões Lopes, Residencial Nova Tablada, Três Vendas, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96080-690, Brasil",
+    "coordinates": {
+      "lat": -31.7324812,
+      "lng": -52.3227265
+    },
+    "short_address": "Avenida Engenheiro Ildefonso Simões Lopes, Residencial Nova Tablada",
+    "logo_url": "/map-logos/quinta-do-oleiro-ii_logo_url.png",
+    "link": "https://acpo.com.br/empreendimentos/quinta-do-oleiro-ii",
+    "logo_bg_color": "#e9d9cc",
+    "image_url": "/empreendimentos/quinta-do-oleiro-ii.webp"
+  },
+  {
+    "id": "riviera",
+    "name": "Riviera",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Avenida Adolfo Fetter, Balneário dos Prazeres, Laranjal / Z3, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96095-020, Brasil",
+    "coordinates": {
+      "lat": -31.7314594,
+      "lng": -52.2177869
+    },
+    "short_address": "Avenida Adolfo Fetter, Balneário dos Prazeres",
+    "logo_url": "/map-logos/riviera_logo_url.svg",
+    "link": "https://acpo.com.br/empreendimentos/riviera-condominio-clube",
+    "logo_bg_color": "#004e74",
+    "image_url": "/empreendimentos/riviera.webp"
+  },
+  {
+    "id": "residencial-life-park-fernando-osório",
+    "name": "Residencial Life Park Fernando Osório",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Avenida Fernando Osório, Três Vendas, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96065-110, Brasil",
+    "coordinates": {
+      "lat": -31.7243387,
+      "lng": -52.3423062
+    },
+    "image_url": "/empreendimentos/residencial-life-park-fernando-osório_image_url.webp",
+    "link": "https://acpo.com.br/empreendimentos/residencial-life-park-fernando-osorio",
+    "short_address": "Avenida Fernando Osório, Três Vendas",
+    "logo_url": "/map-logos/residencial-life-park-fernando-osório_logo_url.png",
+    "logo_bg_color": "#96e19e"
+  },
+  {
+    "id": "reserva-home-club",
+    "name": "Reserva Home Club",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Avenida Cristóvão José dos Santos, Tablada, Três Vendas, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96060-460, Brasil",
+    "coordinates": {
+      "lat": -31.7309197,
+      "lng": -52.3298683
+    },
+    "short_address": "Avenida Cristóvão José dos Santos, Tablada",
+    "logo_url": "/map-logos/reserva-home-club.png",
+    "link": "https://acpo.com.br/empreendimentos/reserva-home-club",
+    "logo_bg_color": "#ffffff",
+    "image_url": "/empreendimentos/reserva-home-club.webp"
+  },
+  {
+    "id": "jardins-de-monet",
+    "name": "Jardins de Monet",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Av. Pres. Juscelino Kubitscheck de Oliveira, 4123, Areal, Pelotas, RS",
+    "coordinates": {
+      "lat": -31.7440043,
+      "lng": -52.3290563
+    },
+    "short_address": "Av. Pres. Juscelino Kubitscheck de Oliveira, 4123",
+    "logo_url": "/map-logos/jardins-de-monet_logo_url.svg",
+    "link": "https://acpo.com.br/empreendimentos/jardins-de-monet",
+    "logo_bg_color": "#ab1b86",
+    "image_url": "/empreendimentos/jardins-de-monet.webp"
+  },
+  {
+    "id": "horizon-fernando-osório",
+    "name": "Horizon Fernando Osório",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Avenida Fernando Osório, Sitio Floresta, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96070-850, Brasil",
+    "coordinates": {
+      "lat": -31.6906254,
+      "lng": -52.3400975
+    },
+    "short_address": "Avenida Fernando Osório, Sitio Floresta",
+    "logo_url": "/map-logos/horizon-fernando-osório_logo_url.svg",
+    "link": "https://acpo.com.br/empreendimentos/horizon-fernando-osorio",
+    "logo_bg_color": "#eda06c"
+  },
+  {
+    "id": "duque-1128",
+    "name": "Duque 1128",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Avenida Duque de Caxias, Verona, Gotuzzo, Fragata, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96030-003, Brasil",
+    "coordinates": {
+      "lat": -31.7556979,
+      "lng": -52.3887575
+    },
+    "short_address": "Avenida Duque de Caxias, Verona",
+    "logo_url": "/map-logos/duque-1128_logo_url.png",
+    "link": "https://acpo.com.br/empreendimentos/duque-1128",
+    "logo_bg_color": "#1d5c6f",
+    "image_url": "/empreendimentos/duque-1128.webp"
+  },
+  {
+    "id": "mozart-residencial",
+    "name": "Mozart Residencial",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Avenida Fernando Osório, Sitio Floresta, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96070-850, Brasil",
+    "coordinates": {
+      "lat": -31.6906254,
+      "lng": -52.3400975
+    },
+    "short_address": "Avenida Fernando Osório, Sitio Floresta",
+    "logo_url": "/map-logos/mozart-residencial_logo_url.png",
+    "link": "https://acpo.com.br/empreendimentos/mozart-residencial",
+    "logo_bg_color": "#e9512c",
+    "image_url": "/empreendimentos/mozart-residencial.webp"
+  },
+  {
+    "id": "life-park-simões-lopes",
+    "name": "Life Park Simões Lopes",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Avenida Visconde da Graça, Simões Lopes, Centro, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96025-380, Brasil",
+    "coordinates": {
+      "lat": -31.7669467,
+      "lng": -52.3672897
+    },
+    "short_address": "Avenida Visconde da Graça, Simões Lopes",
+    "logo_url": "/map-logos/life-park-simões-lopes_logo_url.png",
+    "logo_bg_color": "#799a68",
+    "link": "https://acpo.com.br/empreendimentos/life-park-simoes-lopes",
+    "image_url": "/empreendimentos/life-park-simões-lopes.webp"
+  },
+  {
+    "id": "life-club-fernando-osório",
+    "name": "Life Club Fernando Osório",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Avenida Fernando Osório, Loteamento Jardim do Prado, Três Vendas, Sede, Pelotas, Rio Grande do Sul, Região Sul, 96065-040, Brasil",
+    "coordinates": {
+      "lat": -31.7156057,
+      "lng": -52.3425956
+    },
+    "short_address": "Avenida Fernando Osório, Loteamento Jardim do Prado",
+    "logo_url": "/map-logos/life-club-fernando-osório_logo_url.svg",
+    "link": "https://acpo.com.br/empreendimentos/life-club-fernando-osorio",
+    "logo_bg_color": "#1f303e",
+    "image_url": "/empreendimentos/life-club-fernando-osório.webp"
+  },
+  {
+    "id": "home-club-2",
+    "name": "Home Club 2",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Condomínio Home Club, Três Vendas, Sede, Pelotas, Rio Grande do Sul, Região Sul, Brasil",
+    "coordinates": {
+      "lat": -31.729013199999997,
+      "lng": -52.3301113
+    },
+    "short_address": "Condomínio Home Club, Três Vendas",
+    "logo_url": "/map-logos/home-club-2_logo_url.svg",
+    "link": "https://acpo.com.br/empreendimentos/home-club-2",
+    "logo_bg_color": "#007f5c",
+    "image_url": "/empreendimentos/home-club-2.webp"
+  },
+  {
+    "id": "home-club",
+    "name": "Home Club",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Condomínio Home Club, Três Vendas, Sede, Pelotas, Rio Grande do Sul, Região Sul, Brasil",
+    "coordinates": {
+      "lat": -31.7298132,
+      "lng": -52.3309113
+    },
+    "short_address": "Condomínio Home Club, Três Vendas",
+    "logo_url": "/map-logos/home-club_logo_url.svg",
+    "link": "https://acpo.com.br/empreendimentos/home-club",
+    "logo_bg_color": "#fc592d",
+    "image_url": "/empreendimentos/home-club.webp"
+  },
+  {
+    "id": "connect-residencial",
+    "name": "Connect Residencial",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "R. Presbítero Cláudio Neutzling, 178, Tres Vendas, Pelotas, RS",
+    "coordinates": {
+      "lat": -31.7396554,
+      "lng": -52.3455683
+    },
+    "short_address": "R. Presbítero Cláudio Neutzling, 178",
+    "logo_url": "/map-logos/connect-residencial.jpg",
+    "link": "https://acpo.com.br/empreendimentos/connect-residencial",
+    "logo_bg_color": "#1f0d1b",
+    "image_url": "/empreendimentos/connect-residencial.webp"
+  },
+  {
+    "id": "connect-jk",
+    "name": "Connect JK",
+    "city": "Pelotas",
+    "status": "ENTREGUE",
+    "address": "Connect JK, Parque Una, São Gonçalo, Sede, Pelotas, Rio Grande do Sul, Região Sul, Brasil",
+    "coordinates": {
+      "lat": -31.7670232,
+      "lng": -52.3301168
+    },
+    "short_address": "Connect JK, Parque Una",
+    "logo_url": "/map-logos/connect-jk_logo_url.svg",
+    "link": "https://acpo.com.br/empreendimentos/connect-jk",
+    "logo_bg_color": "#37595f",
+    "image_url": "/empreendimentos/connect-jk.webp"
+  },
+  {
+    "id": "sede-administrativa",
+    "name": "Sede Administrativa ACPO",
+    "city": "Pelotas",
+    "status": "SEDE",
+    "address": "Rua Siqueira Campos, 289, Centro, Pelotas, RS, Brazil",
+    "short_address": "Rua Siqueira Campos, 289",
+    "coordinates": {
+      "lat": -31.7759968,
+      "lng": -52.3568454
+    },
+    "logo_url": "/map-logos/acpo.png",
+    "logo_bg_color": "#ffffff",
+    "image_url": "/empreendimentos/sede-administrativa.webp"
+  }
+]
