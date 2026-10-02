@@ -14,6 +14,7 @@ import { exportLunchListPdf } from "./lunchListPdf";
 import { MonthlyBenefitsTab } from "./MonthlyBenefitsTab";
 import { PharmacyBenefitsTab } from "./PharmacyBenefitsTab";
 import { buildVrCutList } from "./lib/vrCutList";
+import { buscarTudo } from "@/lib/paginacao";
 import {
   Download,
   Utensils,
@@ -95,18 +96,21 @@ export default function BeneficiosPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     // Fetch todos os funcionários para análise de ativos (inclusão) e desligados (corte)
-    const { data: emps } = await supabase
-      // `employees`, não a view `colaboradores`: o corte é justamente de quem saiu, e a view
-      // esconde `Desligado`.
-      // ponytail: sem paginação; o PostgREST corta em 1.000 linhas. Passando disso, paginar.
+    // `employees`, não a view `colaboradores`: o corte é justamente de quem saiu, e a view
+    // esconde `Desligado`. Paginado nas duas: o PostgREST corta em 1.000 linhas sem avisar,
+    // e `employee_benefits` já passou disso — o benefício de quem saiu ficava de fora.
+    const emps = await buscarTudo<Record<string, unknown>>((de, ate) => supabase
       .from("employees")
       .select(`id, name, status, admission_date, cost_center, sectors(name), workplaces!employees_workplace_id_fkey(type)`)
-      .not("admission_date", "is", null);
+      .not("admission_date", "is", null)
+      .order("id")
+      .range(de, ate));
 
-    // Fetch benefícios ativos
-    const { data: bens } = await supabase
+    const bens = await buscarTudo<Record<string, unknown>>((de, ate) => supabase
       .from("employee_benefits")
-      .select("id, employee_id, benefit_name, value");
+      .select("id, employee_id, benefit_name, value")
+      .order("id")
+      .range(de, ate));
 
     // Fetch ignorações cadastradas em benefit_ignores
     const { data: igs } = await supabase
