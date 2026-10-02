@@ -1004,52 +1004,49 @@ function ColaboradoresPageInner() {
     }
   };
 
-  const exportBirthdaysCsv = () => {
-    if (birthdaysThisMonth.length === 0) return;
-    const headers = ["Colaborador", "Cargo", "Departamento", "Dia do Aniversário", "Idade Atual", "Data de Nascimento"];
-    const csvCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-    const rows = birthdaysThisMonth.map(({ employee, info }) => [
-      csvCell(employee.name),
-      csvCell(employee.role),
-      csvCell(employee.departments?.name || employee.unit || employee.workplace),
-      csvCell(info.day.toString().padStart(2, "0")),
-      csvCell(differenceInYears(new Date(), info.date)),
-      csvCell(info.date.toLocaleDateString("pt-BR", { timeZone: "UTC" })),
-    ].join(","));
-
-    const blob = new Blob(["\uFEFF" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `aniversariantes_${MONTHS[selectedMonth]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+  // .xlsx de verdade, não CSV: o Excel em pt-BR separa CSV por ";" e jogava a linha
+  // inteira na coluna A. Import dinâmico para a lib só carregar quando alguém exporta.
+  const baixarXlsx = async (arquivo: string, aba: string, linhas: Record<string, string | number>[]) => {
+    const XLSX = await import("xlsx");
+    const planilha = XLSX.utils.json_to_sheet(linhas);
+    const colunas = Object.keys(linhas[0]);
+    planilha["!cols"] = colunas.map((c) => ({
+      wch: Math.min(50, Math.max(c.length, ...linhas.map((l) => String(l[c]).length)) + 2),
+    }));
+    planilha["!autofilter"] = { ref: planilha["!ref"]! };
+    const pasta = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(pasta, planilha, aba);
+    XLSX.writeFile(pasta, arquivo);
   };
 
-  const exportWorkAnniversariesCsv = () => {
-    if (workAnniversariesThisMonth.length === 0) return;
-    const headers = ["Colaborador", "Cargo", "Departamento", "Dia do Aniversário de Casa", "Anos de Casa", "Na Empresa Desde"];
-    const csvCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-    const rows = workAnniversariesThisMonth.map(({ employee, info }) => [
-      csvCell(employee.name),
-      csvCell(employee.role),
-      csvCell(employee.departments?.name || employee.unit || employee.workplace),
-      csvCell(info.day.toString().padStart(2, "0")),
-      csvCell(info.years),
-      csvCell(info.date.toLocaleDateString("pt-BR")),
-    ].join(","));
+  const obraOuSede = (employee: Employee) => String(employee.workplaces?.name || employee.unit || employee.workplace || "");
 
-    const blob = new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `tempo_de_casa_${MONTHS[selectedMonth]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+  const exportBirthdaysXlsx = () => {
+    if (birthdaysThisMonth.length === 0) return;
+    return baixarXlsx(`aniversariantes_${MONTHS[selectedMonth]}.xlsx`, "Aniversariantes",
+      birthdaysThisMonth.map(({ employee, info }) => ({
+        "Dia": info.day,
+        "Colaborador": employee.name,
+        "Cargo": employee.role || "",
+        "Obra/Sede": obraOuSede(employee),
+        "Departamento": employee.departments?.name || "",
+        "Idade": differenceInYears(new Date(), info.date),
+        "Data de Nascimento": info.date.toLocaleDateString("pt-BR", { timeZone: "UTC" }),
+      })));
+  };
+
+  const exportWorkAnniversariesXlsx = () => {
+    if (workAnniversariesThisMonth.length === 0) return;
+    return baixarXlsx(`tempo_de_casa_${MONTHS[selectedMonth]}.xlsx`, "Tempo de Casa",
+      workAnniversariesThisMonth.map(({ employee, info }) => ({
+        "Dia": info.day,
+        "Colaborador": employee.name,
+        "Cargo": employee.role || "",
+        "Obra/Sede": obraOuSede(employee),
+        "Departamento": employee.departments?.name || "",
+        "Anos de Casa": info.years,
+        "Na Empresa Desde": info.date.toLocaleDateString("pt-BR"),
+      })));
   };
 
   const roleSalaryEntries = salaryRules.filter(
@@ -1465,7 +1462,7 @@ function ColaboradoresPageInner() {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-base font-semibold flex items-center gap-2"><Cake className="h-4 w-4 text-pink-500" /> Aniversário de Vida</h3>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={exportBirthdaysCsv} disabled={birthdaysThisMonth.length === 0}>
+                  <Button size="sm" variant="outline" onClick={exportBirthdaysXlsx} disabled={birthdaysThisMonth.length === 0}>
                     <Download className="mr-2 h-4 w-4" />
                     Excel
                   </Button>
@@ -1527,7 +1524,7 @@ function ColaboradoresPageInner() {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-base font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4 text-blue-500" /> Tempo de Casa</h3>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={exportWorkAnniversariesCsv} disabled={workAnniversariesThisMonth.length === 0}>
+                  <Button size="sm" variant="outline" onClick={exportWorkAnniversariesXlsx} disabled={workAnniversariesThisMonth.length === 0}>
                     <Download className="mr-2 h-4 w-4" />
                     Excel
                   </Button>
