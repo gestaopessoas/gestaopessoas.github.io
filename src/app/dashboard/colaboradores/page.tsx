@@ -1469,6 +1469,7 @@ function ColaboradoresPageInner() {
                   <Button size="sm" variant="outline" onClick={() => exportBirthdaysPdf(MONTHS[selectedMonth], birthdaysThisMonth.map(b => ({
                     name: b.employee.name,
                     role: String(b.employee.role || "-"),
+                    workplace: obraOuSede(b.employee) || "-",
                     day: b.info.day,
                     age: differenceInYears(new Date(), b.info.date),
                     birthDateStr: b.info.date.toLocaleDateString("pt-BR", { timeZone: "UTC" })
@@ -1531,6 +1532,7 @@ function ColaboradoresPageInner() {
                   <Button size="sm" variant="outline" onClick={() => exportWorkAnniversariesPdf(MONTHS[selectedMonth], workAnniversariesThisMonth.map(({ employee, info }) => ({
                     name: employee.name,
                     role: String(employee.role || "-"),
+                    workplace: obraOuSede(employee) || "-",
                     day: info.day,
                     years: info.years,
                     sinceDateStr: info.date.toLocaleDateString("pt-BR")

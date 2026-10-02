@@ -4,6 +4,7 @@ import autoTable, { type Styles } from "jspdf-autotable";
 export type BirthdayData = {
   name: string;
   role: string;
+  workplace: string;
   day: number;
   age: number;
   birthDateStr: string;
@@ -12,6 +13,7 @@ export type BirthdayData = {
 export type WorkAnniversaryData = {
   name: string;
   role: string;
+  workplace: string;
   day: number;
   years: number;
   sinceDateStr: string;
@@ -119,18 +121,20 @@ export const exportBirthdaysPdf = (monthName: string, birthdays: BirthdayData[])
   exportMonthListPdf({
     title: `ANIVERSARIANTES DE ${monthName.toUpperCase()}`,
     listTitle: "LISTA DE ANIVERSARIANTES",
-    head: ["Dia", "Colaborador", "Cargo", "Idade"],
+    head: ["Dia", "Colaborador", "Cargo", "Obra/Sede", "Idade"],
     body: birthdays.map((b) => [
       b.day.toString().padStart(2, "0"),
       b.name,
       b.role,
+      b.workplace,
       b.age.toString(),
     ]),
     columnStyles: {
-      0: { cellWidth: 15, halign: "center" }, // Dia
-      1: { cellWidth: 70 }, // Colaborador
-      2: { cellWidth: 77 }, // Cargo
-      3: { cellWidth: 15, halign: "center" }, // Idade
+      0: { cellWidth: 13, halign: "center" }, // Dia
+      1: { cellWidth: 62 }, // Colaborador
+      2: { cellWidth: 52 }, // Cargo
+      3: { cellWidth: 42 }, // Obra/Sede
+      4: { cellWidth: 13, halign: "center" }, // Idade
     },
     fileName: `aniversariantes_${monthName}.pdf`,
   });
@@ -139,20 +143,22 @@ export const exportWorkAnniversariesPdf = (monthName: string, anniversaries: Wor
   exportMonthListPdf({
     title: `TEMPO DE CASA DE ${monthName.toUpperCase()}`,
     listTitle: "ANIVERSARIANTES DE TEMPO DE CASA",
-    head: ["Dia", "Colaborador", "Cargo", "Desde", "Anos"],
+    head: ["Dia", "Colaborador", "Cargo", "Obra/Sede", "Desde", "Anos"],
     body: anniversaries.map((a) => [
       a.day.toString().padStart(2, "0"),
       a.name,
       a.role,
+      a.workplace,
       a.sinceDateStr,
       a.years.toString(),
     ]),
     columnStyles: {
-      0: { cellWidth: 15, halign: "center" }, // Dia
-      1: { cellWidth: 65 }, // Colaborador
-      2: { cellWidth: 57 }, // Cargo
-      3: { cellWidth: 25, halign: "center" }, // Desde
-      4: { cellWidth: 20, halign: "center" }, // Anos
+      0: { cellWidth: 12, halign: "center" }, // Dia
+      1: { cellWidth: 52 }, // Colaborador
+      2: { cellWidth: 44 }, // Cargo
+      3: { cellWidth: 38 }, // Obra/Sede
+      4: { cellWidth: 22, halign: "center" }, // Desde
+      5: { cellWidth: 14, halign: "center" }, // Anos
     },
     fileName: `tempo_de_casa_${monthName}.pdf`,
   });
