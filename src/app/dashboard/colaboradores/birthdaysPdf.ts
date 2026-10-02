@@ -31,134 +31,178 @@ const getBase64ImageFromUrl = async (imageUrl: string): Promise<string> => {
 };
 
 const GOLD: [number, number, number] = [222, 170, 48];
+const GOLD_SOFT: [number, number, number] = [253, 246, 227];
+const GOLD_DARK: [number, number, number] = [160, 118, 20];
 const TITLE_TEXT: [number, number, number] = [43, 47, 51];
 const LABEL_TEXT: [number, number, number] = [75, 80, 87];
+const NO_WORKPLACE = "Sem obra/sede";
 
-// Mesmo papel timbrado para as duas listas do mês (vida e tempo de casa): só muda o
-// título, as colunas e o nome do arquivo.
-const exportMonthListPdf = async ({ title, listTitle, head, body, columnStyles, fileName }: {
+const anos = (n: number) => `${n} ${n === 1 ? "ano" : "anos"}`;
+
+// Mesmo papel timbrado para as duas listas do mês (vida e tempo de casa), uma página por
+// obra/sede para cada encarregado receber só a sua. Obra com lista longa continua na página
+// seguinte com o mesmo cabeçalho. A última coluna é sempre a de destaque (idade / tempo).
+const exportPerWorkplacePdf = async <T extends { workplace: string; day: number }>({
+  monthName, title, subtitle, head, row, columnStyles, highlight, fileName, items,
+}: {
+  monthName: string;
   title: string;
-  listTitle: string;
+  subtitle: (count: number, month: string) => string;
   head: string[];
-  body: string[][];
+  row: (item: T) => string[];
   columnStyles: Record<number, Partial<Styles>>;
+  highlight: (item: T) => boolean;
   fileName: string;
+  items: T[];
 }) => {
   const doc = new jsPDF("portrait");
+  const pageW = doc.internal.pageSize.width;
+  const pageH = doc.internal.pageSize.height;
+  const lastCol = head.length - 1;
 
+  let logo: string | null = null;
   try {
-    const logoBase64 = await getBase64ImageFromUrl("/logos/SEDE.png");
-    doc.addImage(logoBase64, "PNG", 14, 10, 45, 12);
+    logo = await getBase64ImageFromUrl("/logos/SEDE.png");
   } catch (err) {
     console.warn("Could not load logo for PDF:", err);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.setTextColor(GOLD[0], GOLD[1], GOLD[2]);
-    doc.text("//", 14, 20);
-    doc.setTextColor(TITLE_TEXT[0], TITLE_TEXT[1], TITLE_TEXT[2]);
-    doc.text("ACPO", 21, 20);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text("EMPREENDIMENTOS", 14, 24);
   }
 
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(TITLE_TEXT[0], TITLE_TEXT[1], TITLE_TEXT[2]);
-  doc.setFontSize(16);
-  doc.text(title, 196, 16, { align: "right" });
+  const groups = new Map<string, T[]>();
+  for (const item of [...items].sort((x, y) => x.day - y.day)) {
+    const key = item.workplace && item.workplace !== "-" ? item.workplace : NO_WORKPLACE;
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  const workplaces = [...groups.keys()].sort((x, y) =>
+    x === NO_WORKPLACE ? 1 : y === NO_WORKPLACE ? -1 : x.localeCompare(y, "pt-BR"));
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(LABEL_TEXT[0], LABEL_TEXT[1], LABEL_TEXT[2]);
-  doc.text("GESTÃO DE PESSOAS", 196, 21, { align: "right" });
+  const drawHeader = (workplace: string, count: number) => {
+    if (logo) doc.addImage(logo, "PNG", 14, 10, 45, 12);
+    else {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(...TITLE_TEXT);
+      doc.text("ACPO", 14, 19);
+    }
 
-  doc.setDrawColor(GOLD[0], GOLD[1], GOLD[2]);
-  doc.setLineWidth(0.5);
-  doc.line(14, 26, 196, 26);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.setTextColor(...TITLE_TEXT);
+    doc.text(title, pageW - 14, 15, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...LABEL_TEXT);
+    doc.text(`${monthName.toUpperCase()} · GESTÃO DE PESSOAS`, pageW - 14, 21, { align: "right" });
 
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(TITLE_TEXT[0], TITLE_TEXT[1], TITLE_TEXT[2]);
-  doc.setFontSize(14);
-  doc.text(listTitle, 105, 38, { align: "center" });
+    doc.setDrawColor(...GOLD);
+    doc.setLineWidth(0.6);
+    doc.line(14, 26, pageW - 14, 26);
 
-  autoTable(doc, {
-    startY: 45,
-    head: [head],
-    body,
-    theme: "plain",
-    styles: {
-      font: "helvetica",
-      fontSize: 10,
-      textColor: TITLE_TEXT,
-      lineColor: [201, 204, 206],
-      lineWidth: 0.1,
-    },
-    headStyles: {
-      fillColor: [244, 244, 244],
-      textColor: TITLE_TEXT,
-      fontStyle: "bold",
-    },
-    alternateRowStyles: {
-      fillColor: [250, 250, 250],
-    },
-    margin: { left: 14, right: 14 },
-    columnStyles,
-    didDrawPage: function (data) {
-      const str = "Página " + doc.getCurrentPageInfo().pageNumber;
-      doc.setFontSize(8);
-      doc.setTextColor(LABEL_TEXT[0], LABEL_TEXT[1], LABEL_TEXT[2]);
-      doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
+    // Faixa da obra: barra dourada + nome + quantos no mês
+    doc.setFillColor(...GOLD);
+    doc.rect(14, 33, 1.6, 13, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(17);
+    doc.setTextColor(...TITLE_TEXT);
+    doc.text(workplace, 19.5, 39.5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(...LABEL_TEXT);
+    doc.text(subtitle(count, monthName.toLowerCase()), 19.5, 45.5);
+  };
 
-      doc.setTextColor(GOLD[0], GOLD[1], GOLD[2]);
-      doc.text("ACPO-RH", 196, doc.internal.pageSize.height - 10, { align: "right" });
-    },
+  workplaces.forEach((workplace, i) => {
+    const rows = groups.get(workplace)!;
+    if (i > 0) doc.addPage();
+
+    autoTable(doc, {
+      startY: 54,
+      margin: { top: 54, left: 14, right: 14, bottom: 18 },
+      head: [head],
+      body: rows.map(row),
+      theme: "plain",
+      styles: {
+        font: "helvetica",
+        fontSize: 10,
+        textColor: TITLE_TEXT,
+        cellPadding: { top: 3.2, bottom: 3.2, left: 3, right: 3 },
+        lineColor: [226, 228, 230],
+        lineWidth: { bottom: 0.2 },
+        valign: "middle",
+      },
+      headStyles: {
+        fillColor: TITLE_TEXT,
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 9,
+        // borda da mesma cor do fundo, senão sobra fresta branca entre as células
+        lineColor: TITLE_TEXT,
+        lineWidth: 0.1,
+      },
+      columnStyles,
+      // Data redonda (5/10/15 anos de casa, 30/40/50 de idade) ganha fundo dourado claro
+      didParseCell: (data) => {
+        if (data.section === "body" && highlight(rows[data.row.index])) {
+          data.cell.styles.fillColor = GOLD_SOFT;
+          if (data.column.index === lastCol) data.cell.styles.textColor = GOLD_DARK;
+        }
+      },
+      didDrawPage: () => drawHeader(workplace, rows.length),
+    });
   });
+
+  // Rodapé no fim, quando o total de páginas já é conhecido
+  const total = doc.getNumberOfPages();
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p);
+    doc.setDrawColor(226, 228, 230);
+    doc.setLineWidth(0.2);
+    doc.line(14, pageH - 14, pageW - 14, pageH - 14);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...LABEL_TEXT);
+    doc.text(`Página ${p} de ${total}`, 14, pageH - 9);
+    doc.setTextColor(...GOLD);
+    doc.text("ACPO-RH", pageW - 14, pageH - 9, { align: "right" });
+  }
 
   doc.save(fileName);
 };
 
 export const exportBirthdaysPdf = (monthName: string, birthdays: BirthdayData[]) =>
-  exportMonthListPdf({
-    title: `ANIVERSARIANTES DE ${monthName.toUpperCase()}`,
-    listTitle: "LISTA DE ANIVERSARIANTES",
-    head: ["Dia", "Colaborador", "Cargo", "Obra/Sede", "Idade"],
-    body: birthdays.map((b) => [
-      b.day.toString().padStart(2, "0"),
-      b.name,
-      b.role,
-      b.workplace,
-      b.age.toString(),
-    ]),
+  exportPerWorkplacePdf({
+    monthName,
+    title: "ANIVERSARIANTES",
+    subtitle: (n, month) => `${n} ${n === 1 ? "aniversariante" : "aniversariantes"} em ${month}`,
+    head: ["Dia", "Colaborador", "Cargo", "Nascimento", "Idade"],
+    row: (b) => [b.day.toString().padStart(2, "0"), b.name, b.role, b.birthDateStr, anos(b.age)],
     columnStyles: {
-      0: { cellWidth: 13, halign: "center" }, // Dia
-      1: { cellWidth: 62 }, // Colaborador
-      2: { cellWidth: 52 }, // Cargo
-      3: { cellWidth: 42 }, // Obra/Sede
-      4: { cellWidth: 13, halign: "center" }, // Idade
+      0: { cellWidth: 14, halign: "center", fontStyle: "bold", textColor: GOLD_DARK }, // Dia
+      1: { cellWidth: 66, fontStyle: "bold" }, // Colaborador
+      2: { cellWidth: 54, textColor: LABEL_TEXT }, // Cargo
+      3: { cellWidth: 26, halign: "center", textColor: LABEL_TEXT }, // Nascimento
+      4: { cellWidth: 22, halign: "center", fontStyle: "bold" }, // Idade
     },
+    highlight: (b) => b.age % 10 === 0,
     fileName: `aniversariantes_${monthName}.pdf`,
+    items: birthdays,
   });
 
 export const exportWorkAnniversariesPdf = (monthName: string, anniversaries: WorkAnniversaryData[]) =>
-  exportMonthListPdf({
-    title: `TEMPO DE CASA DE ${monthName.toUpperCase()}`,
-    listTitle: "ANIVERSARIANTES DE TEMPO DE CASA",
-    head: ["Dia", "Colaborador", "Cargo", "Obra/Sede", "Desde", "Anos"],
-    body: anniversaries.map((a) => [
-      a.day.toString().padStart(2, "0"),
-      a.name,
-      a.role,
-      a.workplace,
-      a.sinceDateStr,
-      a.years.toString(),
-    ]),
+  exportPerWorkplacePdf({
+    monthName,
+    title: "TEMPO DE CASA",
+    subtitle: (n, month) =>
+      `${n} ${n === 1 ? "colaborador completa" : "colaboradores completam"} tempo de casa em ${month}`,
+    head: ["Dia", "Colaborador", "Cargo", "Desde", "Tempo"],
+    row: (a) => [a.day.toString().padStart(2, "0"), a.name, a.role, a.sinceDateStr, anos(a.years)],
     columnStyles: {
-      0: { cellWidth: 12, halign: "center" }, // Dia
-      1: { cellWidth: 52 }, // Colaborador
-      2: { cellWidth: 44 }, // Cargo
-      3: { cellWidth: 38 }, // Obra/Sede
-      4: { cellWidth: 22, halign: "center" }, // Desde
-      5: { cellWidth: 14, halign: "center" }, // Anos
+      0: { cellWidth: 14, halign: "center", fontStyle: "bold", textColor: GOLD_DARK }, // Dia
+      1: { cellWidth: 66, fontStyle: "bold" }, // Colaborador
+      2: { cellWidth: 54, textColor: LABEL_TEXT }, // Cargo
+      3: { cellWidth: 26, halign: "center", textColor: LABEL_TEXT }, // Desde
+      4: { cellWidth: 22, halign: "center", fontStyle: "bold" }, // Tempo
     },
+    highlight: (a) => a.years % 5 === 0,
     fileName: `tempo_de_casa_${monthName}.pdf`,
+    items: anniversaries,
   });
