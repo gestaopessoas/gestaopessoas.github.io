@@ -15,14 +15,12 @@ type Process = {
   effective_date: string | null; exam_date: string | null; sst_status: string | null; description: string | null;
   documentation: string | null; integration: string | null; domain_access: string | null;
   solides: string | null; accesses: string | null; esocial_aso: string | null; esocial_amb: string | null;
-  status: string | null;
 };
 
 const emptyForm = {
   process_type: "Contratação", process_date: "", employee_name: "", role: "", contract_type: "",
   location: "", sector: "", effective_date: "", exam_date: "", sst_status: "", description: "",
-  documentation: "", integration: "", domain_access: "", solides: "", accesses: "", esocial_aso: "", esocial_amb: "",
-  status: "Pendente"
+  documentation: "", integration: "", domain_access: "", solides: "", accesses: "", esocial_aso: "", esocial_amb: ""
 };
 
 export default function RgsPage() {
@@ -35,7 +33,6 @@ export default function RgsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [type, setType] = useState("Todos");
-  const [status, setStatus] = useState("Todos");
   const [selectedMonth, setSelectedMonth] = useState(""); // YYYY-MM
   // desc = mais recentes primeiro; a preferência salva já vale no primeiro render
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">(() => {
@@ -79,14 +76,13 @@ export default function RgsPage() {
   
   const filtered = rows.filter((row) =>
     (type === "Todos" || row.process_type === type) &&
-    (status === "Todos" || row.status === status) &&
     (!selectedMonth || (row.process_date && row.process_date.startsWith(selectedMonth))) &&
     (row.employee_name ?? "").toLowerCase().includes(query.toLowerCase())
   );
 
   const exportToCsv = () => {
     if (filtered.length === 0) return;
-    const headers = ["Data", "Processo", "Colaborador", "Cargo", "Local", "Setor", "Vigência", "Status"];
+    const headers = ["Data", "Processo", "Colaborador", "Cargo", "Local", "Setor", "Vigência"];
     const exportRows = filtered.map(r => [
       `"${r.process_date ? new Date(`${r.process_date}T00:00:00`).toLocaleDateString('pt-BR') : ''}"`, 
       `"${r.process_type || ''}"`, 
@@ -94,8 +90,7 @@ export default function RgsPage() {
       `"${r.role || ''}"`, 
       `"${r.location || ''}"`, 
       `"${r.sector || ''}"`, 
-      `"${r.effective_date ? new Date(`${r.effective_date}T00:00:00`).toLocaleDateString('pt-BR') : ''}"`, 
-      `"${r.status || ''}"`
+      `"${r.effective_date ? new Date(`${r.effective_date}T00:00:00`).toLocaleDateString('pt-BR') : ''}"`
     ].join(","));
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...exportRows].join("\n");
     const encodedUri = encodeURI(csvContent);
@@ -119,7 +114,7 @@ export default function RgsPage() {
       role: row.role ?? "", contract_type: row.contract_type ?? "", location: row.location ?? "", sector: row.sector ?? "",
       effective_date: row.effective_date ?? "", exam_date: row.exam_date ?? "", sst_status: row.sst_status ?? "", description: row.description ?? "",
       documentation: row.documentation ?? "", integration: row.integration ?? "", domain_access: row.domain_access ?? "", solides: row.solides ?? "",
-      accesses: row.accesses ?? "", esocial_aso: row.esocial_aso ?? "", esocial_amb: row.esocial_amb ?? "", status: row.status ?? "Pendente"
+      accesses: row.accesses ?? "", esocial_aso: row.esocial_aso ?? "", esocial_amb: row.esocial_amb ?? ""
     });
     setShowForm(true);
   };
@@ -135,12 +130,6 @@ export default function RgsPage() {
       : await supabase.from("rgs_processes").insert(payload);
     setSaving(false);
     if (saveError) setError(saveError.message); else { closeForm(); void load(); }
-  };
-
-  const toggle = async (row: Process) => {
-    const next = row.status === "Concluído" ? "Pendente" : "Concluído";
-    const { error: saveError } = await createClient().from("rgs_processes").update({ status: next }).eq("id", row.id);
-    if (saveError) setError(saveError.message); else void load();
   };
 
   return (
@@ -201,7 +190,6 @@ export default function RgsPage() {
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar colaborador" className="pl-9" />
         </div>
         <Filter value={type} onChange={setType} options={["Todos", ...types]} />
-        <Filter value={status} onChange={setStatus} options={["Todos", "Pendente", "Concluído"]} />
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground ml-2">Mês:</span>
           <Input 
@@ -232,7 +220,7 @@ export default function RgsPage() {
               <th className="p-3">Checklists (Sistemas)</th>
               <th className="p-3">SST & eSocial</th>
               <th className="p-3 max-w-[200px]">Descrição</th>
-              <th className="p-3 text-center">Status</th>
+              <th className="p-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -284,9 +272,6 @@ export default function RgsPage() {
                 </td>
                 <td className="p-3 text-center">
                   <div className="flex items-center justify-center gap-2">
-                    <Button size="sm" variant={row.status === "Concluído" ? "outline" : "default"} onClick={() => toggle(row)}>
-                      {row.status ?? "Pendente"}
-                    </Button>
                     {isAdmin && (
                       <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(row)} title="Editar (admin)" aria-label="Editar processo">
                         <Pencil className="h-4 w-4 text-muted-foreground" />

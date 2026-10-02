@@ -12,13 +12,6 @@ export type TrialNotification = {
   isWarning: boolean;
 };
 
-export type RgsNotification = {
-  id: string;
-  name: string;
-  type: string;
-  daysPending: number;
-};
-
 export type MonthlyBenefitNotification = {
   id: string;
   name: string;
@@ -33,7 +26,6 @@ export type PendingProfileNotification = {
 
 export type UserPreferences = {
   trial: boolean;
-  rgs: boolean;
   benefits: boolean;
   profile: boolean;
 };
@@ -47,7 +39,6 @@ export type NotificationSummary = {
   pending_leads: number;
   profiles: Section<PendingProfileNotification>;
   trial: Section<TrialNotification>;
-  rgs: Section<RgsNotification>;
   benefits: { inclusions: number; cuts: number };
   monthly: Section<MonthlyBenefitNotification>;
 };
@@ -59,7 +50,6 @@ export const EMPTY_NOTIFICATION_SUMMARY: NotificationSummary = {
   pending_leads: 0,
   profiles: emptySection(),
   trial: emptySection(),
-  rgs: emptySection(),
   benefits: { inclusions: 0, cuts: 0 },
   monthly: emptySection(),
 };

@@ -749,7 +749,6 @@ function ColaboradoresPageInner() {
           employee_name: payload.name,
           role: payload.role,
           location: payload.workplace_id ? workplaces.find(w => w.id === payload.workplace_id)?.name || null : null,
-          status: "Pendente",
         });
       }
     }

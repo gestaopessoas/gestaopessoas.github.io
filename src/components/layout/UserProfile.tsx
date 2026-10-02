@@ -92,7 +92,7 @@ export function UserProfile() {
   const [savingPassword, setSavingPassword] = useState(false);
 
   // Preferências de Notificação
-  const [preferences, setPreferences] = useState({ trial: true, rgs: true, benefits: true, profile: true });
+  const [preferences, setPreferences] = useState({ trial: true, benefits: true, profile: true });
   const [savingPrefs, setSavingPrefs] = useState(false);
 
   const limparSenha = useCallback(() => {
@@ -162,7 +162,7 @@ export function UserProfile() {
 
       const p = prefs.data;
       if (p) {
-        setPreferences({ trial: p.notify_trial, rgs: p.notify_rgs, benefits: p.notify_benefits, profile: p.notify_profile });
+        setPreferences({ trial: p.notify_trial, benefits: p.notify_benefits, profile: p.notify_profile });
         if (p.availability_status) setUserStatus(p.availability_status);
         if (p.bio) setUserBio(p.bio);
       }
@@ -195,7 +195,6 @@ export function UserProfile() {
     const { error: updateError } = await createClient().from("profile_preferences").upsert({
       profile_id: userId,
       notify_trial: preferences.trial,
-      notify_rgs: preferences.rgs,
       notify_benefits: preferences.benefits,
       notify_profile: preferences.profile,
       availability_status: userStatus,
@@ -249,7 +248,6 @@ export function UserProfile() {
     const { error: prefError } = await supabase.from("profile_preferences").upsert({
       profile_id: userId,
       notify_trial: preferences.trial,
-      notify_rgs: preferences.rgs,
       notify_benefits: preferences.benefits,
       notify_profile: preferences.profile,
       // Sem colaborador vinculado, cargo e telefone continuam morando aqui, como antes.
@@ -560,16 +558,6 @@ export function UserProfile() {
                     <p className="text-xs text-muted-foreground">Alertas sobre colaboradores atingindo 30, 45 ou 90 dias de contrato.</p>
                   </div>
                   <Switch checked={preferences.trial} onCheckedChange={(c) => setPreferences({...preferences, trial: c})} />
-                </div>
-
-                <div className="flex items-center justify-between pt-3 pb-3">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-semibold flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-blue-500" /> RGS Pendentes & Autorizações
-                    </Label>
-                    <p className="text-xs text-muted-foreground">Notifica quando há novas Requisições de Gestão de Serviço em aberto.</p>
-                  </div>
-                  <Switch checked={preferences.rgs} onCheckedChange={(c) => setPreferences({...preferences, rgs: c})} />
                 </div>
 
                 <div className="flex items-center justify-between pt-3 pb-3">

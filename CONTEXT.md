@@ -160,4 +160,5 @@ Termos usados no código que ainda não têm definição acordada. Não invente 
 resolva com o time e mova para cima.
 
 - **RGS** — módulo `/dashboard/rgs`, tabela `rgs_processes`. A sigla não está expandida
-  em lugar nenhum do código.
+  em lugar nenhum do código. É só registro: não tem status Pendente/Concluído nem aviso no
+  sino (removidos em 2026-10-02).

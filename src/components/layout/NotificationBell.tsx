@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Bell, UserX, AlertTriangle, Briefcase, ChevronRight, HeartPulse, DollarSign } from "lucide-react";
+import { Bell, UserX, Briefcase, ChevronRight, HeartPulse, DollarSign } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import {
@@ -70,7 +70,6 @@ export function NotificationBell() {
   // usa a contagem, as listas usam os itens.
   const pendingProfiles = summary.profiles.items;
   const trialNotifications = summary.trial.items;
-  const rgsNotifications = summary.rgs.items;
   const monthlyBenefitNotifications = summary.monthly.items;
   const pendingLeads = summary.pending_leads;
   const inclusionsCount = summary.benefits.inclusions;
@@ -79,7 +78,6 @@ export function NotificationBell() {
 
   const totalCount =
     summary.trial.count +
-    summary.rgs.count +
     benefitCount +
     summary.monthly.count +
     summary.profiles.count +
@@ -224,36 +222,6 @@ export function NotificationBell() {
                         </div>
                       </button>
                     )}
-                  </div>
-                </div>
-              )}
-
-              {/* RGS Pendentes */}
-              {summary.rgs.count > 0 && (
-                <div className="border-b last:border-b-0 pb-2">
-                  <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-3 py-2 flex items-center justify-between z-10 border-b">
-                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> RGS Pendentes
-                    </h3>
-                    <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{summary.rgs.count}</span>
-                  </div>
-                  <div className="px-2 pt-2 flex flex-col gap-1">
-                    {rgsNotifications.map(n => (
-                      <button 
-                        key={n.id} 
-                        onClick={() => { setIsOpen(false); router.push("/dashboard/rgs"); }}
-                        className="flex flex-col gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted text-left w-full group"
-                      >
-                        <div className="flex justify-between items-start">
-                          <span className="font-medium text-foreground">{n.name}</span>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                        <div className="flex items-center justify-between text-xs mt-0.5">
-                          <span className="text-muted-foreground">{n.type}</span>
-                          <span className="text-amber-600 font-medium">Há {n.daysPending} dias</span>
-                        </div>
-                      </button>
-                    ))}
                   </div>
                 </div>
               )}

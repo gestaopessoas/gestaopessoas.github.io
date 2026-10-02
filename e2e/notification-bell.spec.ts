@@ -37,7 +37,7 @@ test.describe('Sino de notificações', () => {
       pending_leads: expect.any(Number),
       benefits: { inclusions: expect.any(Number), cuts: expect.any(Number) },
     });
-    for (const key of ['profiles', 'trial', 'rgs', 'monthly'] as const) {
+    for (const key of ['profiles', 'trial', 'monthly'] as const) {
       expect(summary[key].count).toEqual(expect.any(Number));
       expect(Array.isArray(summary[key].items)).toBe(true);
       expect(summary[key].items.length).toBeLessThanOrEqual(summary[key].count);
