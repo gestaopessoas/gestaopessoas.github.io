@@ -77,3 +77,12 @@ verify-permissions.mjs
 # Dumps e seeds com dado pessoal: este repositorio e publico.
 # A copia local fica fora do versionamento (ver docs/manutencao.md).
 prints/
+
+# Scripts avulsos e relatorios gerados na raiz: relatorio tem dado de colaborador
+# e este repositorio e publico.
+/geocode*.py
+/geocoded.json
+/empreendimentos_map.json
+/projects*.json
+/scratch_*.js
+/relatorio_*
