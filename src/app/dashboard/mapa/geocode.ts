@@ -2,8 +2,12 @@ import type { Address } from "./people";
 
 // Texto legível enviado ao Nominatim. Partes vazias ficam de fora; endereço com menos de
 // 5 caracteres não é localizável e a pessoa não entra no mapa.
+// Limpa o que o Nominatim não entende: "(LOT DUNAS)", "Rua R X", "Passeio X", "Rua RUA X".
+const cleanStreet = (s?: string | null) =>
+  (s ?? "").replace(/\(.*?\)/g, "").trim().replace(/^(rua r|rua rua|outro rua|passeio)\s+/i, "Rua ");
+
 export function addressQuery(p: Address): string | null {
-  const street = [p.address, p.address_number].filter((v) => v?.trim()).join(" ");
+  const street = [cleanStreet(p.address), p.address_number].filter((v) => v?.trim()).join(" ");
   if (street.trim().length < 5) return null;
   return [street, p.city, p.state, "Brasil"].filter((v) => v?.trim()).join(", ").replace(/\s+/g, " ").trim();
 }
