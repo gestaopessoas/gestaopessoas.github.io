@@ -30,6 +30,7 @@ import { buscarTudo } from "@/lib/paginacao";
 import { EmployeeAvatar, signedPhotoUrl } from "@/components/EmployeeAvatar";
 import { PhotoCropper, type CropPercent } from "@/components/PhotoCropper";
 import { birthdayPhotoMessage, whatsappLink } from "@/lib/birthdayInvite.mjs";
+import { maskAddressNumber, maskCep, maskUf } from "@/lib/masks";
 
 type SalaryRule = { id: string; role_name: string; modality: string; level: string | null; seniority: string | null; salary: number | null; uses_level: boolean; salary_experience: number | null; salary_after_probation: number | null };
 type TrialPeriod = { id: string; name: string; daysRemaining: number; endDate: string; isWarning: boolean; isOverdue: boolean };
@@ -111,7 +112,8 @@ const embedBeneficio = (filtros: AdvancedFilters) =>
   filtros.benefit ? ", employee_benefits!inner(benefit_name, active)" : "";
 
 const fields = [
-  "id", "name", "registered_name", "pharmacy_card", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "contract_end_date", "company_anniversary", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission", "photo_path", "photo_crop"
+  "id", "name", "registered_name", "pharmacy_card", "registration_number", "ficha", "profile_code", "department_id", "sector_id", "rhid_code", "birthday", "status", "dismissed_at", "role", "phone", "email_personal", "email_corporate", "contract_type", "admission_date", "contract_end_date", "company_anniversary", "shirt_size", "boot_size", "gender", "cpf", "rg", "ctps", "ctps_serie", "pis", "marital_status", "cbo", "aso_date", "observation", "level", "senioridade", "company_id", "cost_center_id", "workplace_id", "work_schedule_start_1", "work_schedule_end_1", "work_schedule_start_2", "work_schedule_end_2", "weekly_hours", "work_days", "base_salary", "variable_salary", "commission", "photo_path", "photo_crop",
+  "cep", "address", "address_number", "address_complement", "neighborhood", "city", "state"
 ].join(", ");
 
 const emptyForm = {
@@ -121,7 +123,8 @@ const emptyForm = {
   gender: "", cpf: "", rg: "", ctps: "", ctps_serie: "", pis: "", pharmacy_card: "", marital_status: "",
   cbo: "", aso_date: "", observation: "", company_id: "", cost_center_id: "", workplace_id: "",
   work_schedule_start_1: "", work_schedule_end_1: "", work_schedule_start_2: "", work_schedule_end_2: "", weekly_hours: "", work_days: "",
-  base_salary: "", variable_salary: "", commission: ""
+  base_salary: "", variable_salary: "", commission: "",
+  cep: "", address: "", address_number: "", address_complement: "", neighborhood: "", city: "", state: ""
 };
 
 type EmployeeForm = typeof emptyForm;
@@ -161,6 +164,7 @@ const canonicalizeEmployeeForm = (employee: Employee) => {
   next.marital_status = canonicalizeOption(next.marital_status, maritalStatusOptions);
   next.status = canonicalizeOption(next.status, statusOptions);
   for (const field of ["base_salary", "variable_salary", "commission"] as const) if (next[field]) next[field] = formatCurrencyInput(next[field]);
+  next.cep = maskCep(next.cep);
   return next;
 };
 
@@ -409,6 +413,28 @@ function ColaboradoresPageInner() {
       } else {
         alert("Nenhum código encontrado.");
       }
+    }
+  };
+
+  // O aviso guarda de qual CEP ele é: trocar de ficha ou de CEP o esconde sem precisar limpar.
+  const [cepStatus, setCepStatus] = useState({ cep: "", msg: "" });
+  // Mesma consulta da candidatura pública. Só preenche o que o ViaCEP devolveu; o resto
+  // fica como estava, para não apagar o que o RH já digitou.
+  const lookupCep = async (digits: string) => {
+    setCepStatus({ cep: digits, msg: "Buscando..." });
+    try {
+      const data = await (await fetch(`https://viacep.com.br/ws/${digits}/json/`)).json();
+      if (data.erro) { setCepStatus({ cep: digits, msg: "CEP não encontrado." }); return; }
+      setForm((current) => ({
+        ...current,
+        address: data.logradouro || current.address,
+        neighborhood: data.bairro || current.neighborhood,
+        city: data.localidade || current.city,
+        state: data.uf || current.state,
+      }));
+      setCepStatus({ cep: "", msg: "" });
+    } catch {
+      setCepStatus({ cep: digits, msg: "Não foi possível consultar o CEP. Preencha manualmente." });
     }
   };
 
@@ -664,7 +690,9 @@ function ColaboradoresPageInner() {
     payload.marital_status = canonicalizeOption(form.marital_status, maritalStatusOptions) || null;
     payload.status = canonicalizeOption(form.status, statusOptions);
     for (const field of ["base_salary", "variable_salary", "commission"]) payload[field] = parseCurrencyInput(form[field as keyof EmployeeForm]);
-    
+    // Banco guarda só dígitos, igual a `candidates`.
+    payload.cep = onlyDigits(form.cep) || null;
+
     // Efetivado (estágio → CLT) não carrega a data do contrato antigo.
     if (!FIXED_TERM_CONTRACTS.includes(form.contract_type)) payload.contract_end_date = null;
 
@@ -1222,6 +1250,22 @@ function ColaboradoresPageInner() {
               <Field label="Telefone"><Input inputMode="numeric" value={form.phone} onChange={(e) => update("phone", maskPhone(e.target.value))} placeholder="(00) 00000-0000" /></Field>
               <Field label="E-mail pessoal"><Input type="email" value={form.email_personal} onChange={(e) => update("email_personal", e.target.value)} /></Field>
               <Field label="E-mail corporativo"><Input type="email" value={form.email_corporate} onChange={(e) => update("email_corporate", e.target.value)} /></Field>
+            </Section>
+
+            <Section title="Endereço">
+              <Field label="CEP"><Input inputMode="numeric" placeholder="00000-000" value={form.cep} onChange={(e) => {
+                const masked = maskCep(e.target.value);
+                const digits = onlyDigits(masked);
+                // A máscara trava em 8 dígitos: sem comparar com o anterior, cada tecla extra consultaria de novo.
+                if (digits.length === 8 && digits !== onlyDigits(form.cep)) lookupCep(digits);
+                update("cep", masked);
+              }} />{cepStatus.msg && cepStatus.cep === onlyDigits(form.cep) && <p role="status" className="text-xs text-muted-foreground">{cepStatus.msg}</p>}</Field>
+              <Field label="Logradouro" span><Input value={form.address} onChange={(e) => update("address", e.target.value)} /></Field>
+              <Field label="Número"><Input value={form.address_number} onChange={(e) => update("address_number", maskAddressNumber(e.target.value))} placeholder="Ex.: 123 ou S/N" /></Field>
+              <Field label="Complemento"><Input value={form.address_complement} onChange={(e) => update("address_complement", e.target.value)} /></Field>
+              <Field label="Bairro"><Input value={form.neighborhood} onChange={(e) => update("neighborhood", e.target.value)} /></Field>
+              <Field label="Cidade"><Input value={form.city} onChange={(e) => update("city", e.target.value)} /></Field>
+              <Field label="UF"><Input maxLength={2} value={form.state} onChange={(e) => update("state", maskUf(e.target.value))} /></Field>
             </Section>
 
             <Section title="Vínculo e lotação">

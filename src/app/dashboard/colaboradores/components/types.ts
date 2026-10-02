@@ -41,6 +41,13 @@ export interface Employee extends Record<string, unknown> {
   contract_type?: string | null;
   admission_date?: string | null;
   contract_end_date?: string | null;
+  cep?: string | null;
+  address?: string | null;
+  address_number?: string | null;
+  address_complement?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
   company_anniversary?: string | null;
   shirt_size?: string | null;
   boot_size?: string | null;
